@@ -44,10 +44,16 @@ add_diagon_benchmark(SearchBenchmark
     SearchBenchmark.cpp
 )
 
+# ==================== SIMD Benchmarks ====================
+
+add_diagon_benchmark(SIMDBenchmark
+    SIMDBenchmark.cpp
+)
+
 # ==================== Combined Benchmark Target ====================
 
 add_custom_target(run_all_benchmarks
-    DEPENDS run_IndexingBenchmark run_SearchBenchmark
+    DEPENDS run_IndexingBenchmark run_SearchBenchmark run_SIMDBenchmark
     COMMENT "Running all benchmarks"
 )
 

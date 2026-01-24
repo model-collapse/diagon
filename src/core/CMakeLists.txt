@@ -53,6 +53,7 @@ set(DIAGON_CORE_SOURCES
     src/search/TopScoreDocCollector.cpp
     src/search/TermQuery.cpp
     src/search/IndexSearcher.cpp
+    src/search/BM25ScorerSIMD.cpp
 )
 
 set(DIAGON_CORE_HEADERS
@@ -224,17 +225,34 @@ endif()
 
 # ==================== Link Libraries ====================
 
-# Core utilities have no external dependencies (yet)
-# target_link_libraries(diagon_core
-#     PUBLIC
-#         ZLIB::ZLIB
-#         zstd::zstd
-#         LZ4::LZ4
-#     # TODO: Add when implemented
-#     # PRIVATE
-#     #     diagon_columns
-#     #     diagon_compression
-# )
+# Link compression libraries
+target_link_libraries(diagon_core
+    PUBLIC
+        ZLIB::ZLIB
+)
+
+if(TARGET zstd::zstd)
+    target_link_libraries(diagon_core PUBLIC zstd::zstd)
+else()
+    target_link_libraries(diagon_core PUBLIC ${ZSTD_LIBRARY})
+    target_include_directories(diagon_core PUBLIC ${ZSTD_INCLUDE_DIR})
+endif()
+
+if(TARGET LZ4::LZ4)
+    target_link_libraries(diagon_core PUBLIC LZ4::LZ4)
+else()
+    target_link_libraries(diagon_core PUBLIC ${LZ4_LIBRARY})
+    target_include_directories(diagon_core PUBLIC ${LZ4_INCLUDE_DIR})
+endif()
+
+# Define compression library availability
+if(HAVE_LZ4)
+    target_compile_definitions(diagon_core PUBLIC HAVE_LZ4)
+endif()
+
+if(HAVE_ZSTD)
+    target_compile_definitions(diagon_core PUBLIC HAVE_ZSTD)
+endif()
 
 # ==================== Compiler Features ====================
 

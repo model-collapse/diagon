@@ -112,3 +112,4 @@ add_diagon_test(SimpleFieldsProducerTest unit/codecs/SimpleFieldsProducerTest.cp
 add_diagon_test(SegmentReaderTest unit/index/SegmentReaderTest.cpp)
 add_diagon_test(DirectoryReaderTest unit/index/DirectoryReaderTest.cpp)
 add_diagon_test(IndexSearcherTest unit/search/IndexSearcherTest.cpp)
+add_diagon_test(BM25ScorerSIMDTest unit/search/BM25ScorerSIMDTest.cpp)
