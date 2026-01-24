@@ -144,6 +144,31 @@ int main() {
 }
 ```
 
+## Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+### Getting Started
+- **[Quick Start Guide](docs/guides/quick-start.md)** - Get started in 5 minutes
+- **[Indexing Guide](docs/guides/indexing.md)** - Learn how to index documents
+- **[Searching Guide](docs/guides/searching.md)** - Execute queries and filters
+- **[Performance Guide](docs/guides/performance.md)** - Optimize for speed and efficiency
+
+### API Reference
+- **[Core APIs](docs/api/core.md)** - IndexWriter, IndexReader, IndexSearcher
+- **[SIMD APIs](docs/api/simd.md)** - AVX2 accelerated BM25 scoring
+- **[Compression APIs](docs/api/compression.md)** - LZ4 and ZSTD codecs
+
+### Examples
+- **[Basic Indexing](docs/examples/basic-indexing.md)** - Indexing documents from various sources
+- **[Text Search](docs/examples/text-search.md)** - Full-text search examples
+- **[Hybrid Queries](docs/examples/hybrid-queries.md)** - Combine text search with filters
+
+### Additional Resources
+- **[Build Instructions](BUILD.md)** - Detailed build and dependency guide
+- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to Diagon
+- **[Design Documents](design/README.md)** - Architecture and design specifications
+
 ## Performance
 
 ### Benchmarks (AWS c5.2xlarge: 8 vCPU, 16GB RAM)
