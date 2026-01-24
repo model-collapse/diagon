@@ -196,6 +196,14 @@ if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
     )
 endif()
 
+# BM25ScorerSIMD needs AVX2 and FMA instructions
+if(DIAGON_ENABLE_SIMD AND HAVE_AVX2)
+    set_source_files_properties(
+        src/search/BM25ScorerSIMD.cpp
+        PROPERTIES COMPILE_FLAGS "-mavx2 -mfma"
+    )
+endif()
+
 # Alternative static library
 if(DIAGON_BUILD_STATIC)
     add_library(diagon_core_static STATIC ${DIAGON_CORE_SOURCES} ${DIAGON_CORE_HEADERS})
