@@ -53,7 +53,6 @@ set(DIAGON_CORE_SOURCES
     src/search/TopScoreDocCollector.cpp
     src/search/TermQuery.cpp
     src/search/IndexSearcher.cpp
-    src/search/BM25ScorerSIMD.cpp
 )
 
 set(DIAGON_CORE_HEADERS
@@ -183,6 +182,14 @@ set(DIAGON_CORE_HEADERS
     include/diagon/observability/Metrics.h
     include/diagon/observability/HealthCheck.h
 )
+
+# ==================== Conditional SIMD Sources ====================
+
+# Add SIMD sources only if SIMD is enabled and AVX2 is available
+if(DIAGON_ENABLE_SIMD AND HAVE_AVX2)
+    message(STATUS "Adding SIMD sources to build")
+    list(APPEND DIAGON_CORE_SOURCES src/search/BM25ScorerSIMD.cpp)
+endif()
 
 # ==================== Library Target ====================
 

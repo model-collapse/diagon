@@ -181,9 +181,9 @@ TEST_F(IndexReaderTest, LeafReaderLeaves) {
 
     auto leaves = reader->leaves();
     EXPECT_EQ(1, leaves.size());
-    EXPECT_EQ(reader.get(), leaves[0].reader());
-    EXPECT_EQ(0, leaves[0].docBase());
-    EXPECT_EQ(0, leaves[0].ord());
+    EXPECT_EQ(reader.get(), leaves[0].reader);
+    EXPECT_EQ(0, leaves[0].docBase);
+    EXPECT_EQ(0, leaves[0].ord);
 }
 
 TEST_F(IndexReaderTest, LeafReaderContext) {
@@ -194,7 +194,7 @@ TEST_F(IndexReaderTest, LeafReaderContext) {
 
     auto leaves = context->leaves();
     EXPECT_EQ(1, leaves.size());
-    EXPECT_EQ(reader.get(), leaves[0].reader());
+    EXPECT_EQ(reader.get(), leaves[0].reader);
 }
 
 // ==================== CompositeReader Tests ====================
@@ -245,19 +245,19 @@ TEST_F(IndexReaderTest, CompositeReaderLeaves) {
     EXPECT_EQ(3, leaves.size());
 
     // Check leaf 0
-    EXPECT_EQ(0, leaves[0].docBase());
-    EXPECT_EQ(0, leaves[0].ord());
-    EXPECT_EQ(100, leaves[0].reader()->maxDoc());
+    EXPECT_EQ(0, leaves[0].docBase);
+    EXPECT_EQ(0, leaves[0].ord);
+    EXPECT_EQ(100, leaves[0].reader->maxDoc());
 
     // Check leaf 1
-    EXPECT_EQ(100, leaves[1].docBase());  // Offset by first segment
-    EXPECT_EQ(1, leaves[1].ord());
-    EXPECT_EQ(200, leaves[1].reader()->maxDoc());
+    EXPECT_EQ(100, leaves[1].docBase);  // Offset by first segment
+    EXPECT_EQ(1, leaves[1].ord);
+    EXPECT_EQ(200, leaves[1].reader->maxDoc());
 
     // Check leaf 2
-    EXPECT_EQ(300, leaves[2].docBase());  // Offset by first + second
-    EXPECT_EQ(2, leaves[2].ord());
-    EXPECT_EQ(50, leaves[2].reader()->maxDoc());
+    EXPECT_EQ(300, leaves[2].docBase);  // Offset by first + second
+    EXPECT_EQ(2, leaves[2].ord);
+    EXPECT_EQ(50, leaves[2].reader->maxDoc());
 }
 
 TEST_F(IndexReaderTest, CompositeReaderGetSubReaders) {
@@ -299,14 +299,14 @@ TEST_F(IndexReaderTest, NestedCompositeReader) {
     auto leaves = outerComposite->leaves();
     EXPECT_EQ(3, leaves.size());
 
-    EXPECT_EQ(0, leaves[0].docBase());
-    EXPECT_EQ(0, leaves[0].ord());
+    EXPECT_EQ(0, leaves[0].docBase);
+    EXPECT_EQ(0, leaves[0].ord);
 
-    EXPECT_EQ(100, leaves[1].docBase());
-    EXPECT_EQ(1, leaves[1].ord());
+    EXPECT_EQ(100, leaves[1].docBase);
+    EXPECT_EQ(1, leaves[1].ord);
 
-    EXPECT_EQ(150, leaves[2].docBase());
-    EXPECT_EQ(2, leaves[2].ord());
+    EXPECT_EQ(150, leaves[2].docBase);
+    EXPECT_EQ(2, leaves[2].ord);
 }
 
 // ==================== Context Tests ====================
@@ -316,9 +316,9 @@ TEST_F(IndexReaderTest, LeafReaderContextConstruction) {
 
     LeafReaderContext ctx(reader.get(), 50, 2);
 
-    EXPECT_EQ(reader.get(), ctx.reader());
-    EXPECT_EQ(50, ctx.docBase());
-    EXPECT_EQ(2, ctx.ord());
+    EXPECT_EQ(reader.get(), ctx.reader);
+    EXPECT_EQ(50, ctx.docBase);
+    EXPECT_EQ(2, ctx.ord);
 }
 
 TEST_F(IndexReaderTest, LeafReaderContextDefaults) {
@@ -326,9 +326,9 @@ TEST_F(IndexReaderTest, LeafReaderContextDefaults) {
 
     LeafReaderContext ctx(reader.get());
 
-    EXPECT_EQ(reader.get(), ctx.reader());
-    EXPECT_EQ(0, ctx.docBase());
-    EXPECT_EQ(0, ctx.ord());
+    EXPECT_EQ(reader.get(), ctx.reader);
+    EXPECT_EQ(0, ctx.docBase);
+    EXPECT_EQ(0, ctx.ord);
 }
 
 TEST_F(IndexReaderTest, CompositeReaderContextCreation) {
@@ -410,8 +410,8 @@ TEST_F(IndexReaderTest, LargeCompositeReader) {
     EXPECT_EQ(100, leaves.size());
 
     // Check first and last leaf
-    EXPECT_EQ(0, leaves[0].docBase());
-    EXPECT_EQ(99000, leaves[99].docBase());
+    EXPECT_EQ(0, leaves[0].docBase);
+    EXPECT_EQ(99000, leaves[99].docBase);
 }
 
 TEST_F(IndexReaderTest, MultipleIncDecCycles) {
@@ -468,7 +468,7 @@ TEST_F(IndexReaderTest, ThreeLevelNesting) {
     auto leaves = level3->leaves();
     EXPECT_EQ(3, leaves.size());
 
-    EXPECT_EQ(0, leaves[0].docBase());
-    EXPECT_EQ(100, leaves[1].docBase());
-    EXPECT_EQ(300, leaves[2].docBase());
+    EXPECT_EQ(0, leaves[0].docBase);
+    EXPECT_EQ(100, leaves[1].docBase);
+    EXPECT_EQ(300, leaves[2].docBase);
 }
