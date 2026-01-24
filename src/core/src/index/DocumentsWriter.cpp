@@ -16,6 +16,8 @@ DocumentsWriter::DocumentsWriter(const Config& config, store::Directory* directo
     , directory_(directory) {}
 
 int DocumentsWriter::addDocument(const document::Document& doc) {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     // Add document to DWPT
     bool needsFlush = dwpt_->addDocument(doc);
     numDocsAdded_++;
@@ -31,12 +33,16 @@ int DocumentsWriter::addDocument(const document::Document& doc) {
 }
 
 int DocumentsWriter::flush() {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     // Flush current DWPT
     auto segmentInfo = maybeFlushdwpt();
     return segmentInfo ? 1 : 0;
 }
 
 void DocumentsWriter::reset() {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     // Reset DWPT
     dwpt_->reset();
 

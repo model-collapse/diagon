@@ -9,6 +9,7 @@
 #include "diagon/store/Directory.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -37,8 +38,8 @@ namespace index {
  * - Concurrent flushing
  *
  * Thread Safety:
- * - Phase 3: Single-threaded (no synchronization needed)
- * - Phase 4: Will add locks for multi-threaded access
+ * - Mutex protects all access to dwpt_ and internal state
+ * - Safe for concurrent addDocument() calls
  *
  * Usage:
  *   DocumentsWriter writer;
@@ -101,31 +102,46 @@ public:
     /**
      * Get total documents buffered in RAM
      */
-    int getNumDocsInRAM() const { return dwpt_->getNumDocsInRAM(); }
+    int getNumDocsInRAM() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return dwpt_->getNumDocsInRAM();
+    }
 
     /**
      * Get approximate bytes used
      */
-    int64_t bytesUsed() const { return dwpt_->bytesUsed(); }
+    int64_t bytesUsed() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return dwpt_->bytesUsed();
+    }
 
     /**
      * Get list of segment names created
      *
      * Returns segment names in creation order.
      */
-    const std::vector<std::string>& getSegments() const { return segmentNames_; }
+    std::vector<std::string> getSegments() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return segmentNames_;  // Return copy to avoid holding lock
+    }
 
     /**
      * Get list of SegmentInfo objects
      *
      * Returns SegmentInfo instances in creation order.
      */
-    const std::vector<std::shared_ptr<SegmentInfo>>& getSegmentInfos() const { return segments_; }
+    std::vector<std::shared_ptr<SegmentInfo>> getSegmentInfos() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return segments_;  // Return copy to avoid holding lock
+    }
 
     /**
      * Get total number of documents added
      */
-    int getNumDocsAdded() const { return numDocsAdded_; }
+    int getNumDocsAdded() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return numDocsAdded_;
+    }
 
     /**
      * Reset for reuse
@@ -136,7 +152,10 @@ public:
     /**
      * Check if flush is needed
      */
-    bool needsFlush() const { return dwpt_->needsFlush(); }
+    bool needsFlush() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return dwpt_->needsFlush();
+    }
 
 private:
     // Configuration
@@ -156,6 +175,9 @@ private:
 
     // Total documents added (across all segments)
     int numDocsAdded_{0};
+
+    // Mutex to protect concurrent access
+    mutable std::mutex mutex_;
 
     /**
      * Flush DWPT if it has documents

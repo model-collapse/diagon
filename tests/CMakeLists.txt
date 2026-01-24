@@ -73,6 +73,11 @@ add_diagon_test(BlockTreeTest unit/codecs/BlockTreeTest.cpp)
 # Column tests
 add_diagon_test(ColumnTest unit/columns/ColumnTest.cpp)
 
+# ColumnTest needs proper NaN handling, disable -ffast-math
+if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
+    target_compile_options(ColumnTest PRIVATE -fno-fast-math)
+endif()
+
 # Compression tests
 add_diagon_test(CompressionTest unit/compression/CompressionTest.cpp)
 

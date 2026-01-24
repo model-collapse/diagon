@@ -20,6 +20,9 @@ void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) 
         const std::string& fieldName = field->name();
         const auto& fieldType = field->fieldType();
 
+        // Ensure field exists (get or create)
+        fieldInfosBuilder_.getOrAdd(fieldName);
+
         // Update field metadata
         fieldInfosBuilder_.updateIndexOptions(fieldName, fieldType.indexOptions);
         fieldInfosBuilder_.updateDocValuesType(fieldName, fieldType.docValuesType);

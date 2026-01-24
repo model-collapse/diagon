@@ -193,10 +193,12 @@ FieldInfo* FieldInfosBuilder::getFieldInfo(const std::string& fieldName) {
 
 void FieldInfosBuilder::updateIndexOptions(const std::string& fieldName,
                                            IndexOptions indexOptions) {
-    // Get or create field
-    getOrAdd(fieldName);
-
+    // Field must exist - throw if not found
     auto it = byName_.find(fieldName);
+    if (it == byName_.end()) {
+        throw std::invalid_argument("Cannot update non-existent field: " + fieldName);
+    }
+
     FieldInfo& info = it->second;
 
     // Can only upgrade index options, not downgrade

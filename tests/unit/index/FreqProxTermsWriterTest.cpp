@@ -37,6 +37,9 @@ TEST(FieldInfosBuilderTest, DuplicateFieldName) {
 TEST(FieldInfosBuilderTest, UpdateIndexOptions) {
     FieldInfosBuilder builder;
 
+    // Create field first
+    builder.getOrAdd("title");
+
     // Start with DOCS
     builder.updateIndexOptions("title", IndexOptions::DOCS);
 
