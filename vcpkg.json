@@ -1,0 +1,19 @@
+{
+  "name": "diagon",
+  "version": "1.0.0",
+  "description": "C++ search engine combining Lucene and ClickHouse",
+  "dependencies": [
+    "zlib",
+    "zstd",
+    "lz4",
+    {
+      "name": "gtest",
+      "default-features": false
+    },
+    {
+      "name": "benchmark",
+      "default-features": false
+    }
+  ],
+  "builtin-baseline": "latest"
+}
