@@ -29,10 +29,32 @@ namespace fs = std::filesystem;
  */
 std::string generateRandomText(int numWords, std::mt19937& rng) {
     static const std::vector<std::string> words = {
-        "search", "engine", "index", "document", "query", "result", "score",
-        "lucene", "elasticsearch", "database", "algorithm", "data", "fast",
-        "performance", "benchmark", "optimization", "memory", "distributed",
-        "the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog"
+        "search",
+        "engine",
+        "index",
+        "document",
+        "query",
+        "result",
+        "score",
+        "lucene",
+        "elasticsearch",
+        "database",
+        "algorithm",
+        "data",
+        "fast",
+        "performance",
+        "benchmark",
+        "optimization",
+        "memory",
+        "distributed",
+        "the",
+        "quick",
+        "brown",
+        "fox",
+        "jumps",
+        "over",
+        "lazy",
+        "dog"
     };
 
     std::uniform_int_distribution<> dist(0, words.size() - 1);
