@@ -28,9 +28,7 @@ class MergeTreeIndexGranularityAdaptive : public IMergeTreeIndexGranularity {
 public:
     MergeTreeIndexGranularityAdaptive() = default;
 
-    size_t getMarksCount() const override {
-        return marks_rows_partial_sums_.size();
-    }
+    size_t getMarksCount() const override { return marks_rows_partial_sums_.size(); }
 
     size_t getMarkRows(size_t mark_index) const override {
         if (mark_index >= marks_rows_partial_sums_.size()) {
@@ -41,12 +39,12 @@ public:
             return marks_rows_partial_sums_[0];
         }
 
-        return marks_rows_partial_sums_[mark_index] -
-               marks_rows_partial_sums_[mark_index - 1];
+        return marks_rows_partial_sums_[mark_index] - marks_rows_partial_sums_[mark_index - 1];
     }
 
     size_t getRowsCountInRange(size_t begin, size_t end) const override {
-        if (end <= begin) return 0;
+        if (end <= begin)
+            return 0;
         if (end > marks_rows_partial_sums_.size()) {
             end = marks_rows_partial_sums_.size();
         }
@@ -66,11 +64,8 @@ public:
         }
 
         // Binary search in cumulative sums
-        auto it = std::upper_bound(
-            marks_rows_partial_sums_.begin(),
-            marks_rows_partial_sums_.end(),
-            row
-        );
+        auto it = std::upper_bound(marks_rows_partial_sums_.begin(), marks_rows_partial_sums_.end(),
+                                   row);
 
         if (it == marks_rows_partial_sums_.end()) {
             throw std::out_of_range("Row out of range");
@@ -88,11 +83,8 @@ public:
         size_t target_row = rows_before + number_of_rows;
 
         // Find first mark that ends at or after target_row
-        auto it = std::lower_bound(
-            marks_rows_partial_sums_.begin() + from_mark,
-            marks_rows_partial_sums_.end(),
-            target_row
-        );
+        auto it = std::lower_bound(marks_rows_partial_sums_.begin() + from_mark,
+                                   marks_rows_partial_sums_.end(), target_row);
 
         if (it == marks_rows_partial_sums_.end()) {
             // Target is beyond all marks
@@ -113,9 +105,9 @@ public:
      * Add mark with specific row count
      */
     void addMark(size_t rows) override {
-        size_t cumulative = marks_rows_partial_sums_.empty() ?
-                           rows :
-                           marks_rows_partial_sums_.back() + rows;
+        size_t cumulative = marks_rows_partial_sums_.empty()
+                                ? rows
+                                : marks_rows_partial_sums_.back() + rows;
 
         marks_rows_partial_sums_.push_back(cumulative);
     }

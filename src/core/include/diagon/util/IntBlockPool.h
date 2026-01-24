@@ -103,9 +103,7 @@ public:
     /**
      * Get current size (total ints written)
      */
-    int size() const {
-        return bufferUpto_ * INT_BLOCK_SIZE + intUpto_;
-    }
+    int size() const { return bufferUpto_ * INT_BLOCK_SIZE + intUpto_; }
 
     /**
      * Get bytes used (allocated memory)
@@ -130,9 +128,9 @@ private:
     // Use std::deque for stable addresses
     std::deque<std::unique_ptr<int[]>> buffers_;
 
-    int bufferUpto_{0};      // Current buffer index
-    int* buffer_{nullptr};   // Pointer to current buffer
-    int intUpto_{0};         // Offset within current buffer
+    int bufferUpto_{0};     // Current buffer index
+    int* buffer_{nullptr};  // Pointer to current buffer
+    int intUpto_{0};        // Offset within current buffer
 
     /**
      * Allocate next buffer

@@ -3,15 +3,15 @@
 
 #pragma once
 
+#include "diagon/codecs/PostingsFormat.h"
 #include "diagon/index/FieldInfo.h"
 #include "diagon/store/IndexOutput.h"
 #include "diagon/util/BytesRef.h"
 #include "diagon/util/FST.h"
-#include "diagon/codecs/PostingsFormat.h"
 
 #include <memory>
-#include <vector>
 #include <string>
+#include <vector>
 
 namespace diagon {
 namespace codecs {
@@ -46,7 +46,9 @@ public:
         int maxItemsInBlock;
 
         /** Constructor */
-        Config() : minItemsInBlock(25), maxItemsInBlock(48) {}
+        Config()
+            : minItemsInBlock(25)
+            , maxItemsInBlock(48) {}
     };
 
     /**
@@ -65,7 +67,9 @@ public:
         /** Constructor */
         TermStats() = default;
         TermStats(int df, int64_t ttf, int64_t fp)
-            : docFreq(df), totalTermFreq(ttf), postingsFP(fp) {}
+            : docFreq(df)
+            , totalTermFreq(ttf)
+            , postingsFP(fp) {}
     };
 
     /**
@@ -76,11 +80,8 @@ public:
      * @param fieldInfo Field information
      * @param config Block configuration
      */
-    BlockTreeTermsWriter(
-        store::IndexOutput* timOut,
-        store::IndexOutput* tipOut,
-        const index::FieldInfo& fieldInfo,
-        const Config& config = {});
+    BlockTreeTermsWriter(store::IndexOutput* timOut, store::IndexOutput* tipOut,
+                         const index::FieldInfo& fieldInfo, const Config& config = {});
 
     /**
      * Add a term with its statistics.

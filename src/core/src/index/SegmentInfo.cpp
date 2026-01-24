@@ -3,26 +3,23 @@
 
 #include "diagon/index/SegmentInfo.h"
 
+#include "diagon/store/Directory.h"
+#include "diagon/store/IndexInput.h"
+
 #include <algorithm>
 #include <sstream>
 #include <stdexcept>
-
-#include "diagon/store/Directory.h"
-#include "diagon/store/IndexInput.h"
 
 namespace diagon {
 namespace index {
 
 // ==================== SegmentInfo ====================
 
-SegmentInfo::SegmentInfo(
-    const std::string& name,
-    int maxDoc,
-    const std::string& codecName)
-    : name_(name),
-      maxDoc_(maxDoc),
-      codecName_(codecName),
-      fieldInfos_(std::vector<FieldInfo>{}) {  // Initialize with empty vector
+SegmentInfo::SegmentInfo(const std::string& name, int maxDoc, const std::string& codecName)
+    : name_(name)
+    , maxDoc_(maxDoc)
+    , codecName_(codecName)
+    , fieldInfos_(std::vector<FieldInfo>{}) {  // Initialize with empty vector
 }
 
 void SegmentInfo::addFile(const std::string& fileName) {
@@ -51,8 +48,7 @@ std::string SegmentInfo::getDiagnostic(const std::string& key) const {
 
 // ==================== SegmentInfos ====================
 
-SegmentInfos::SegmentInfos() {
-}
+SegmentInfos::SegmentInfos() {}
 
 void SegmentInfos::add(std::shared_ptr<SegmentInfo> segmentInfo) {
     segments_.push_back(segmentInfo);
@@ -159,9 +155,7 @@ SegmentInfos SegmentInfos::read(store::Directory& dir, const std::string& fileNa
         std::string codecName = input->readString();
 
         // Create SegmentInfo
-        auto segmentInfo = std::make_shared<SegmentInfo>(
-            segmentName, maxDoc, codecName
-        );
+        auto segmentInfo = std::make_shared<SegmentInfo>(segmentName, maxDoc, codecName);
 
         // Read file list
         int32_t numFiles = input->readInt();

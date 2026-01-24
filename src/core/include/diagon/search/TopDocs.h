@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include <vector>
 #include <cstdint>
 #include <limits>
+#include <vector>
 
 namespace diagon {
 namespace search {
@@ -35,7 +35,9 @@ struct ScoreDoc {
      * Constructor
      */
     ScoreDoc(int d = -1, float s = 0.0f, int shard = -1)
-        : doc(d), score(s), shardIndex(shard) {}
+        : doc(d)
+        , score(s)
+        , shardIndex(shard) {}
 
     /**
      * Comparison for sorting (by score descending, then doc ascending)
@@ -52,9 +54,7 @@ struct ScoreDoc {
     /**
      * Greater-than comparison (needed for std::greater in priority_queue)
      */
-    bool operator>(const ScoreDoc& other) const {
-        return other < *this;
-    }
+    bool operator>(const ScoreDoc& other) const { return other < *this; }
 };
 
 /**
@@ -89,7 +89,8 @@ struct TotalHits {
      * Constructor
      */
     TotalHits(int64_t val = 0, Relation rel = Relation::EQUAL_TO)
-        : value(val), relation(rel) {}
+        : value(val)
+        , relation(rel) {}
 };
 
 /**

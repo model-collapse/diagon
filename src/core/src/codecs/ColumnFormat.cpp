@@ -16,7 +16,7 @@ ColumnFormat::getRegistry() {
 }
 
 void ColumnFormat::registerFormat(const std::string& name,
-                                 std::function<std::unique_ptr<ColumnFormat>()> factory) {
+                                  std::function<std::unique_ptr<ColumnFormat>()> factory) {
     getRegistry()[name] = factory;
 }
 

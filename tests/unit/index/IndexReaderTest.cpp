@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/IndexReader.h"
+
 #include "diagon/index/FieldInfo.h"
 
 #include <gtest/gtest.h>
@@ -16,7 +17,9 @@ using namespace diagon::index;
 class MockLeafReader : public LeafReader {
 public:
     explicit MockLeafReader(int maxDoc, int numDocs, bool hasDeletions = false)
-        : maxDoc_(maxDoc), numDocs_(numDocs), hasDeletions_(hasDeletions) {
+        : maxDoc_(maxDoc)
+        , numDocs_(numDocs)
+        , hasDeletions_(hasDeletions) {
         // Create minimal FieldInfos
         std::vector<FieldInfo> infos;
         fieldInfos_ = std::make_unique<FieldInfos>(std::move(infos));
@@ -29,11 +32,21 @@ public:
 
     // Pure virtual implementations (return nullptr)
     Terms* terms(const std::string& /*field*/) const override { return nullptr; }
-    NumericDocValues* getNumericDocValues(const std::string& /*field*/) const override { return nullptr; }
-    BinaryDocValues* getBinaryDocValues(const std::string& /*field*/) const override { return nullptr; }
-    SortedDocValues* getSortedDocValues(const std::string& /*field*/) const override { return nullptr; }
-    SortedSetDocValues* getSortedSetDocValues(const std::string& /*field*/) const override { return nullptr; }
-    SortedNumericDocValues* getSortedNumericDocValues(const std::string& /*field*/) const override { return nullptr; }
+    NumericDocValues* getNumericDocValues(const std::string& /*field*/) const override {
+        return nullptr;
+    }
+    BinaryDocValues* getBinaryDocValues(const std::string& /*field*/) const override {
+        return nullptr;
+    }
+    SortedDocValues* getSortedDocValues(const std::string& /*field*/) const override {
+        return nullptr;
+    }
+    SortedSetDocValues* getSortedSetDocValues(const std::string& /*field*/) const override {
+        return nullptr;
+    }
+    SortedNumericDocValues* getSortedNumericDocValues(const std::string& /*field*/) const override {
+        return nullptr;
+    }
     StoredFieldsReader* storedFieldsReader() const override { return nullptr; }
     NumericDocValues* getNormValues(const std::string& /*field*/) const override { return nullptr; }
     const FieldInfos& getFieldInfos() const override { return *fieldInfos_; }
@@ -194,8 +207,8 @@ TEST_F(IndexReaderTest, CompositeReaderStatistics) {
 
     auto composite = std::make_shared<MockCompositeReader>(subReaders);
 
-    EXPECT_EQ(350, composite->maxDoc());  // 100 + 200 + 50
-    EXPECT_EQ(330, composite->numDocs());  // 100 + 180 + 50
+    EXPECT_EQ(350, composite->maxDoc());     // 100 + 200 + 50
+    EXPECT_EQ(330, composite->numDocs());    // 100 + 180 + 50
     EXPECT_TRUE(composite->hasDeletions());  // Second segment has deletions
 }
 

@@ -135,22 +135,20 @@ public:
     /**
      * Check if codec supports concurrent access
      */
-    virtual bool supportsConcurrentAccess() const {
-        return false;
-    }
+    virtual bool supportsConcurrentAccess() const { return false; }
 
     /**
      * Codec capability flags
      */
     enum class Capability : uint64_t {
-        POSTINGS            = 1 << 0,  // Supports inverted index
-        DOC_VALUES          = 1 << 1,  // Supports doc values
-        COLUMN_STORAGE      = 1 << 2,  // Supports ClickHouse columns
-        SKIP_INDEXES        = 1 << 3,  // Supports skip indexes
-        SIMD_ACCELERATION   = 1 << 4,  // Supports SIMD postings/columns
-        VECTORS             = 1 << 5,  // Supports KNN vectors
-        COMPRESSION_ZSTD    = 1 << 6,  // Supports ZSTD compression
-        ADAPTIVE_GRANULES   = 1 << 7,  // Supports adaptive granularity
+        POSTINGS = 1 << 0,           // Supports inverted index
+        DOC_VALUES = 1 << 1,         // Supports doc values
+        COLUMN_STORAGE = 1 << 2,     // Supports ClickHouse columns
+        SKIP_INDEXES = 1 << 3,       // Supports skip indexes
+        SIMD_ACCELERATION = 1 << 4,  // Supports SIMD postings/columns
+        VECTORS = 1 << 5,            // Supports KNN vectors
+        COMPRESSION_ZSTD = 1 << 6,   // Supports ZSTD compression
+        ADAPTIVE_GRANULES = 1 << 7,  // Supports adaptive granularity
     };
 
     /**

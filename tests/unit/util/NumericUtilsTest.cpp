@@ -4,6 +4,7 @@
 #include "diagon/util/NumericUtils.h"
 
 #include <gtest/gtest.h>
+
 #include <cmath>
 #include <limits>
 

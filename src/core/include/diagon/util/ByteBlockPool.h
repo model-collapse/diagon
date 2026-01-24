@@ -109,16 +109,12 @@ public:
     /**
      * Get current size (total bytes written)
      */
-    int64_t size() const {
-        return static_cast<int64_t>(bufferUpto_) * BYTE_BLOCK_SIZE + byteUpto_;
-    }
+    int64_t size() const { return static_cast<int64_t>(bufferUpto_) * BYTE_BLOCK_SIZE + byteUpto_; }
 
     /**
      * Get bytes used (allocated memory)
      */
-    int64_t bytesUsed() const {
-        return static_cast<int64_t>(buffers_.size()) * BYTE_BLOCK_SIZE;
-    }
+    int64_t bytesUsed() const { return static_cast<int64_t>(buffers_.size()) * BYTE_BLOCK_SIZE; }
 
     /**
      * Reset pool for reuse
@@ -138,7 +134,7 @@ private:
 
     int bufferUpto_{0};         // Current buffer index
     uint8_t* buffer_{nullptr};  // Pointer to current buffer
-    int byteUpto_{0};          // Offset within current buffer
+    int byteUpto_{0};           // Offset within current buffer
 
     /**
      * Allocate next buffer

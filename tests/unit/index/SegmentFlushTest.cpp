@@ -1,13 +1,14 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/index/DocumentsWriterPerThread.h"
-#include "diagon/index/DocumentsWriter.h"
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/DocumentsWriter.h"
+#include "diagon/index/DocumentsWriterPerThread.h"
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 #include <memory>
 
@@ -51,9 +52,7 @@ TEST_F(SegmentFlushTest, FlushWithDirectory) {
     for (int i = 0; i < 5; i++) {
         Document doc;
         doc.add(std::make_unique<TextField>(
-            "body",
-            "term1 term2 term3 unique_term_" + std::to_string(i),
-            TextField::TYPE_STORED));
+            "body", "term1 term2 term3 unique_term_" + std::to_string(i), TextField::TYPE_STORED));
         dwpt.addDocument(doc);
     }
 
@@ -115,14 +114,13 @@ TEST_F(SegmentFlushTest, MultipleFlushesToDisk) {
     auto dir = FSDirectory::open(testDir_.string());
 
     // Create DWPT with directory
-    DocumentsWriterPerThread dwpt(
-        DocumentsWriterPerThread::Config{},
-        dir.get());
+    DocumentsWriterPerThread dwpt(DocumentsWriterPerThread::Config{}, dir.get());
 
     // First flush
     for (int i = 0; i < 3; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "first_" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(std::make_unique<TextField>("body", "first_" + std::to_string(i),
+                                            TextField::TYPE_STORED));
         dwpt.addDocument(doc);
     }
     auto segment1 = dwpt.flush();
@@ -131,7 +129,8 @@ TEST_F(SegmentFlushTest, MultipleFlushesToDisk) {
     // Second flush
     for (int i = 0; i < 3; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "second_" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(std::make_unique<TextField>("body", "second_" + std::to_string(i),
+                                            TextField::TYPE_STORED));
         dwpt.addDocument(doc);
     }
     auto segment2 = dwpt.flush();
@@ -169,7 +168,8 @@ TEST_F(SegmentFlushTest, DocumentsWriterFlush) {
     // Add documents
     for (int i = 0; i < 5; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "test_" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(std::make_unique<TextField>("body", "test_" + std::to_string(i),
+                                            TextField::TYPE_STORED));
         writer.addDocument(doc);
     }
 
@@ -207,7 +207,8 @@ TEST_F(SegmentFlushTest, DocumentsWriterAutoFlush) {
     // Add documents - should trigger auto-flush
     for (int i = 0; i < 10; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "test_" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(std::make_unique<TextField>("body", "test_" + std::to_string(i),
+                                            TextField::TYPE_STORED));
         int segmentsCreated = writer.addDocument(doc);
 
         if (i == 4) {
@@ -234,9 +235,7 @@ TEST_F(SegmentFlushTest, LargeDocumentFlush) {
     auto dir = FSDirectory::open(testDir_.string());
 
     // Create DWPT with directory
-    DocumentsWriterPerThread dwpt(
-        DocumentsWriterPerThread::Config{},
-        dir.get());
+    DocumentsWriterPerThread dwpt(DocumentsWriterPerThread::Config{}, dir.get());
 
     // Create large document with many unique terms
     Document doc;
@@ -272,9 +271,7 @@ TEST_F(SegmentFlushTest, FlushEmptyWithDirectory) {
     auto dir = FSDirectory::open(testDir_.string());
 
     // Create DWPT with directory
-    DocumentsWriterPerThread dwpt(
-        DocumentsWriterPerThread::Config{},
-        dir.get());
+    DocumentsWriterPerThread dwpt(DocumentsWriterPerThread::Config{}, dir.get());
 
     // Flush without adding documents
     auto segmentInfo = dwpt.flush();

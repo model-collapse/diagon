@@ -1,12 +1,14 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/storage/LifecyclePolicy.h"
 #include "diagon/storage/StorageTier.h"
+
+#include "diagon/storage/LifecyclePolicy.h"
 #include "diagon/storage/TierManager.h"
 #include "diagon/storage/TierMigrationService.h"
 
 #include <gtest/gtest.h>
+
 #include <thread>
 
 using namespace diagon::storage;
@@ -30,20 +32,18 @@ TEST(StorageTierTest, ToString) {
 // ==================== TierConfig Tests ====================
 
 TEST(TierConfigTest, Construction) {
-    TierConfig config{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,  // 16GB
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
+    TierConfig config{.tier = StorageTier::HOT,
+                      .directory_type = "MMapDirectory",
+                      .base_path = "/mnt/nvme",
+                      .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,  // 16GB
+                      .use_mmap = true,
+                      .read_ahead_bytes = 1024 * 1024,
+                      .searchable = true,
+                      .use_skip_indexes = true,
+                      .max_concurrent_queries = 100,
+                      .writable = true,
+                      .compress_on_migrate = false,
+                      .compression_codec = "LZ4"};
 
     EXPECT_EQ(StorageTier::HOT, config.tier);
     EXPECT_EQ("MMapDirectory", config.directory_type);
@@ -90,11 +90,10 @@ TEST(LifecyclePolicyTest, EvaluateSegmentHotToWarmByAge) {
     policy.hot.max_age_seconds = 7 * 24 * 3600;  // 7 days
 
     // Segment older than 7 days should move to WARM
-    auto result = policy.evaluateSegment(
-        StorageTier::HOT,
-        8 * 24 * 3600,  // 8 days old
-        1024,           // 1KB size
-        100             // 100 accesses
+    auto result = policy.evaluateSegment(StorageTier::HOT,
+                                         8 * 24 * 3600,  // 8 days old
+                                         1024,           // 1KB size
+                                         100             // 100 accesses
     );
 
     ASSERT_TRUE(result.has_value());
@@ -106,11 +105,10 @@ TEST(LifecyclePolicyTest, EvaluateSegmentHotToWarmBySize) {
     policy.hot.max_size_bytes = 50LL * 1024 * 1024 * 1024;  // 50GB
 
     // Segment larger than 50GB should move to WARM
-    auto result = policy.evaluateSegment(
-        StorageTier::HOT,
-        3600,                           // 1 hour old
-        60LL * 1024 * 1024 * 1024,     // 60GB size
-        100                             // 100 accesses
+    auto result = policy.evaluateSegment(StorageTier::HOT,
+                                         3600,                       // 1 hour old
+                                         60LL * 1024 * 1024 * 1024,  // 60GB size
+                                         100                         // 100 accesses
     );
 
     ASSERT_TRUE(result.has_value());
@@ -121,11 +119,10 @@ TEST(LifecyclePolicyTest, EvaluateSegmentHotNoTransition) {
     LifecyclePolicy policy;
 
     // Young and small segment should stay in HOT
-    auto result = policy.evaluateSegment(
-        StorageTier::HOT,
-        3600,  // 1 hour old
-        1024,  // 1KB size
-        100    // 100 accesses
+    auto result = policy.evaluateSegment(StorageTier::HOT,
+                                         3600,  // 1 hour old
+                                         1024,  // 1KB size
+                                         100    // 100 accesses
     );
 
     EXPECT_FALSE(result.has_value());
@@ -136,11 +133,10 @@ TEST(LifecyclePolicyTest, EvaluateSegmentWarmToColdByAge) {
     policy.warm.max_age_seconds = 30 * 24 * 3600;  // 30 days
 
     // Segment older than 30 days should move to COLD
-    auto result = policy.evaluateSegment(
-        StorageTier::WARM,
-        35 * 24 * 3600,  // 35 days old
-        1024,            // 1KB size
-        50               // 50 accesses
+    auto result = policy.evaluateSegment(StorageTier::WARM,
+                                         35 * 24 * 3600,  // 35 days old
+                                         1024,            // 1KB size
+                                         50               // 50 accesses
     );
 
     ASSERT_TRUE(result.has_value());
@@ -152,11 +148,10 @@ TEST(LifecyclePolicyTest, EvaluateSegmentWarmToColdByAccessCount) {
     policy.warm.min_access_count = 10;
 
     // Segment with < 10 accesses should move to COLD
-    auto result = policy.evaluateSegment(
-        StorageTier::WARM,
-        10 * 24 * 3600,  // 10 days old
-        1024,            // 1KB size
-        5                // 5 accesses (below threshold)
+    auto result = policy.evaluateSegment(StorageTier::WARM,
+                                         10 * 24 * 3600,  // 10 days old
+                                         1024,            // 1KB size
+                                         5                // 5 accesses (below threshold)
     );
 
     ASSERT_TRUE(result.has_value());
@@ -167,11 +162,10 @@ TEST(LifecyclePolicyTest, EvaluateSegmentWarmNoTransition) {
     LifecyclePolicy policy;
 
     // Recent segment with good access count should stay in WARM
-    auto result = policy.evaluateSegment(
-        StorageTier::WARM,
-        10 * 24 * 3600,  // 10 days old
-        1024,            // 1KB size
-        50               // 50 accesses
+    auto result = policy.evaluateSegment(StorageTier::WARM,
+                                         10 * 24 * 3600,  // 10 days old
+                                         1024,            // 1KB size
+                                         50               // 50 accesses
     );
 
     EXPECT_FALSE(result.has_value());
@@ -182,11 +176,10 @@ TEST(LifecyclePolicyTest, EvaluateSegmentColdToFrozen) {
     policy.cold.max_age_seconds = 365 * 24 * 3600;  // 365 days
 
     // Segment older than 365 days should move to FROZEN
-    auto result = policy.evaluateSegment(
-        StorageTier::COLD,
-        400 * 24 * 3600,  // 400 days old
-        1024,             // 1KB size
-        0                 // 0 accesses
+    auto result = policy.evaluateSegment(StorageTier::COLD,
+                                         400 * 24 * 3600,  // 400 days old
+                                         1024,             // 1KB size
+                                         0                 // 0 accesses
     );
 
     ASSERT_TRUE(result.has_value());
@@ -198,11 +191,10 @@ TEST(LifecyclePolicyTest, EvaluateSegmentColdNoTransition) {
     policy.cold.max_age_seconds = 365 * 24 * 3600;  // 365 days
 
     // Segment less than 365 days old should stay in COLD
-    auto result = policy.evaluateSegment(
-        StorageTier::COLD,
-        100 * 24 * 3600,  // 100 days old
-        1024,             // 1KB size
-        0                 // 0 accesses
+    auto result = policy.evaluateSegment(StorageTier::COLD,
+                                         100 * 24 * 3600,  // 100 days old
+                                         1024,             // 1KB size
+                                         0                 // 0 accesses
     );
 
     EXPECT_FALSE(result.has_value());
@@ -212,11 +204,10 @@ TEST(LifecyclePolicyTest, EvaluateSegmentFrozenTerminal) {
     LifecyclePolicy policy;
 
     // FROZEN is terminal - no further transitions
-    auto result = policy.evaluateSegment(
-        StorageTier::FROZEN,
-        1000 * 24 * 3600,  // 1000 days old
-        1024,              // 1KB size
-        0                  // 0 accesses
+    auto result = policy.evaluateSegment(StorageTier::FROZEN,
+                                         1000 * 24 * 3600,  // 1000 days old
+                                         1024,              // 1KB size
+                                         0                  // 0 accesses
     );
 
     EXPECT_FALSE(result.has_value());
@@ -226,20 +217,18 @@ TEST(LifecyclePolicyTest, EvaluateSegmentFrozenTerminal) {
 
 TEST(TierManagerTest, Construction) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
 
     LifecyclePolicy policy;
 
@@ -251,20 +240,18 @@ TEST(TierManagerTest, Construction) {
 
 TEST(TierManagerTest, RegisterSegment) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
 
     LifecyclePolicy policy;
     TierManager manager(configs, policy);
@@ -277,20 +264,18 @@ TEST(TierManagerTest, RegisterSegment) {
 
 TEST(TierManagerTest, GetSegmentTierUnknown) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
 
     LifecyclePolicy policy;
     TierManager manager(configs, policy);
@@ -300,20 +285,18 @@ TEST(TierManagerTest, GetSegmentTierUnknown) {
 
 TEST(TierManagerTest, RecordAccess) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
 
     LifecyclePolicy policy;
     TierManager manager(configs, policy);
@@ -332,20 +315,18 @@ TEST(TierManagerTest, RecordAccess) {
 
 TEST(TierManagerTest, GetConfig) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
 
     LifecyclePolicy policy;
     TierManager manager(configs, policy);
@@ -358,20 +339,18 @@ TEST(TierManagerTest, GetConfig) {
 
 TEST(TierManagerTest, GetConfigUnconfiguredTier) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
 
     LifecyclePolicy policy;
     TierManager manager(configs, policy);
@@ -381,34 +360,30 @@ TEST(TierManagerTest, GetConfigUnconfiguredTier) {
 
 TEST(TierManagerTest, MigrateSegment) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
-    configs[StorageTier::WARM] = TierConfig{
-        .tier = StorageTier::WARM,
-        .directory_type = "FSDirectory",
-        .base_path = "/mnt/ssd",
-        .max_cache_bytes = 4ULL * 1024 * 1024 * 1024,
-        .use_mmap = false,
-        .read_ahead_bytes = 256 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 50,
-        .writable = false,
-        .compress_on_migrate = true,
-        .compression_codec = "ZSTD"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
+    configs[StorageTier::WARM] = TierConfig{.tier = StorageTier::WARM,
+                                            .directory_type = "FSDirectory",
+                                            .base_path = "/mnt/ssd",
+                                            .max_cache_bytes = 4ULL * 1024 * 1024 * 1024,
+                                            .use_mmap = false,
+                                            .read_ahead_bytes = 256 * 1024,
+                                            .searchable = true,
+                                            .use_skip_indexes = true,
+                                            .max_concurrent_queries = 50,
+                                            .writable = false,
+                                            .compress_on_migrate = true,
+                                            .compression_codec = "ZSTD"};
 
     LifecyclePolicy policy;
     TierManager manager(configs, policy);
@@ -422,20 +397,18 @@ TEST(TierManagerTest, MigrateSegment) {
 
 TEST(TierManagerTest, MigrateSegmentSameTier) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
 
     LifecyclePolicy policy;
     TierManager manager(configs, policy);
@@ -449,48 +422,42 @@ TEST(TierManagerTest, MigrateSegmentSameTier) {
 
 TEST(TierManagerTest, GetSearchableTiers) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
-    configs[StorageTier::WARM] = TierConfig{
-        .tier = StorageTier::WARM,
-        .directory_type = "FSDirectory",
-        .base_path = "/mnt/ssd",
-        .max_cache_bytes = 4ULL * 1024 * 1024 * 1024,
-        .use_mmap = false,
-        .read_ahead_bytes = 256 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 50,
-        .writable = false,
-        .compress_on_migrate = true,
-        .compression_codec = "ZSTD"
-    };
-    configs[StorageTier::COLD] = TierConfig{
-        .tier = StorageTier::COLD,
-        .directory_type = "S3Directory",
-        .base_path = "s3://bucket",
-        .max_cache_bytes = 512ULL * 1024 * 1024,
-        .use_mmap = false,
-        .read_ahead_bytes = 64 * 1024,
-        .searchable = false,  // Not searchable by default
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 10,
-        .writable = false,
-        .compress_on_migrate = true,
-        .compression_codec = "ZSTD"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
+    configs[StorageTier::WARM] = TierConfig{.tier = StorageTier::WARM,
+                                            .directory_type = "FSDirectory",
+                                            .base_path = "/mnt/ssd",
+                                            .max_cache_bytes = 4ULL * 1024 * 1024 * 1024,
+                                            .use_mmap = false,
+                                            .read_ahead_bytes = 256 * 1024,
+                                            .searchable = true,
+                                            .use_skip_indexes = true,
+                                            .max_concurrent_queries = 50,
+                                            .writable = false,
+                                            .compress_on_migrate = true,
+                                            .compression_codec = "ZSTD"};
+    configs[StorageTier::COLD] = TierConfig{.tier = StorageTier::COLD,
+                                            .directory_type = "S3Directory",
+                                            .base_path = "s3://bucket",
+                                            .max_cache_bytes = 512ULL * 1024 * 1024,
+                                            .use_mmap = false,
+                                            .read_ahead_bytes = 64 * 1024,
+                                            .searchable = false,  // Not searchable by default
+                                            .use_skip_indexes = true,
+                                            .max_concurrent_queries = 10,
+                                            .writable = false,
+                                            .compress_on_migrate = true,
+                                            .compression_codec = "ZSTD"};
 
     LifecyclePolicy policy;
     TierManager manager(configs, policy);
@@ -508,34 +475,30 @@ TEST(TierManagerTest, GetSearchableTiers) {
 
 TEST(TierManagerTest, GetSegmentsInTiers) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
-    configs[StorageTier::WARM] = TierConfig{
-        .tier = StorageTier::WARM,
-        .directory_type = "FSDirectory",
-        .base_path = "/mnt/ssd",
-        .max_cache_bytes = 4ULL * 1024 * 1024 * 1024,
-        .use_mmap = false,
-        .read_ahead_bytes = 256 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 50,
-        .writable = false,
-        .compress_on_migrate = true,
-        .compression_codec = "ZSTD"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
+    configs[StorageTier::WARM] = TierConfig{.tier = StorageTier::WARM,
+                                            .directory_type = "FSDirectory",
+                                            .base_path = "/mnt/ssd",
+                                            .max_cache_bytes = 4ULL * 1024 * 1024 * 1024,
+                                            .use_mmap = false,
+                                            .read_ahead_bytes = 256 * 1024,
+                                            .searchable = true,
+                                            .use_skip_indexes = true,
+                                            .max_concurrent_queries = 50,
+                                            .writable = false,
+                                            .compress_on_migrate = true,
+                                            .compression_codec = "ZSTD"};
 
     LifecyclePolicy policy;
     TierManager manager(configs, policy);
@@ -559,20 +522,18 @@ TEST(TierManagerTest, GetSegmentsInTiers) {
 
 TEST(TierManagerTest, EvaluateMigrations) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
 
     LifecyclePolicy policy;
     policy.hot.max_age_seconds = 1;  // 1 second
@@ -595,20 +556,18 @@ TEST(TierManagerTest, EvaluateMigrations) {
 
 TEST(TierMigrationServiceTest, Construction) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
 
     LifecyclePolicy policy;
     TierManager manager(configs, policy);
@@ -621,20 +580,18 @@ TEST(TierMigrationServiceTest, Construction) {
 
 TEST(TierMigrationServiceTest, StartStop) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
 
     LifecyclePolicy policy;
     TierManager manager(configs, policy);
@@ -652,20 +609,18 @@ TEST(TierMigrationServiceTest, StartStop) {
 
 TEST(TierMigrationServiceTest, SetCheckInterval) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
 
     LifecyclePolicy policy;
     TierManager manager(configs, policy);
@@ -680,24 +635,22 @@ TEST(TierMigrationServiceTest, SetCheckInterval) {
 
 TEST(TierMigrationServiceTest, AutomaticMigration) {
     std::map<StorageTier, TierConfig> configs;
-    configs[StorageTier::HOT] = TierConfig{
-        .tier = StorageTier::HOT,
-        .directory_type = "MMapDirectory",
-        .base_path = "/mnt/nvme",
-        .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
-        .use_mmap = true,
-        .read_ahead_bytes = 1024 * 1024,
-        .searchable = true,
-        .use_skip_indexes = true,
-        .max_concurrent_queries = 100,
-        .writable = true,
-        .compress_on_migrate = false,
-        .compression_codec = "LZ4"
-    };
+    configs[StorageTier::HOT] = TierConfig{.tier = StorageTier::HOT,
+                                           .directory_type = "MMapDirectory",
+                                           .base_path = "/mnt/nvme",
+                                           .max_cache_bytes = 16ULL * 1024 * 1024 * 1024,
+                                           .use_mmap = true,
+                                           .read_ahead_bytes = 1024 * 1024,
+                                           .searchable = true,
+                                           .use_skip_indexes = true,
+                                           .max_concurrent_queries = 100,
+                                           .writable = true,
+                                           .compress_on_migrate = false,
+                                           .compression_codec = "LZ4"};
 
     LifecyclePolicy policy;
-    policy.hot.max_age_seconds = 1;  // 1 second
-    policy.warm.min_access_count = 0;  // Don't migrate to COLD based on access count
+    policy.hot.max_age_seconds = 1;      // 1 second
+    policy.warm.min_access_count = 0;    // Don't migrate to COLD based on access count
     policy.warm.max_age_seconds = 3600;  // 1 hour
 
     TierManager manager(configs, policy);

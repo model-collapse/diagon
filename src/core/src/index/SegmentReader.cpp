@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/SegmentReader.h"
+
 #include "diagon/util/Exceptions.h"
 
 namespace diagon {
@@ -13,10 +14,8 @@ using namespace diagon::util;
 
 // ==================== Factory Method ====================
 
-std::shared_ptr<SegmentReader> SegmentReader::open(
-    Directory& dir,
-    std::shared_ptr<SegmentInfo> si) {
-
+std::shared_ptr<SegmentReader> SegmentReader::open(Directory& dir,
+                                                   std::shared_ptr<SegmentInfo> si) {
     // Constructor is private, use std::shared_ptr constructor hack
     auto reader = std::shared_ptr<SegmentReader>(new SegmentReader(dir, si));
 
@@ -28,12 +27,9 @@ std::shared_ptr<SegmentReader> SegmentReader::open(
 
 // ==================== Constructor / Destructor ====================
 
-SegmentReader::SegmentReader(
-    Directory& dir,
-    std::shared_ptr<SegmentInfo> si)
-    : directory_(dir),
-      segmentInfo_(si) {
-
+SegmentReader::SegmentReader(Directory& dir, std::shared_ptr<SegmentInfo> si)
+    : directory_(dir)
+    , segmentInfo_(si) {
     // Phase 4: Constructor completes immediately
     // Fields producers are loaded lazily on first terms() call
 }
@@ -91,11 +87,7 @@ void SegmentReader::loadFieldsProducer(const std::string& field) const {
 
     // Phase 4: Create SimpleFieldsProducer
     // Note: SimpleFieldsProducer reads <segment>.post file with a single field
-    auto producer = std::make_unique<SimpleFieldsProducer>(
-        directory_,
-        segmentInfo_->name(),
-        field
-    );
+    auto producer = std::make_unique<SimpleFieldsProducer>(directory_, segmentInfo_->name(), field);
 
     fieldsProducers_[field] = std::move(producer);
 }

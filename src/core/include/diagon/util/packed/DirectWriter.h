@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "diagon/store/IndexOutput.h"
 #include "diagon/store/IndexInput.h"
+#include "diagon/store/IndexOutput.h"
 
 #include <cstdint>
 #include <vector>
@@ -100,10 +100,7 @@ public:
      * @param count Number of values to read
      * @return Vector of decoded values
      */
-    static std::vector<int64_t> read(
-        store::IndexInput* input,
-        int bitsPerValue,
-        int64_t count);
+    static std::vector<int64_t> read(store::IndexInput* input, int bitsPerValue, int64_t count);
 
     /**
      * Read a single value at a given index without reading preceding values.
@@ -113,16 +110,10 @@ public:
      * @param index Index of value to read
      * @return Decoded value
      */
-    static int64_t getInstance(
-        store::IndexInput* input,
-        int bitsPerValue,
-        int64_t index);
+    static int64_t getInstance(store::IndexInput* input, int bitsPerValue, int64_t index);
 
 private:
-    static int64_t readValue(
-        store::IndexInput* input,
-        int bitsPerValue,
-        int64_t bitPosition);
+    static int64_t readValue(store::IndexInput* input, int bitsPerValue, int64_t bitPosition);
 };
 
 }  // namespace packed

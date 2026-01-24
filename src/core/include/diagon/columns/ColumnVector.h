@@ -19,36 +19,96 @@ namespace columns {
 /**
  * Type name helper
  */
-template <typename T>
+template<typename T>
 struct TypeName;
 
-template <> struct TypeName<uint8_t> { static const char* get() { return "UInt8"; } };
-template <> struct TypeName<uint16_t> { static const char* get() { return "UInt16"; } };
-template <> struct TypeName<uint32_t> { static const char* get() { return "UInt32"; } };
-template <> struct TypeName<uint64_t> { static const char* get() { return "UInt64"; } };
-template <> struct TypeName<int8_t> { static const char* get() { return "Int8"; } };
-template <> struct TypeName<int16_t> { static const char* get() { return "Int16"; } };
-template <> struct TypeName<int32_t> { static const char* get() { return "Int32"; } };
-template <> struct TypeName<int64_t> { static const char* get() { return "Int64"; } };
-template <> struct TypeName<float> { static const char* get() { return "Float32"; } };
-template <> struct TypeName<double> { static const char* get() { return "Float64"; } };
+template<>
+struct TypeName<uint8_t> {
+    static const char* get() { return "UInt8"; }
+};
+template<>
+struct TypeName<uint16_t> {
+    static const char* get() { return "UInt16"; }
+};
+template<>
+struct TypeName<uint32_t> {
+    static const char* get() { return "UInt32"; }
+};
+template<>
+struct TypeName<uint64_t> {
+    static const char* get() { return "UInt64"; }
+};
+template<>
+struct TypeName<int8_t> {
+    static const char* get() { return "Int8"; }
+};
+template<>
+struct TypeName<int16_t> {
+    static const char* get() { return "Int16"; }
+};
+template<>
+struct TypeName<int32_t> {
+    static const char* get() { return "Int32"; }
+};
+template<>
+struct TypeName<int64_t> {
+    static const char* get() { return "Int64"; }
+};
+template<>
+struct TypeName<float> {
+    static const char* get() { return "Float32"; }
+};
+template<>
+struct TypeName<double> {
+    static const char* get() { return "Float64"; }
+};
 
 /**
  * Type index helper
  */
-template <typename T>
+template<typename T>
 struct TypeIndexForType;
 
-template <> struct TypeIndexForType<uint8_t> { static constexpr TypeIndex value = TypeIndex::UInt8; };
-template <> struct TypeIndexForType<uint16_t> { static constexpr TypeIndex value = TypeIndex::UInt16; };
-template <> struct TypeIndexForType<uint32_t> { static constexpr TypeIndex value = TypeIndex::UInt32; };
-template <> struct TypeIndexForType<uint64_t> { static constexpr TypeIndex value = TypeIndex::UInt64; };
-template <> struct TypeIndexForType<int8_t> { static constexpr TypeIndex value = TypeIndex::Int8; };
-template <> struct TypeIndexForType<int16_t> { static constexpr TypeIndex value = TypeIndex::Int16; };
-template <> struct TypeIndexForType<int32_t> { static constexpr TypeIndex value = TypeIndex::Int32; };
-template <> struct TypeIndexForType<int64_t> { static constexpr TypeIndex value = TypeIndex::Int64; };
-template <> struct TypeIndexForType<float> { static constexpr TypeIndex value = TypeIndex::Float32; };
-template <> struct TypeIndexForType<double> { static constexpr TypeIndex value = TypeIndex::Float64; };
+template<>
+struct TypeIndexForType<uint8_t> {
+    static constexpr TypeIndex value = TypeIndex::UInt8;
+};
+template<>
+struct TypeIndexForType<uint16_t> {
+    static constexpr TypeIndex value = TypeIndex::UInt16;
+};
+template<>
+struct TypeIndexForType<uint32_t> {
+    static constexpr TypeIndex value = TypeIndex::UInt32;
+};
+template<>
+struct TypeIndexForType<uint64_t> {
+    static constexpr TypeIndex value = TypeIndex::UInt64;
+};
+template<>
+struct TypeIndexForType<int8_t> {
+    static constexpr TypeIndex value = TypeIndex::Int8;
+};
+template<>
+struct TypeIndexForType<int16_t> {
+    static constexpr TypeIndex value = TypeIndex::Int16;
+};
+template<>
+struct TypeIndexForType<int32_t> {
+    static constexpr TypeIndex value = TypeIndex::Int32;
+};
+template<>
+struct TypeIndexForType<int64_t> {
+    static constexpr TypeIndex value = TypeIndex::Int64;
+};
+template<>
+struct TypeIndexForType<float> {
+    static constexpr TypeIndex value = TypeIndex::Float32;
+};
+template<>
+struct TypeIndexForType<double> {
+    static constexpr TypeIndex value = TypeIndex::Float64;
+};
 
 /**
  * Column for fixed-size numeric types.
@@ -56,7 +116,7 @@ template <> struct TypeIndexForType<double> { static constexpr TypeIndex value =
  *
  * Based on: ClickHouse ColumnVector
  */
-template <typename T>
+template<typename T>
 class ColumnVector final : public IColumn {
 public:
     using Self = ColumnVector<T>;
@@ -69,69 +129,47 @@ public:
 
     ColumnVector() = default;
 
-    explicit ColumnVector(size_t n) : data_(n) {}
+    explicit ColumnVector(size_t n)
+        : data_(n) {}
 
-    ColumnVector(size_t n, const T& value) : data_(n, value) {}
+    ColumnVector(size_t n, const T& value)
+        : data_(n, value) {}
 
     // ==================== Type ====================
 
-    std::string getName() const override {
-        return TypeName<T>::get();
-    }
+    std::string getName() const override { return TypeName<T>::get(); }
 
-    TypeIndex getDataType() const override {
-        return TypeIndexForType<T>::value;
-    }
+    TypeIndex getDataType() const override { return TypeIndexForType<T>::value; }
 
     // ==================== Size ====================
 
-    size_t size() const override {
-        return data_.size();
-    }
+    size_t size() const override { return data_.size(); }
 
-    size_t byteSize() const override {
-        return data_.size() * sizeof(T);
-    }
+    size_t byteSize() const override { return data_.size() * sizeof(T); }
 
     // ==================== Data Access ====================
 
-    Field operator[](size_t n) const override {
-        return Field(data_[n]);
-    }
+    Field operator[](size_t n) const override { return Field(data_[n]); }
 
-    void get(size_t n, Field& res) const override {
-        res = Field(data_[n]);
-    }
+    void get(size_t n, Field& res) const override { res = Field(data_[n]); }
 
     /**
      * Direct access to element
      */
-    T& getElement(size_t n) {
-        return data_[n];
-    }
+    T& getElement(size_t n) { return data_[n]; }
 
-    const T& getElement(size_t n) const {
-        return data_[n];
-    }
+    const T& getElement(size_t n) const { return data_[n]; }
 
     /**
      * Direct access to data container
      */
-    Container& getData() {
-        return data_;
-    }
+    Container& getData() { return data_; }
 
-    const Container& getData() const {
-        return data_;
-    }
+    const Container& getData() const { return data_; }
 
-    const char* getRawData() const override {
-        return reinterpret_cast<const char*>(data_.data());
-    }
+    const char* getRawData() const override { return reinterpret_cast<const char*>(data_.data()); }
 
-    bool isNumeric() const override {
-        return true;
-    }
+    bool isNumeric() const override { return true; }
 
     // ==================== Insertion ====================
 
@@ -172,9 +210,7 @@ public:
         std::memcpy(&data_[old_size], &src_data[start], length * sizeof(T));
     }
 
-    void insertDefault() override {
-        data_.push_back(T{});
-    }
+    void insertDefault() override { data_.push_back(T{}); }
 
     void insertManyDefaults(size_t length) override {
         size_t old_size = data_.size();
@@ -226,8 +262,7 @@ public:
 
     // ==================== Comparison ====================
 
-    int compareAt(size_t n, size_t m, const IColumn& rhs,
-                 int nan_direction_hint) const override {
+    int compareAt(size_t n, size_t m, const IColumn& rhs, int nan_direction_hint) const override {
         const Self& rhs_vec = typedCast(rhs);
 
         if constexpr (std::is_floating_point_v<T>) {
@@ -236,13 +271,16 @@ public:
             bool rhs_is_nan = std::isnan(rhs_vec.data_[m]);
 
             if (lhs_is_nan || rhs_is_nan) {
-                if (lhs_is_nan && rhs_is_nan) return 0;
+                if (lhs_is_nan && rhs_is_nan)
+                    return 0;
                 return lhs_is_nan ? nan_direction_hint : -nan_direction_hint;
             }
         }
 
-        if (data_[n] < rhs_vec.data_[m]) return -1;
-        if (data_[n] > rhs_vec.data_[m]) return 1;
+        if (data_[n] < rhs_vec.data_[m])
+            return -1;
+        if (data_[n] > rhs_vec.data_[m])
+            return 1;
         return 0;
     }
 
@@ -270,19 +308,13 @@ public:
         return res;
     }
 
-    MutableColumnPtr cloneEmpty() const override {
-        return Self::create();
-    }
+    MutableColumnPtr cloneEmpty() const override { return Self::create(); }
 
     // ==================== Factory ====================
 
-    static std::shared_ptr<Self> create() {
-        return std::make_shared<Self>();
-    }
+    static std::shared_ptr<Self> create() { return std::make_shared<Self>(); }
 
-    static std::shared_ptr<Self> create(size_t n) {
-        return std::make_shared<Self>(n);
-    }
+    static std::shared_ptr<Self> create(size_t n) { return std::make_shared<Self>(n); }
 
     static std::shared_ptr<Self> create(size_t n, const T& value) {
         return std::make_shared<Self>(n, value);

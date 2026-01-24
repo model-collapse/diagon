@@ -30,4 +30,4 @@ void IndexOutput::writeString(const std::string& s) {
     writeBytes(reinterpret_cast<const uint8_t*>(s.data()), s.length());
 }
 
-} // namespace diagon::store
+}  // namespace diagon::store

@@ -2,11 +2,13 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/search/TopScoreDocCollector.h"
+
 #include "diagon/index/LeafReaderContext.h"
 
 #include <gtest/gtest.h>
-#include <vector>
+
 #include <cmath>
+#include <vector>
 
 using namespace diagon::search;
 using namespace diagon::index;
@@ -15,20 +17,18 @@ using namespace diagon::index;
 
 class MockScorable : public Scorable {
 public:
-    MockScorable() : currentDoc_(-1), currentScore_(0.0f) {}
+    MockScorable()
+        : currentDoc_(-1)
+        , currentScore_(0.0f) {}
 
     void setDoc(int doc, float score) {
         currentDoc_ = doc;
         currentScore_ = score;
     }
 
-    float score() override {
-        return currentScore_;
-    }
+    float score() override { return currentScore_; }
 
-    int docID() override {
-        return currentDoc_;
-    }
+    int docID() override { return currentDoc_; }
 
 private:
     int currentDoc_;
@@ -152,7 +152,7 @@ TEST(TopScoreDocCollectorTest, TopKLimiting) {
 
     // Get results - should only have top 3
     TopDocs results = collector->topDocs();
-    EXPECT_EQ(5, results.totalHits.value);  // Total hits tracked
+    EXPECT_EQ(5, results.totalHits.value);   // Total hits tracked
     ASSERT_EQ(3, results.scoreDocs.size());  // But only top 3 returned
 
     // Check we got the top 3
@@ -298,7 +298,7 @@ TEST(TopScoreDocCollectorTest, NaNScoresIgnored) {
 
     // Only valid score should be collected
     TopDocs results = collector->topDocs();
-    EXPECT_EQ(2, results.totalHits.value);  // Both counted in total
+    EXPECT_EQ(2, results.totalHits.value);   // Both counted in total
     ASSERT_EQ(1, results.scoreDocs.size());  // But only valid one kept
     EXPECT_EQ(1, results.scoreDocs[0].doc);
 }

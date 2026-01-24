@@ -598,10 +598,8 @@ TEST_F(FieldInfoTest, BuilderUpdateIndexOptions) {
 TEST_F(FieldInfoTest, BuilderUpdateNonExistentField) {
     FieldInfosBuilder builder;
 
-    EXPECT_THROW(
-        builder.updateIndexOptions("nonexistent", IndexOptions::DOCS),
-        std::invalid_argument
-    );
+    EXPECT_THROW(builder.updateIndexOptions("nonexistent", IndexOptions::DOCS),
+                 std::invalid_argument);
 }
 
 TEST_F(FieldInfoTest, BuilderFinish) {
@@ -699,8 +697,8 @@ TEST_F(FieldInfoTest, PointValuesPartialIndexing) {
     FieldInfo info;
     info.name = "geo";
     info.number = 0;
-    info.pointDimensionCount = 3;     // 3 dimensions stored
-    info.pointIndexDimensionCount = 2; // But only 2 indexed
+    info.pointDimensionCount = 3;       // 3 dimensions stored
+    info.pointIndexDimensionCount = 2;  // But only 2 indexed
     info.pointNumBytes = 4;
 
     EXPECT_NO_THROW(info.validate());

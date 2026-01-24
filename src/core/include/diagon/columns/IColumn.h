@@ -71,9 +71,7 @@ public:
     /**
      * Check if column is empty
      */
-    bool empty() const {
-        return size() == 0;
-    }
+    bool empty() const { return size() == 0; }
 
     // ==================== Data Access ====================
 
@@ -91,16 +89,12 @@ public:
      * Get raw data pointer (if column is contiguous)
      * Returns nullptr if not applicable
      */
-    virtual const char* getRawData() const {
-        return nullptr;
-    }
+    virtual const char* getRawData() const { return nullptr; }
 
     /**
      * Is column numeric and contiguous?
      */
-    virtual bool isNumeric() const {
-        return false;
-    }
+    virtual bool isNumeric() const { return false; }
 
     // ==================== Insertion ====================
 
@@ -158,8 +152,7 @@ public:
      * Compare row n with row m in rhs
      * @return <0 if less, 0 if equal, >0 if greater
      */
-    virtual int compareAt(size_t n, size_t m, const IColumn& rhs,
-                         int nan_direction_hint) const = 0;
+    virtual int compareAt(size_t n, size_t m, const IColumn& rhs, int nan_direction_hint) const = 0;
 
     // ==================== COW Operations ====================
 
@@ -203,31 +196,23 @@ public:
     /**
      * Check if column is ColumnConst
      */
-    virtual bool isConst() const {
-        return false;
-    }
+    virtual bool isConst() const { return false; }
 
     /**
      * Check if column is ColumnNullable
      */
-    virtual bool isNullable() const {
-        return false;
-    }
+    virtual bool isNullable() const { return false; }
 
     /**
      * Check if column can be inside Nullable
      */
-    virtual bool canBeInsideNullable() const {
-        return true;
-    }
+    virtual bool canBeInsideNullable() const { return true; }
 
 protected:
     /**
      * Reference count (for COW)
      */
-    long use_count() const {
-        return shared_from_this().use_count();
-    }
+    long use_count() const { return shared_from_this().use_count(); }
 };
 
 /**

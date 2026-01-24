@@ -3,12 +3,12 @@
 
 #pragma once
 
+#include "diagon/codecs/blocktree/BlockTreeTermsWriter.h"
 #include "diagon/index/FieldInfo.h"
 #include "diagon/index/TermsEnum.h"
 #include "diagon/store/IndexInput.h"
 #include "diagon/util/BytesRef.h"
 #include "diagon/util/FST.h"
-#include "diagon/codecs/blocktree/BlockTreeTermsWriter.h"
 
 #include <memory>
 #include <vector>
@@ -48,7 +48,8 @@ public:
         /** File pointer to this block */
         int64_t blockFP;
 
-        TermBlock() : blockFP(0) {}
+        TermBlock()
+            : blockFP(0) {}
     };
 
     /**
@@ -58,10 +59,8 @@ public:
      * @param tipIn Input for FST index (.tip file)
      * @param fieldInfo Field information
      */
-    BlockTreeTermsReader(
-        store::IndexInput* timIn,
-        store::IndexInput* tipIn,
-        const index::FieldInfo& fieldInfo);
+    BlockTreeTermsReader(store::IndexInput* timIn, store::IndexInput* tipIn,
+                         const index::FieldInfo& fieldInfo);
 
     /**
      * Get terms enum for iteration.

@@ -12,15 +12,12 @@ namespace search {
 // ==================== Factory Methods ====================
 
 std::unique_ptr<TopScoreDocCollector> TopScoreDocCollector::create(int numHits) {
-    return std::unique_ptr<TopScoreDocCollector>(
-        new TopScoreDocCollector(numHits, nullptr));
+    return std::unique_ptr<TopScoreDocCollector>(new TopScoreDocCollector(numHits, nullptr));
 }
 
-std::unique_ptr<TopScoreDocCollector> TopScoreDocCollector::create(
-    int numHits,
-    const ScoreDoc& after) {
-    return std::unique_ptr<TopScoreDocCollector>(
-        new TopScoreDocCollector(numHits, &after));
+std::unique_ptr<TopScoreDocCollector> TopScoreDocCollector::create(int numHits,
+                                                                   const ScoreDoc& after) {
+    return std::unique_ptr<TopScoreDocCollector>(new TopScoreDocCollector(numHits, &after));
 }
 
 // ==================== Constructor ====================
@@ -33,7 +30,6 @@ TopScoreDocCollector::TopScoreDocCollector(int numHits, const ScoreDoc* after)
     , totalHitsRelation_(TotalHits::Relation::EQUAL_TO)
     , pq_()
     , leafCollector_(nullptr) {
-
     if (numHits <= 0) {
         throw std::invalid_argument("numHits must be > 0");
     }
@@ -41,9 +37,7 @@ TopScoreDocCollector::TopScoreDocCollector(int numHits, const ScoreDoc* after)
 
 // ==================== Collector Implementation ====================
 
-LeafCollector* TopScoreDocCollector::getLeafCollector(
-    const index::LeafReaderContext& context) {
-
+LeafCollector* TopScoreDocCollector::getLeafCollector(const index::LeafReaderContext& context) {
     leafCollector_ = std::make_unique<TopScoreLeafCollector>(this, context);
     return leafCollector_.get();
 }
@@ -77,8 +71,7 @@ TopDocs TopScoreDocCollector::topDocs(int start, int howMany) {
         results.clear();
     } else {
         int end = std::min(start + howMany, static_cast<int>(results.size()));
-        results = std::vector<ScoreDoc>(results.begin() + start,
-                                        results.begin() + end);
+        results = std::vector<ScoreDoc>(results.begin() + start, results.begin() + end);
     }
 
     TotalHits hits(totalHits_, totalHitsRelation_);
@@ -88,8 +81,7 @@ TopDocs TopScoreDocCollector::topDocs(int start, int howMany) {
 // ==================== TopScoreLeafCollector ====================
 
 TopScoreDocCollector::TopScoreLeafCollector::TopScoreLeafCollector(
-    TopScoreDocCollector* parent,
-    const index::LeafReaderContext& context)
+    TopScoreDocCollector* parent, const index::LeafReaderContext& context)
     : parent_(parent)
     , docBase_(context.docBase)
     , scorer_(nullptr)
@@ -139,8 +131,7 @@ void TopScoreDocCollector::TopScoreLeafCollector::collect(int doc) {
         const ScoreDoc& top = parent_->pq_.top();
 
         // Compare: higher score is better, lower doc ID breaks ties
-        bool betterThanTop = (score > top.score) ||
-                            (score == top.score && globalDoc < top.doc);
+        bool betterThanTop = (score > top.score) || (score == top.score && globalDoc < top.doc);
 
         if (betterThanTop) {
             parent_->pq_.pop();

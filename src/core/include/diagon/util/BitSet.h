@@ -66,17 +66,13 @@ public:
      * @brief Returns the number of bits in this set.
      * @return Number of bits
      */
-    [[nodiscard]] size_t length() const noexcept {
-        return num_bits_;
-    }
+    [[nodiscard]] size_t length() const noexcept { return num_bits_; }
 
     /**
      * @brief Returns the number of bits in this set (alias for length).
      * @return Number of bits
      */
-    [[nodiscard]] size_t size() const noexcept {
-        return num_bits_;
-    }
+    [[nodiscard]] size_t size() const noexcept { return num_bits_; }
 
     /**
      * @brief Gets the value of the bit at the specified index.
@@ -130,9 +126,7 @@ public:
      *
      * @return Approximate number of 1 bits
      */
-    [[nodiscard]] virtual size_t approximateCardinality() const noexcept {
-        return cardinality();
-    }
+    [[nodiscard]] virtual size_t approximateCardinality() const noexcept { return cardinality(); }
 
     /**
      * @brief Finds the next set bit starting from index (inclusive).
@@ -183,26 +177,20 @@ public:
      * @brief Provides direct access to the backing word array.
      * @return Pointer to the uint64_t array
      */
-    [[nodiscard]] const uint64_t* getBits() const noexcept {
-        return bits_.data();
-    }
+    [[nodiscard]] const uint64_t* getBits() const noexcept { return bits_.data(); }
 
     /**
      * @brief Provides mutable access to the backing word array.
      * @return Pointer to the uint64_t array
      * @warning Callers must maintain the "ghost bits clear" invariant
      */
-    [[nodiscard]] uint64_t* getBits() noexcept {
-        return bits_.data();
-    }
+    [[nodiscard]] uint64_t* getBits() noexcept { return bits_.data(); }
 
     /**
      * @brief Returns the number of words in the backing array.
      * @return Number of 64-bit words
      */
-    [[nodiscard]] size_t numWords() const noexcept {
-        return num_words_;
-    }
+    [[nodiscard]] size_t numWords() const noexcept { return num_words_; }
 
     // Static utility methods
 
@@ -221,8 +209,7 @@ public:
      * @param b Second BitSet
      * @return Population count of (a & b)
      */
-    [[nodiscard]] static size_t intersectionCount(const BitSet& a,
-                                                   const BitSet& b) noexcept;
+    [[nodiscard]] static size_t intersectionCount(const BitSet& a, const BitSet& b) noexcept;
 
     /**
      * @brief Counts set bits in the union of two BitSets.
@@ -247,11 +234,11 @@ public:
 
 private:
     std::vector<uint64_t> bits_;  // Backing storage
-    size_t num_bits_;              // Number of bits in use
-    size_t num_words_;             // Number of words in use (<= bits_.size())
+    size_t num_bits_;             // Number of bits in use
+    size_t num_words_;            // Number of words in use (<= bits_.size())
 
     // Verify that ghost bits (past numBits) are clear
     [[nodiscard]] bool verifyGhostBitsClear() const noexcept;
 };
 
-} // namespace diagon::util
+}  // namespace diagon::util

@@ -171,7 +171,7 @@ TEST(FSTTest, LongestPrefixMatch_PartialMatch) {
     int prefixLen;
     FST::Output output = fst->getLongestPrefixMatch(BytesRef("catsuit"), prefixLen);
 
-    EXPECT_EQ(2, output);  // Matches "cats"
+    EXPECT_EQ(2, output);     // Matches "cats"
     EXPECT_EQ(4, prefixLen);  // Length of "cats"
 }
 

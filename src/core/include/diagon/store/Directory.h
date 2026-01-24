@@ -94,9 +94,8 @@ public:
      * @throws FileAlreadyExistsException if file exists
      * @throws IOException on I/O error
      */
-    virtual std::unique_ptr<IndexOutput> createOutput(
-        const std::string& name,
-        const IOContext& context) = 0;
+    virtual std::unique_ptr<IndexOutput> createOutput(const std::string& name,
+                                                      const IOContext& context) = 0;
 
     /**
      * @brief Creates a temporary output file.
@@ -109,10 +108,9 @@ public:
      * @return IndexOutput for writing
      * @throws IOException on I/O error
      */
-    virtual std::unique_ptr<IndexOutput> createTempOutput(
-        const std::string& prefix,
-        const std::string& suffix,
-        const IOContext& context) = 0;
+    virtual std::unique_ptr<IndexOutput> createTempOutput(const std::string& prefix,
+                                                          const std::string& suffix,
+                                                          const IOContext& context) = 0;
 
     /**
      * @brief Opens an input stream for reading.
@@ -122,9 +120,8 @@ public:
      * @throws FileNotFoundException if file doesn't exist
      * @throws IOException on I/O error
      */
-    virtual std::unique_ptr<IndexInput> openInput(
-        const std::string& name,
-        const IOContext& context) const = 0;
+    virtual std::unique_ptr<IndexInput> openInput(const std::string& name,
+                                                  const IOContext& context) const = 0;
 
     // ==================== Atomic Operations ====================
 
@@ -138,8 +135,7 @@ public:
      * @param dest Destination filename (must not exist)
      * @throws IOException on I/O error
      */
-    virtual void rename(const std::string& source,
-                       const std::string& dest) = 0;
+    virtual void rename(const std::string& source, const std::string& dest) = 0;
 
     /**
      * @brief Syncs files to stable storage.
@@ -189,9 +185,7 @@ public:
      * @brief Checks if directory is closed.
      * @return true if closed
      */
-    [[nodiscard]] bool isClosed() const {
-        return closed_.load(std::memory_order_relaxed);
-    }
+    [[nodiscard]] bool isClosed() const { return closed_.load(std::memory_order_relaxed); }
 
     // ==================== Utilities ====================
 
@@ -207,9 +201,7 @@ public:
      * @brief Returns a string description for debugging.
      * @return Directory description
      */
-    [[nodiscard]] virtual std::string toString() const {
-        return "Directory";
-    }
+    [[nodiscard]] virtual std::string toString() const { return "Directory"; }
 
 protected:
     /**
@@ -222,4 +214,4 @@ protected:
     std::atomic<bool> closed_{false};
 };
 
-} // namespace diagon::store
+}  // namespace diagon::store

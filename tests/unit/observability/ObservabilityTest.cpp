@@ -5,6 +5,7 @@
 #include "diagon/observability/Metrics.h"
 
 #include <gtest/gtest.h>
+
 #include <thread>
 
 using namespace diagon::observability;
@@ -301,8 +302,7 @@ TEST(HealthCheckResultTest, AddDetail) {
 
 TEST(FunctionHealthCheckTest, Construction) {
     auto check = std::make_shared<FunctionHealthCheck>(
-        "test_check",
-        []() { return HealthCheckResult::healthy(); });
+        "test_check", []() { return HealthCheckResult::healthy(); });
 
     EXPECT_EQ("test_check", check->getName());
     EXPECT_TRUE(check->isCritical());
@@ -310,17 +310,14 @@ TEST(FunctionHealthCheckTest, Construction) {
 
 TEST(FunctionHealthCheckTest, NonCritical) {
     auto check = std::make_shared<FunctionHealthCheck>(
-        "test_check",
-        []() { return HealthCheckResult::healthy(); },
-        false);
+        "test_check", []() { return HealthCheckResult::healthy(); }, false);
 
     EXPECT_FALSE(check->isCritical());
 }
 
 TEST(FunctionHealthCheckTest, Execute) {
     auto check = std::make_shared<FunctionHealthCheck>(
-        "test_check",
-        []() { return HealthCheckResult::healthy("OK"); });
+        "test_check", []() { return HealthCheckResult::healthy("OK"); });
 
     auto result = check->check();
     EXPECT_EQ(HealthStatus::HEALTHY, result.status);
@@ -369,9 +366,7 @@ TEST(HealthCheckRegistryTest, RegisterFunction) {
     auto& registry = HealthCheckRegistry::instance();
     registry.clear();
 
-    registry.registerCheck("database", []() {
-        return HealthCheckResult::healthy("Connected");
-    });
+    registry.registerCheck("database", []() { return HealthCheckResult::healthy("Connected"); });
 
     auto names = registry.getCheckNames();
     EXPECT_EQ(1, names.size());
@@ -383,8 +378,7 @@ TEST(HealthCheckRegistryTest, RegisterHealthCheck) {
     registry.clear();
 
     auto check = std::make_shared<FunctionHealthCheck>(
-        "api",
-        []() { return HealthCheckResult::healthy(); });
+        "api", []() { return HealthCheckResult::healthy(); });
 
     registry.registerCheck(check);
 
@@ -397,9 +391,7 @@ TEST(HealthCheckRegistryTest, UnregisterCheck) {
     auto& registry = HealthCheckRegistry::instance();
     registry.clear();
 
-    registry.registerCheck("test", []() {
-        return HealthCheckResult::healthy();
-    });
+    registry.registerCheck("test", []() { return HealthCheckResult::healthy(); });
 
     EXPECT_EQ(1, registry.getCheckNames().size());
 
@@ -411,13 +403,9 @@ TEST(HealthCheckRegistryTest, RunAllChecksAllHealthy) {
     auto& registry = HealthCheckRegistry::instance();
     registry.clear();
 
-    registry.registerCheck("check1", []() {
-        return HealthCheckResult::healthy("OK");
-    });
+    registry.registerCheck("check1", []() { return HealthCheckResult::healthy("OK"); });
 
-    registry.registerCheck("check2", []() {
-        return HealthCheckResult::healthy("OK");
-    });
+    registry.registerCheck("check2", []() { return HealthCheckResult::healthy("OK"); });
 
     auto report = registry.runAllChecks();
 
@@ -430,13 +418,9 @@ TEST(HealthCheckRegistryTest, RunAllChecksWithDegraded) {
     auto& registry = HealthCheckRegistry::instance();
     registry.clear();
 
-    registry.registerCheck("check1", []() {
-        return HealthCheckResult::healthy();
-    });
+    registry.registerCheck("check1", []() { return HealthCheckResult::healthy(); });
 
-    registry.registerCheck("check2", []() {
-        return HealthCheckResult::degraded("Slow");
-    });
+    registry.registerCheck("check2", []() { return HealthCheckResult::degraded("Slow"); });
 
     auto report = registry.runAllChecks();
 
@@ -448,13 +432,11 @@ TEST(HealthCheckRegistryTest, RunAllChecksWithUnhealthy) {
     auto& registry = HealthCheckRegistry::instance();
     registry.clear();
 
-    registry.registerCheck("check1", []() {
-        return HealthCheckResult::healthy();
-    }, true);  // critical
+    registry.registerCheck(
+        "check1", []() { return HealthCheckResult::healthy(); }, true);  // critical
 
-    registry.registerCheck("check2", []() {
-        return HealthCheckResult::unhealthy("Failed");
-    }, true);  // critical
+    registry.registerCheck(
+        "check2", []() { return HealthCheckResult::unhealthy("Failed"); }, true);  // critical
 
     auto report = registry.runAllChecks();
 
@@ -466,13 +448,11 @@ TEST(HealthCheckRegistryTest, RunAllChecksNonCriticalUnhealthy) {
     auto& registry = HealthCheckRegistry::instance();
     registry.clear();
 
-    registry.registerCheck("check1", []() {
-        return HealthCheckResult::healthy();
-    }, true);  // critical
+    registry.registerCheck(
+        "check1", []() { return HealthCheckResult::healthy(); }, true);  // critical
 
-    registry.registerCheck("check2", []() {
-        return HealthCheckResult::unhealthy("Failed");
-    }, false);  // non-critical
+    registry.registerCheck(
+        "check2", []() { return HealthCheckResult::unhealthy("Failed"); }, false);  // non-critical
 
     auto report = registry.runAllChecks();
 
@@ -485,9 +465,7 @@ TEST(HealthCheckRegistryTest, RunSpecificCheck) {
     auto& registry = HealthCheckRegistry::instance();
     registry.clear();
 
-    registry.registerCheck("database", []() {
-        return HealthCheckResult::healthy("Connected");
-    });
+    registry.registerCheck("database", []() { return HealthCheckResult::healthy("Connected"); });
 
     auto result = registry.runCheck("database");
 
@@ -524,7 +502,7 @@ TEST(ObservabilityIntegrationTest, MetricsAndHealthChecks) {
 
     health.registerCheck("error_rate", [&]() {
         double errorRate = static_cast<double>(errorCounter->getValue()) /
-                          static_cast<double>(requestCounter->getValue());
+                           static_cast<double>(requestCounter->getValue());
 
         if (errorRate > 0.1) {
             return HealthCheckResult::unhealthy("Error rate too high");

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
+
 #include "diagon/store/ByteBuffersIndexInput.h"
 #include "diagon/util/Exceptions.h"
 
@@ -16,7 +17,6 @@ Lucene104PostingsReader::Lucene104PostingsReader(index::SegmentReadState& state)
     : docIn_(nullptr)
     , segmentName_(state.segmentName)
     , segmentSuffix_(state.segmentSuffix) {
-
     // Create .doc input file
     std::string docFileName = segmentName_;
     if (!segmentSuffix_.empty()) {
@@ -38,10 +38,8 @@ Lucene104PostingsReader::~Lucene104PostingsReader() {
     }
 }
 
-std::unique_ptr<index::PostingsEnum> Lucene104PostingsReader::postings(
-    const index::FieldInfo& fieldInfo,
-    const TermState& termState) {
-
+std::unique_ptr<index::PostingsEnum>
+Lucene104PostingsReader::postings(const index::FieldInfo& fieldInfo, const TermState& termState) {
     if (!docIn_) {
         throw std::runtime_error("No input set for PostingsReader");
     }
@@ -49,10 +47,7 @@ std::unique_ptr<index::PostingsEnum> Lucene104PostingsReader::postings(
     // Determine if frequencies are written
     bool writeFreqs = (fieldInfo.indexOptions >= index::IndexOptions::DOCS_AND_FREQS);
 
-    return std::make_unique<Lucene104PostingsEnum>(
-        docIn_.get(),
-        termState,
-        writeFreqs);
+    return std::make_unique<Lucene104PostingsEnum>(docIn_.get(), termState, writeFreqs);
 }
 
 void Lucene104PostingsReader::close() {
@@ -63,10 +58,8 @@ void Lucene104PostingsReader::close() {
 
 // ==================== Lucene104PostingsEnum ====================
 
-Lucene104PostingsEnum::Lucene104PostingsEnum(
-    store::IndexInput* docIn,
-    const TermState& termState,
-    bool writeFreqs)
+Lucene104PostingsEnum::Lucene104PostingsEnum(store::IndexInput* docIn, const TermState& termState,
+                                             bool writeFreqs)
     : docIn_(docIn)
     , docFreq_(termState.docFreq)
     , totalTermFreq_(termState.totalTermFreq)
@@ -74,7 +67,6 @@ Lucene104PostingsEnum::Lucene104PostingsEnum(
     , currentDoc_(-1)
     , currentFreq_(1)
     , docsRead_(0) {
-
     // Seek to start of this term's postings
     docIn_->seek(termState.docStartFP);
 }

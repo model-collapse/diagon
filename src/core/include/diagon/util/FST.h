@@ -5,9 +5,9 @@
 
 #include "diagon/util/BytesRef.h"
 
-#include <vector>
-#include <memory>
 #include <cstdint>
+#include <memory>
+#include <vector>
 
 namespace diagon {
 namespace util {
@@ -90,14 +90,14 @@ public:
          * Constructor.
          */
         Arc(uint8_t l, Node* t, Output o = 0)
-            : label(l), target(t), output(o) {}
+            : label(l)
+            , target(t)
+            , output(o) {}
 
         /**
          * Comparison for sorting arcs by label.
          */
-        bool operator<(const Arc& other) const {
-            return label < other.label;
-        }
+        bool operator<(const Arc& other) const { return label < other.label; }
     };
 
     /**

@@ -1,14 +1,13 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
+#include "diagon/index/IndexReader.h"
 #include "diagon/search/DocIdSetIterator.h"
 #include "diagon/search/IndexSearcher.h"
 #include "diagon/search/Query.h"
 #include "diagon/search/ScoreMode.h"
 #include "diagon/search/Scorer.h"
 #include "diagon/search/Weight.h"
-
-#include "diagon/index/IndexReader.h"
 #include "diagon/store/Directory.h"
 
 #include <gtest/gtest.h>
@@ -21,11 +20,10 @@ using namespace diagon::store;
 
 class MockDocIdSetIterator : public DocIdSetIterator {
 public:
-    MockDocIdSetIterator() : current_doc_(-1) {}
+    MockDocIdSetIterator()
+        : current_doc_(-1) {}
 
-    int docID() const override {
-        return current_doc_;
-    }
+    int docID() const override { return current_doc_; }
 
     int nextDoc() override {
         if (current_doc_ == NO_MORE_DOCS) {
@@ -46,9 +44,7 @@ public:
         return current_doc_;
     }
 
-    int64_t cost() const override {
-        return 10;
-    }
+    int64_t cost() const override { return 10; }
 
 private:
     int current_doc_;
@@ -58,23 +54,17 @@ class MockWeight;
 
 class MockScorer : public Scorer {
 public:
-    explicit MockScorer(const MockWeight& weight) : weight_(weight), it_() {}
+    explicit MockScorer(const MockWeight& weight)
+        : weight_(weight)
+        , it_() {}
 
-    int docID() const override {
-        return it_.docID();
-    }
+    int docID() const override { return it_.docID(); }
 
-    int nextDoc() override {
-        return it_.nextDoc();
-    }
+    int nextDoc() override { return it_.nextDoc(); }
 
-    int advance(int target) override {
-        return it_.advance(target);
-    }
+    int advance(int target) override { return it_.advance(target); }
 
-    int64_t cost() const override {
-        return it_.cost();
-    }
+    int64_t cost() const override { return it_.cost(); }
 
     float score() const override {
         return 1.0f;  // Constant score
@@ -89,39 +79,30 @@ private:
 
 class MockQuery : public Query {
 public:
-    std::unique_ptr<Weight> createWeight(
-        IndexSearcher& searcher,
-        ScoreMode scoreMode,
-        float boost) const override;
+    std::unique_ptr<Weight> createWeight(IndexSearcher& searcher, ScoreMode scoreMode,
+                                         float boost) const override;
 
-    std::string toString(const std::string& field) const override {
-        return "MockQuery";
-    }
+    std::string toString(const std::string& field) const override { return "MockQuery"; }
 
     bool equals(const Query& other) const override {
         return dynamic_cast<const MockQuery*>(&other) != nullptr;
     }
 
-    size_t hashCode() const override {
-        return 42;
-    }
+    size_t hashCode() const override { return 42; }
 
-    std::unique_ptr<Query> clone() const override {
-        return std::make_unique<MockQuery>();
-    }
+    std::unique_ptr<Query> clone() const override { return std::make_unique<MockQuery>(); }
 };
 
 class MockWeight : public Weight {
 public:
-    explicit MockWeight(const MockQuery& query) : query_(query) {}
+    explicit MockWeight(const MockQuery& query)
+        : query_(query) {}
 
     std::unique_ptr<Scorer> scorer(const LeafReaderContext& context) const override {
         return std::make_unique<MockScorer>(*this);
     }
 
-    const Query& getQuery() const override {
-        return query_;
-    }
+    const Query& getQuery() const override { return query_; }
 
 private:
     const MockQuery& query_;
@@ -131,10 +112,8 @@ const Weight& MockScorer::getWeight() const {
     return weight_;
 }
 
-std::unique_ptr<Weight> MockQuery::createWeight(
-    IndexSearcher& searcher,
-    ScoreMode scoreMode,
-    float boost) const {
+std::unique_ptr<Weight> MockQuery::createWeight(IndexSearcher& searcher, ScoreMode scoreMode,
+                                                float boost) const {
     return std::make_unique<MockWeight>(*this);
 }
 

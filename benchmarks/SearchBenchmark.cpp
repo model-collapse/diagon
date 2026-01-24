@@ -1,15 +1,16 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/index/IndexWriter.h"
-#include "diagon/index/DirectoryReader.h"
-#include "diagon/search/IndexSearcher.h"
-#include "diagon/search/TermQuery.h"
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/DirectoryReader.h"
+#include "diagon/index/IndexWriter.h"
+#include "diagon/search/IndexSearcher.h"
+#include "diagon/search/TermQuery.h"
 #include "diagon/store/FSDirectory.h"
 
 #include <benchmark/benchmark.h>
+
 #include <filesystem>
 #include <random>
 #include <sstream>
@@ -29,39 +30,17 @@ namespace fs = std::filesystem;
  */
 std::string generateRandomText(int numWords, std::mt19937& rng) {
     static const std::vector<std::string> words = {
-        "search",
-        "engine",
-        "index",
-        "document",
-        "query",
-        "result",
-        "score",
-        "lucene",
-        "elasticsearch",
-        "database",
-        "algorithm",
-        "data",
-        "fast",
-        "performance",
-        "benchmark",
-        "optimization",
-        "memory",
-        "distributed",
-        "the",
-        "quick",
-        "brown",
-        "fox",
-        "jumps",
-        "over",
-        "lazy",
-        "dog"
-    };
+        "search",    "engine",        "index",    "document",    "query", "result", "score",
+        "lucene",    "elasticsearch", "database", "algorithm",   "data",  "fast",   "performance",
+        "benchmark", "optimization",  "memory",   "distributed", "the",   "quick",  "brown",
+        "fox",       "jumps",         "over",     "lazy",        "dog"};
 
     std::uniform_int_distribution<> dist(0, words.size() - 1);
     std::ostringstream oss;
 
     for (int i = 0; i < numWords; i++) {
-        if (i > 0) oss << " ";
+        if (i > 0)
+            oss << " ";
         oss << words[dist(rng)];
     }
 
@@ -112,7 +91,8 @@ static void BM_TermQuerySearch(benchmark::State& state) {
     static std::unordered_map<int, fs::path> pathCache;
 
     if (indexCache.find(numDocs) == indexCache.end()) {
-        fs::path indexPath = fs::temp_directory_path() / ("diagon_search_bench_" + std::to_string(numDocs));
+        fs::path indexPath = fs::temp_directory_path() /
+                             ("diagon_search_bench_" + std::to_string(numDocs));
         indexCache[numDocs] = createTestIndex(numDocs, indexPath);
         pathCache[numDocs] = indexPath;
     }

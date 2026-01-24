@@ -31,7 +31,8 @@ struct ScoreDoc {
     float score;
 
     ScoreDoc(int doc_ = 0, float score_ = 0.0f)
-        : doc(doc_), score(score_) {}
+        : doc(doc_)
+        , score(score_) {}
 };
 
 /**
@@ -42,7 +43,8 @@ struct TopDocs {
     std::vector<ScoreDoc> scoreDocs;
 
     TopDocs() = default;
-    explicit TopDocs(int totalHits_) : totalHits(totalHits_) {}
+    explicit TopDocs(int totalHits_)
+        : totalHits(totalHits_) {}
 };
 
 /**
@@ -98,9 +100,8 @@ public:
  */
 class UnifiedSIMDQueryProcessor {
 public:
-    explicit UnifiedSIMDQueryProcessor(
-        const UnifiedColumnReader& reader,
-        ScoringMode mode = ScoringMode::BM25)
+    explicit UnifiedSIMDQueryProcessor(const UnifiedColumnReader& reader,
+                                       ScoringMode mode = ScoringMode::BM25)
         : reader_(reader)
         , mode_(mode)
         , bm25Scorer_(1.2f, 0.75f, 100.0f)
@@ -112,23 +113,17 @@ public:
     /**
      * Get scoring mode
      */
-    ScoringMode getScoringMode() const {
-        return mode_;
-    }
+    ScoringMode getScoringMode() const { return mode_; }
 
     /**
      * Set scoring mode
      */
-    void setScoringMode(ScoringMode mode) {
-        mode_ = mode;
-    }
+    void setScoringMode(ScoringMode mode) { mode_ = mode; }
 
     /**
      * Get BM25 scorer (for parameter tuning)
      */
-    SIMDBm25Scorer& getBm25Scorer() {
-        return bm25Scorer_;
-    }
+    SIMDBm25Scorer& getBm25Scorer() { return bm25Scorer_; }
 
     // ==================== Query Execution ====================
 
@@ -141,11 +136,8 @@ public:
      *
      * NOTE: Stub - actual SIMD execution not implemented
      */
-    TopDocs searchOr(
-        const std::vector<std::pair<std::string, float>>& queryTerms,
-        FilterPtr filter,
-        int topK) {
-
+    TopDocs searchOr(const std::vector<std::pair<std::string, float>>& queryTerms, FilterPtr filter,
+                     int topK) {
         TopDocs result;
 
         if (mode_ == ScoringMode::BM25) {
@@ -186,11 +178,8 @@ public:
      *
      * NOTE: Stub implementation
      */
-    TopDocs searchAnd(
-        const std::vector<std::pair<std::string, float>>& queryTerms,
-        FilterPtr filter,
-        int topK) {
-
+    TopDocs searchAnd(const std::vector<std::pair<std::string, float>>& queryTerms,
+                      FilterPtr filter, int topK) {
         // Stub: would intersect posting lists then score
         return TopDocs{};
     }
@@ -200,11 +189,7 @@ public:
      *
      * NOTE: Stub implementation
      */
-    TopDocs searchPhrase(
-        const std::vector<std::string>& terms,
-        FilterPtr filter,
-        int topK) {
-
+    TopDocs searchPhrase(const std::vector<std::string>& terms, FilterPtr filter, int topK) {
         // Stub: would verify position constraints
         return TopDocs{};
     }

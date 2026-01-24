@@ -5,11 +5,13 @@
 
 #include "diagon/util/Exceptions.h"
 
+#include <sys/file.h>
+
 #include <algorithm>
 #include <atomic>
 #include <cstring>
+
 #include <fcntl.h>
-#include <sys/file.h>
 #include <unistd.h>
 
 namespace diagon::store {
@@ -75,9 +77,8 @@ int64_t FSDirectory::fileLength(const std::string& name) const {
     }
 }
 
-std::unique_ptr<IndexOutput> FSDirectory::createOutput(
-    const std::string& name,
-    const IOContext& context) {
+std::unique_ptr<IndexOutput> FSDirectory::createOutput(const std::string& name,
+                                                       const IOContext& context) {
     ensureOpen();
 
     auto path = directory_ / name;
@@ -90,10 +91,9 @@ std::unique_ptr<IndexOutput> FSDirectory::createOutput(
     return std::make_unique<FSIndexOutput>(path);
 }
 
-std::unique_ptr<IndexOutput> FSDirectory::createTempOutput(
-    const std::string& prefix,
-    const std::string& suffix,
-    const IOContext& context) {
+std::unique_ptr<IndexOutput> FSDirectory::createTempOutput(const std::string& prefix,
+                                                           const std::string& suffix,
+                                                           const IOContext& context) {
     ensureOpen();
 
     // Generate unique temp filename
@@ -101,9 +101,8 @@ std::unique_ptr<IndexOutput> FSDirectory::createTempOutput(
     return createOutput(tempName, context);
 }
 
-std::unique_ptr<IndexInput> FSDirectory::openInput(
-    const std::string& name,
-    const IOContext& context) const {
+std::unique_ptr<IndexInput> FSDirectory::openInput(const std::string& name,
+                                                   const IOContext& context) const {
     ensureOpen();
 
     auto path = directory_ / name;
@@ -197,13 +196,13 @@ void FSDirectory::fsyncDirectory(const std::filesystem::path& path) {
 // ==================== FSIndexInput ====================
 
 FSIndexInput::FSIndexInput(const std::filesystem::path& path, size_t bufferSize)
-    : file_path_(path),
-      file_(path, std::ios::binary),
-      buffer_(bufferSize),
-      buffer_position_(0),
-      buffer_length_(0),
-      slice_offset_(0),
-      is_slice_(false) {
+    : file_path_(path)
+    , file_(path, std::ios::binary)
+    , buffer_(bufferSize)
+    , buffer_position_(0)
+    , buffer_length_(0)
+    , slice_offset_(0)
+    , is_slice_(false) {
     if (!file_.is_open()) {
         throw IOException("Failed to open file: " + path.string());
     }
@@ -217,18 +216,16 @@ FSIndexInput::FSIndexInput(const std::filesystem::path& path, size_t bufferSize)
     slice_length_ = file_length_;
 }
 
-FSIndexInput::FSIndexInput(const std::filesystem::path& path,
-                           int64_t offset,
-                           int64_t length,
+FSIndexInput::FSIndexInput(const std::filesystem::path& path, int64_t offset, int64_t length,
                            size_t bufferSize)
-    : file_path_(path),
-      file_(path, std::ios::binary),
-      buffer_(bufferSize),
-      buffer_position_(0),
-      buffer_length_(0),
-      slice_offset_(offset),
-      slice_length_(length),
-      is_slice_(true) {
+    : file_path_(path)
+    , file_(path, std::ios::binary)
+    , buffer_(bufferSize)
+    , buffer_position_(0)
+    , buffer_length_(0)
+    , slice_offset_(offset)
+    , slice_length_(length)
+    , is_slice_(true) {
     if (!file_.is_open()) {
         throw IOException("Failed to open file: " + path.string());
     }
@@ -304,8 +301,8 @@ int64_t FSIndexInput::length() const {
 std::unique_ptr<IndexInput> FSIndexInput::clone() const {
     std::unique_ptr<FSIndexInput> cloned;
     if (is_slice_) {
-        cloned = std::make_unique<FSIndexInput>(file_path_, slice_offset_,
-                                                 slice_length_, buffer_.size());
+        cloned = std::make_unique<FSIndexInput>(file_path_, slice_offset_, slice_length_,
+                                                buffer_.size());
     } else {
         cloned = std::make_unique<FSIndexInput>(file_path_, buffer_.size());
     }
@@ -314,17 +311,14 @@ std::unique_ptr<IndexInput> FSIndexInput::clone() const {
     return cloned;
 }
 
-std::unique_ptr<IndexInput> FSIndexInput::slice(
-    const std::string& sliceDescription,
-    int64_t offset,
-    int64_t length) const {
+std::unique_ptr<IndexInput> FSIndexInput::slice(const std::string& sliceDescription, int64_t offset,
+                                                int64_t length) const {
     if (offset < 0 || length < 0 || offset + length > this->length()) {
         throw IOException("Invalid slice parameters");
     }
 
     int64_t absoluteOffset = is_slice_ ? (slice_offset_ + offset) : offset;
-    return std::make_unique<FSIndexInput>(file_path_, absoluteOffset, length,
-                                           buffer_.size());
+    return std::make_unique<FSIndexInput>(file_path_, absoluteOffset, length, buffer_.size());
 }
 
 std::string FSIndexInput::toString() const {
@@ -352,11 +346,11 @@ void FSIndexInput::refillBuffer() {
 // ==================== FSIndexOutput ====================
 
 FSIndexOutput::FSIndexOutput(const std::filesystem::path& path, size_t bufferSize)
-    : file_path_(path),
-      file_(path, std::ios::binary | std::ios::trunc),
-      file_position_(0),
-      buffer_(bufferSize),
-      buffer_position_(0) {
+    : file_path_(path)
+    , file_(path, std::ios::binary | std::ios::trunc)
+    , file_position_(0)
+    , buffer_(bufferSize)
+    , buffer_position_(0) {
     if (!file_.is_open()) {
         throw IOException("Failed to create file: " + path.string());
     }
@@ -411,8 +405,7 @@ void FSIndexOutput::close() {
 
 void FSIndexOutput::flushBuffer() {
     if (buffer_position_ > 0) {
-        file_.write(reinterpret_cast<const char*>(buffer_.data()),
-                    buffer_position_);
+        file_.write(reinterpret_cast<const char*>(buffer_.data()), buffer_position_);
         if (!file_) {
             throw IOException("Write failed");
         }
@@ -428,19 +421,19 @@ std::unique_ptr<Lock> FSLock::obtain(const std::filesystem::path& lockPath) {
 }
 
 FSLock::FSLock(const std::filesystem::path& lockPath)
-    : lock_path_(lockPath), fd_(-1), closed_(false) {
+    : lock_path_(lockPath)
+    , fd_(-1)
+    , closed_(false) {
     // Create lock file
     fd_ = ::open(lockPath.c_str(), O_CREAT | O_RDWR, 0644);
     if (fd_ == -1) {
-        throw LockObtainFailedException("Failed to create lock file: " +
-                                        lockPath.string());
+        throw LockObtainFailedException("Failed to create lock file: " + lockPath.string());
     }
 
     // Try to lock (non-blocking)
     if (::flock(fd_, LOCK_EX | LOCK_NB) != 0) {
         ::close(fd_);
-        throw LockObtainFailedException("Failed to obtain lock: " +
-                                        lockPath.string());
+        throw LockObtainFailedException("Failed to obtain lock: " + lockPath.string());
     }
 }
 
@@ -476,4 +469,4 @@ void FSLock::ensureValid() {
     }
 }
 
-} // namespace diagon::store
+}  // namespace diagon::store

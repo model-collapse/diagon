@@ -127,32 +127,32 @@ enum class DocValuesSkipIndexType : uint8_t {
 struct FieldInfo {
     // ==================== Basic Identity ====================
 
-    std::string name;           // Field name (unique)
-    int32_t number{-1};         // Global field number (unique, >= 0)
+    std::string name;    // Field name (unique)
+    int32_t number{-1};  // Global field number (unique, >= 0)
 
     // ==================== Indexing Configuration ====================
 
     IndexOptions indexOptions{IndexOptions::NONE};  // Posting list detail level
-    bool storeTermVector{false};       // Store term vectors?
-    bool omitNorms{false};             // Omit length normalization?
-    bool storePayloads{false};         // Store position payloads?
+    bool storeTermVector{false};                    // Store term vectors?
+    bool omitNorms{false};                          // Omit length normalization?
+    bool storePayloads{false};                      // Store position payloads?
 
     // ==================== Doc Values Configuration ====================
 
-    DocValuesType docValuesType{DocValuesType::NONE};            // Column storage type
+    DocValuesType docValuesType{DocValuesType::NONE};                         // Column storage type
     DocValuesSkipIndexType docValuesSkipIndex{DocValuesSkipIndexType::NONE};  // Skip index type
-    int64_t dvGen{-1};                          // Doc values generation (-1 if none)
+    int64_t dvGen{-1};  // Doc values generation (-1 if none)
 
     // ==================== Point Values (Spatial/Numeric) ====================
 
-    int32_t pointDimensionCount{0};        // Number of dimensions (0 if none)
-    int32_t pointIndexDimensionCount{0};   // Dimensions used for indexing
-    int32_t pointNumBytes{0};              // Bytes per dimension
+    int32_t pointDimensionCount{0};       // Number of dimensions (0 if none)
+    int32_t pointIndexDimensionCount{0};  // Dimensions used for indexing
+    int32_t pointNumBytes{0};             // Bytes per dimension
 
     // ==================== Special Field Roles ====================
 
-    bool softDeletesField{false};      // Is this the soft-deletes marker field?
-    bool isParentField{false};         // Is this the parent document field?
+    bool softDeletesField{false};  // Is this the soft-deletes marker field?
+    bool isParentField{false};     // Is this the parent document field?
 
     // ==================== Codec Metadata ====================
 
@@ -171,23 +171,17 @@ struct FieldInfo {
     /**
      * Does this field have postings?
      */
-    bool hasPostings() const {
-        return indexOptions != IndexOptions::NONE;
-    }
+    bool hasPostings() const { return indexOptions != IndexOptions::NONE; }
 
     /**
      * Does this field have frequencies?
      */
-    bool hasFreqs() const {
-        return indexOptions >= IndexOptions::DOCS_AND_FREQS;
-    }
+    bool hasFreqs() const { return indexOptions >= IndexOptions::DOCS_AND_FREQS; }
 
     /**
      * Does this field have positions?
      */
-    bool hasPositions() const {
-        return indexOptions >= IndexOptions::DOCS_AND_FREQS_AND_POSITIONS;
-    }
+    bool hasPositions() const { return indexOptions >= IndexOptions::DOCS_AND_FREQS_AND_POSITIONS; }
 
     /**
      * Does this field have offsets?
@@ -199,23 +193,17 @@ struct FieldInfo {
     /**
      * Does this field have norms?
      */
-    bool hasNorms() const {
-        return !omitNorms && hasPostings();
-    }
+    bool hasNorms() const { return !omitNorms && hasPostings(); }
 
     /**
      * Does this field have doc values?
      */
-    bool hasDocValues() const {
-        return docValuesType != DocValuesType::NONE;
-    }
+    bool hasDocValues() const { return docValuesType != DocValuesType::NONE; }
 
     /**
      * Does this field have point values?
      */
-    bool hasPointValues() const {
-        return pointDimensionCount > 0;
-    }
+    bool hasPointValues() const { return pointDimensionCount > 0; }
 
     /**
      * Get attribute value
@@ -263,9 +251,7 @@ public:
     /**
      * Number of fields
      */
-    size_t size() const {
-        return byNumber_.size();
-    }
+    size_t size() const { return byNumber_.size(); }
 
     // ==================== Iteration ====================
 
@@ -292,20 +278,16 @@ public:
     /**
      * Name of soft-deletes field (empty if none)
      */
-    const std::string& getSoftDeletesField() const {
-        return softDeletesField_;
-    }
+    const std::string& getSoftDeletesField() const { return softDeletesField_; }
 
     /**
      * Name of parent document field (empty if none)
      */
-    const std::string& getParentField() const {
-        return parentField_;
-    }
+    const std::string& getParentField() const { return parentField_; }
 
 private:
     // Storage
-    std::vector<FieldInfo> byNumber_;  // Indexed by field number
+    std::vector<FieldInfo> byNumber_;                 // Indexed by field number
     std::map<std::string, const FieldInfo*> byName_;  // Name lookup
 
     // Aggregate flags
@@ -369,9 +351,7 @@ public:
     /**
      * Get field count
      */
-    int32_t getFieldCount() const {
-        return static_cast<int32_t>(byName_.size());
-    }
+    int32_t getFieldCount() const { return static_cast<int32_t>(byName_.size()); }
 
     /**
      * Reset for reuse

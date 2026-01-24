@@ -2,12 +2,14 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/SegmentReader.h"
-#include "diagon/index/IndexWriter.h"
+
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/IndexWriter.h"
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 
 using namespace diagon;
@@ -22,7 +24,8 @@ protected:
     void SetUp() override {
         // Create unique directory for each test
         static int testCounter = 0;
-        testDir_ = fs::temp_directory_path() / ("diagon_segment_reader_test_" + std::to_string(testCounter++));
+        testDir_ = fs::temp_directory_path() /
+                   ("diagon_segment_reader_test_" + std::to_string(testCounter++));
         fs::create_directories(testDir_);
         dir = FSDirectory::open(testDir_.string());
     }
@@ -50,7 +53,8 @@ protected:
             ft.stored = true;
             ft.tokenized = true;
 
-            doc.add(std::make_unique<Field>("body", "hello world test doc" + std::to_string(i), ft));
+            doc.add(
+                std::make_unique<Field>("body", "hello world test doc" + std::to_string(i), ft));
             writer.addDocument(doc);
         }
 

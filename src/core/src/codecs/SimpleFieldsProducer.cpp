@@ -2,8 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/SimpleFieldsProducer.h"
-#include "diagon/store/IndexInput.h"
+
 #include "diagon/store/IOContext.h"
+#include "diagon/store/IndexInput.h"
 #include "diagon/util/Exceptions.h"
 
 #include <algorithm>
@@ -21,12 +22,10 @@ static const int32_t VERSION = 1;
 
 // ==================== SimpleFieldsProducer ====================
 
-SimpleFieldsProducer::SimpleFieldsProducer(
-    Directory& dir,
-    const std::string& segmentName,
-    const std::string& fieldName)
-    : segmentName_(segmentName),
-      fieldName_(fieldName) {
+SimpleFieldsProducer::SimpleFieldsProducer(Directory& dir, const std::string& segmentName,
+                                           const std::string& fieldName)
+    : segmentName_(segmentName)
+    , fieldName_(fieldName) {
     load(dir);
 }
 
@@ -101,14 +100,9 @@ bool SimpleTermsEnum::seekExact(const BytesRef& text) {
     std::string target(reinterpret_cast<const char*>(text.bytes().data()), text.length());
 
     // Binary search
-    auto it = std::lower_bound(
-        terms_.begin(),
-        terms_.end(),
-        target,
-        [](const SimpleFieldsProducer::TermData& term, const std::string& value) {
-            return term.term < value;
-        }
-    );
+    auto it = std::lower_bound(terms_.begin(), terms_.end(), target,
+                               [](const SimpleFieldsProducer::TermData& term,
+                                  const std::string& value) { return term.term < value; });
 
     if (it != terms_.end() && it->term == target) {
         current_ = static_cast<int>(std::distance(terms_.begin(), it));
@@ -122,14 +116,9 @@ TermsEnum::SeekStatus SimpleTermsEnum::seekCeil(const BytesRef& text) {
     std::string target(reinterpret_cast<const char*>(text.bytes().data()), text.length());
 
     // Binary search for ceiling
-    auto it = std::lower_bound(
-        terms_.begin(),
-        terms_.end(),
-        target,
-        [](const SimpleFieldsProducer::TermData& term, const std::string& value) {
-            return term.term < value;
-        }
-    );
+    auto it = std::lower_bound(terms_.begin(), terms_.end(), target,
+                               [](const SimpleFieldsProducer::TermData& term,
+                                  const std::string& value) { return term.term < value; });
 
     if (it == terms_.end()) {
         // Past last term
@@ -151,10 +140,8 @@ BytesRef SimpleTermsEnum::term() const {
     }
 
     const std::string& termStr = terms_[current_].term;
-    return BytesRef(
-        reinterpret_cast<const uint8_t*>(termStr.data()),
-        static_cast<int>(termStr.length())
-    );
+    return BytesRef(reinterpret_cast<const uint8_t*>(termStr.data()),
+                    static_cast<int>(termStr.length()));
 }
 
 int SimpleTermsEnum::docFreq() const {

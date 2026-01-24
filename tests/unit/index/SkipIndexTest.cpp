@@ -74,8 +74,8 @@ TEST(MergeTreeIndexGranuleMinMaxTest, MinMaxTracking) {
     granule.addMinValue(50.0);
     granule.addMaxValue(50.0);
 
-    granule.addMinValue(10.0);  // New min
-    granule.addMaxValue(100.0); // New max
+    granule.addMinValue(10.0);   // New min
+    granule.addMaxValue(100.0);  // New max
 
     granule.addMinValue(30.0);  // Not a new min
     granule.addMaxValue(80.0);  // Not a new max

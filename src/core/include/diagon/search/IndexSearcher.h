@@ -7,8 +7,8 @@
 #include "diagon/search/ScoreMode.h"
 #include "diagon/search/TopDocs.h"
 
-#include <memory>
 #include <limits>
+#include <memory>
 
 namespace diagon {
 
@@ -92,13 +92,9 @@ public:
     /**
      * Get underlying reader
      */
-    index::IndexReader& getIndexReader() {
-        return reader_;
-    }
+    index::IndexReader& getIndexReader() { return reader_; }
 
-    const index::IndexReader& getIndexReader() const {
-        return reader_;
-    }
+    const index::IndexReader& getIndexReader() const { return reader_; }
 
 private:
     index::IndexReader& reader_;

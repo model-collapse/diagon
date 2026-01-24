@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "diagon/util/BytesRef.h"
 #include "diagon/index/PostingsEnum.h"
+#include "diagon/util/BytesRef.h"
 
 #include <memory>
 

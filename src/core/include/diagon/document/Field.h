@@ -26,7 +26,8 @@ protected:
 
     // Protected constructor for subclasses
     Field(std::string name, FieldType type)
-        : name_(std::move(name)), type_(type) {}
+        : name_(std::move(name))
+        , type_(type) {}
 
 public:
     /**
@@ -46,13 +47,9 @@ public:
         , numericValue_(value) {}
 
     // IndexableField implementation
-    std::string name() const override {
-        return name_;
-    }
+    std::string name() const override { return name_; }
 
-    const FieldType& fieldType() const override {
-        return type_;
-    }
+    const FieldType& fieldType() const override { return type_; }
 
     std::optional<std::string> stringValue() const override {
         if (!stringValue_.empty()) {
@@ -64,9 +61,7 @@ public:
         return std::nullopt;
     }
 
-    std::optional<int64_t> numericValue() const override {
-        return numericValue_;
-    }
+    std::optional<int64_t> numericValue() const override { return numericValue_; }
 
     std::optional<util::BytesRef> binaryValue() const override {
         // Phase 2: not supporting binary fields yet
@@ -117,8 +112,7 @@ public:
     static FieldType TYPE_NOT_STORED;
 
     TextField(std::string name, std::string value, bool stored = false)
-        : Field(std::move(name), std::move(value),
-                stored ? TYPE_STORED : TYPE_NOT_STORED) {}
+        : Field(std::move(name), std::move(value), stored ? TYPE_STORED : TYPE_NOT_STORED) {}
 
     explicit TextField(std::string name, std::string value, FieldType type)
         : Field(std::move(name), std::move(value), type) {}
@@ -136,8 +130,7 @@ public:
     static FieldType TYPE_NOT_STORED;
 
     StringField(std::string name, std::string value, bool stored = false)
-        : Field(std::move(name), std::move(value),
-                stored ? TYPE_STORED : TYPE_NOT_STORED) {}
+        : Field(std::move(name), std::move(value), stored ? TYPE_STORED : TYPE_NOT_STORED) {}
 
     explicit StringField(std::string name, std::string value, FieldType type)
         : Field(std::move(name), std::move(value), type) {}

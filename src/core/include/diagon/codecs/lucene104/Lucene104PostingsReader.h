@@ -3,14 +3,14 @@
 
 #pragma once
 
-#include "diagon/store/IndexInput.h"
-#include "diagon/index/SegmentWriteState.h"
-#include "diagon/index/PostingsEnum.h"
 #include "diagon/codecs/lucene104/Lucene104PostingsWriter.h"
+#include "diagon/index/PostingsEnum.h"
+#include "diagon/index/SegmentWriteState.h"
+#include "diagon/store/IndexInput.h"
 
+#include <cstdint>
 #include <memory>
 #include <vector>
-#include <cstdint>
 
 namespace diagon {
 namespace codecs {
@@ -47,9 +47,8 @@ public:
      * @param termState Term state from writer (file pointers)
      * @return PostingsEnum for iterating docs
      */
-    std::unique_ptr<index::PostingsEnum> postings(
-        const index::FieldInfo& fieldInfo,
-        const TermState& termState);
+    std::unique_ptr<index::PostingsEnum> postings(const index::FieldInfo& fieldInfo,
+                                                  const TermState& termState);
 
     /**
      * Close all input files.
@@ -62,9 +61,7 @@ public:
      *
      * @param input IndexInput to read from
      */
-    void setInput(std::unique_ptr<store::IndexInput> input) {
-        docIn_ = std::move(input);
-    }
+    void setInput(std::unique_ptr<store::IndexInput> input) { docIn_ = std::move(input); }
 
 private:
     // Input file for doc IDs and frequencies
@@ -88,29 +85,21 @@ public:
      * @param termState Term state with file pointers
      * @param writeFreqs Whether frequencies are encoded
      */
-    Lucene104PostingsEnum(store::IndexInput* docIn,
-                          const TermState& termState,
-                          bool writeFreqs);
+    Lucene104PostingsEnum(store::IndexInput* docIn, const TermState& termState, bool writeFreqs);
 
     // ==================== DocIdSetIterator ====================
 
-    int docID() const override {
-        return currentDoc_;
-    }
+    int docID() const override { return currentDoc_; }
 
     int nextDoc() override;
 
     int advance(int target) override;
 
-    int64_t cost() const override {
-        return docFreq_;
-    }
+    int64_t cost() const override { return docFreq_; }
 
     // ==================== PostingsEnum ====================
 
-    int freq() const override {
-        return currentFreq_;
-    }
+    int freq() const override { return currentFreq_; }
 
 private:
     store::IndexInput* docIn_;  // Not owned

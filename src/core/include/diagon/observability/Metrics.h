@@ -18,10 +18,10 @@ namespace observability {
  * Metric types
  */
 enum class MetricType {
-    COUNTER,      // Monotonically increasing value
-    GAUGE,        // Value that can go up or down
-    HISTOGRAM,    // Distribution of values
-    TIMER         // Duration measurements
+    COUNTER,    // Monotonically increasing value
+    GAUGE,      // Value that can go up or down
+    HISTOGRAM,  // Distribution of values
+    TIMER       // Duration measurements
 };
 
 /**
@@ -43,40 +43,29 @@ public:
 class Counter : public Metric {
 public:
     explicit Counter(const std::string& name)
-        : name_(name), value_(0) {}
+        : name_(name)
+        , value_(0) {}
 
-    MetricType getType() const override {
-        return MetricType::COUNTER;
-    }
+    MetricType getType() const override { return MetricType::COUNTER; }
 
-    std::string getName() const override {
-        return name_;
-    }
+    std::string getName() const override { return name_; }
 
-    double getValue() const override {
-        return value_.load();
-    }
+    double getValue() const override { return value_.load(); }
 
     /**
      * Increment counter by 1
      */
-    void inc() {
-        value_.fetch_add(1, std::memory_order_relaxed);
-    }
+    void inc() { value_.fetch_add(1, std::memory_order_relaxed); }
 
     /**
      * Increment counter by value
      */
-    void add(int64_t value) {
-        value_.fetch_add(value, std::memory_order_relaxed);
-    }
+    void add(int64_t value) { value_.fetch_add(value, std::memory_order_relaxed); }
 
     /**
      * Reset counter to 0
      */
-    void reset() {
-        value_.store(0, std::memory_order_relaxed);
-    }
+    void reset() { value_.store(0, std::memory_order_relaxed); }
 
 private:
     std::string name_;
@@ -91,15 +80,12 @@ private:
 class Gauge : public Metric {
 public:
     explicit Gauge(const std::string& name)
-        : name_(name), value_(0) {}
+        : name_(name)
+        , value_(0) {}
 
-    MetricType getType() const override {
-        return MetricType::GAUGE;
-    }
+    MetricType getType() const override { return MetricType::GAUGE; }
 
-    std::string getName() const override {
-        return name_;
-    }
+    std::string getName() const override { return name_; }
 
     double getValue() const override {
         return value_.load() / 1000.0;  // Stored as int64 * 1000
@@ -117,16 +103,12 @@ public:
     /**
      * Increment gauge
      */
-    void inc() {
-        value_.fetch_add(1000, std::memory_order_relaxed);
-    }
+    void inc() { value_.fetch_add(1000, std::memory_order_relaxed); }
 
     /**
      * Decrement gauge
      */
-    void dec() {
-        value_.fetch_sub(1000, std::memory_order_relaxed);
-    }
+    void dec() { value_.fetch_sub(1000, std::memory_order_relaxed); }
 
 private:
     std::string name_;
@@ -147,17 +129,14 @@ public:
         , count_(0)
         , sum_(0) {}
 
-    MetricType getType() const override {
-        return MetricType::HISTOGRAM;
-    }
+    MetricType getType() const override { return MetricType::HISTOGRAM; }
 
-    std::string getName() const override {
-        return name_;
-    }
+    std::string getName() const override { return name_; }
 
     double getValue() const override {
         int64_t count = count_.load();
-        if (count == 0) return 0.0;
+        if (count == 0)
+            return 0.0;
         return (sum_.load() / static_cast<double>(count)) / 1000.0;  // Stored as value * 1000
     }
 
@@ -174,23 +153,17 @@ public:
     /**
      * Get count of observations
      */
-    int64_t getCount() const {
-        return count_.load();
-    }
+    int64_t getCount() const { return count_.load(); }
 
     /**
      * Get sum of all observations
      */
-    double getSum() const {
-        return sum_.load() / 1000.0;
-    }
+    double getSum() const { return sum_.load() / 1000.0; }
 
     /**
      * Get average value
      */
-    double getAverage() const {
-        return getValue();
-    }
+    double getAverage() const { return getValue(); }
 
 private:
     std::string name_;
@@ -212,17 +185,14 @@ public:
         , count_(0)
         , totalNanos_(0) {}
 
-    MetricType getType() const override {
-        return MetricType::TIMER;
-    }
+    MetricType getType() const override { return MetricType::TIMER; }
 
-    std::string getName() const override {
-        return name_;
-    }
+    std::string getName() const override { return name_; }
 
     double getValue() const override {
         int64_t count = count_.load();
-        if (count == 0) return 0.0;
+        if (count == 0)
+            return 0.0;
         // Return average in milliseconds
         return (totalNanos_.load() / count) / 1000000.0;
     }
@@ -247,23 +217,17 @@ public:
     /**
      * Get count of measurements
      */
-    int64_t getCount() const {
-        return count_.load();
-    }
+    int64_t getCount() const { return count_.load(); }
 
     /**
      * Get total duration in milliseconds
      */
-    double getTotalMs() const {
-        return totalNanos_.load() / 1000000.0;
-    }
+    double getTotalMs() const { return totalNanos_.load() / 1000000.0; }
 
     /**
      * Get average duration in milliseconds
      */
-    double getAverageMs() const {
-        return getValue();
-    }
+    double getAverageMs() const { return getValue(); }
 
 private:
     std::string name_;

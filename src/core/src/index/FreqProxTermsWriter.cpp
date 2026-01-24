@@ -12,8 +12,7 @@ namespace index {
 // ==================== FreqProxTermsWriter ====================
 
 FreqProxTermsWriter::FreqProxTermsWriter(FieldInfosBuilder& fieldInfosBuilder)
-    : fieldInfosBuilder_(fieldInfosBuilder) {
-}
+    : fieldInfosBuilder_(fieldInfosBuilder) {}
 
 void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) {
     // Iterate over all fields in document
@@ -52,12 +51,8 @@ void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) 
     }
 }
 
-void FreqProxTermsWriter::addTermOccurrence(
-    const std::string& fieldName,
-    const std::string& term,
-    int docID,
-    IndexOptions indexOptions) {
-
+void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const std::string& term,
+                                            int docID, IndexOptions indexOptions) {
     // Check if term already exists
     auto it = termToPosting_.find(term);
 
@@ -78,10 +73,8 @@ void FreqProxTermsWriter::addTermOccurrence(
     }
 }
 
-FreqProxTermsWriter::PostingData FreqProxTermsWriter::createPostingList(
-    const std::string& term,
-    int docID) {
-
+FreqProxTermsWriter::PostingData FreqProxTermsWriter::createPostingList(const std::string& term,
+                                                                        int docID) {
     PostingData data;
 
     // Store initial [docID, freq] pair
@@ -130,7 +123,7 @@ int64_t FreqProxTermsWriter::bytesUsed() const {
 
     // Posting list vectors (approximate)
     for (const auto& [term, data] : termToPosting_) {
-        bytes += term.capacity();  // Term string
+        bytes += term.capacity();                         // Term string
         bytes += data.postings.capacity() * sizeof(int);  // Posting vector
     }
 

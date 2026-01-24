@@ -4,6 +4,7 @@
 #include "diagon/compression/CompressionCodecs.h"
 
 #include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
 
@@ -25,16 +26,14 @@ TEST(NoneCodecTest, CompressDecompress) {
     std::vector<char> decompressed(input.size());
 
     // Compress
-    size_t comp_size = codec->compress(
-        input.data(), input.size(),
-        compressed.data(), compressed.size());
+    size_t comp_size = codec->compress(input.data(), input.size(), compressed.data(),
+                                       compressed.size());
 
     EXPECT_EQ(input.size(), comp_size);
 
     // Decompress
-    size_t decomp_size = codec->decompress(
-        compressed.data(), comp_size,
-        decompressed.data(), decompressed.size());
+    size_t decomp_size = codec->decompress(compressed.data(), comp_size, decompressed.data(),
+                                           decompressed.size());
 
     EXPECT_EQ(input.size(), decomp_size);
     EXPECT_EQ(input, std::string(decompressed.data(), decomp_size));
@@ -62,14 +61,12 @@ TEST(LZ4CodecTest, CompressDecompressStub) {
     std::vector<char> decompressed(input.size());
 
     // Compress (stub just copies)
-    size_t comp_size = codec->compress(
-        input.data(), input.size(),
-        compressed.data(), compressed.size());
+    size_t comp_size = codec->compress(input.data(), input.size(), compressed.data(),
+                                       compressed.size());
 
     // Decompress (stub just copies)
-    size_t decomp_size = codec->decompress(
-        compressed.data(), comp_size,
-        decompressed.data(), decompressed.size());
+    size_t decomp_size = codec->decompress(compressed.data(), comp_size, decompressed.data(),
+                                           decompressed.size());
 
     EXPECT_EQ(input, std::string(decompressed.data(), decomp_size));
 }
@@ -107,14 +104,12 @@ TEST(ZSTDCodecTest, CompressDecompressStub) {
     std::vector<char> decompressed(input.size());
 
     // Compress (stub just copies)
-    size_t comp_size = codec->compress(
-        input.data(), input.size(),
-        compressed.data(), compressed.size());
+    size_t comp_size = codec->compress(input.data(), input.size(), compressed.data(),
+                                       compressed.size());
 
     // Decompress (stub just copies)
-    size_t decomp_size = codec->decompress(
-        compressed.data(), comp_size,
-        decompressed.data(), decompressed.size());
+    size_t decomp_size = codec->decompress(compressed.data(), comp_size, decompressed.data(),
+                                           decompressed.size());
 
     EXPECT_EQ(input, std::string(decompressed.data(), decomp_size));
 }
@@ -133,29 +128,22 @@ TEST(CompressionCodecFactoryTest, GetCodecByName) {
 }
 
 TEST(CompressionCodecFactoryTest, GetCodecByNameInvalid) {
-    EXPECT_THROW(
-        CompressionCodecFactory::getCodec("InvalidCodec"),
-        std::runtime_error);
+    EXPECT_THROW(CompressionCodecFactory::getCodec("InvalidCodec"), std::runtime_error);
 }
 
 TEST(CompressionCodecFactoryTest, GetCodecById) {
-    auto none = CompressionCodecFactory::getCodecById(
-        static_cast<uint8_t>(CodecId::None));
+    auto none = CompressionCodecFactory::getCodecById(static_cast<uint8_t>(CodecId::None));
     EXPECT_EQ("None", none->getName());
 
-    auto lz4 = CompressionCodecFactory::getCodecById(
-        static_cast<uint8_t>(CodecId::LZ4));
+    auto lz4 = CompressionCodecFactory::getCodecById(static_cast<uint8_t>(CodecId::LZ4));
     EXPECT_EQ("LZ4", lz4->getName());
 
-    auto zstd = CompressionCodecFactory::getCodecById(
-        static_cast<uint8_t>(CodecId::ZSTD));
+    auto zstd = CompressionCodecFactory::getCodecById(static_cast<uint8_t>(CodecId::ZSTD));
     EXPECT_EQ("ZSTD", zstd->getName());
 }
 
 TEST(CompressionCodecFactoryTest, GetCodecByIdInvalid) {
-    EXPECT_THROW(
-        CompressionCodecFactory::getCodecById(0xFF),
-        std::runtime_error);
+    EXPECT_THROW(CompressionCodecFactory::getCodecById(0xFF), std::runtime_error);
 }
 
 TEST(CompressionCodecFactoryTest, GetDefault) {
@@ -176,17 +164,14 @@ TEST(CompressionIntegrationTest, RoundTripAllCodecs) {
         std::vector<char> compressed(codec->getMaxCompressedSize(input.size()));
         std::vector<char> decompressed(input.size());
 
-        size_t comp_size = codec->compress(
-            input.data(), input.size(),
-            compressed.data(), compressed.size());
+        size_t comp_size = codec->compress(input.data(), input.size(), compressed.data(),
+                                           compressed.size());
 
-        size_t decomp_size = codec->decompress(
-            compressed.data(), comp_size,
-            decompressed.data(), decompressed.size());
+        size_t decomp_size = codec->decompress(compressed.data(), comp_size, decompressed.data(),
+                                               decompressed.size());
 
         EXPECT_EQ(input.size(), decomp_size) << "Codec: " << name;
-        EXPECT_EQ(input, std::string(decompressed.data(), decomp_size))
-            << "Codec: " << name;
+        EXPECT_EQ(input, std::string(decompressed.data(), decomp_size)) << "Codec: " << name;
     }
 }
 
@@ -199,17 +184,14 @@ TEST(CompressionIntegrationTest, LargeData) {
     std::vector<char> compressed(codec->getMaxCompressedSize(input.size()));
     std::vector<char> decompressed(input.size());
 
-    size_t comp_size = codec->compress(
-        input.data(), input.size(),
-        compressed.data(), compressed.size());
+    size_t comp_size = codec->compress(input.data(), input.size(), compressed.data(),
+                                       compressed.size());
 
-    size_t decomp_size = codec->decompress(
-        compressed.data(), comp_size,
-        decompressed.data(), decompressed.size());
+    size_t decomp_size = codec->decompress(compressed.data(), comp_size, decompressed.data(),
+                                           decompressed.size());
 
     EXPECT_EQ(input.size(), decomp_size);
-    EXPECT_EQ(input, std::vector<char>(decompressed.begin(),
-                                       decompressed.begin() + decomp_size));
+    EXPECT_EQ(input, std::vector<char>(decompressed.begin(), decompressed.begin() + decomp_size));
 }
 
 TEST(CompressionIntegrationTest, EmptyData) {
@@ -220,15 +202,13 @@ TEST(CompressionIntegrationTest, EmptyData) {
     std::vector<char> compressed(codec->getMaxCompressedSize(1));
     std::vector<char> decompressed(1);
 
-    size_t comp_size = codec->compress(
-        input.data(), input.size(),
-        compressed.data(), compressed.size());
+    size_t comp_size = codec->compress(input.data(), input.size(), compressed.data(),
+                                       compressed.size());
 
     EXPECT_EQ(0, comp_size);
 
-    size_t decomp_size = codec->decompress(
-        compressed.data(), comp_size,
-        decompressed.data(), decompressed.size());
+    size_t decomp_size = codec->decompress(compressed.data(), comp_size, decompressed.data(),
+                                           decompressed.size());
 
     EXPECT_EQ(0, decomp_size);
 }

@@ -45,9 +45,7 @@ public:
      * Is this a cacheable DocIdSet?
      * Some implementations may be too expensive to cache
      */
-    virtual bool isCacheable() const {
-        return true;
-    }
+    virtual bool isCacheable() const { return true; }
 };
 
 }  // namespace search

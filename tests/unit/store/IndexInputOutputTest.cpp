@@ -4,6 +4,7 @@
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 
 using namespace diagon::store;
@@ -90,11 +91,11 @@ TEST_F(IndexInputOutputTest, WriteAndReadVInt) {
 
     // Various sizes
     output->writeVInt(0);
-    output->writeVInt(127);            // 1 byte
-    output->writeVInt(128);            // 2 bytes
-    output->writeVInt(16383);          // 2 bytes
-    output->writeVInt(16384);          // 3 bytes
-    output->writeVInt(0x7FFFFFFF);     // 5 bytes (max positive)
+    output->writeVInt(127);         // 1 byte
+    output->writeVInt(128);         // 2 bytes
+    output->writeVInt(16383);       // 2 bytes
+    output->writeVInt(16384);       // 3 bytes
+    output->writeVInt(0x7FFFFFFF);  // 5 bytes (max positive)
 
     output->close();
 

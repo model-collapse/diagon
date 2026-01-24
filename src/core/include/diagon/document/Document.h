@@ -35,16 +35,12 @@ public:
     /**
      * Add a field to the document
      */
-    void add(std::unique_ptr<IndexableField> field) {
-        fields_.push_back(std::move(field));
-    }
+    void add(std::unique_ptr<IndexableField> field) { fields_.push_back(std::move(field)); }
 
     /**
      * Get all fields
      */
-    const std::vector<std::unique_ptr<IndexableField>>& getFields() const {
-        return fields_;
-    }
+    const std::vector<std::unique_ptr<IndexableField>>& getFields() const { return fields_; }
 
     /**
      * Get first field with given name
@@ -86,23 +82,17 @@ public:
     /**
      * Get number of fields
      */
-    size_t size() const {
-        return fields_.size();
-    }
+    size_t size() const { return fields_.size(); }
 
     /**
      * Check if document is empty
      */
-    bool empty() const {
-        return fields_.empty();
-    }
+    bool empty() const { return fields_.empty(); }
 
     /**
      * Clear all fields
      */
-    void clear() {
-        fields_.clear();
-    }
+    void clear() { fields_.clear(); }
 };
 
 }  // namespace document

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104PostingsWriter.h"
+
 #include "diagon/store/ByteBuffersIndexOutput.h"
 #include "diagon/util/Exceptions.h"
 
@@ -24,7 +25,6 @@ Lucene104PostingsWriter::Lucene104PostingsWriter(index::SegmentWriteState& state
     , totalTermFreq_(0)
     , segmentName_(state.segmentName)
     , segmentSuffix_(state.segmentSuffix) {
-
     // Create .doc output file
     std::string docFileName = segmentName_;
     if (!segmentSuffix_.empty()) {
@@ -73,9 +73,8 @@ void Lucene104PostingsWriter::startDoc(int docID, int freq) {
     }
 
     if (docCount_ > 0 && docID <= lastDocID_) {
-        throw std::invalid_argument("docs must be added in order (docID " +
-                                    std::to_string(docID) + " <= lastDocID " +
-                                    std::to_string(lastDocID_) + ")");
+        throw std::invalid_argument("docs must be added in order (docID " + std::to_string(docID) +
+                                    " <= lastDocID " + std::to_string(lastDocID_) + ")");
     }
 
     if (freq <= 0) {

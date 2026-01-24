@@ -380,10 +380,8 @@ TEST(UnifiedSIMDQueryProcessorTest, SearchOr) {
     MockUnifiedColumnReader reader;
     UnifiedSIMDQueryProcessor processor(reader);
 
-    std::vector<std::pair<std::string, float>> queryTerms = {
-        {"wireless", 2.5f},
-        {"headphones", 2.8f}
-    };
+    std::vector<std::pair<std::string, float>> queryTerms = {{"wireless", 2.5f},
+                                                             {"headphones", 2.8f}};
 
     // Stub returns empty result
     TopDocs result = processor.searchOr(queryTerms, nullptr, 10);
@@ -396,10 +394,8 @@ TEST(UnifiedSIMDQueryProcessorTest, SearchAnd) {
     MockUnifiedColumnReader reader;
     UnifiedSIMDQueryProcessor processor(reader);
 
-    std::vector<std::pair<std::string, float>> queryTerms = {
-        {"wireless", 2.5f},
-        {"headphones", 2.8f}
-    };
+    std::vector<std::pair<std::string, float>> queryTerms = {{"wireless", 2.5f},
+                                                             {"headphones", 2.8f}};
 
     // Stub returns empty result
     TopDocs result = processor.searchAnd(queryTerms, nullptr, 10);
@@ -426,9 +422,9 @@ TEST(UnifiedSIMDQueryProcessorTest, SearchPhrase) {
 TEST(SIMDIntegrationTest, WindowBuildAndQuery) {
     // Build sparse window (posting list)
     ColumnWindow<int> tfWindow(0, 100000, ColumnDensity::SPARSE);
-    tfWindow.addSparseValue(5, 2);    // doc 5, tf=2
-    tfWindow.addSparseValue(12, 1);   // doc 12, tf=1
-    tfWindow.addSparseValue(23, 3);   // doc 23, tf=3
+    tfWindow.addSparseValue(5, 2);   // doc 5, tf=2
+    tfWindow.addSparseValue(12, 1);  // doc 12, tf=1
+    tfWindow.addSparseValue(23, 3);  // doc 23, tf=3
 
     // Build dense window (doc lengths)
     ColumnWindow<int> docLengthWindow(0, 100000, ColumnDensity::DENSE);

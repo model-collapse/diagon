@@ -55,7 +55,9 @@ public:
         int maxBufferedDocs;      // Max docs before flush
 
         // Default constructor with default values
-        Config() : ramBufferSizeMB(16), maxBufferedDocs(1000) {}
+        Config()
+            : ramBufferSizeMB(16)
+            , maxBufferedDocs(1000) {}
     };
 
     /**
@@ -70,10 +72,8 @@ public:
      * @param directory Directory for writing segment files (optional for Phase 3)
      * @param codecName Codec name (default: "Lucene104")
      */
-    explicit DocumentsWriterPerThread(
-        const Config& config,
-        store::Directory* directory = nullptr,
-        const std::string& codecName = "Lucene104");
+    explicit DocumentsWriterPerThread(const Config& config, store::Directory* directory = nullptr,
+                                      const std::string& codecName = "Lucene104");
 
     /**
      * Destructor
@@ -97,9 +97,7 @@ public:
     /**
      * Get number of documents in RAM buffer
      */
-    int getNumDocsInRAM() const {
-        return numDocsInRAM_;
-    }
+    int getNumDocsInRAM() const { return numDocsInRAM_; }
 
     /**
      * Get approximate bytes used
@@ -130,16 +128,12 @@ public:
     /**
      * Get field infos builder (for testing)
      */
-    const FieldInfosBuilder& getFieldInfosBuilder() const {
-        return fieldInfosBuilder_;
-    }
+    const FieldInfosBuilder& getFieldInfosBuilder() const { return fieldInfosBuilder_; }
 
     /**
      * Get terms writer (for testing)
      */
-    const FreqProxTermsWriter& getTermsWriter() const {
-        return termsWriter_;
-    }
+    const FreqProxTermsWriter& getTermsWriter() const { return termsWriter_; }
 
 private:
     // Configuration

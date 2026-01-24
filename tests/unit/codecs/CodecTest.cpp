@@ -2,12 +2,14 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/Codec.h"
-#include "diagon/codecs/lucene104/Lucene104Codec.h"
-#include "diagon/codecs/PostingsFormat.h"
-#include "diagon/codecs/DocValuesFormat.h"
+
 #include "diagon/codecs/ColumnFormat.h"
+#include "diagon/codecs/DocValuesFormat.h"
+#include "diagon/codecs/PostingsFormat.h"
+#include "diagon/codecs/lucene104/Lucene104Codec.h"
 
 #include <gtest/gtest.h>
+
 #include <memory>
 #include <string>
 
@@ -100,9 +102,7 @@ TEST(CodecTest, RegisterCustomCodec) {
     };
 
     // Register custom codec
-    Codec::registerCodec("Custom", []() {
-        return std::make_unique<CustomCodec>();
-    });
+    Codec::registerCodec("Custom", []() { return std::make_unique<CustomCodec>(); });
 
     // Verify it's registered
     Codec& codec = Codec::forName("Custom");
@@ -270,7 +270,8 @@ TEST(CapabilityTest, SingleCapability) {
     Codec* testCodec = nullptr;
     class TestCodec : public Codec {
     public:
-        TestCodec(uint64_t c) : caps_(c) {}
+        TestCodec(uint64_t c)
+            : caps_(c) {}
         std::string getName() const override { return "Test"; }
         uint64_t getCapabilities() const override { return caps_; }
 
@@ -331,12 +332,13 @@ TEST(CapabilityTest, SingleCapability) {
 
 TEST(CapabilityTest, MultipleCapabilities) {
     uint64_t caps = static_cast<uint64_t>(Codec::Capability::POSTINGS) |
-                   static_cast<uint64_t>(Codec::Capability::DOC_VALUES) |
-                   static_cast<uint64_t>(Codec::Capability::COLUMN_STORAGE);
+                    static_cast<uint64_t>(Codec::Capability::DOC_VALUES) |
+                    static_cast<uint64_t>(Codec::Capability::COLUMN_STORAGE);
 
     class TestCodec : public Codec {
     public:
-        TestCodec(uint64_t c) : caps_(c) {}
+        TestCodec(uint64_t c)
+            : caps_(c) {}
         std::string getName() const override { return "Test"; }
         uint64_t getCapabilities() const override { return caps_; }
 

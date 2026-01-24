@@ -60,17 +60,14 @@ public:
      * @brief Reads a 16-bit short (big-endian).
      * @return The short value
      */
-    virtual int16_t readShort() {
-        return static_cast<int16_t>((readByte() << 8) | readByte());
-    }
+    virtual int16_t readShort() { return static_cast<int16_t>((readByte() << 8) | readByte()); }
 
     /**
      * @brief Reads a 32-bit integer (big-endian).
      * @return The int value
      */
     virtual int32_t readInt() {
-        return (static_cast<int32_t>(readShort()) << 16) |
-               (readShort() & 0xFFFF);
+        return (static_cast<int32_t>(readShort()) << 16) | (readShort() & 0xFFFF);
     }
 
     /**
@@ -78,8 +75,7 @@ public:
      * @return The long value
      */
     virtual int64_t readLong() {
-        return (static_cast<int64_t>(readInt()) << 32) |
-               (readInt() & 0xFFFFFFFFLL);
+        return (static_cast<int64_t>(readInt()) << 32) | (readInt() & 0xFFFFFFFFLL);
     }
 
     // ==================== Variable-Length Encoding ====================
@@ -135,9 +131,7 @@ public:
      * @brief Returns the file name for diagnostic purposes.
      * @return File name or slice description
      */
-    virtual std::string toString() const {
-        return "IndexInput";
-    }
+    virtual std::string toString() const { return "IndexInput"; }
 
     // ==================== Cloning and Slicing ====================
 
@@ -163,10 +157,8 @@ public:
      * @param length Length of slice
      * @return A new IndexInput representing the slice
      */
-    virtual std::unique_ptr<IndexInput> slice(
-        const std::string& sliceDescription,
-        int64_t offset,
-        int64_t length) const = 0;
+    virtual std::unique_ptr<IndexInput> slice(const std::string& sliceDescription, int64_t offset,
+                                              int64_t length) const = 0;
 
     // ==================== Utilities ====================
 
@@ -174,17 +166,13 @@ public:
      * @brief Skips over bytes without reading them.
      * @param numBytes Number of bytes to skip
      */
-    virtual void skipBytes(int64_t numBytes) {
-        seek(getFilePointer() + numBytes);
-    }
+    virtual void skipBytes(int64_t numBytes) { seek(getFilePointer() + numBytes); }
 
     /**
      * @brief Checks if we're at end of file.
      * @return true if no more bytes can be read
      */
-    [[nodiscard]] bool eof() const {
-        return getFilePointer() >= length();
-    }
+    [[nodiscard]] bool eof() const { return getFilePointer() >= length(); }
 
 protected:
     /**
@@ -194,4 +182,4 @@ protected:
     IndexInput() = default;
 };
 
-} // namespace diagon::store
+}  // namespace diagon::store

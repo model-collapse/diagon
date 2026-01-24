@@ -2,11 +2,13 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/IndexWriter.h"
-#include "diagon/store/FSDirectory.h"
+
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 #include <thread>
 #include <vector>
@@ -109,10 +111,10 @@ TEST_F(IndexWriterTest, ConfigFluentInterface) {
     IndexWriterConfig config;
 
     config.setRAMBufferSizeMB(64.0)
-          .setMaxBufferedDocs(5000)
-          .setOpenMode(IndexWriterConfig::OpenMode::CREATE)
-          .setCommitOnClose(false)
-          .setUseCompoundFile(false);
+        .setMaxBufferedDocs(5000)
+        .setOpenMode(IndexWriterConfig::OpenMode::CREATE)
+        .setCommitOnClose(false)
+        .setUseCompoundFile(false);
 
     EXPECT_DOUBLE_EQ(64.0, config.getRAMBufferSizeMB());
     EXPECT_EQ(5000, config.getMaxBufferedDocs());
@@ -136,10 +138,8 @@ TEST_F(IndexWriterTest, ConstructorObtainsWriteLock) {
     auto writer1 = std::make_unique<IndexWriter>(*dir, config);
 
     // Second writer should fail to obtain lock
-    EXPECT_THROW(
-        auto writer2 = std::make_unique<IndexWriter>(*dir, config),
-        LockObtainFailedException
-    );
+    EXPECT_THROW(auto writer2 = std::make_unique<IndexWriter>(*dir, config),
+                 LockObtainFailedException);
 }
 
 TEST_F(IndexWriterTest, WriteLockReleasedOnClose) {
@@ -151,9 +151,7 @@ TEST_F(IndexWriterTest, WriteLockReleasedOnClose) {
     }
 
     // Should be able to open new writer after first is closed
-    EXPECT_NO_THROW(
-        auto writer2 = std::make_unique<IndexWriter>(*dir, config)
-    );
+    EXPECT_NO_THROW(auto writer2 = std::make_unique<IndexWriter>(*dir, config));
 }
 
 TEST_F(IndexWriterTest, WriteLockReleasedOnDestruction) {
@@ -165,9 +163,7 @@ TEST_F(IndexWriterTest, WriteLockReleasedOnDestruction) {
     }
 
     // Should be able to open new writer after first is destroyed
-    EXPECT_NO_THROW(
-        auto writer2 = std::make_unique<IndexWriter>(*dir, config)
-    );
+    EXPECT_NO_THROW(auto writer2 = std::make_unique<IndexWriter>(*dir, config));
 }
 
 // ==================== IndexWriter Lifecycle Tests ====================
@@ -279,7 +275,7 @@ TEST_F(IndexWriterTest, SequenceNumbersAreMonotonic) {
 
     // Check all sequence numbers are unique and increasing
     for (size_t i = 1; i < seqNos.size(); i++) {
-        EXPECT_GT(seqNos[i], seqNos[i-1]);
+        EXPECT_GT(seqNos[i], seqNos[i - 1]);
     }
 }
 
@@ -391,7 +387,7 @@ TEST_F(IndexWriterTest, ConcurrentAddDocument) {
     // Check all sequence numbers are unique
     std::sort(seqNos.begin(), seqNos.end());
     for (size_t i = 1; i < seqNos.size(); i++) {
-        EXPECT_NE(seqNos[i], seqNos[i-1]) << "Duplicate sequence number found";
+        EXPECT_NE(seqNos[i], seqNos[i - 1]) << "Duplicate sequence number found";
     }
 }
 
@@ -462,9 +458,7 @@ TEST_F(IndexWriterTest, DestructorWithCommitOnClose) {
     }
 
     // Should be able to open new writer
-    EXPECT_NO_THROW(
-        auto writer2 = std::make_unique<IndexWriter>(*dir, config)
-    );
+    EXPECT_NO_THROW(auto writer2 = std::make_unique<IndexWriter>(*dir, config));
 }
 
 TEST_F(IndexWriterTest, DestructorWithoutCommitOnClose) {
@@ -480,9 +474,7 @@ TEST_F(IndexWriterTest, DestructorWithoutCommitOnClose) {
     }
 
     // Should be able to open new writer
-    EXPECT_NO_THROW(
-        auto writer2 = std::make_unique<IndexWriter>(*dir, config)
-    );
+    EXPECT_NO_THROW(auto writer2 = std::make_unique<IndexWriter>(*dir, config));
 }
 
 // ==================== Edge Cases ====================

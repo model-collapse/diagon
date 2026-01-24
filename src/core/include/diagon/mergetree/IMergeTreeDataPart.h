@@ -118,16 +118,12 @@ public:
     /**
      * Check if part is active (ready for queries)
      */
-    bool isActive() const {
-        return getState() == DataPartState::Active;
-    }
+    bool isActive() const { return getState() == DataPartState::Active; }
 
     /**
      * Check if part is obsolete (replaced)
      */
-    bool isObsolete() const {
-        return getState() == DataPartState::Obsolete;
-    }
+    bool isObsolete() const { return getState() == DataPartState::Obsolete; }
 
     // ==================== Factory ====================
 
@@ -167,9 +163,12 @@ inline std::string dataPartTypeToString(DataPartType type) {
  * Convert string to DataPartType
  */
 inline DataPartType stringToDataPartType(const std::string& str) {
-    if (str == "Wide") return DataPartType::Wide;
-    if (str == "Compact") return DataPartType::Compact;
-    if (str == "InMemory") return DataPartType::InMemory;
+    if (str == "Wide")
+        return DataPartType::Wide;
+    if (str == "Compact")
+        return DataPartType::Compact;
+    if (str == "InMemory")
+        return DataPartType::InMemory;
     throw std::runtime_error("Unknown DataPartType: " + str);
 }
 

@@ -26,11 +26,8 @@ TEST(DataPartTypeTest, FromStringInvalid) {
 }
 
 TEST(DataPartTypeTest, RoundTrip) {
-    std::vector<DataPartType> types = {
-        DataPartType::Wide,
-        DataPartType::Compact,
-        DataPartType::InMemory
-    };
+    std::vector<DataPartType> types = {DataPartType::Wide, DataPartType::Compact,
+                                       DataPartType::InMemory};
 
     for (auto type : types) {
         std::string str = dataPartTypeToString(type);

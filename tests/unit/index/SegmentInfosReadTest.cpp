@@ -1,13 +1,14 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/index/SegmentInfo.h"
-#include "diagon/index/IndexWriter.h"
-#include "diagon/store/FSDirectory.h"
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/IndexWriter.h"
+#include "diagon/index/SegmentInfo.h"
+#include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 
 using namespace diagon;
@@ -62,10 +63,7 @@ protected:
 
 TEST_F(SegmentInfosReadTest, ReadEmptyIndex) {
     // Empty directory should throw
-    EXPECT_THROW(
-        SegmentInfos::readLatestCommit(*dir),
-        IOException
-    );
+    EXPECT_THROW(SegmentInfos::readLatestCommit(*dir), IOException);
 }
 
 TEST_F(SegmentInfosReadTest, ReadAfterWrite) {
@@ -77,8 +75,8 @@ TEST_F(SegmentInfosReadTest, ReadAfterWrite) {
 
     // Verify
     EXPECT_EQ(infos.getGeneration(), 0);  // First commit is generation 0
-    EXPECT_GE(infos.size(), 1);  // At least one segment
-    EXPECT_EQ(infos.totalMaxDoc(), 5);  // 5 documents total
+    EXPECT_GE(infos.size(), 1);           // At least one segment
+    EXPECT_EQ(infos.totalMaxDoc(), 5);    // 5 documents total
 }
 
 TEST_F(SegmentInfosReadTest, ReadSpecificGeneration) {
@@ -96,10 +94,7 @@ TEST_F(SegmentInfosReadTest, ReadSpecificGeneration) {
 
 TEST_F(SegmentInfosReadTest, ReadNonExistentFile) {
     // Try to read non-existent file
-    EXPECT_THROW(
-        SegmentInfos::read(*dir, "segments_999"),
-        std::exception
-    );
+    EXPECT_THROW(SegmentInfos::read(*dir, "segments_999"), std::exception);
 }
 
 // ==================== Segment Metadata Tests ====================
@@ -247,32 +242,26 @@ TEST_F(SegmentInfosReadTest, InvalidMagicHeader) {
     // Create a file with invalid magic
     auto output = dir->createOutput("segments_bad", IOContext::DEFAULT);
     output->writeInt(0xDEADBEEF);  // Wrong magic
-    output->writeInt(1);  // Version
-    output->writeLong(0);  // Generation
-    output->writeInt(0);  // No segments
+    output->writeInt(1);           // Version
+    output->writeLong(0);          // Generation
+    output->writeInt(0);           // No segments
     output->close();
 
     // Should throw on read
-    EXPECT_THROW(
-        SegmentInfos::read(*dir, "segments_bad"),
-        IOException
-    );
+    EXPECT_THROW(SegmentInfos::read(*dir, "segments_bad"), IOException);
 }
 
 TEST_F(SegmentInfosReadTest, UnsupportedVersion) {
     // Create a file with unsupported version
     auto output = dir->createOutput("segments_bad_version", IOContext::DEFAULT);
     output->writeInt(0x3fd76c17);  // Correct magic
-    output->writeInt(999);  // Unsupported version
-    output->writeLong(0);  // Generation
-    output->writeInt(0);  // No segments
+    output->writeInt(999);         // Unsupported version
+    output->writeLong(0);          // Generation
+    output->writeInt(0);           // No segments
     output->close();
 
     // Should throw on read
-    EXPECT_THROW(
-        SegmentInfos::read(*dir, "segments_bad_version"),
-        IOException
-    );
+    EXPECT_THROW(SegmentInfos::read(*dir, "segments_bad_version"), IOException);
 }
 
 // ==================== Round-Trip Tests ====================
@@ -309,8 +298,7 @@ TEST_F(SegmentInfosReadTest, WriteReadRoundTrip) {
 
         // Files should exist on disk
         for (const auto& file : seg->files()) {
-            EXPECT_TRUE(fs::exists(testDir_ / file))
-                << "File " << file << " should exist";
+            EXPECT_TRUE(fs::exists(testDir_ / file)) << "File " << file << " should exist";
         }
     }
 }
@@ -342,8 +330,7 @@ TEST_F(SegmentInfosReadTest, LargeIndex) {
     std::set<std::string> names;
     for (int i = 0; i < infos.size(); i++) {
         auto seg = infos.info(i);
-        EXPECT_TRUE(names.insert(seg->name()).second)
-            << "Duplicate segment name: " << seg->name();
+        EXPECT_TRUE(names.insert(seg->name()).second) << "Duplicate segment name: " << seg->name();
     }
 }
 

@@ -52,38 +52,27 @@ public:
      * @param maxDoc Number of documents in segment
      * @param codecName Codec name used for this segment
      */
-    SegmentInfo(
-        const std::string& name,
-        int maxDoc,
-        const std::string& codecName = "Lucene104");
+    SegmentInfo(const std::string& name, int maxDoc, const std::string& codecName = "Lucene104");
 
     /**
      * Get segment name
      */
-    const std::string& name() const {
-        return name_;
-    }
+    const std::string& name() const { return name_; }
 
     /**
      * Get maximum document ID (= document count)
      */
-    int maxDoc() const {
-        return maxDoc_;
-    }
+    int maxDoc() const { return maxDoc_; }
 
     /**
      * Get codec name
      */
-    const std::string& codecName() const {
-        return codecName_;
-    }
+    const std::string& codecName() const { return codecName_; }
 
     /**
      * Get list of files
      */
-    const std::vector<std::string>& files() const {
-        return files_;
-    }
+    const std::vector<std::string>& files() const { return files_; }
 
     /**
      * Add file to segment
@@ -102,9 +91,7 @@ public:
     /**
      * Get diagnostics
      */
-    const std::map<std::string, std::string>& diagnostics() const {
-        return diagnostics_;
-    }
+    const std::map<std::string, std::string>& diagnostics() const { return diagnostics_; }
 
     /**
      * Set diagnostic value
@@ -126,42 +113,34 @@ public:
      * Get total size of files (bytes)
      * Phase 3: Returns 0 (no actual files yet)
      */
-    int64_t sizeInBytes() const {
-        return sizeInBytes_;
-    }
+    int64_t sizeInBytes() const { return sizeInBytes_; }
 
     /**
      * Set size in bytes
      * Phase 3: For testing/tracking
      */
-    void setSizeInBytes(int64_t size) {
-        sizeInBytes_ = size;
-    }
+    void setSizeInBytes(int64_t size) { sizeInBytes_ = size; }
 
     /**
      * Get field infos
      * Phase 4: Store FieldInfos directly in SegmentInfo
      */
-    const FieldInfos& fieldInfos() const {
-        return fieldInfos_;
-    }
+    const FieldInfos& fieldInfos() const { return fieldInfos_; }
 
     /**
      * Set field infos
      * Phase 4: Allow setting FieldInfos
      */
-    void setFieldInfos(const FieldInfos& fieldInfos) {
-        fieldInfos_ = fieldInfos;
-    }
+    void setFieldInfos(const FieldInfos& fieldInfos) { fieldInfos_ = fieldInfos; }
 
 private:
-    std::string name_;                              // Segment name
-    int maxDoc_;                                    // Document count
-    std::string codecName_;                         // Codec name
-    std::vector<std::string> files_;               // Files in segment
-    std::map<std::string, std::string> diagnostics_; // Diagnostics
-    int64_t sizeInBytes_{0};                       // Total size
-    FieldInfos fieldInfos_;                         // Field metadata (Phase 4)
+    std::string name_;                                // Segment name
+    int maxDoc_;                                      // Document count
+    std::string codecName_;                           // Codec name
+    std::vector<std::string> files_;                  // Files in segment
+    std::map<std::string, std::string> diagnostics_;  // Diagnostics
+    int64_t sizeInBytes_{0};                          // Total size
+    FieldInfos fieldInfos_;                           // Field metadata (Phase 4)
 };
 
 /**
@@ -204,9 +183,7 @@ public:
     /**
      * Get number of segments
      */
-    int size() const {
-        return static_cast<int>(segments_.size());
-    }
+    int size() const { return static_cast<int>(segments_.size()); }
 
     /**
      * Get segment by index
@@ -219,9 +196,7 @@ public:
     /**
      * Get all segments
      */
-    const std::vector<std::shared_ptr<SegmentInfo>>& segments() const {
-        return segments_;
-    }
+    const std::vector<std::shared_ptr<SegmentInfo>>& segments() const { return segments_; }
 
     /**
      * Get total document count across all segments
@@ -234,32 +209,24 @@ public:
      * Incremented on each commit.
      * Format: segments_N where N is generation in base-36.
      */
-    int64_t getGeneration() const {
-        return generation_;
-    }
+    int64_t getGeneration() const { return generation_; }
 
     /**
      * Increment generation
      * Called when committing changes.
      */
-    void incrementGeneration() {
-        generation_++;
-    }
+    void incrementGeneration() { generation_++; }
 
     /**
      * Get version
      * Tracks modification count.
      */
-    int64_t getVersion() const {
-        return version_;
-    }
+    int64_t getVersion() const { return version_; }
 
     /**
      * Increment version
      */
-    void incrementVersion() {
-        version_++;
-    }
+    void incrementVersion() { version_++; }
 
     /**
      * Clear all segments

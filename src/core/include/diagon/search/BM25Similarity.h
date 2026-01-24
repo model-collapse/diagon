@@ -5,8 +5,8 @@
 
 #include "diagon/util/BytesRef.h"
 
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 #include <string>
 
 namespace diagon {
@@ -17,21 +17,18 @@ namespace search {
  */
 struct CollectionStatistics {
     std::string field;
-    int64_t maxDoc;          // Number of documents
-    int64_t docCount;        // Documents with this field
-    int64_t sumTotalTermFreq; // Total term occurrences
-    int64_t sumDocFreq;      // Sum of document frequencies
+    int64_t maxDoc;            // Number of documents
+    int64_t docCount;          // Documents with this field
+    int64_t sumTotalTermFreq;  // Total term occurrences
+    int64_t sumDocFreq;        // Sum of document frequencies
 
-    CollectionStatistics(const std::string& field_,
-                        int64_t maxDoc_,
-                        int64_t docCount_,
-                        int64_t sumTotalTermFreq_,
-                        int64_t sumDocFreq_)
-        : field(field_),
-          maxDoc(maxDoc_),
-          docCount(docCount_),
-          sumTotalTermFreq(sumTotalTermFreq_),
-          sumDocFreq(sumDocFreq_) {}
+    CollectionStatistics(const std::string& field_, int64_t maxDoc_, int64_t docCount_,
+                         int64_t sumTotalTermFreq_, int64_t sumDocFreq_)
+        : field(field_)
+        , maxDoc(maxDoc_)
+        , docCount(docCount_)
+        , sumTotalTermFreq(sumTotalTermFreq_)
+        , sumDocFreq(sumDocFreq_) {}
 };
 
 /**
@@ -39,15 +36,13 @@ struct CollectionStatistics {
  */
 struct TermStatistics {
     util::BytesRef term;
-    int64_t docFreq;         // Documents containing this term
-    int64_t totalTermFreq;   // Total occurrences of this term
+    int64_t docFreq;        // Documents containing this term
+    int64_t totalTermFreq;  // Total occurrences of this term
 
-    TermStatistics(const util::BytesRef& term_,
-                  int64_t docFreq_,
-                  int64_t totalTermFreq_)
-        : term(term_),
-          docFreq(docFreq_),
-          totalTermFreq(totalTermFreq_) {}
+    TermStatistics(const util::BytesRef& term_, int64_t docFreq_, int64_t totalTermFreq_)
+        : term(term_)
+        , docFreq(docFreq_)
+        , totalTermFreq(totalTermFreq_) {}
 };
 
 /**
@@ -69,7 +64,8 @@ public:
      * Constructor with default parameters
      */
     BM25Similarity()
-        : k1_(1.2f), b_(0.75f) {}
+        : k1_(1.2f)
+        , b_(0.75f) {}
 
     /**
      * Constructor with custom parameters
@@ -77,7 +73,8 @@ public:
      * @param b Length normalization (default 0.75)
      */
     BM25Similarity(float k1, float b)
-        : k1_(k1), b_(b) {}
+        : k1_(k1)
+        , b_(b) {}
 
     /**
      * Compute IDF (Inverse Document Frequency)
@@ -113,7 +110,9 @@ public:
     class SimScorer {
     public:
         SimScorer(float idf, float k1, float b)
-            : idf_(idf), k1_(k1), b_(b) {}
+            : idf_(idf)
+            , k1_(k1)
+            , b_(b) {}
 
         /**
          * Score a document
@@ -121,7 +120,8 @@ public:
          * @param norm Document norm (encoded length)
          */
         float score(float freq, long norm) const {
-            if (freq == 0.0f) return 0.0f;
+            if (freq == 0.0f)
+                return 0.0f;
 
             // Decode norm to field length
             float fieldLength = decodeNorm(norm);
@@ -147,9 +147,8 @@ public:
     /**
      * Create scorer for term
      */
-    SimScorer scorer(float boost,
-                    const CollectionStatistics& collectionStats,
-                    const TermStatistics& termStats) const {
+    SimScorer scorer(float boost, const CollectionStatistics& collectionStats,
+                     const TermStatistics& termStats) const {
         float idfValue = idf(termStats.docFreq, collectionStats.docCount);
         return SimScorer(idfValue * boost, k1_, b_);
     }

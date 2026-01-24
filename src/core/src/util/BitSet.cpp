@@ -11,12 +11,14 @@
 namespace diagon::util {
 
 BitSet::BitSet(size_t numBits)
-    : bits_(bits2words(numBits), 0),
-      num_bits_(numBits),
-      num_words_(bits2words(numBits)) {}
+    : bits_(bits2words(numBits), 0)
+    , num_bits_(numBits)
+    , num_words_(bits2words(numBits)) {}
 
 BitSet::BitSet(std::vector<uint64_t> words, size_t numBits)
-    : bits_(std::move(words)), num_bits_(numBits), num_words_(bits2words(numBits)) {
+    : bits_(std::move(words))
+    , num_bits_(numBits)
+    , num_words_(bits2words(numBits)) {
     assert(bits_.size() >= num_words_);
     assert(verifyGhostBitsClear());
 }
@@ -69,7 +71,8 @@ void BitSet::clear(size_t startIndex, size_t endIndex) noexcept {
 
     // Create masks for partial words
     const uint64_t startMask = ~((1ULL << (startIndex & 63)) - 1);
-    const uint64_t endMask = (1ULL << ((endIndex - 1) & 63)) | ((1ULL << ((endIndex - 1) & 63)) - 1);
+    const uint64_t endMask = (1ULL << ((endIndex - 1) & 63)) |
+                             ((1ULL << ((endIndex - 1) & 63)) - 1);
 
     if (startWord == endWord) {
         // Range within a single word
@@ -263,4 +266,4 @@ bool BitSet::verifyGhostBitsClear() const noexcept {
     return (bits_[num_words_ - 1] & mask) == 0;
 }
 
-} // namespace diagon::util
+}  // namespace diagon::util

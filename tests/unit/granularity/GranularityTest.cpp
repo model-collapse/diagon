@@ -348,11 +348,7 @@ TEST(MarkRangeTest, MarkRangesToRows) {
     granularity.addMark(8192);
     granularity.addMark(5000);
 
-    MarkRanges ranges = {
-        MarkRange(0, 1),
-        MarkRange(1, 3),
-        MarkRange(3, 4)
-    };
+    MarkRanges ranges = {MarkRange(0, 1), MarkRange(1, 3), MarkRange(3, 4)};
 
     auto row_ranges = markRangesToRows(ranges, granularity);
 
@@ -368,10 +364,7 @@ TEST(MarkRangeTest, MarkRangesToRows) {
 TEST(MarkRangeTest, MarkRangesToRowsEmptyRanges) {
     MergeTreeIndexGranularityConstant granularity(8192, 3);
 
-    MarkRanges ranges = {
-        MarkRange(0, 0),
-        MarkRange(1, 1)
-    };
+    MarkRanges ranges = {MarkRange(0, 0), MarkRange(1, 1)};
 
     auto row_ranges = markRangesToRows(ranges, granularity);
 

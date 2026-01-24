@@ -2,15 +2,17 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/search/BM25ScorerSIMD.h"
-#include "diagon/search/BM25Similarity.h"
-#include "diagon/search/Weight.h"
-#include "diagon/search/TermQuery.h"
+
 #include "diagon/index/LeafReaderContext.h"
+#include "diagon/search/BM25Similarity.h"
+#include "diagon/search/TermQuery.h"
+#include "diagon/search/Weight.h"
 
 #include <gtest/gtest.h>
+
 #include <cmath>
-#include <vector>
 #include <random>
+#include <vector>
 
 using namespace diagon::search;
 
@@ -39,7 +41,8 @@ protected:
      * Compute expected BM25 score using scalar formula
      */
     float computeExpectedScore(int freq, long norm = 1L) const {
-        if (freq == 0) return 0.0f;
+        if (freq == 0)
+            return 0.0f;
 
         // Phase 4: Simplified norm decoding
         float fieldLength = 1.0f;
@@ -105,8 +108,8 @@ TEST_F(BM25ScorerSIMDTest, SIMDCorrectnessVsScalar) {
     for (int i = 0; i < 8; i++) {
         float expected = computeExpectedScore(freqs[i], norms[i]);
         EXPECT_TRUE(approxEqual(scores[i], expected))
-            << "i=" << i << ", freq=" << freqs[i]
-            << ", expected=" << expected << ", actual=" << scores[i];
+            << "i=" << i << ", freq=" << freqs[i] << ", expected=" << expected
+            << ", actual=" << scores[i];
     }
 }
 
@@ -126,8 +129,8 @@ TEST_F(BM25ScorerSIMDTest, SIMDUniformNorm) {
     for (int i = 0; i < 8; i++) {
         float expected = computeExpectedScore(freqs[i], 1L);
         EXPECT_TRUE(approxEqual(scores[i], expected))
-            << "i=" << i << ", freq=" << freqs[i]
-            << ", expected=" << expected << ", actual=" << scores[i];
+            << "i=" << i << ", freq=" << freqs[i] << ", expected=" << expected
+            << ", actual=" << scores[i];
     }
 }
 
@@ -163,8 +166,8 @@ TEST_F(BM25ScorerSIMDTest, MixedFrequencies) {
     for (int i = 0; i < 8; i++) {
         float expected = computeExpectedScore(freqs[i], norms[i]);
         EXPECT_TRUE(approxEqual(scores[i], expected))
-            << "i=" << i << ", freq=" << freqs[i]
-            << ", expected=" << expected << ", actual=" << scores[i];
+            << "i=" << i << ", freq=" << freqs[i] << ", expected=" << expected
+            << ", actual=" << scores[i];
     }
 }
 
@@ -183,7 +186,7 @@ TEST_F(BM25ScorerSIMDTest, HighFrequencies) {
     // BM25 should saturate at high frequencies
     // Verify saturation: score(2000) < 2 * score(1000)
     for (int i = 1; i < 8; i++) {
-        float ratio = scores[i] / scores[i-1];
+        float ratio = scores[i] / scores[i - 1];
         EXPECT_LT(ratio, 2.0f) << "i=" << i << ", no saturation observed";
         EXPECT_GT(ratio, 1.0f) << "i=" << i << ", scores should increase";
     }
@@ -191,8 +194,7 @@ TEST_F(BM25ScorerSIMDTest, HighFrequencies) {
     // Verify against scalar
     for (int i = 0; i < 8; i++) {
         float expected = computeExpectedScore(freqs[i], norms[i]);
-        EXPECT_TRUE(approxEqual(scores[i], expected))
-            << "i=" << i << ", freq=" << freqs[i];
+        EXPECT_TRUE(approxEqual(scores[i], expected)) << "i=" << i << ", freq=" << freqs[i];
     }
 }
 
@@ -224,8 +226,7 @@ TEST_F(BM25ScorerSIMDTest, DifferentParameters) {
             float expected = idf_ * freqs[i] * (k1 + 1.0f) / (freqs[i] + k);
 
             EXPECT_TRUE(approxEqual(scores[i], expected))
-                << "k1=" << k1 << ", b=" << b << ", i=" << i
-                << ", freq=" << freqs[i]
+                << "k1=" << k1 << ", b=" << b << ", i=" << i << ", freq=" << freqs[i]
                 << ", expected=" << expected << ", actual=" << scores[i];
         }
     }
@@ -285,8 +286,7 @@ TEST_F(BM25ScorerSIMDTest, RandomData) {
         for (int i = 0; i < 8; i++) {
             float expected = computeExpectedScore(freqs[i], norms[i]);
             EXPECT_TRUE(approxEqual(scores[i], expected))
-                << "batch=" << batch << ", i=" << i
-                << ", freq=" << freqs[i]
+                << "batch=" << batch << ", i=" << i << ", freq=" << freqs[i]
                 << ", expected=" << expected << ", actual=" << scores[i];
         }
     }

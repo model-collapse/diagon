@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "diagon/index/FieldInfo.h"
 #include "diagon/index/DocValues.h"
+#include "diagon/index/FieldInfo.h"
 
 #include <functional>
 #include <memory>
@@ -46,14 +46,12 @@ public:
     /**
      * Create consumer for writing doc values
      */
-    virtual std::unique_ptr<DocValuesConsumer> fieldsConsumer(
-        SegmentWriteState& state) = 0;
+    virtual std::unique_ptr<DocValuesConsumer> fieldsConsumer(SegmentWriteState& state) = 0;
 
     /**
      * Create producer for reading doc values
      */
-    virtual std::unique_ptr<DocValuesProducer> fieldsProducer(
-        SegmentReadState& state) = 0;
+    virtual std::unique_ptr<DocValuesProducer> fieldsProducer(SegmentReadState& state) = 0;
 
     // ==================== Factory ====================
 
@@ -62,7 +60,8 @@ public:
                                std::function<std::unique_ptr<DocValuesFormat>()> factory);
 
 private:
-    static std::unordered_map<std::string, std::function<std::unique_ptr<DocValuesFormat>()>>& getRegistry();
+    static std::unordered_map<std::string, std::function<std::unique_ptr<DocValuesFormat>()>>&
+    getRegistry();
 };
 
 /**
@@ -83,9 +82,8 @@ public:
      * @param field Field metadata
      * @param valuesProducer Producer of numeric values to write
      */
-    virtual void addNumericField(
-        const index::FieldInfo& field,
-        DocValuesProducer& valuesProducer) = 0;
+    virtual void addNumericField(const index::FieldInfo& field,
+                                 DocValuesProducer& valuesProducer) = 0;
 
     /**
      * Write a binary field.
@@ -93,9 +91,8 @@ public:
      * @param field Field metadata
      * @param valuesProducer Producer of binary values to write
      */
-    virtual void addBinaryField(
-        const index::FieldInfo& field,
-        DocValuesProducer& valuesProducer) = 0;
+    virtual void addBinaryField(const index::FieldInfo& field,
+                                DocValuesProducer& valuesProducer) = 0;
 
     /**
      * Write a sorted field (deferred to Phase 3).
@@ -103,9 +100,8 @@ public:
      * @param field Field metadata
      * @param valuesProducer Producer of sorted values to write
      */
-    virtual void addSortedField(
-        const index::FieldInfo& field,
-        DocValuesProducer& valuesProducer) = 0;
+    virtual void addSortedField(const index::FieldInfo& field,
+                                DocValuesProducer& valuesProducer) = 0;
 
     /**
      * Write a sorted-set field (deferred to Phase 3).
@@ -113,9 +109,8 @@ public:
      * @param field Field metadata
      * @param valuesProducer Producer of sorted-set values to write
      */
-    virtual void addSortedSetField(
-        const index::FieldInfo& field,
-        DocValuesProducer& valuesProducer) = 0;
+    virtual void addSortedSetField(const index::FieldInfo& field,
+                                   DocValuesProducer& valuesProducer) = 0;
 
     /**
      * Write a sorted-numeric field (deferred to Phase 3).
@@ -123,9 +118,8 @@ public:
      * @param field Field metadata
      * @param valuesProducer Producer of sorted-numeric values to write
      */
-    virtual void addSortedNumericField(
-        const index::FieldInfo& field,
-        DocValuesProducer& valuesProducer) = 0;
+    virtual void addSortedNumericField(const index::FieldInfo& field,
+                                       DocValuesProducer& valuesProducer) = 0;
 
     /**
      * Close and flush any pending data.
@@ -150,8 +144,7 @@ public:
      * @param field Field metadata
      * @return Iterator over numeric values
      */
-    virtual std::unique_ptr<index::NumericDocValues> getNumeric(
-        const index::FieldInfo& field) = 0;
+    virtual std::unique_ptr<index::NumericDocValues> getNumeric(const index::FieldInfo& field) = 0;
 
     /**
      * Get binary doc values for a field.
@@ -159,8 +152,7 @@ public:
      * @param field Field metadata
      * @return Iterator over binary values
      */
-    virtual std::unique_ptr<index::BinaryDocValues> getBinary(
-        const index::FieldInfo& field) = 0;
+    virtual std::unique_ptr<index::BinaryDocValues> getBinary(const index::FieldInfo& field) = 0;
 
     /**
      * Get sorted doc values for a field (deferred to Phase 3).
@@ -168,8 +160,7 @@ public:
      * @param field Field metadata
      * @return Iterator over sorted values
      */
-    virtual std::unique_ptr<index::SortedDocValues> getSorted(
-        const index::FieldInfo& field) = 0;
+    virtual std::unique_ptr<index::SortedDocValues> getSorted(const index::FieldInfo& field) = 0;
 
     /**
      * Get sorted-set doc values for a field (deferred to Phase 3).
@@ -177,8 +168,8 @@ public:
      * @param field Field metadata
      * @return Iterator over sorted-set values
      */
-    virtual std::unique_ptr<index::SortedSetDocValues> getSortedSet(
-        const index::FieldInfo& field) = 0;
+    virtual std::unique_ptr<index::SortedSetDocValues>
+    getSortedSet(const index::FieldInfo& field) = 0;
 
     /**
      * Get sorted-numeric doc values for a field (deferred to Phase 3).
@@ -186,8 +177,8 @@ public:
      * @param field Field metadata
      * @return Iterator over sorted-numeric values
      */
-    virtual std::unique_ptr<index::SortedNumericDocValues> getSortedNumeric(
-        const index::FieldInfo& field) = 0;
+    virtual std::unique_ptr<index::SortedNumericDocValues>
+    getSortedNumeric(const index::FieldInfo& field) = 0;
 
     /**
      * Check integrity of all doc values data.

@@ -5,9 +5,9 @@
 
 #include "diagon/store/IndexOutput.h"
 
-#include <vector>
-#include <string>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace diagon::store {
 
@@ -25,7 +25,9 @@ public:
      * @param name File name for diagnostic purposes
      */
     explicit ByteBuffersIndexOutput(const std::string& name)
-        : name_(name), buffer_(), position_(0) {
+        : name_(name)
+        , buffer_()
+        , position_(0) {
         buffer_.reserve(1024);  // Start with 1KB
     }
 
@@ -43,13 +45,9 @@ public:
 
     // ==================== Positioning ====================
 
-    int64_t getFilePointer() const override {
-        return position_;
-    }
+    int64_t getFilePointer() const override { return position_; }
 
-    std::string getName() const override {
-        return name_;
-    }
+    std::string getName() const override { return name_; }
 
     // ==================== Finalization ====================
 
@@ -63,25 +61,19 @@ public:
      * Get the bytes written so far.
      * @return Vector of bytes
      */
-    const std::vector<uint8_t>& toArrayCopy() const {
-        return buffer_;
-    }
+    const std::vector<uint8_t>& toArrayCopy() const { return buffer_; }
 
     /**
      * Get pointer to buffer data.
      * @return Pointer to internal buffer
      */
-    const uint8_t* data() const {
-        return buffer_.data();
-    }
+    const uint8_t* data() const { return buffer_.data(); }
 
     /**
      * Get size of buffer.
      * @return Number of bytes written
      */
-    size_t size() const {
-        return buffer_.size();
-    }
+    size_t size() const { return buffer_.size(); }
 
     /**
      * Reset buffer to empty state.

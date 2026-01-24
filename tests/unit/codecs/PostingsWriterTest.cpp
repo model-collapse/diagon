@@ -2,11 +2,12 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104PostingsWriter.h"
-#include "diagon/index/SegmentWriteState.h"
 #include "diagon/index/FieldInfo.h"
+#include "diagon/index/SegmentWriteState.h"
 #include "diagon/store/ByteBuffersIndexOutput.h"
 
 #include <gtest/gtest.h>
+
 #include <memory>
 
 using namespace diagon::codecs::lucene104;
@@ -18,12 +19,11 @@ using namespace diagon::store;
 SegmentWriteState createTestState() {
     std::vector<FieldInfo> fields;
     FieldInfos fieldInfos(fields);
-    return SegmentWriteState(
-        nullptr,  // directory (not needed for ByteBuffersIndexOutput)
-        "test_segment",
-        100,  // maxDoc
-        fieldInfos,
-        ""  // suffix
+    return SegmentWriteState(nullptr,  // directory (not needed for ByteBuffersIndexOutput)
+                             "test_segment",
+                             100,  // maxDoc
+                             fieldInfos,
+                             ""  // suffix
     );
 }
 

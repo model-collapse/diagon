@@ -45,9 +45,7 @@ public:
      * Get smoothing score
      * Used for global statistics in distributed search
      */
-    virtual float smoothingScore(int docId) const {
-        return 0.0f;
-    }
+    virtual float smoothingScore(int docId) const { return 0.0f; }
 
     /**
      * Get parent weight
@@ -60,17 +58,13 @@ public:
      * Maximum possible score for docs in [upTo, ∞)
      * Used for early termination (WAND)
      */
-    virtual float getMaxScore(int upTo) const {
-        return std::numeric_limits<float>::max();
-    }
+    virtual float getMaxScore(int upTo) const { return std::numeric_limits<float>::max(); }
 
     /**
      * Shallow advance to doc >= target
      * Cheaper than advance(), doesn't position for scoring
      */
-    virtual int advanceShallow(int target) {
-        return advance(target);
-    }
+    virtual int advanceShallow(int target) { return advance(target); }
 };
 
 /**

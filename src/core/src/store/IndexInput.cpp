@@ -75,4 +75,4 @@ std::string IndexInput::readString() {
     return s;
 }
 
-} // namespace diagon::store
+}  // namespace diagon::store

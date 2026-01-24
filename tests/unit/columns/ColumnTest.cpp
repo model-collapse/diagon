@@ -1,11 +1,12 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/columns/ColumnVector.h"
 #include "diagon/columns/ColumnString.h"
+#include "diagon/columns/ColumnVector.h"
 #include "diagon/columns/Field.h"
 
 #include <gtest/gtest.h>
+
 #include <memory>
 
 using namespace diagon::columns;
@@ -249,7 +250,7 @@ TEST(ColumnVectorTest, FloatingPointNaN) {
 
     // NaN handling in comparison
     EXPECT_EQ(0, col->compareAt(1, 1, *col, 1));  // NaN == NaN
-    EXPECT_GT(0, col->compareAt(0, 1, *col, 1));   // 1.0 < NaN (with hint 1)
+    EXPECT_GT(0, col->compareAt(0, 1, *col, 1));  // 1.0 < NaN (with hint 1)
 }
 
 // ==================== ColumnString Tests ====================

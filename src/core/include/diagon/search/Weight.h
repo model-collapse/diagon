@@ -52,9 +52,7 @@ public:
     /**
      * Is this weight cacheable for the given segment?
      */
-    virtual bool isCacheable(const index::LeafReaderContext& context) const {
-        return true;
-    }
+    virtual bool isCacheable(const index::LeafReaderContext& context) const { return true; }
 
     // ==================== Utilities ====================
 
@@ -66,9 +64,7 @@ public:
     /**
      * String representation for debugging
      */
-    virtual std::string toString() const {
-        return "Weight";
-    }
+    virtual std::string toString() const { return "Weight"; }
 };
 
 }  // namespace search

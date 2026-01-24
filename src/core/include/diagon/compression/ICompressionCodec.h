@@ -44,11 +44,8 @@ public:
      * @param dest_capacity Destination capacity
      * @return Compressed size in bytes
      */
-    virtual size_t compress(
-        const char* source,
-        size_t source_size,
-        char* dest,
-        size_t dest_capacity) const = 0;
+    virtual size_t compress(const char* source, size_t source_size, char* dest,
+                            size_t dest_capacity) const = 0;
 
     /**
      * Decompress data
@@ -58,11 +55,8 @@ public:
      * @param dest_capacity Destination capacity
      * @return Decompressed size in bytes
      */
-    virtual size_t decompress(
-        const char* source,
-        size_t source_size,
-        char* dest,
-        size_t dest_capacity) const = 0;
+    virtual size_t decompress(const char* source, size_t source_size, char* dest,
+                              size_t dest_capacity) const = 0;
 
     /**
      * Get maximum compressed size for given input
@@ -74,9 +68,7 @@ public:
      * Get compression level (1-9, where higher = better compression)
      * Returns 0 if not applicable
      */
-    virtual int getLevel() const {
-        return 0;
-    }
+    virtual int getLevel() const { return 0; }
 };
 
 using CompressionCodecPtr = std::shared_ptr<const ICompressionCodec>;

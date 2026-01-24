@@ -2,25 +2,27 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/search/IndexSearcher.h"
-#include "diagon/search/TermQuery.h"
-#include "diagon/search/TopScoreDocCollector.h"
-#include "diagon/index/DirectoryReader.h"
-#include "diagon/index/IndexWriter.h"
+
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/DirectoryReader.h"
+#include "diagon/index/IndexWriter.h"
+#include "diagon/search/TermQuery.h"
+#include "diagon/search/TopScoreDocCollector.h"
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 
 using namespace diagon;
 using namespace diagon::index;
 using namespace diagon::document;
 using namespace diagon::store;
+using diagon::search::IndexSearcher;
 using diagon::search::Term;
 using diagon::search::TermQuery;
 using diagon::search::TopScoreDocCollector;
-using diagon::search::IndexSearcher;
 
 namespace fs = std::filesystem;
 
@@ -29,7 +31,8 @@ protected:
     void SetUp() override {
         // Create unique directory for each test
         static int testCounter = 0;
-        testDir_ = fs::temp_directory_path() / ("diagon_index_searcher_test_" + std::to_string(testCounter++));
+        testDir_ = fs::temp_directory_path() /
+                   ("diagon_index_searcher_test_" + std::to_string(testCounter++));
         fs::create_directories(testDir_);
         dir = FSDirectory::open(testDir_.string());
     }
@@ -71,11 +74,7 @@ protected:
 
 TEST_F(IndexSearcherTest, SearchWithTermQuery) {
     // Write test documents
-    writeDocuments({
-        "hello world",
-        "hello there",
-        "goodbye world"
-    });
+    writeDocuments({"hello world", "hello there", "goodbye world"});
 
     // Open reader
     auto reader = DirectoryReader::open(*dir);
@@ -95,10 +94,7 @@ TEST_F(IndexSearcherTest, SearchWithTermQuery) {
 
 TEST_F(IndexSearcherTest, SearchNoMatches) {
     // Write test documents
-    writeDocuments({
-        "hello world",
-        "goodbye world"
-    });
+    writeDocuments({"hello world", "goodbye world"});
 
     // Open reader
     auto reader = DirectoryReader::open(*dir);
@@ -140,7 +136,7 @@ TEST_F(IndexSearcherTest, SearchWithTopK) {
 
     // Scores should be in descending order
     for (size_t i = 1; i < results.scoreDocs.size(); i++) {
-        EXPECT_GE(results.scoreDocs[i-1].score, results.scoreDocs[i].score);
+        EXPECT_GE(results.scoreDocs[i - 1].score, results.scoreDocs[i].score);
     }
 }
 
@@ -149,10 +145,10 @@ TEST_F(IndexSearcherTest, SearchWithTopK) {
 TEST_F(IndexSearcherTest, BM25Scoring) {
     // Write documents with different searchTerm frequencies
     writeDocuments({
-        "apple",                     // freq=1
-        "apple apple",               // freq=2
-        "apple apple apple",         // freq=3
-        "orange"                     // no "apple"
+        "apple",              // freq=1
+        "apple apple",        // freq=2
+        "apple apple apple",  // freq=3
+        "orange"              // no "apple"
     });
 
     // Open reader
@@ -183,11 +179,7 @@ TEST_F(IndexSearcherTest, BM25Scoring) {
 
 TEST_F(IndexSearcherTest, SearchWithCollector) {
     // Write test documents
-    writeDocuments({
-        "search test one",
-        "search test two",
-        "search test three"
-    });
+    writeDocuments({"search test one", "search test two", "search test three"});
 
     // Open reader
     auto reader = DirectoryReader::open(*dir);
@@ -250,12 +242,7 @@ TEST_F(IndexSearcherTest, SearchAcrossMultipleSegments) {
 
 TEST_F(IndexSearcherTest, CountMatchingDocs) {
     // Write test documents
-    writeDocuments({
-        "count test one",
-        "count test two",
-        "count test three",
-        "other document"
-    });
+    writeDocuments({"count test one", "count test two", "count test three", "other document"});
 
     // Open reader
     auto reader = DirectoryReader::open(*dir);
@@ -296,11 +283,7 @@ TEST_F(IndexSearcherTest, SearchEmptyIndex) {
 
 TEST_F(IndexSearcherTest, MaxScoreInResults) {
     // Write documents
-    writeDocuments({
-        "score test alpha",
-        "score test beta",
-        "score test gamma"
-    });
+    writeDocuments({"score test alpha", "score test beta", "score test gamma"});
 
     // Open reader
     auto reader = DirectoryReader::open(*dir);

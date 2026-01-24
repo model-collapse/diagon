@@ -186,8 +186,8 @@ public:
 
 private:
     // Endianness conversion helpers
-    template <typename T>
+    template<typename T>
     static T swapBytes(T value) noexcept;
 };
 
-} // namespace diagon::util
+}  // namespace diagon::util

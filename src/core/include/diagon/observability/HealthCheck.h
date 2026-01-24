@@ -24,9 +24,12 @@ enum class HealthStatus {
 
 inline const char* toString(HealthStatus status) {
     switch (status) {
-        case HealthStatus::HEALTHY: return "HEALTHY";
-        case HealthStatus::DEGRADED: return "DEGRADED";
-        case HealthStatus::UNHEALTHY: return "UNHEALTHY";
+        case HealthStatus::HEALTHY:
+            return "HEALTHY";
+        case HealthStatus::DEGRADED:
+            return "DEGRADED";
+        case HealthStatus::UNHEALTHY:
+            return "UNHEALTHY";
     }
     return "UNKNOWN";
 }
@@ -43,7 +46,8 @@ struct HealthCheckResult {
         : status(HealthStatus::HEALTHY) {}
 
     explicit HealthCheckResult(HealthStatus status_, const std::string& message_ = "")
-        : status(status_), message(message_) {}
+        : status(status_)
+        , message(message_) {}
 
     /**
      * Create healthy result
@@ -69,9 +73,7 @@ struct HealthCheckResult {
     /**
      * Add detail
      */
-    void addDetail(const std::string& key, const std::string& value) {
-        details[key] = value;
-    }
+    void addDetail(const std::string& key, const std::string& value) { details[key] = value; }
 };
 
 /**
@@ -101,9 +103,7 @@ public:
      * Critical checks failing = overall status UNHEALTHY
      * Non-critical checks failing = overall status DEGRADED
      */
-    virtual bool isCritical() const {
-        return true;
-    }
+    virtual bool isCritical() const { return true; }
 };
 
 /**
@@ -112,19 +112,15 @@ public:
 class FunctionHealthCheck : public HealthCheck {
 public:
     FunctionHealthCheck(const std::string& name, HealthCheckFunc func, bool critical = true)
-        : name_(name), func_(func), critical_(critical) {}
+        : name_(name)
+        , func_(func)
+        , critical_(critical) {}
 
-    std::string getName() const override {
-        return name_;
-    }
+    std::string getName() const override { return name_; }
 
-    HealthCheckResult check() override {
-        return func_();
-    }
+    HealthCheckResult check() override { return func_(); }
 
-    bool isCritical() const override {
-        return critical_;
-    }
+    bool isCritical() const override { return critical_; }
 
 private:
     std::string name_;
@@ -139,35 +135,28 @@ struct HealthReport {
     HealthStatus overallStatus;
     std::map<std::string, HealthCheckResult> checks;
 
-    HealthReport() : overallStatus(HealthStatus::HEALTHY) {}
+    HealthReport()
+        : overallStatus(HealthStatus::HEALTHY) {}
 
     /**
      * Get overall status string
      */
-    std::string getOverallStatusString() const {
-        return toString(overallStatus);
-    }
+    std::string getOverallStatusString() const { return toString(overallStatus); }
 
     /**
      * Is system healthy?
      */
-    bool isHealthy() const {
-        return overallStatus == HealthStatus::HEALTHY;
-    }
+    bool isHealthy() const { return overallStatus == HealthStatus::HEALTHY; }
 
     /**
      * Is system degraded?
      */
-    bool isDegraded() const {
-        return overallStatus == HealthStatus::DEGRADED;
-    }
+    bool isDegraded() const { return overallStatus == HealthStatus::DEGRADED; }
 
     /**
      * Is system unhealthy?
      */
-    bool isUnhealthy() const {
-        return overallStatus == HealthStatus::UNHEALTHY;
-    }
+    bool isUnhealthy() const { return overallStatus == HealthStatus::UNHEALTHY; }
 };
 
 /**
@@ -221,11 +210,10 @@ public:
             if (result.status == HealthStatus::UNHEALTHY && check->isCritical()) {
                 report.overallStatus = HealthStatus::UNHEALTHY;
             } else if (result.status == HealthStatus::DEGRADED &&
-                      report.overallStatus == HealthStatus::HEALTHY) {
+                       report.overallStatus == HealthStatus::HEALTHY) {
                 report.overallStatus = HealthStatus::DEGRADED;
-            } else if (result.status == HealthStatus::UNHEALTHY &&
-                      !check->isCritical() &&
-                      report.overallStatus == HealthStatus::HEALTHY) {
+            } else if (result.status == HealthStatus::UNHEALTHY && !check->isCritical() &&
+                       report.overallStatus == HealthStatus::HEALTHY) {
                 report.overallStatus = HealthStatus::DEGRADED;
             }
         }

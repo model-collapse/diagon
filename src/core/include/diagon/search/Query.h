@@ -45,10 +45,8 @@ public:
      * @param boost Boost factor for scores
      * @return Weight for execution
      */
-    virtual std::unique_ptr<Weight> createWeight(
-        IndexSearcher& searcher,
-        ScoreMode scoreMode,
-        float boost) const = 0;
+    virtual std::unique_ptr<Weight> createWeight(IndexSearcher& searcher, ScoreMode scoreMode,
+                                                 float boost) const = 0;
 
     // ==================== Rewriting ====================
 
@@ -57,9 +55,7 @@ public:
      * @param reader IndexReader for statistics
      * @return Rewritten query (may be this)
      */
-    virtual std::unique_ptr<Query> rewrite(index::IndexReader& reader) const {
-        return clone();
-    }
+    virtual std::unique_ptr<Query> rewrite(index::IndexReader& reader) const { return clone(); }
 
     // ==================== Utilities ====================
 
@@ -87,9 +83,7 @@ protected:
     /**
      * Helper: combine boost values
      */
-    static float combineBoost(float boost1, float boost2) {
-        return boost1 * boost2;
-    }
+    static float combineBoost(float boost1, float boost2) { return boost1 * boost2; }
 };
 
 }  // namespace search

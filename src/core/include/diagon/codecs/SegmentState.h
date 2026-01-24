@@ -34,7 +34,7 @@ class BufferedUpdates;
 struct SegmentWriteState {
     store::Directory& directory;
     std::string segmentName;
-    std::string segmentSuffix;   // For multi-format support
+    std::string segmentSuffix;  // For multi-format support
     store::IOContext& context;
 
     // TODO: Add when implemented:
@@ -42,10 +42,8 @@ struct SegmentWriteState {
     // FieldInfos& fieldInfos;
     // BufferedUpdates* deletes;    // May be nullptr
 
-    SegmentWriteState(store::Directory& dir,
-                     const std::string& name,
-                     const std::string& suffix,
-                     store::IOContext& ctx)
+    SegmentWriteState(store::Directory& dir, const std::string& name, const std::string& suffix,
+                      store::IOContext& ctx)
         : directory(dir)
         , segmentName(name)
         , segmentSuffix(suffix)
@@ -67,10 +65,8 @@ struct SegmentReadState {
     // SegmentInfo& segmentInfo;
     // FieldInfos& fieldInfos;
 
-    SegmentReadState(store::Directory& dir,
-                    const std::string& name,
-                    const std::string& suffix,
-                    store::IOContext& ctx)
+    SegmentReadState(store::Directory& dir, const std::string& name, const std::string& suffix,
+                     store::IOContext& ctx)
         : directory(dir)
         , segmentName(name)
         , segmentSuffix(suffix)

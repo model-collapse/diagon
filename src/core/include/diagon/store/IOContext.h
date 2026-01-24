@@ -60,14 +60,20 @@ struct IOContext {
      * @brief Default constructor - creates DEFAULT context.
      */
     IOContext()
-        : type(Type::DEFAULT), readOnce(false), mergeSize(0), flushSize(0) {}
+        : type(Type::DEFAULT)
+        , readOnce(false)
+        , mergeSize(0)
+        , flushSize(0) {}
 
     /**
      * @brief Construct from type.
      * @param t I/O context type
      */
     explicit IOContext(Type t)
-        : type(t), readOnce(t == Type::READONCE), mergeSize(0), flushSize(0) {}
+        : type(t)
+        , readOnce(t == Type::READONCE)
+        , mergeSize(0)
+        , flushSize(0) {}
 
     /**
      * @brief Construct MERGE context with size hint.
@@ -97,4 +103,4 @@ struct IOContext {
     static const IOContext FLUSH;
 };
 
-} // namespace diagon::store
+}  // namespace diagon::store

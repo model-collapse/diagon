@@ -43,9 +43,7 @@ struct MarkInCompressedFile {
                offset_in_decompressed_block == other.offset_in_decompressed_block;
     }
 
-    bool operator!=(const MarkInCompressedFile& other) const {
-        return !(*this == other);
-    }
+    bool operator!=(const MarkInCompressedFile& other) const { return !(*this == other); }
 };
 
 }  // namespace granularity

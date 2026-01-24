@@ -48,8 +48,7 @@ public:
      */
     static int encodeInt32(int32_t value, uint8_t* output) {
         // Zig-zag encoding: (n << 1) ^ (n >> 31)
-        uint32_t zigzag = (static_cast<uint32_t>(value) << 1) ^
-                          static_cast<uint32_t>(value >> 31);
+        uint32_t zigzag = (static_cast<uint32_t>(value) << 1) ^ static_cast<uint32_t>(value >> 31);
         return encodeUInt32(zigzag, output);
     }
 
@@ -77,8 +76,7 @@ public:
      */
     static int encodeInt64(int64_t value, uint8_t* output) {
         // Zig-zag encoding: (n << 1) ^ (n >> 63)
-        uint64_t zigzag = (static_cast<uint64_t>(value) << 1) ^
-                          static_cast<uint64_t>(value >> 63);
+        uint64_t zigzag = (static_cast<uint64_t>(value) << 1) ^ static_cast<uint64_t>(value >> 63);
         return encodeUInt64(zigzag, output);
     }
 

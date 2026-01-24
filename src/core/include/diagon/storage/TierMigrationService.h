@@ -21,14 +21,12 @@ namespace storage {
 class TierMigrationService {
 public:
     TierMigrationService(TierManager& tier_manager,
-                        std::chrono::seconds check_interval = std::chrono::hours(1))
+                         std::chrono::seconds check_interval = std::chrono::hours(1))
         : tier_manager_(tier_manager)
         , check_interval_(check_interval)
         , running_(false) {}
 
-    ~TierMigrationService() {
-        stop();
-    }
+    ~TierMigrationService() { stop(); }
 
     /**
      * Start background migration worker
@@ -39,9 +37,7 @@ public:
         }
 
         running_ = true;
-        worker_thread_ = std::thread([this]() {
-            this->run();
-        });
+        worker_thread_ = std::thread([this]() { this->run(); });
     }
 
     /**
@@ -61,23 +57,17 @@ public:
     /**
      * Check if service is running
      */
-    bool isRunning() const {
-        return running_.load();
-    }
+    bool isRunning() const { return running_.load(); }
 
     /**
      * Get check interval
      */
-    std::chrono::seconds getCheckInterval() const {
-        return check_interval_;
-    }
+    std::chrono::seconds getCheckInterval() const { return check_interval_; }
 
     /**
      * Set check interval
      */
-    void setCheckInterval(std::chrono::seconds interval) {
-        check_interval_ = interval;
-    }
+    void setCheckInterval(std::chrono::seconds interval) { check_interval_ = interval; }
 
 private:
     TierManager& tier_manager_;
@@ -93,10 +83,11 @@ private:
 
                 // Execute migrations
                 for (const auto& [segment_name, target_tier] : migrations) {
-                    if (!running_) break;
+                    if (!running_)
+                        break;
 
-                    std::cout << "Migrating segment " << segment_name
-                             << " to " << toString(target_tier) << std::endl;
+                    std::cout << "Migrating segment " << segment_name << " to "
+                              << toString(target_tier) << std::endl;
 
                     tier_manager_.migrateSegment(segment_name, target_tier);
                 }

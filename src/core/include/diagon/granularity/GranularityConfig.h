@@ -36,9 +36,7 @@ struct GranularityConfig {
     /**
      * Use adaptive granularity?
      */
-    bool use_adaptive_granularity() const {
-        return index_granularity_bytes > 0;
-    }
+    bool use_adaptive_granularity() const { return index_granularity_bytes > 0; }
 
     /**
      * Create appropriate granularity object
@@ -47,9 +45,7 @@ struct GranularityConfig {
         if (use_adaptive_granularity()) {
             return std::make_shared<MergeTreeIndexGranularityAdaptive>();
         } else {
-            return std::make_shared<MergeTreeIndexGranularityConstant>(
-                index_granularity
-            );
+            return std::make_shared<MergeTreeIndexGranularityConstant>(index_granularity);
         }
     }
 };
@@ -67,7 +63,7 @@ public:
      * Check if should finish current granule
      */
     bool shouldFinishGranule(size_t rows_written_in_granule,
-                            size_t bytes_written_in_granule) const {
+                             size_t bytes_written_in_granule) const {
         if (config_.use_adaptive_granularity()) {
             // Adaptive: check both rows and bytes
             return bytes_written_in_granule >= config_.index_granularity_bytes ||
@@ -81,17 +77,11 @@ public:
     /**
      * Finish granule and add mark
      */
-    void finishGranule(size_t rows_in_granule) {
-        granularity_->addMark(rows_in_granule);
-    }
+    void finishGranule(size_t rows_in_granule) { granularity_->addMark(rows_in_granule); }
 
-    const IMergeTreeIndexGranularity& getGranularity() const {
-        return *granularity_;
-    }
+    const IMergeTreeIndexGranularity& getGranularity() const { return *granularity_; }
 
-    MergeTreeIndexGranularityPtr getGranularityPtr() const {
-        return granularity_;
-    }
+    MergeTreeIndexGranularityPtr getGranularityPtr() const { return granularity_; }
 
 private:
     GranularityConfig config_;

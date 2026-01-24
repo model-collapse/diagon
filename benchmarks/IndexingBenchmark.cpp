@@ -1,12 +1,13 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/index/IndexWriter.h"
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/IndexWriter.h"
 #include "diagon/store/FSDirectory.h"
 
 #include <benchmark/benchmark.h>
+
 #include <filesystem>
 #include <random>
 #include <sstream>
@@ -25,18 +26,19 @@ namespace fs = std::filesystem;
  */
 std::string generateRandomText(int numWords, std::mt19937& rng) {
     static const std::vector<std::string> words = {
-        "the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog",
-        "search", "engine", "index", "document", "query", "result", "score",
-        "lucene", "elasticsearch", "solr", "database", "algorithm", "data",
-        "performance", "benchmark", "optimization", "memory", "disk", "cache",
-        "distributed", "scalable", "fast", "efficient", "robust", "reliable"
-    };
+        "the",       "quick",     "brown",   "fox",         "jumps",         "over",
+        "lazy",      "dog",       "search",  "engine",      "index",         "document",
+        "query",     "result",    "score",   "lucene",      "elasticsearch", "solr",
+        "database",  "algorithm", "data",    "performance", "benchmark",     "optimization",
+        "memory",    "disk",      "cache",   "distributed", "scalable",      "fast",
+        "efficient", "robust",    "reliable"};
 
     std::uniform_int_distribution<> dist(0, words.size() - 1);
     std::ostringstream oss;
 
     for (int i = 0; i < numWords; i++) {
-        if (i > 0) oss << " ";
+        if (i > 0)
+            oss << " ";
         oss << words[dist(rng)];
     }
 
@@ -255,11 +257,7 @@ BENCHMARK(BM_IndexWithDifferentRAMBuffers)
     ->Unit(benchmark::kMillisecond);
 
 // Commit overhead
-BENCHMARK(BM_CommitOverhead)
-    ->Arg(100)
-    ->Arg(500)
-    ->Arg(1000)
-    ->Unit(benchmark::kMillisecond);
+BENCHMARK(BM_CommitOverhead)->Arg(100)->Arg(500)->Arg(1000)->Unit(benchmark::kMillisecond);
 
 // Document size impact
 BENCHMARK(BM_IndexDifferentDocSizes)

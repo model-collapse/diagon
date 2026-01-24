@@ -4,6 +4,7 @@
 #include "diagon/util/VByte.h"
 
 #include <gtest/gtest.h>
+
 #include <limits>
 
 using namespace diagon::util;
@@ -103,10 +104,8 @@ TEST(VByteTest, EncodeDecodeInt32_MinMax) {
     uint8_t buffer[10];
 
     // Test min and max int32
-    int32_t test_values[] = {
-        std::numeric_limits<int32_t>::min(),
-        std::numeric_limits<int32_t>::max()
-    };
+    int32_t test_values[] = {std::numeric_limits<int32_t>::min(),
+                             std::numeric_limits<int32_t>::max()};
 
     for (int32_t val : test_values) {
         int encoded = VByte::encodeInt32(val, buffer);
@@ -139,11 +138,7 @@ TEST(VByteTest, EncodeDecodeUInt64_Large) {
     uint8_t buffer[12];
 
     // Test large values
-    uint64_t test_values[] = {
-        1000000000ULL,
-        1000000000000ULL,
-        1000000000000000ULL
-    };
+    uint64_t test_values[] = {1000000000ULL, 1000000000000ULL, 1000000000000000ULL};
 
     for (uint64_t val : test_values) {
         int encoded = VByte::encodeUInt64(val, buffer);
@@ -202,10 +197,8 @@ TEST(VByteTest, EncodeDecodeInt64_MinMax) {
     uint8_t buffer[12];
 
     // Test min and max int64
-    int64_t test_values[] = {
-        std::numeric_limits<int64_t>::min(),
-        std::numeric_limits<int64_t>::max()
-    };
+    int64_t test_values[] = {std::numeric_limits<int64_t>::min(),
+                             std::numeric_limits<int64_t>::max()};
 
     for (int64_t val : test_values) {
         int encoded = VByte::encodeInt64(val, buffer);

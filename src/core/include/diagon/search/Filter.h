@@ -44,8 +44,8 @@ public:
      * @param context Segment to filter
      * @return DocIdSet or nullptr if no matches possible
      */
-    virtual std::unique_ptr<DocIdSet> getDocIdSet(
-        const index::LeafReaderContext& context) const = 0;
+    virtual std::unique_ptr<DocIdSet>
+    getDocIdSet(const index::LeafReaderContext& context) const = 0;
 
     // ==================== Caching Support ====================
 
@@ -60,9 +60,7 @@ public:
     /**
      * Should this filter be cached?
      */
-    bool isCacheable() const {
-        return !getCacheKey().empty();
-    }
+    bool isCacheable() const { return !getCacheKey().empty(); }
 
     // ==================== Utilities ====================
 

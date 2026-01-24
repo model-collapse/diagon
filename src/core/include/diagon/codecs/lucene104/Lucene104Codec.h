@@ -4,10 +4,10 @@
 #pragma once
 
 #include "diagon/codecs/Codec.h"
-#include "diagon/codecs/PostingsFormat.h"
-#include "diagon/codecs/DocValuesFormat.h"
 #include "diagon/codecs/ColumnFormat.h"
+#include "diagon/codecs/DocValuesFormat.h"
 #include "diagon/codecs/OtherFormats.h"
+#include "diagon/codecs/PostingsFormat.h"
 
 #include <memory>
 #include <string>
@@ -149,9 +149,7 @@ public:
 
     // ==================== Identification ====================
 
-    std::string getName() const override {
-        return "Lucene104";
-    }
+    std::string getName() const override { return "Lucene104"; }
 
     // ==================== Capabilities ====================
 

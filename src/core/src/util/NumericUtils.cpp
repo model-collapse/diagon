@@ -7,17 +7,17 @@
 #include <cstring>
 
 #if defined(_MSC_VER)
-#include <stdlib.h>
-#define bswap_32(x) _byteswap_ulong(x)
-#define bswap_64(x) _byteswap_uint64(x)
+#    include <stdlib.h>
+#    define bswap_32(x) _byteswap_ulong(x)
+#    define bswap_64(x) _byteswap_uint64(x)
 #elif defined(__GNUC__) || defined(__clang__)
-#define bswap_32(x) __builtin_bswap32(x)
-#define bswap_64(x) __builtin_bswap64(x)
+#    define bswap_32(x) __builtin_bswap32(x)
+#    define bswap_64(x) __builtin_bswap64(x)
 #else
 // Fallback implementation
 static inline uint32_t bswap_32(uint32_t x) {
-    return ((x & 0x000000FFU) << 24) | ((x & 0x0000FF00U) << 8) |
-           ((x & 0x00FF0000U) >> 8) | ((x & 0xFF000000U) >> 24);
+    return ((x & 0x000000FFU) << 24) | ((x & 0x0000FF00U) << 8) | ((x & 0x00FF0000U) >> 8) |
+           ((x & 0xFF000000U) >> 24);
 }
 
 static inline uint64_t bswap_64(uint64_t x) {
@@ -104,4 +104,4 @@ double NumericUtils::bytesToDoubleBE(const uint8_t* src) noexcept {
     return sortableLongToDouble(sortable);
 }
 
-} // namespace diagon::util
+}  // namespace diagon::util

@@ -33,8 +33,7 @@ namespace storage {
  */
 class TierManager {
 public:
-    TierManager(const std::map<StorageTier, TierConfig>& configs,
-                const LifecyclePolicy& policy)
+    TierManager(const std::map<StorageTier, TierConfig>& configs, const LifecyclePolicy& policy)
         : configs_(configs)
         , policy_(policy) {}
 
@@ -51,8 +50,7 @@ public:
             .creation_time = std::chrono::system_clock::now(),
             .last_access_time = std::chrono::system_clock::now(),
             .access_count = 0,
-            .size_bytes = static_cast<int64_t>(size_bytes)
-        };
+            .size_bytes = static_cast<int64_t>(size_bytes)};
     }
 
     // ==================== Tier Query ====================
@@ -130,12 +128,8 @@ public:
             auto age_seconds = std::chrono::duration_cast<std::chrono::seconds>(age).count();
 
             // Evaluate policy
-            auto target_tier = policy_.evaluateSegment(
-                metadata.tier,
-                age_seconds,
-                metadata.size_bytes,
-                metadata.access_count
-            );
+            auto target_tier = policy_.evaluateSegment(metadata.tier, age_seconds,
+                                                       metadata.size_bytes, metadata.access_count);
 
             if (target_tier.has_value()) {
                 migrations.emplace_back(segment_name, *target_tier);
@@ -193,9 +187,7 @@ public:
     /**
      * Get segments in specified tiers
      */
-    std::vector<std::string> getSegmentsInTiers(
-        const std::vector<StorageTier>& tiers) const {
-
+    std::vector<std::string> getSegmentsInTiers(const std::vector<StorageTier>& tiers) const {
         std::lock_guard lock(mutex_);
 
         std::vector<std::string> segments;
@@ -226,9 +218,7 @@ public:
     /**
      * Get lifecycle policy
      */
-    const LifecyclePolicy& getPolicy() const {
-        return policy_;
-    }
+    const LifecyclePolicy& getPolicy() const { return policy_; }
 
 private:
     struct SegmentMetadata {

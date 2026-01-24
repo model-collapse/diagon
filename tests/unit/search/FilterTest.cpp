@@ -1,10 +1,11 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
+#include "diagon/search/Filter.h"
+
 #include "diagon/search/BooleanClause.h"
 #include "diagon/search/DocIdSet.h"
 #include "diagon/search/DocIdSetIterator.h"
-#include "diagon/search/Filter.h"
 #include "diagon/search/Query.h"
 #include "diagon/search/Weight.h"
 
@@ -16,14 +17,14 @@ using namespace diagon::search;
 
 class MockDocIdSetIterator : public DocIdSetIterator {
 public:
-    MockDocIdSetIterator() : current_(-1) {}
+    MockDocIdSetIterator()
+        : current_(-1) {}
 
-    int docID() const override {
-        return current_;
-    }
+    int docID() const override { return current_; }
 
     int nextDoc() override {
-        if (current_ == NO_MORE_DOCS) return NO_MORE_DOCS;
+        if (current_ == NO_MORE_DOCS)
+            return NO_MORE_DOCS;
         current_++;
         if (current_ >= 5) {
             current_ = NO_MORE_DOCS;
@@ -38,9 +39,7 @@ public:
         return current_;
     }
 
-    int64_t cost() const override {
-        return 5;
-    }
+    int64_t cost() const override { return 5; }
 
 private:
     int current_;
@@ -52,39 +51,30 @@ public:
         return std::make_unique<MockDocIdSetIterator>();
     }
 
-    size_t ramBytesUsed() const override {
-        return 1024;
-    }
+    size_t ramBytesUsed() const override { return 1024; }
 
-    bool isCacheable() const override {
-        return true;
-    }
+    bool isCacheable() const override { return true; }
 };
 
 class MockFilter : public Filter {
 public:
-    explicit MockFilter(bool cacheable = true) : cacheable_(cacheable) {}
+    explicit MockFilter(bool cacheable = true)
+        : cacheable_(cacheable) {}
 
-    std::unique_ptr<DocIdSet> getDocIdSet(
-        const diagon::index::LeafReaderContext& context) const override {
+    std::unique_ptr<DocIdSet>
+    getDocIdSet(const diagon::index::LeafReaderContext& context) const override {
         return std::make_unique<MockDocIdSet>();
     }
 
-    std::string getCacheKey() const override {
-        return cacheable_ ? "mock_filter_key" : "";
-    }
+    std::string getCacheKey() const override { return cacheable_ ? "mock_filter_key" : ""; }
 
-    std::string toString() const override {
-        return "MockFilter";
-    }
+    std::string toString() const override { return "MockFilter"; }
 
     bool equals(const Filter& other) const override {
         return dynamic_cast<const MockFilter*>(&other) != nullptr;
     }
 
-    size_t hashCode() const override {
-        return 12345;
-    }
+    size_t hashCode() const override { return 12345; }
 
 private:
     bool cacheable_;
@@ -92,28 +82,20 @@ private:
 
 class MockQuery : public Query {
 public:
-    std::unique_ptr<Weight> createWeight(
-        IndexSearcher& searcher,
-        ScoreMode scoreMode,
-        float boost) const override {
+    std::unique_ptr<Weight> createWeight(IndexSearcher& searcher, ScoreMode scoreMode,
+                                         float boost) const override {
         return nullptr;  // Not needed for this test
     }
 
-    std::string toString(const std::string& field) const override {
-        return "MockQuery";
-    }
+    std::string toString(const std::string& field) const override { return "MockQuery"; }
 
     bool equals(const Query& other) const override {
         return dynamic_cast<const MockQuery*>(&other) != nullptr;
     }
 
-    size_t hashCode() const override {
-        return 999;
-    }
+    size_t hashCode() const override { return 999; }
 
-    std::unique_ptr<Query> clone() const override {
-        return std::make_unique<MockQuery>();
-    }
+    std::unique_ptr<Query> clone() const override { return std::make_unique<MockQuery>(); }
 };
 
 // ==================== BooleanClause Tests ====================

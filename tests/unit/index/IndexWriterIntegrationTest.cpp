@@ -1,12 +1,13 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/index/IndexWriter.h"
-#include "diagon/store/FSDirectory.h"
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/IndexWriter.h"
+#include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 
 using namespace diagon;

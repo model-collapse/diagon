@@ -1,11 +1,11 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/codecs/blocktree/BlockTreeTermsWriter.h"
 #include "diagon/codecs/blocktree/BlockTreeTermsReader.h"
-#include "diagon/store/ByteBuffersIndexOutput.h"
-#include "diagon/store/ByteBuffersIndexInput.h"
+#include "diagon/codecs/blocktree/BlockTreeTermsWriter.h"
 #include "diagon/index/FieldInfo.h"
+#include "diagon/store/ByteBuffersIndexInput.h"
+#include "diagon/store/ByteBuffersIndexOutput.h"
 
 #include <gtest/gtest.h>
 
@@ -226,7 +226,7 @@ TEST(BlockTreeTest, MultipleBlocks) {
             snprintf(buf, sizeof(buf), "term_%02d", i);
             std::string term(buf);
             writer.addTerm(BytesRef(term),
-                         BlockTreeTermsWriter::TermStats(i + 1, i + 1, (i + 1) * 100));
+                           BlockTreeTermsWriter::TermStats(i + 1, i + 1, (i + 1) * 100));
         }
         writer.finish();
     }
@@ -274,8 +274,7 @@ TEST(BlockTreeTest, InvalidConfig) {
     config.minItemsInBlock = 10;
     config.maxItemsInBlock = 5;  // Invalid: max < min
 
-    EXPECT_THROW(BlockTreeTermsWriter(&timOut, &tipOut, fieldInfo, config),
-                 std::invalid_argument);
+    EXPECT_THROW(BlockTreeTermsWriter(&timOut, &tipOut, fieldInfo, config), std::invalid_argument);
 }
 
 // ==================== Empty Field ====================

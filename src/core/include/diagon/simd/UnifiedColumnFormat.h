@@ -37,7 +37,7 @@ struct ColumnMetadata {
     bool hasPayloads{false};     // Store payloads?
 
     // For dense columns (doc values)
-    bool hasNulls{false};        // Nullable column?
+    bool hasNulls{false};  // Nullable column?
 
     // Statistics for query optimization
     int64_t totalDocs{0};
@@ -69,16 +69,12 @@ public:
     /**
      * Get window size
      */
-    size_t getWindowSize() const {
-        return windowSize_;
-    }
+    size_t getWindowSize() const { return windowSize_; }
 
     /**
      * Set window size
      */
-    void setWindowSize(size_t size) {
-        windowSize_ = size;
-    }
+    void setWindowSize(size_t size) { windowSize_ = size; }
 
     // ==================== Write API (Stub) ====================
 

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/document/Document.h"
+
 #include "diagon/document/Field.h"
 
 #include <gtest/gtest.h>

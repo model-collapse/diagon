@@ -4,9 +4,9 @@
 #pragma once
 
 #include "diagon/codecs/PostingsFormat.h"
+#include "diagon/index/PostingsEnum.h"
 #include "diagon/index/Terms.h"
 #include "diagon/index/TermsEnum.h"
-#include "diagon/index/PostingsEnum.h"
 #include "diagon/store/Directory.h"
 
 #include <map>
@@ -46,7 +46,9 @@ public:
         int docID;
         int freq;
 
-        Posting(int d, int f) : docID(d), freq(f) {}
+        Posting(int d, int f)
+            : docID(d)
+            , freq(f) {}
     };
 
     /**
@@ -64,11 +66,8 @@ public:
      * @param segmentName Segment name (e.g., "_0")
      * @param fieldName Field name
      */
-    SimpleFieldsProducer(
-        store::Directory& dir,
-        const std::string& segmentName,
-        const std::string& fieldName
-    );
+    SimpleFieldsProducer(store::Directory& dir, const std::string& segmentName,
+                         const std::string& fieldName);
 
     /**
      * Get terms for the field
@@ -80,16 +79,12 @@ public:
     /**
      * Get all term data (for testing/debugging)
      */
-    const std::vector<TermData>& getTermData() const {
-        return terms_;
-    }
+    const std::vector<TermData>& getTermData() const { return terms_; }
 
     /**
      * Get number of terms
      */
-    size_t size() const {
-        return terms_.size();
-    }
+    size_t size() const { return terms_.size(); }
 
     /**
      * Check integrity (FieldsProducer interface)
@@ -131,9 +126,7 @@ public:
 
     std::unique_ptr<index::TermsEnum> iterator() const override;
 
-    int64_t size() const override {
-        return static_cast<int64_t>(terms_.size());
-    }
+    int64_t size() const override { return static_cast<int64_t>(terms_.size()); }
 
 private:
     const std::vector<SimpleFieldsProducer::TermData>& terms_;
@@ -145,7 +138,8 @@ private:
 class SimpleTermsEnum : public index::TermsEnum {
 public:
     explicit SimpleTermsEnum(const std::vector<SimpleFieldsProducer::TermData>& terms)
-        : terms_(terms), current_(-1) {}
+        : terms_(terms)
+        , current_(-1) {}
 
     bool next() override;
 
@@ -168,9 +162,7 @@ private:
     /**
      * Check if current position is valid
      */
-    bool isValid() const {
-        return current_ >= 0 && current_ < static_cast<int>(terms_.size());
-    }
+    bool isValid() const { return current_ >= 0 && current_ < static_cast<int>(terms_.size()); }
 };
 
 /**
@@ -179,7 +171,8 @@ private:
 class SimplePostingsEnum : public index::PostingsEnum {
 public:
     explicit SimplePostingsEnum(const std::vector<SimpleFieldsProducer::Posting>& postings)
-        : postings_(postings), current_(-1) {}
+        : postings_(postings)
+        , current_(-1) {}
 
     int nextDoc() override;
 
@@ -187,9 +180,7 @@ public:
 
     int docID() const override;
 
-    int64_t cost() const override {
-        return static_cast<int64_t>(postings_.size());
-    }
+    int64_t cost() const override { return static_cast<int64_t>(postings_.size()); }
 
     int freq() const override;
 
@@ -200,9 +191,7 @@ private:
     /**
      * Check if current position is valid
      */
-    bool isValid() const {
-        return current_ >= 0 && current_ < static_cast<int>(postings_.size());
-    }
+    bool isValid() const { return current_ >= 0 && current_ < static_cast<int>(postings_.size()); }
 };
 
 }  // namespace codecs

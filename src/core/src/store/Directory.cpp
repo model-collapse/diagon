@@ -13,4 +13,4 @@ void Directory::ensureOpen() const {
     }
 }
 
-} // namespace diagon::store
+}  // namespace diagon::store

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/DocumentsWriter.h"
+
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
 
@@ -41,7 +42,8 @@ TEST(DocumentsWriterTest, AddMultipleDocuments) {
 
     for (int i = 0; i < 10; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "document " + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(std::make_unique<TextField>("body", "document " + std::to_string(i),
+                                            TextField::TYPE_STORED));
         writer.addDocument(doc);
     }
 
@@ -60,7 +62,8 @@ TEST(DocumentsWriterTest, AutoFlushByDocumentCount) {
     // Add 4 documents - should not trigger flush
     for (int i = 0; i < 4; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(
+            std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
         int segments = writer.addDocument(doc);
         totalSegments += segments;
     }
@@ -74,7 +77,7 @@ TEST(DocumentsWriterTest, AutoFlushByDocumentCount) {
     doc5.add(std::make_unique<TextField>("body", "doc5", TextField::TYPE_STORED));
     int segments = writer.addDocument(doc5);
 
-    EXPECT_EQ(segments, 1);  // One segment created
+    EXPECT_EQ(segments, 1);                  // One segment created
     EXPECT_EQ(writer.getNumDocsInRAM(), 0);  // DWPT reset
     EXPECT_EQ(writer.getNumDocsAdded(), 5);  // Total docs tracked
     EXPECT_EQ(writer.getSegments().size(), 1);
@@ -82,7 +85,7 @@ TEST(DocumentsWriterTest, AutoFlushByDocumentCount) {
 
 TEST(DocumentsWriterTest, AutoFlushByRAMLimit) {
     DocumentsWriter::Config config;
-    config.dwptConfig.ramBufferSizeMB = 1;  // Small RAM limit (1MB)
+    config.dwptConfig.ramBufferSizeMB = 1;      // Small RAM limit (1MB)
     config.dwptConfig.maxBufferedDocs = 10000;  // High doc limit
     DocumentsWriter writer(config);
 
@@ -120,7 +123,8 @@ TEST(DocumentsWriterTest, ManualFlush) {
     // Add documents
     for (int i = 0; i < 5; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(
+            std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
         writer.addDocument(doc);
     }
 
@@ -155,7 +159,8 @@ TEST(DocumentsWriterTest, MultipleFlushCycles) {
     // First cycle: add 3 docs, auto-flush
     for (int i = 0; i < 3; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(
+            std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
         writer.addDocument(doc);
     }
 
@@ -166,7 +171,8 @@ TEST(DocumentsWriterTest, MultipleFlushCycles) {
     // Second cycle: add 3 more docs, auto-flush
     for (int i = 0; i < 3; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i + 3), TextField::TYPE_STORED));
+        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i + 3),
+                                            TextField::TYPE_STORED));
         writer.addDocument(doc);
     }
 
@@ -177,7 +183,8 @@ TEST(DocumentsWriterTest, MultipleFlushCycles) {
     // Third cycle: add 2 docs, manual flush
     for (int i = 0; i < 2; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i + 6), TextField::TYPE_STORED));
+        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i + 6),
+                                            TextField::TYPE_STORED));
         writer.addDocument(doc);
     }
 
@@ -220,7 +227,8 @@ TEST(DocumentsWriterTest, Reset) {
     // Add documents
     for (int i = 0; i < 5; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(
+            std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
         writer.addDocument(doc);
     }
 
@@ -246,7 +254,8 @@ TEST(DocumentsWriterTest, BytesUsedIncreases) {
     // Add documents
     for (int i = 0; i < 10; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "document content here", TextField::TYPE_STORED));
+        doc.add(
+            std::make_unique<TextField>("body", "document content here", TextField::TYPE_STORED));
         writer.addDocument(doc);
     }
 
@@ -325,8 +334,10 @@ TEST(DocumentsWriterTest, LargeDocumentBatch) {
     // Add 100 documents
     for (int i = 0; i < 100; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("title", "Title " + std::to_string(i), TextField::TYPE_STORED));
-        doc.add(std::make_unique<TextField>("body", "Body content for document " + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(std::make_unique<TextField>("title", "Title " + std::to_string(i),
+                                            TextField::TYPE_STORED));
+        doc.add(std::make_unique<TextField>(
+            "body", "Body content for document " + std::to_string(i), TextField::TYPE_STORED));
         doc.add(std::make_unique<NumericDocValuesField>("id", i));
         writer.addDocument(doc);
     }
@@ -360,7 +371,8 @@ TEST(DocumentsWriterTest, SegmentTrackingOrder) {
     // Create segments by adding docs
     for (int i = 0; i < 6; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(
+            std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
         writer.addDocument(doc);
     }
 

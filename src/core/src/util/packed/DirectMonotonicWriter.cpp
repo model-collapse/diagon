@@ -2,12 +2,13 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/util/packed/DirectMonotonicWriter.h"
+
 #include "diagon/util/packed/DirectWriter.h"
 
-#include <stdexcept>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <stdexcept>
 
 namespace diagon {
 namespace util {
@@ -15,11 +16,8 @@ namespace packed {
 
 // ==================== DirectMonotonicWriter ====================
 
-DirectMonotonicWriter::DirectMonotonicWriter(
-    store::IndexOutput* meta,
-    store::IndexOutput* data,
-    int64_t numValues,
-    int blockShift)
+DirectMonotonicWriter::DirectMonotonicWriter(store::IndexOutput* meta, store::IndexOutput* data,
+                                             int64_t numValues, int blockShift)
     : meta_(meta)
     , data_(data)
     , numValues_(numValues)
@@ -27,7 +25,6 @@ DirectMonotonicWriter::DirectMonotonicWriter(
     , blockSize_(1 << blockShift)
     , count_(0)
     , lastValue_(0) {
-
     if (!meta_ || !data_) {
         throw std::invalid_argument("Outputs cannot be null");
     }
@@ -162,12 +159,9 @@ void DirectMonotonicWriter::writeMeta(const Block& block) {
 
 // ==================== DirectMonotonicReader ====================
 
-int64_t DirectMonotonicReader::get(
-    const DirectMonotonicWriter::Meta& meta,
-    store::IndexInput* metaIn,
-    store::IndexInput* dataIn,
-    int64_t index) {
-
+int64_t DirectMonotonicReader::get(const DirectMonotonicWriter::Meta& meta,
+                                   store::IndexInput* metaIn, store::IndexInput* dataIn,
+                                   int64_t index) {
     if (index < 0 || index >= meta.numValues) {
         throw std::invalid_argument("Index out of range");
     }
@@ -218,11 +212,9 @@ int64_t DirectMonotonicReader::get(
     return expected + deviation + block.minDeviation;
 }
 
-std::vector<int64_t> DirectMonotonicReader::readAll(
-    const DirectMonotonicWriter::Meta& meta,
-    store::IndexInput* metaIn,
-    store::IndexInput* dataIn) {
-
+std::vector<int64_t> DirectMonotonicReader::readAll(const DirectMonotonicWriter::Meta& meta,
+                                                    store::IndexInput* metaIn,
+                                                    store::IndexInput* dataIn) {
     std::vector<int64_t> result;
     result.reserve(meta.numValues);
 
@@ -233,9 +225,8 @@ std::vector<int64_t> DirectMonotonicReader::readAll(
         Block block = readBlockMeta(meta, metaIn, blockIndex);
 
         // Calculate number of values in this block
-        int64_t valuesInBlock = std::min<int64_t>(
-            blockSize,
-            meta.numValues - blockIndex * blockSize);
+        int64_t valuesInBlock = std::min<int64_t>(blockSize,
+                                                  meta.numValues - blockIndex * blockSize);
 
         // Read deviations for this block
         std::vector<int64_t> deviations(valuesInBlock);
@@ -280,13 +271,12 @@ std::vector<int64_t> DirectMonotonicReader::readAll(
     return result;
 }
 
-DirectMonotonicReader::Block DirectMonotonicReader::readBlockMeta(
-    const DirectMonotonicWriter::Meta& meta,
-    store::IndexInput* metaIn,
-    int64_t blockIndex) {
-
+DirectMonotonicReader::Block
+DirectMonotonicReader::readBlockMeta(const DirectMonotonicWriter::Meta& meta,
+                                     store::IndexInput* metaIn, int64_t blockIndex) {
     // Seek to block metadata
-    // Each block metadata is: 8 (min) + 4 (slope) + 8 (minDeviation) + 8 (offset) + 1 (bits) = 29 bytes
+    // Each block metadata is: 8 (min) + 4 (slope) + 8 (minDeviation) + 8 (offset) + 1 (bits) = 29
+    // bytes
     int64_t metaOffset = meta.metaFP + blockIndex * 29;
     metaIn->seek(metaOffset);
 

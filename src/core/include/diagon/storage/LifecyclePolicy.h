@@ -113,30 +113,23 @@ struct LifecyclePolicy {
      *
      * NOTE: Stub implementation - requires full SegmentInfo
      */
-    std::optional<StorageTier> evaluateSegment(
-        StorageTier current_tier,
-        int64_t age_seconds,
-        int64_t size_bytes,
-        int32_t access_count) const {
-
+    std::optional<StorageTier> evaluateSegment(StorageTier current_tier, int64_t age_seconds,
+                                               int64_t size_bytes, int32_t access_count) const {
         switch (current_tier) {
             case StorageTier::HOT:
-                if (age_seconds >= hot.max_age_seconds ||
-                    size_bytes >= hot.max_size_bytes) {
+                if (age_seconds >= hot.max_age_seconds || size_bytes >= hot.max_size_bytes) {
                     return StorageTier::WARM;
                 }
                 break;
 
             case StorageTier::WARM:
-                if (age_seconds >= warm.max_age_seconds ||
-                    access_count < warm.min_access_count) {
+                if (age_seconds >= warm.max_age_seconds || access_count < warm.min_access_count) {
                     return StorageTier::COLD;
                 }
                 break;
 
             case StorageTier::COLD:
-                if (cold.max_age_seconds > 0 &&
-                    age_seconds >= cold.max_age_seconds) {
+                if (cold.max_age_seconds > 0 && age_seconds >= cold.max_age_seconds) {
                     return StorageTier::FROZEN;
                 }
                 break;

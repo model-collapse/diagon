@@ -50,8 +50,7 @@ public:
      *
      * NOTE: Stub - returns nullptr until formats are implemented
      */
-    virtual std::unique_ptr<FieldsConsumer> fieldsConsumer(
-        SegmentWriteState& state) = 0;
+    virtual std::unique_ptr<FieldsConsumer> fieldsConsumer(SegmentWriteState& state) = 0;
 
     /**
      * Create producer for reading postings
@@ -59,8 +58,7 @@ public:
      *
      * NOTE: Stub - returns nullptr until formats are implemented
      */
-    virtual std::unique_ptr<FieldsProducer> fieldsProducer(
-        SegmentReadState& state) = 0;
+    virtual std::unique_ptr<FieldsProducer> fieldsProducer(SegmentReadState& state) = 0;
 
     // ==================== Factory & Registration ====================
 
@@ -77,7 +75,8 @@ public:
                                std::function<std::unique_ptr<PostingsFormat>()> factory);
 
 private:
-    static std::unordered_map<std::string, std::function<std::unique_ptr<PostingsFormat>()>>& getRegistry();
+    static std::unordered_map<std::string, std::function<std::unique_ptr<PostingsFormat>()>>&
+    getRegistry();
 };
 
 /**

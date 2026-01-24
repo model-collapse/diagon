@@ -53,46 +53,34 @@ public:
     /**
      * Segments being merged
      */
-    const std::vector<SegmentCommitInfo*>& getSegments() const {
-        return segments_;
-    }
+    const std::vector<SegmentCommitInfo*>& getSegments() const { return segments_; }
 
     /**
      * Total document count
      */
-    size_t getTotalDocCount() const {
-        return totalDocCount_;
-    }
+    size_t getTotalDocCount() const { return totalDocCount_; }
 
     // ==================== State ====================
 
     /**
      * Get merge state
      */
-    State getState() const {
-        return state_.load();
-    }
+    State getState() const { return state_.load(); }
 
     /**
      * Set merge state
      */
-    void setState(State state) {
-        state_.store(state);
-    }
+    void setState(State state) { state_.store(state); }
 
     /**
      * Is merge running?
      */
-    bool isRunning() const {
-        return state_.load() == State::RUNNING;
-    }
+    bool isRunning() const { return state_.load() == State::RUNNING; }
 
     /**
      * Is merge aborted?
      */
-    bool isAborted() const {
-        return state_.load() == State::ABORTED;
-    }
+    bool isAborted() const { return state_.load() == State::ABORTED; }
 
     // ==================== Description ====================
 

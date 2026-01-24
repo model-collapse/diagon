@@ -34,15 +34,15 @@ TEST_F(IOContextTest, ReadOnceType) {
 }
 
 TEST_F(IOContextTest, ForMerge) {
-    IOContext ctx = IOContext::forMerge(1024*1024);
+    IOContext ctx = IOContext::forMerge(1024 * 1024);
     EXPECT_EQ(IOContext::Type::MERGE, ctx.type);
-    EXPECT_EQ(1024*1024, ctx.mergeSize);
+    EXPECT_EQ(1024 * 1024, ctx.mergeSize);
 }
 
 TEST_F(IOContextTest, ForFlush) {
-    IOContext ctx = IOContext::forFlush(512*1024);
+    IOContext ctx = IOContext::forFlush(512 * 1024);
     EXPECT_EQ(IOContext::Type::FLUSH, ctx.type);
-    EXPECT_EQ(512*1024, ctx.flushSize);
+    EXPECT_EQ(512 * 1024, ctx.flushSize);
 }
 
 TEST_F(IOContextTest, StaticConstants) {

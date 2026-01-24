@@ -14,9 +14,9 @@ namespace simd {
  * Column density classification
  */
 enum class ColumnDensity {
-    SPARSE,     // < 10% non-zero (use posting list format)
-    MEDIUM,     // 10-50% non-zero (use bitmap + values)
-    DENSE       // > 50% non-zero (use full array)
+    SPARSE,  // < 10% non-zero (use posting list format)
+    MEDIUM,  // 10-50% non-zero (use bitmap + values)
+    DENSE    // > 50% non-zero (use full array)
 };
 
 /**
@@ -31,23 +31,23 @@ enum class ColumnDensity {
  */
 template<typename ValueType>
 struct ColumnWindow {
-    int docIdBase;              // Base doc ID for window
-    int capacity;               // Window size (e.g., 100K)
+    int docIdBase;  // Base doc ID for window
+    int capacity;   // Window size (e.g., 100K)
     ColumnDensity density;
 
     // Sparse representation (for posting lists)
-    std::vector<int> indices;           // Doc IDs (sorted)
-    std::vector<ValueType> values;      // Values at those doc IDs
+    std::vector<int> indices;       // Doc IDs (sorted)
+    std::vector<ValueType> values;  // Values at those doc IDs
 
     // Dense representation (for doc values)
-    std::vector<ValueType> denseValues; // Full array [0...capacity)
+    std::vector<ValueType> denseValues;  // Full array [0...capacity)
     // Note: nullBitmap would be std::unique_ptr<BitSet> in full implementation
 
-    ColumnWindow(int docIdBase_ = 0, int capacity_ = 100000, ColumnDensity density_ = ColumnDensity::SPARSE)
+    ColumnWindow(int docIdBase_ = 0, int capacity_ = 100000,
+                 ColumnDensity density_ = ColumnDensity::SPARSE)
         : docIdBase(docIdBase_)
         , capacity(capacity_)
         , density(density_) {
-
         if (density == ColumnDensity::DENSE) {
             denseValues.resize(capacity);
         }
@@ -82,8 +82,7 @@ struct ColumnWindow {
      *
      * NOTE: Stub - SIMD optimization not implemented
      */
-    void batchGet(const std::vector<int>& docIds,
-                  std::vector<ValueType>& output) const {
+    void batchGet(const std::vector<int>& docIds, std::vector<ValueType>& output) const {
         output.resize(docIds.size());
 
         if (density == ColumnDensity::SPARSE) {
@@ -92,7 +91,8 @@ struct ColumnWindow {
             while (i < docIds.size() && j < indices.size()) {
                 if (docIds[i] == indices[j]) {
                     output[i] = values[j];
-                    i++; j++;
+                    i++;
+                    j++;
                 } else if (docIds[i] < indices[j]) {
                     output[i] = ValueType{};  // Zero
                     i++;

@@ -3,17 +3,17 @@
 
 #pragma once
 
-#include <atomic>
-#include <memory>
-#include <mutex>
-#include <string>
-
 #include "diagon/document/Document.h"
 #include "diagon/index/DocumentsWriter.h"
 #include "diagon/index/SegmentInfo.h"
 #include "diagon/store/Directory.h"
 #include "diagon/store/Lock.h"
 #include "diagon/util/Exceptions.h"
+
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <string>
 
 namespace diagon {
 namespace index {
@@ -36,9 +36,9 @@ public:
     // ==================== Open Modes ====================
 
     enum class OpenMode {
-        CREATE,              // Create new index, overwrite existing
-        APPEND,              // Open existing, fail if doesn't exist
-        CREATE_OR_APPEND     // Create if missing, append otherwise
+        CREATE,           // Create new index, overwrite existing
+        APPEND,           // Open existing, fail if doesn't exist
+        CREATE_OR_APPEND  // Create if missing, append otherwise
     };
 
     // ==================== Construction ====================
@@ -56,9 +56,7 @@ public:
         return *this;
     }
 
-    double getRAMBufferSizeMB() const {
-        return ramBufferSizeMB_;
-    }
+    double getRAMBufferSizeMB() const { return ramBufferSizeMB_; }
 
     /**
      * Max buffered docs (default: disabled/-1)
@@ -69,9 +67,7 @@ public:
         return *this;
     }
 
-    int getMaxBufferedDocs() const {
-        return maxBufferedDocs_;
-    }
+    int getMaxBufferedDocs() const { return maxBufferedDocs_; }
 
     // ==================== Open Mode ====================
 
@@ -80,9 +76,7 @@ public:
         return *this;
     }
 
-    OpenMode getOpenMode() const {
-        return openMode_;
-    }
+    OpenMode getOpenMode() const { return openMode_; }
 
     // ==================== Commit ====================
 
@@ -94,9 +88,7 @@ public:
         return *this;
     }
 
-    bool getCommitOnClose() const {
-        return commitOnClose_;
-    }
+    bool getCommitOnClose() const { return commitOnClose_; }
 
     // ==================== Use Compound File ====================
 
@@ -108,9 +100,7 @@ public:
         return *this;
     }
 
-    bool getUseCompoundFile() const {
-        return useCompoundFile_;
-    }
+    bool getUseCompoundFile() const { return useCompoundFile_; }
 
 private:
     double ramBufferSizeMB_{16.0};
@@ -222,18 +212,14 @@ public:
 
     // ==================== Configuration ====================
 
-    const IndexWriterConfig& getConfig() const {
-        return config_;
-    }
+    const IndexWriterConfig& getConfig() const { return config_; }
 
     // ==================== Statistics ====================
 
     /**
      * Get current sequence number
      */
-    int64_t getSequenceNumber() const {
-        return nextSeqNo_.load(std::memory_order_relaxed);
-    }
+    int64_t getSequenceNumber() const { return nextSeqNo_.load(std::memory_order_relaxed); }
 
     /**
      * Get number of documents in RAM buffer
@@ -248,18 +234,14 @@ public:
     /**
      * Get segment infos (for testing)
      */
-    const SegmentInfos& getSegmentInfos() const {
-        return segmentInfos_;
-    }
+    const SegmentInfos& getSegmentInfos() const { return segmentInfos_; }
 
     // ==================== Lifecycle ====================
 
     /**
      * Check if closed
      */
-    bool isOpen() const {
-        return !closed_.load(std::memory_order_acquire);
-    }
+    bool isOpen() const { return !closed_.load(std::memory_order_acquire); }
 
     /**
      * Close writer (commits if commitOnClose is true)

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/DocumentsWriterPerThread.h"
+
 #include "diagon/codecs/SimpleFieldsConsumer.h"
 #include "diagon/index/SegmentWriteState.h"
 
@@ -16,20 +17,17 @@ namespace index {
 std::atomic<int> DocumentsWriterPerThread::nextSegmentNumber_{0};
 
 DocumentsWriterPerThread::DocumentsWriterPerThread()
-    : config_(Config{}),
-      termsWriter_(fieldInfosBuilder_),
-      codecName_("Lucene104") {
-}
+    : config_(Config{})
+    , termsWriter_(fieldInfosBuilder_)
+    , codecName_("Lucene104") {}
 
-DocumentsWriterPerThread::DocumentsWriterPerThread(
-    const Config& config,
-    store::Directory* directory,
-    const std::string& codecName)
-    : config_(config),
-      termsWriter_(fieldInfosBuilder_),
-      directory_(directory),
-      codecName_(codecName) {
-}
+DocumentsWriterPerThread::DocumentsWriterPerThread(const Config& config,
+                                                   store::Directory* directory,
+                                                   const std::string& codecName)
+    : config_(config)
+    , termsWriter_(fieldInfosBuilder_)
+    , directory_(directory)
+    , codecName_(codecName) {}
 
 bool DocumentsWriterPerThread::addDocument(const document::Document& doc) {
     // Add document to terms writer
@@ -79,7 +77,8 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
 
     // Generate unique segment name with timestamp + counter for uniqueness across tests
     auto now = std::chrono::system_clock::now();
-    auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    auto timestamp =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     int counter = nextSegmentNumber_.fetch_add(1, std::memory_order_relaxed);
 
     std::ostringstream oss;
@@ -87,10 +86,7 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
     std::string segmentName = oss.str();
 
     // Create SegmentInfo
-    auto segmentInfo = std::make_shared<SegmentInfo>(
-        segmentName,
-        numDocsInRAM_,
-        codecName_);
+    auto segmentInfo = std::make_shared<SegmentInfo>(segmentName, numDocsInRAM_, codecName_);
 
     // If directory available, write posting lists to disk
     if (directory_) {
@@ -111,12 +107,7 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
         segmentInfo->setFieldInfos(fieldInfos);
 
         // Create segment write state
-        SegmentWriteState state(
-            directory_,
-            segmentName,
-            numDocsInRAM_,
-            fieldInfos,
-            "");
+        SegmentWriteState state(directory_, segmentName, numDocsInRAM_, fieldInfos, "");
 
         // Create codec consumer
         codecs::SimpleFieldsConsumer consumer(state);

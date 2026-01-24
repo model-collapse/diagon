@@ -7,15 +7,13 @@ namespace diagon {
 namespace index {
 
 DocumentsWriter::DocumentsWriter()
-    : config_(Config{}),
-      dwpt_(std::make_unique<DocumentsWriterPerThread>(config_.dwptConfig, nullptr, "Lucene104")) {
-}
+    : config_(Config{})
+    , dwpt_(std::make_unique<DocumentsWriterPerThread>(config_.dwptConfig, nullptr, "Lucene104")) {}
 
 DocumentsWriter::DocumentsWriter(const Config& config, store::Directory* directory)
-    : config_(config),
-      dwpt_(std::make_unique<DocumentsWriterPerThread>(config_.dwptConfig, directory, "Lucene104")),
-      directory_(directory) {
-}
+    : config_(config)
+    , dwpt_(std::make_unique<DocumentsWriterPerThread>(config_.dwptConfig, directory, "Lucene104"))
+    , directory_(directory) {}
 
 int DocumentsWriter::addDocument(const document::Document& doc) {
     // Add document to DWPT

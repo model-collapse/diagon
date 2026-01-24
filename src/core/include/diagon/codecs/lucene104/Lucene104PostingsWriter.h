@@ -3,13 +3,13 @@
 
 #pragma once
 
-#include "diagon/store/IndexOutput.h"
-#include "diagon/index/SegmentWriteState.h"
 #include "diagon/index/FieldInfo.h"
+#include "diagon/index/SegmentWriteState.h"
+#include "diagon/store/IndexOutput.h"
 
+#include <cstdint>
 #include <memory>
 #include <vector>
-#include <cstdint>
 
 namespace diagon {
 namespace codecs {

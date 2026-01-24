@@ -14,7 +14,7 @@ class Scorable;
 }  // namespace search
 
 namespace index {
-    struct LeafReaderContext;
+struct LeafReaderContext;
 }
 
 namespace search {

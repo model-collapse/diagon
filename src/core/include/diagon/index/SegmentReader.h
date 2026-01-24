@@ -3,11 +3,11 @@
 
 #pragma once
 
+#include "diagon/codecs/SimpleFieldsProducer.h"
+#include "diagon/index/FieldInfo.h"
 #include "diagon/index/IndexReader.h"
 #include "diagon/index/SegmentInfo.h"
-#include "diagon/index/FieldInfo.h"
 #include "diagon/index/Terms.h"
-#include "diagon/codecs/SimpleFieldsProducer.h"
 #include "diagon/store/Directory.h"
 
 #include <memory>
@@ -39,10 +39,8 @@ public:
      * @param si SegmentInfo for the segment
      * @return SegmentReader instance
      */
-    static std::shared_ptr<SegmentReader> open(
-        store::Directory& dir,
-        std::shared_ptr<SegmentInfo> si
-    );
+    static std::shared_ptr<SegmentReader> open(store::Directory& dir,
+                                               std::shared_ptr<SegmentInfo> si);
 
     /**
      * Destructor
@@ -63,13 +61,9 @@ public:
         return nullptr;
     }
 
-    BinaryDocValues* getBinaryDocValues(const std::string& field) const override {
-        return nullptr;
-    }
+    BinaryDocValues* getBinaryDocValues(const std::string& field) const override { return nullptr; }
 
-    SortedDocValues* getSortedDocValues(const std::string& field) const override {
-        return nullptr;
-    }
+    SortedDocValues* getSortedDocValues(const std::string& field) const override { return nullptr; }
 
     SortedSetDocValues* getSortedSetDocValues(const std::string& field) const override {
         return nullptr;
@@ -81,15 +75,11 @@ public:
 
     // ==================== Stored Fields (Not implemented in Phase 4) ====================
 
-    StoredFieldsReader* storedFieldsReader() const override {
-        return nullptr;
-    }
+    StoredFieldsReader* storedFieldsReader() const override { return nullptr; }
 
     // ==================== Norms (Not implemented in Phase 4) ====================
 
-    NumericDocValues* getNormValues(const std::string& field) const override {
-        return nullptr;
-    }
+    NumericDocValues* getNormValues(const std::string& field) const override { return nullptr; }
 
     // ==================== Field Metadata ====================
 
@@ -105,25 +95,17 @@ public:
      * Get live docs (deleted docs bitmap)
      * Returns nullptr - no deletions in Phase 4
      */
-    const Bits* getLiveDocs() const override {
-        return nullptr;
-    }
+    const Bits* getLiveDocs() const override { return nullptr; }
 
     // ==================== Points (Not implemented in Phase 4) ====================
 
-    PointValues* getPointValues(const std::string& field) const override {
-        return nullptr;
-    }
+    PointValues* getPointValues(const std::string& field) const override { return nullptr; }
 
     // ==================== Caching (Not implemented in Phase 4) ====================
 
-    CacheHelper* getCoreCacheHelper() const override {
-        return nullptr;
-    }
+    CacheHelper* getCoreCacheHelper() const override { return nullptr; }
 
-    CacheHelper* getReaderCacheHelper() const override {
-        return nullptr;
-    }
+    CacheHelper* getReaderCacheHelper() const override { return nullptr; }
 
     // ==================== Statistics ====================
 
@@ -181,10 +163,7 @@ private:
     /**
      * Private constructor - use open() factory method
      */
-    SegmentReader(
-        store::Directory& dir,
-        std::shared_ptr<SegmentInfo> si
-    );
+    SegmentReader(store::Directory& dir, std::shared_ptr<SegmentInfo> si);
 
     /**
      * Load fields producer for a field
@@ -199,7 +178,8 @@ private:
 
     // Fields producers (one per field, lazy loaded)
     // Phase 4: Eager loading, but using mutable for lazy pattern compatibility
-    mutable std::unordered_map<std::string, std::unique_ptr<codecs::SimpleFieldsProducer>> fieldsProducers_;
+    mutable std::unordered_map<std::string, std::unique_ptr<codecs::SimpleFieldsProducer>>
+        fieldsProducers_;
 
     // Cached Terms objects
     mutable std::unordered_map<std::string, std::unique_ptr<Terms>> termsCache_;

@@ -51,4 +51,4 @@ protected:
     Lock() = default;
 };
 
-} // namespace diagon::store
+}  // namespace diagon::store

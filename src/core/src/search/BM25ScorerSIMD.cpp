@@ -6,20 +6,16 @@
 namespace diagon {
 namespace search {
 
-BM25ScorerSIMD::BM25ScorerSIMD(const Weight& weight,
-                               std::unique_ptr<index::PostingsEnum> postings,
-                               float idf,
-                               float k1,
-                               float b)
-    : weight_(weight),
-      postings_(std::move(postings)),
-      doc_(-1),
-      currentScore_(0.0f),
-      idf_(idf),
-      k1_(k1),
-      b_(b),
-      k1_plus_1_(k1 + 1.0f) {
-
+BM25ScorerSIMD::BM25ScorerSIMD(const Weight& weight, std::unique_ptr<index::PostingsEnum> postings,
+                               float idf, float k1, float b)
+    : weight_(weight)
+    , postings_(std::move(postings))
+    , doc_(-1)
+    , currentScore_(0.0f)
+    , idf_(idf)
+    , k1_(k1)
+    , b_(b)
+    , k1_plus_1_(k1 + 1.0f) {
 #ifdef DIAGON_HAVE_AVX2
     // Precompute SIMD constants
     idf_vec_ = _mm256_set1_ps(idf_);
@@ -71,7 +67,8 @@ const Weight& BM25ScorerSIMD::getWeight() const {
 }
 
 float BM25ScorerSIMD::scoreScalar(int freq, long norm) const {
-    if (freq == 0) return 0.0f;
+    if (freq == 0)
+        return 0.0f;
 
     // Decode norm to field length
     // Phase 4: Simplified - returns 1.0
@@ -133,27 +130,27 @@ void BM25ScorerSIMD::scoreBatchUniformNorm(const int* freqs, long norm, float* s
     __m256 fieldLength = _mm256_set1_ps(1.0f);
 
     // Compute k = k1 * (1 - b + b * fieldLength / avgFieldLength)
-#ifdef DIAGON_HAVE_FMA
+#    ifdef DIAGON_HAVE_FMA
     // Use FMA for better performance and accuracy
     // k = k1 * (one_minus_b + b * fieldLength)
     __m256 k = _mm256_fmadd_ps(b_vec_, fieldLength, one_minus_b_vec_);
     k = _mm256_mul_ps(k1_vec_, k);
-#else
+#    else
     __m256 b_times_fieldLength = _mm256_mul_ps(b_vec_, fieldLength);
     __m256 one_minus_b_plus_term = _mm256_add_ps(one_minus_b_vec_, b_times_fieldLength);
     __m256 k = _mm256_mul_ps(k1_vec_, one_minus_b_plus_term);
-#endif
+#    endif
 
     // Compute numerator = idf * freq * (k1 + 1)
     __m256 numerator;
-#ifdef DIAGON_HAVE_FMA
+#    ifdef DIAGON_HAVE_FMA
     // numerator = idf * freq * k1_plus_1
     numerator = _mm256_mul_ps(idf_vec_, freq_floats);
     numerator = _mm256_mul_ps(numerator, k1_plus_1_vec_);
-#else
+#    else
     numerator = _mm256_mul_ps(idf_vec_, freq_floats);
     numerator = _mm256_mul_ps(numerator, k1_plus_1_vec_);
-#endif
+#    endif
 
     // Compute denominator = freq + k
     __m256 denominator = _mm256_add_ps(freq_floats, k);
@@ -178,13 +175,9 @@ __m256 BM25ScorerSIMD::int32ToFloat(__m256i int_vec) const {
 
 #endif  // DIAGON_HAVE_AVX2
 
-std::unique_ptr<BM25ScorerSIMD> createBM25Scorer(
-    const Weight& weight,
-    std::unique_ptr<index::PostingsEnum> postings,
-    float idf,
-    float k1,
-    float b) {
-
+std::unique_ptr<BM25ScorerSIMD> createBM25Scorer(const Weight& weight,
+                                                 std::unique_ptr<index::PostingsEnum> postings,
+                                                 float idf, float k1, float b) {
     return std::make_unique<BM25ScorerSIMD>(weight, std::move(postings), idf, k1, b);
 }
 

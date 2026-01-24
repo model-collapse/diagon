@@ -63,18 +63,15 @@ public:
 
     // ==================== Stream Creation ====================
 
-    std::unique_ptr<IndexOutput> createOutput(
-        const std::string& name,
-        const IOContext& context) override;
+    std::unique_ptr<IndexOutput> createOutput(const std::string& name,
+                                              const IOContext& context) override;
 
-    std::unique_ptr<IndexOutput> createTempOutput(
-        const std::string& prefix,
-        const std::string& suffix,
-        const IOContext& context) override;
+    std::unique_ptr<IndexOutput> createTempOutput(const std::string& prefix,
+                                                  const std::string& suffix,
+                                                  const IOContext& context) override;
 
-    std::unique_ptr<IndexInput> openInput(
-        const std::string& name,
-        const IOContext& context) const override;
+    std::unique_ptr<IndexInput> openInput(const std::string& name,
+                                          const IOContext& context) const override;
 
     // ==================== Atomic Operations ====================
 
@@ -92,9 +89,7 @@ public:
 
     // ==================== Utilities ====================
 
-    std::optional<std::filesystem::path> getPath() const override {
-        return directory_;
-    }
+    std::optional<std::filesystem::path> getPath() const override { return directory_; }
 
     std::string toString() const override;
 
@@ -121,8 +116,7 @@ public:
      * @param path File path
      * @param bufferSize Buffer size (default 8KB)
      */
-    explicit FSIndexInput(const std::filesystem::path& path,
-                          size_t bufferSize = 8192);
+    explicit FSIndexInput(const std::filesystem::path& path, size_t bufferSize = 8192);
 
     ~FSIndexInput() override = default;
 
@@ -140,17 +134,13 @@ public:
     // ==================== Cloning ====================
 
     std::unique_ptr<IndexInput> clone() const override;
-    std::unique_ptr<IndexInput> slice(
-        const std::string& sliceDescription,
-        int64_t offset,
-        int64_t length) const override;
+    std::unique_ptr<IndexInput> slice(const std::string& sliceDescription, int64_t offset,
+                                      int64_t length) const override;
 
     std::string toString() const override;
 
     // Constructor for slices
-    FSIndexInput(const std::filesystem::path& path,
-                 int64_t offset,
-                 int64_t length,
+    FSIndexInput(const std::filesystem::path& path, int64_t offset, int64_t length,
                  size_t bufferSize);
 
 private:
@@ -185,8 +175,7 @@ public:
      * @param path File path
      * @param bufferSize Buffer size (default 8KB)
      */
-    explicit FSIndexOutput(const std::filesystem::path& path,
-                           size_t bufferSize = 8192);
+    explicit FSIndexOutput(const std::filesystem::path& path, size_t bufferSize = 8192);
 
     ~FSIndexOutput() override;
 
@@ -203,9 +192,7 @@ public:
 
     void close() override;
 
-    std::string getName() const override {
-        return file_path_.filename().string();
-    }
+    std::string getName() const override { return file_path_.filename().string(); }
 
 private:
     std::filesystem::path file_path_;
@@ -241,4 +228,4 @@ private:
     bool closed_;
 };
 
-} // namespace diagon::store
+}  // namespace diagon::store

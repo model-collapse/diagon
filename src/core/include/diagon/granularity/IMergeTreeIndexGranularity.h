@@ -41,9 +41,7 @@ public:
     /**
      * Get total rows from start to mark
      */
-    size_t getRowsCountInRange(size_t end) const {
-        return getRowsCountInRange(0, end);
-    }
+    size_t getRowsCountInRange(size_t end) const { return getRowsCountInRange(0, end); }
 
     /**
      * Total rows across all marks
@@ -74,9 +72,7 @@ public:
     /**
      * Is empty (no marks)?
      */
-    bool empty() const {
-        return getMarksCount() == 0;
-    }
+    bool empty() const { return getMarksCount() == 0; }
 
     /**
      * Add mark (during writing)

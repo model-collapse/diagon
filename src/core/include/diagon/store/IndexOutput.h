@@ -155,4 +155,4 @@ protected:
     IndexOutput() = default;
 };
 
-} // namespace diagon::store
+}  // namespace diagon::store

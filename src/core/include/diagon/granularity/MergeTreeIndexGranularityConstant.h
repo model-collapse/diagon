@@ -20,14 +20,11 @@ namespace granularity {
  */
 class MergeTreeIndexGranularityConstant : public IMergeTreeIndexGranularity {
 public:
-    explicit MergeTreeIndexGranularityConstant(size_t granularity = 8192,
-                                               size_t num_marks = 0)
+    explicit MergeTreeIndexGranularityConstant(size_t granularity = 8192, size_t num_marks = 0)
         : granularity_(granularity)
         , num_marks_(num_marks) {}
 
-    size_t getMarksCount() const override {
-        return num_marks_;
-    }
+    size_t getMarksCount() const override { return num_marks_; }
 
     size_t getMarkRows(size_t mark_index) const override {
         if (mark_index >= num_marks_) {
@@ -39,9 +36,12 @@ public:
     }
 
     size_t getRowsCountInRange(size_t begin, size_t end) const override {
-        if (end <= begin) return 0;
-        if (end > num_marks_) end = num_marks_;
-        if (begin >= num_marks_) return 0;
+        if (end <= begin)
+            return 0;
+        if (end > num_marks_)
+            end = num_marks_;
+        if (begin >= num_marks_)
+            return 0;
 
         size_t rows = 0;
 
@@ -67,7 +67,8 @@ public:
     }
 
     size_t countMarksForRows(size_t from_mark, size_t number_of_rows) const override {
-        if (from_mark >= num_marks_) return 0;
+        if (from_mark >= num_marks_)
+            return 0;
 
         size_t from_row = from_mark * granularity_;
         size_t to_row = from_row + number_of_rows;
@@ -96,9 +97,7 @@ public:
     /**
      * Get granularity (rows per mark)
      */
-    size_t getGranularity() const {
-        return granularity_;
-    }
+    size_t getGranularity() const { return granularity_; }
 
 private:
     size_t granularity_;  // Rows per mark (e.g., 8192)

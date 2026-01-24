@@ -30,23 +30,15 @@ public:
 
     // ==================== Type ====================
 
-    std::string getName() const override {
-        return "String";
-    }
+    std::string getName() const override { return "String"; }
 
-    TypeIndex getDataType() const override {
-        return TypeIndex::String;
-    }
+    TypeIndex getDataType() const override { return TypeIndex::String; }
 
     // ==================== Size ====================
 
-    size_t size() const override {
-        return offsets_.size();
-    }
+    size_t size() const override { return offsets_.size(); }
 
-    size_t byteSize() const override {
-        return chars_.size() + offsets_.size() * sizeof(uint64_t);
-    }
+    size_t byteSize() const override { return chars_.size() + offsets_.size() * sizeof(uint64_t); }
 
     // ==================== Data Access ====================
 
@@ -85,21 +77,13 @@ public:
 
     // ==================== Direct Access ====================
 
-    Chars& getChars() {
-        return chars_;
-    }
+    Chars& getChars() { return chars_; }
 
-    const Chars& getChars() const {
-        return chars_;
-    }
+    const Chars& getChars() const { return chars_; }
 
-    Offsets& getOffsets() {
-        return offsets_;
-    }
+    Offsets& getOffsets() { return offsets_; }
 
-    const Offsets& getOffsets() const {
-        return offsets_;
-    }
+    const Offsets& getOffsets() const { return offsets_; }
 
     // ==================== Insertion ====================
 
@@ -117,7 +101,8 @@ public:
     void insertRangeFrom(const IColumn& src, size_t start, size_t length) override {
         const ColumnString& src_string = typedCast(src);
 
-        if (length == 0) return;
+        if (length == 0)
+            return;
 
         if (start + length > src_string.size()) {
             throw std::out_of_range("insertRangeFrom: range exceeds source size");
@@ -140,16 +125,15 @@ public:
         }
     }
 
-    void insertDefault() override {
-        insertData("", 0);
-    }
+    void insertDefault() override { insertData("", 0); }
 
     void popBack(size_t n) override {
         if (n > offsets_.size()) {
             throw std::out_of_range("popBack: n exceeds column size");
         }
 
-        if (n == 0) return;
+        if (n == 0)
+            return;
 
         size_t new_size = offsets_.size() - n;
         if (new_size > 0) {
@@ -200,7 +184,7 @@ public:
     // ==================== Comparison ====================
 
     int compareAt(size_t n, size_t m, const IColumn& rhs,
-                 int /*nan_direction_hint*/) const override {
+                  int /*nan_direction_hint*/) const override {
         const ColumnString& rhs_string = typedCast(rhs);
 
         std::string_view lhs_sv = getDataAt(n);
@@ -233,24 +217,16 @@ public:
         return res;
     }
 
-    MutableColumnPtr cloneEmpty() const override {
-        return ColumnString::create();
-    }
+    MutableColumnPtr cloneEmpty() const override { return ColumnString::create(); }
 
     // ==================== Factory ====================
 
-    static std::shared_ptr<ColumnString> create() {
-        return std::make_shared<ColumnString>();
-    }
+    static std::shared_ptr<ColumnString> create() { return std::make_shared<ColumnString>(); }
 
 private:
-    uint64_t offsetAt(size_t i) const {
-        return i == 0 ? 0 : offsets_[i - 1];
-    }
+    uint64_t offsetAt(size_t i) const { return i == 0 ? 0 : offsets_[i - 1]; }
 
-    size_t sizeAt(size_t i) const {
-        return i == 0 ? offsets_[0] : (offsets_[i] - offsets_[i - 1]);
-    }
+    size_t sizeAt(size_t i) const { return i == 0 ? offsets_[0] : (offsets_[i] - offsets_[i - 1]); }
 
     // Type-safe cast helper
     static const ColumnString& typedCast(const IColumn& col) {

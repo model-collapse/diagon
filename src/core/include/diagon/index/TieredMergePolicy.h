@@ -27,60 +27,41 @@ public:
 
     // ==================== Merge Selection (Stubs) ====================
 
-    MergeSpecification* findMerges(
-        MergeTrigger trigger,
-        const SegmentInfos& segmentInfos) override {
+    MergeSpecification* findMerges(MergeTrigger trigger,
+                                   const SegmentInfos& segmentInfos) override {
         // Stub: would analyze segment sizes and select merges
         return nullptr;
     }
 
-    MergeSpecification* findForcedMerges(
-        const SegmentInfos& segmentInfos,
-        int maxSegmentCount,
-        const std::map<SegmentCommitInfo*, bool>& segmentsToMerge) override {
+    MergeSpecification*
+    findForcedMerges(const SegmentInfos& segmentInfos, int maxSegmentCount,
+                     const std::map<SegmentCommitInfo*, bool>& segmentsToMerge) override {
         // Stub: would merge down to maxSegmentCount segments
         return nullptr;
     }
 
-    MergeSpecification* findForcedDeletesMerges(
-        const SegmentInfos& segmentInfos) override {
+    MergeSpecification* findForcedDeletesMerges(const SegmentInfos& segmentInfos) override {
         // Stub: would merge segments with high delete ratios
         return nullptr;
     }
 
     // ==================== Configuration ====================
 
-    void setMaxMergedSegmentMB(double mb) override {
-        maxMergedSegmentMB_ = mb;
-    }
+    void setMaxMergedSegmentMB(double mb) override { maxMergedSegmentMB_ = mb; }
 
-    void setFloorSegmentMB(double mb) override {
-        floorSegmentMB_ = mb;
-    }
+    void setFloorSegmentMB(double mb) override { floorSegmentMB_ = mb; }
 
-    double getMaxMergedSegmentMB() const override {
-        return maxMergedSegmentMB_;
-    }
+    double getMaxMergedSegmentMB() const override { return maxMergedSegmentMB_; }
 
-    double getFloorSegmentMB() const override {
-        return floorSegmentMB_;
-    }
+    double getFloorSegmentMB() const override { return floorSegmentMB_; }
 
-    void setMaxMergeAtOnce(int max) {
-        maxMergeAtOnce_ = max;
-    }
+    void setMaxMergeAtOnce(int max) { maxMergeAtOnce_ = max; }
 
-    int getMaxMergeAtOnce() const {
-        return maxMergeAtOnce_;
-    }
+    int getMaxMergeAtOnce() const { return maxMergeAtOnce_; }
 
-    void setSegmentsPerTier(double segs) {
-        segmentsPerTier_ = segs;
-    }
+    void setSegmentsPerTier(double segs) { segmentsPerTier_ = segs; }
 
-    double getSegmentsPerTier() const {
-        return segmentsPerTier_;
-    }
+    double getSegmentsPerTier() const { return segmentsPerTier_; }
 
 private:
     double maxMergedSegmentMB_;

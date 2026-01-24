@@ -3,13 +3,13 @@
 
 #pragma once
 
+#include "diagon/index/LeafReaderContext.h"
 #include "diagon/search/Collector.h"
 #include "diagon/search/TopDocs.h"
-#include "diagon/index/LeafReaderContext.h"
 
+#include <memory>
 #include <queue>
 #include <vector>
-#include <memory>
 
 namespace diagon {
 namespace search {
@@ -75,9 +75,7 @@ public:
 
     LeafCollector* getLeafCollector(const index::LeafReaderContext& context) override;
 
-    ScoreMode scoreMode() const override {
-        return ScoreMode::COMPLETE;
-    }
+    ScoreMode scoreMode() const override { return ScoreMode::COMPLETE; }
 
 private:
     /**
@@ -91,11 +89,9 @@ private:
     class TopScoreLeafCollector : public LeafCollector {
     public:
         TopScoreLeafCollector(TopScoreDocCollector* parent,
-                             const index::LeafReaderContext& context);
+                              const index::LeafReaderContext& context);
 
-        void setScorer(Scorable* scorer) override {
-            scorer_ = scorer;
-        }
+        void setScorer(Scorable* scorer) override { scorer_ = scorer; }
 
         void collect(int doc) override;
 
@@ -124,17 +120,15 @@ private:
         }
     };
 
-    int numHits_;                           // Number of hits to collect
-    ScoreDoc after_;                        // For searchAfter pagination
-    bool hasAfter_;                         // Whether after_ is set
-    int64_t totalHits_;                     // Total matching documents
-    TotalHits::Relation totalHitsRelation_; // Relation (exact or lower bound)
+    int numHits_;                            // Number of hits to collect
+    ScoreDoc after_;                         // For searchAfter pagination
+    bool hasAfter_;                          // Whether after_ is set
+    int64_t totalHits_;                      // Total matching documents
+    TotalHits::Relation totalHitsRelation_;  // Relation (exact or lower bound)
 
     // Priority queue: .top() returns worst document in top-K set
     // When queue is full, we can reject docs with score <= top
-    std::priority_queue<ScoreDoc,
-                        std::vector<ScoreDoc>,
-                        ScoreDocComparator> pq_;
+    std::priority_queue<ScoreDoc, std::vector<ScoreDoc>, ScoreDocComparator> pq_;
 
     // Leaf collector instance (reused across segments)
     std::unique_ptr<TopScoreLeafCollector> leafCollector_;

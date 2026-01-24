@@ -19,20 +19,17 @@ std::shared_ptr<DirectoryReader> DirectoryReader::open(store::Directory& dir) {
 
     // Construct DirectoryReader
     return std::shared_ptr<DirectoryReader>(
-        new DirectoryReader(dir, std::move(segmentReaders), segmentInfos)
-    );
+        new DirectoryReader(dir, std::move(segmentReaders), segmentInfos));
 }
 
 // ==================== Constructor/Destructor ====================
 
-DirectoryReader::DirectoryReader(
-    store::Directory& dir,
-    std::vector<std::shared_ptr<SegmentReader>> readers,
-    const SegmentInfos& segmentInfos)
-    : directory_(dir),
-      segmentReaders_(std::move(readers)),
-      segmentInfos_(segmentInfos) {
-}
+DirectoryReader::DirectoryReader(store::Directory& dir,
+                                 std::vector<std::shared_ptr<SegmentReader>> readers,
+                                 const SegmentInfos& segmentInfos)
+    : directory_(dir)
+    , segmentReaders_(std::move(readers))
+    , segmentInfos_(segmentInfos) {}
 
 DirectoryReader::~DirectoryReader() {
     // Destructor - resources cleaned up in doClose()
@@ -74,10 +71,8 @@ void DirectoryReader::doClose() {
 
 // ==================== Helper Methods ====================
 
-std::vector<std::shared_ptr<SegmentReader>> DirectoryReader::createSegmentReaders(
-    store::Directory& dir,
-    const SegmentInfos& sis) {
-
+std::vector<std::shared_ptr<SegmentReader>>
+DirectoryReader::createSegmentReaders(store::Directory& dir, const SegmentInfos& sis) {
     std::vector<std::shared_ptr<SegmentReader>> readers;
     readers.reserve(sis.size());
 

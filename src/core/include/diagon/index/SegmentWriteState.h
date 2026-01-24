@@ -3,9 +3,9 @@
 
 #pragma once
 
+#include "diagon/index/FieldInfo.h"
 #include "diagon/store/Directory.h"
 #include "diagon/store/IOContext.h"
-#include "diagon/index/FieldInfo.h"
 
 #include <memory>
 #include <string>
@@ -57,12 +57,8 @@ struct SegmentWriteState {
     /**
      * Constructor
      */
-    SegmentWriteState(
-        store::Directory* dir,
-        const std::string& segName,
-        int maxDocs,
-        const FieldInfos& fis,
-        const std::string& suffix = "")
+    SegmentWriteState(store::Directory* dir, const std::string& segName, int maxDocs,
+                      const FieldInfos& fis, const std::string& suffix = "")
         : directory(dir)
         , segmentName(segName)
         , maxDoc(maxDocs)
@@ -110,12 +106,8 @@ struct SegmentReadState {
     /**
      * Constructor
      */
-    SegmentReadState(
-        store::Directory* dir,
-        const std::string& segName,
-        int maxDocs,
-        const FieldInfos& fis,
-        const std::string& suffix = "")
+    SegmentReadState(store::Directory* dir, const std::string& segName, int maxDocs,
+                     const FieldInfos& fis, const std::string& suffix = "")
         : directory(dir)
         , segmentName(segName)
         , maxDoc(maxDocs)

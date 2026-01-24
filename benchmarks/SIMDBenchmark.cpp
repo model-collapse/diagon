@@ -1,13 +1,14 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
+#include "diagon/index/LeafReaderContext.h"
 #include "diagon/search/BM25ScorerSIMD.h"
 #include "diagon/search/BM25Similarity.h"
-#include "diagon/search/Weight.h"
 #include "diagon/search/TermQuery.h"
-#include "diagon/index/LeafReaderContext.h"
+#include "diagon/search/Weight.h"
 
 #include <benchmark/benchmark.h>
+
 #include <random>
 #include <vector>
 
@@ -103,7 +104,8 @@ static void BM_BM25_SIMD(benchmark::State& state) {
     };
 
     DummyWeight weight;
-    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, std::unique_ptr<diagon::index::PostingsEnum>(nullptr), idf, k1, b);
+    auto scorer = std::make_unique<BM25ScorerSIMD>(
+        weight, std::unique_ptr<diagon::index::PostingsEnum>(nullptr), idf, k1, b);
 
     int64_t docsProcessed = 0;
 
@@ -166,7 +168,8 @@ static void BM_BM25_SIMDUniformNorm(benchmark::State& state) {
     };
 
     DummyWeight weight;
-    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, std::unique_ptr<diagon::index::PostingsEnum>(nullptr), idf, k1, b);
+    auto scorer = std::make_unique<BM25ScorerSIMD>(
+        weight, std::unique_ptr<diagon::index::PostingsEnum>(nullptr), idf, k1, b);
 
     int64_t docsProcessed = 0;
 

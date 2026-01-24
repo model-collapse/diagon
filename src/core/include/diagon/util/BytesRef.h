@@ -99,41 +99,31 @@ public:
      * @brief Returns a span view of the bytes.
      * @return std::span<const uint8_t> view of the data
      */
-    [[nodiscard]] std::span<const uint8_t> bytes() const noexcept {
-        return data_;
-    }
+    [[nodiscard]] std::span<const uint8_t> bytes() const noexcept { return data_; }
 
     /**
      * @brief Returns the raw data pointer.
      * @return Pointer to the first byte, or nullptr if empty
      */
-    [[nodiscard]] const uint8_t* data() const noexcept {
-        return data_.data();
-    }
+    [[nodiscard]] const uint8_t* data() const noexcept { return data_.data(); }
 
     /**
      * @brief Returns the length in bytes.
      * @return Number of bytes
      */
-    [[nodiscard]] size_t length() const noexcept {
-        return data_.size();
-    }
+    [[nodiscard]] size_t length() const noexcept { return data_.size(); }
 
     /**
      * @brief Returns the length in bytes.
      * @return Number of bytes
      */
-    [[nodiscard]] size_t size() const noexcept {
-        return data_.size();
-    }
+    [[nodiscard]] size_t size() const noexcept { return data_.size(); }
 
     /**
      * @brief Checks if the BytesRef is empty.
      * @return true if length is 0
      */
-    [[nodiscard]] bool empty() const noexcept {
-        return data_.empty();
-    }
+    [[nodiscard]] bool empty() const noexcept { return data_.empty(); }
 
     /**
      * @brief Converts UTF-8 bytes to a UTF-8 string.
@@ -169,38 +159,24 @@ public:
     [[nodiscard]] size_t hashCode() const noexcept;
 
     // Operator overloads for convenience
-    bool operator==(const BytesRef& other) const noexcept {
-        return equals(other);
-    }
+    bool operator==(const BytesRef& other) const noexcept { return equals(other); }
 
-    bool operator!=(const BytesRef& other) const noexcept {
-        return !equals(other);
-    }
+    bool operator!=(const BytesRef& other) const noexcept { return !equals(other); }
 
-    bool operator<(const BytesRef& other) const noexcept {
-        return compareTo(other) < 0;
-    }
+    bool operator<(const BytesRef& other) const noexcept { return compareTo(other) < 0; }
 
-    bool operator<=(const BytesRef& other) const noexcept {
-        return compareTo(other) <= 0;
-    }
+    bool operator<=(const BytesRef& other) const noexcept { return compareTo(other) <= 0; }
 
-    bool operator>(const BytesRef& other) const noexcept {
-        return compareTo(other) > 0;
-    }
+    bool operator>(const BytesRef& other) const noexcept { return compareTo(other) > 0; }
 
-    bool operator>=(const BytesRef& other) const noexcept {
-        return compareTo(other) >= 0;
-    }
+    bool operator>=(const BytesRef& other) const noexcept { return compareTo(other) >= 0; }
 
     /**
      * @brief Array subscript operator.
      * @param index Index of the byte to access
      * @return The byte at the specified index
      */
-    uint8_t operator[](size_t index) const noexcept {
-        return data_[index];
-    }
+    uint8_t operator[](size_t index) const noexcept { return data_[index]; }
 
     /**
      * @brief Creates a sub-slice of this BytesRef.
@@ -221,14 +197,12 @@ private:
     static std::vector<uint8_t> stringToUTF8(std::string_view text);
 };
 
-} // namespace diagon::util
+}  // namespace diagon::util
 
 // Hash function for use in std::unordered_map
 namespace std {
-template <>
+template<>
 struct hash<diagon::util::BytesRef> {
-    size_t operator()(const diagon::util::BytesRef& ref) const noexcept {
-        return ref.hashCode();
-    }
+    size_t operator()(const diagon::util::BytesRef& ref) const noexcept { return ref.hashCode(); }
 };
-} // namespace std
+}  // namespace std

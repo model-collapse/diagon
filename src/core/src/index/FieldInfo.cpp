@@ -108,15 +108,24 @@ void FieldInfos::computeAggregateFlags() {
     for (const auto& info : byNumber_) {
         info.validate();  // Validate each field
 
-        if (info.hasFreqs()) hasFreq_ = true;
-        if (info.hasPostings()) hasPostings_ = true;
-        if (info.hasPositions()) hasProx_ = true;
-        if (info.storePayloads) hasPayloads_ = true;
-        if (info.hasOffsets()) hasOffsets_ = true;
-        if (info.storeTermVector) hasTermVectors_ = true;
-        if (info.hasNorms()) hasNorms_ = true;
-        if (info.hasDocValues()) hasDocValues_ = true;
-        if (info.hasPointValues()) hasPointValues_ = true;
+        if (info.hasFreqs())
+            hasFreq_ = true;
+        if (info.hasPostings())
+            hasPostings_ = true;
+        if (info.hasPositions())
+            hasProx_ = true;
+        if (info.storePayloads)
+            hasPayloads_ = true;
+        if (info.hasOffsets())
+            hasOffsets_ = true;
+        if (info.storeTermVector)
+            hasTermVectors_ = true;
+        if (info.hasNorms())
+            hasNorms_ = true;
+        if (info.hasDocValues())
+            hasDocValues_ = true;
+        if (info.hasPointValues())
+            hasPointValues_ = true;
     }
 }
 
@@ -182,7 +191,8 @@ FieldInfo* FieldInfosBuilder::getFieldInfo(const std::string& fieldName) {
     return nullptr;
 }
 
-void FieldInfosBuilder::updateIndexOptions(const std::string& fieldName, IndexOptions indexOptions) {
+void FieldInfosBuilder::updateIndexOptions(const std::string& fieldName,
+                                           IndexOptions indexOptions) {
     // Get or create field
     getOrAdd(fieldName);
 
@@ -195,7 +205,8 @@ void FieldInfosBuilder::updateIndexOptions(const std::string& fieldName, IndexOp
     }
 }
 
-void FieldInfosBuilder::updateDocValuesType(const std::string& fieldName, DocValuesType docValuesType) {
+void FieldInfosBuilder::updateDocValuesType(const std::string& fieldName,
+                                            DocValuesType docValuesType) {
     // Skip NONE
     if (docValuesType == DocValuesType::NONE) {
         return;
@@ -208,10 +219,8 @@ void FieldInfosBuilder::updateDocValuesType(const std::string& fieldName, DocVal
     FieldInfo& info = it->second;
 
     // Check for conflicts
-    if (info.docValuesType != DocValuesType::NONE &&
-        info.docValuesType != docValuesType) {
-        throw std::invalid_argument(
-            "Cannot change DocValuesType for field: " + fieldName);
+    if (info.docValuesType != DocValuesType::NONE && info.docValuesType != docValuesType) {
+        throw std::invalid_argument("Cannot change DocValuesType for field: " + fieldName);
     }
 
     info.docValuesType = docValuesType;
@@ -240,9 +249,7 @@ std::unique_ptr<FieldInfos> FieldInfosBuilder::finish() {
 
     // Sort by field number
     std::sort(infos.begin(), infos.end(),
-              [](const FieldInfo& a, const FieldInfo& b) {
-                  return a.number < b.number;
-              });
+              [](const FieldInfo& a, const FieldInfo& b) { return a.number < b.number; });
 
     return std::make_unique<FieldInfos>(std::move(infos));
 }

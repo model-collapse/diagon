@@ -62,23 +62,16 @@ struct BooleanClause {
     Occur occur;
 
     BooleanClause(std::shared_ptr<Query> q, Occur o)
-        : query(std::move(q)), occur(o) {}
+        : query(std::move(q))
+        , occur(o) {}
 
-    bool isScoring() const {
-        return occur == Occur::MUST || occur == Occur::SHOULD;
-    }
+    bool isScoring() const { return occur == Occur::MUST || occur == Occur::SHOULD; }
 
-    bool isProhibited() const {
-        return occur == Occur::MUST_NOT;
-    }
+    bool isProhibited() const { return occur == Occur::MUST_NOT; }
 
-    bool isRequired() const {
-        return occur == Occur::MUST || occur == Occur::FILTER;
-    }
+    bool isRequired() const { return occur == Occur::MUST || occur == Occur::FILTER; }
 
-    bool isFilter() const {
-        return occur == Occur::FILTER;
-    }
+    bool isFilter() const { return occur == Occur::FILTER; }
 };
 
 }  // namespace search

@@ -26,10 +26,7 @@ namespace simd {
  */
 class SIMDBm25Scorer {
 public:
-    SIMDBm25Scorer(
-        float k1 = 1.2f,
-        float b = 0.75f,
-        float avgDocLength = 100.0f)
+    SIMDBm25Scorer(float k1 = 1.2f, float b = 0.75f, float avgDocLength = 100.0f)
         : k1_(k1)
         , b_(b)
         , avgDocLength_(avgDocLength) {}
@@ -58,12 +55,10 @@ public:
      *
      * NOTE: Stub - SIMD vectorization not implemented
      */
-    std::vector<std::pair<int, float>> scoreOrQuery(
-        const std::vector<std::pair<std::string, float>>& queryTerms,
-        const std::map<std::string, ColumnWindow<int>*>& tfColumns,
-        const ColumnWindow<int>& docLengthColumn,
-        int topK) const {
-
+    std::vector<std::pair<int, float>>
+    scoreOrQuery(const std::vector<std::pair<std::string, float>>& queryTerms,
+                 const std::map<std::string, ColumnWindow<int>*>& tfColumns,
+                 const ColumnWindow<int>& docLengthColumn, int topK) const {
         // Stub: would use SIMD scatter-add and vectorized BM25 formula
         // Real implementation would use __m256 operations
         return std::vector<std::pair<int, float>>{};
@@ -98,11 +93,10 @@ public:
      *
      * NOTE: Stub - SIMD scatter-add not implemented
      */
-    std::vector<std::pair<int, float>> scoreOrQuery(
-        const std::vector<std::pair<std::string, float>>& queryTerms,
-        const std::map<std::string, ColumnWindow<float>*>& featureColumns,
-        int topK) const {
-
+    std::vector<std::pair<int, float>>
+    scoreOrQuery(const std::vector<std::pair<std::string, float>>& queryTerms,
+                 const std::map<std::string, ColumnWindow<float>*>& featureColumns,
+                 int topK) const {
         // Stub: would use SIMD scatter-add with static weights
         // Much simpler than BM25 - no dynamic formula
         return std::vector<std::pair<int, float>>{};
@@ -125,11 +119,9 @@ public:
      *
      * NOTE: Stub implementation
      */
-    std::vector<std::pair<int, float>> scoreOrQuery(
-        const std::vector<std::pair<std::string, float>>& queryTerms,
-        const std::map<std::string, ColumnWindow<int>*>& tfColumns,
-        int topK) const {
-
+    std::vector<std::pair<int, float>>
+    scoreOrQuery(const std::vector<std::pair<std::string, float>>& queryTerms,
+                 const std::map<std::string, ColumnWindow<int>*>& tfColumns, int topK) const {
         // Stub: would multiply tf × idf with SIMD
         return std::vector<std::pair<int, float>>{};
     }

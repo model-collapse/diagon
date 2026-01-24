@@ -66,9 +66,7 @@ public:
      * @param config Configuration
      * @param directory Directory for writing segment files (optional)
      */
-    explicit DocumentsWriter(
-        const Config& config,
-        store::Directory* directory = nullptr);
+    explicit DocumentsWriter(const Config& config, store::Directory* directory = nullptr);
 
     /**
      * Destructor
@@ -103,41 +101,31 @@ public:
     /**
      * Get total documents buffered in RAM
      */
-    int getNumDocsInRAM() const {
-        return dwpt_->getNumDocsInRAM();
-    }
+    int getNumDocsInRAM() const { return dwpt_->getNumDocsInRAM(); }
 
     /**
      * Get approximate bytes used
      */
-    int64_t bytesUsed() const {
-        return dwpt_->bytesUsed();
-    }
+    int64_t bytesUsed() const { return dwpt_->bytesUsed(); }
 
     /**
      * Get list of segment names created
      *
      * Returns segment names in creation order.
      */
-    const std::vector<std::string>& getSegments() const {
-        return segmentNames_;
-    }
+    const std::vector<std::string>& getSegments() const { return segmentNames_; }
 
     /**
      * Get list of SegmentInfo objects
      *
      * Returns SegmentInfo instances in creation order.
      */
-    const std::vector<std::shared_ptr<SegmentInfo>>& getSegmentInfos() const {
-        return segments_;
-    }
+    const std::vector<std::shared_ptr<SegmentInfo>>& getSegmentInfos() const { return segments_; }
 
     /**
      * Get total number of documents added
      */
-    int getNumDocsAdded() const {
-        return numDocsAdded_;
-    }
+    int getNumDocsAdded() const { return numDocsAdded_; }
 
     /**
      * Reset for reuse
@@ -148,9 +136,7 @@ public:
     /**
      * Check if flush is needed
      */
-    bool needsFlush() const {
-        return dwpt_->needsFlush();
-    }
+    bool needsFlush() const { return dwpt_->needsFlush(); }
 
 private:
     // Configuration

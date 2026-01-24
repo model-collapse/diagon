@@ -72,9 +72,7 @@ public:
     /**
      * Get the directory this reader is reading from
      */
-    store::Directory& directory() const {
-        return directory_;
-    }
+    store::Directory& directory() const { return directory_; }
 
     /**
      * Get the SegmentInfos this reader is reading
@@ -102,19 +100,14 @@ private:
     /**
      * Private constructor - use open() factory method
      */
-    DirectoryReader(
-        store::Directory& dir,
-        std::vector<std::shared_ptr<SegmentReader>> readers,
-        const SegmentInfos& segmentInfos
-    );
+    DirectoryReader(store::Directory& dir, std::vector<std::shared_ptr<SegmentReader>> readers,
+                    const SegmentInfos& segmentInfos);
 
     /**
      * Create SegmentReaders for all segments in SegmentInfos
      */
-    static std::vector<std::shared_ptr<SegmentReader>> createSegmentReaders(
-        store::Directory& dir,
-        const SegmentInfos& sis
-    );
+    static std::vector<std::shared_ptr<SegmentReader>>
+    createSegmentReaders(store::Directory& dir, const SegmentInfos& sis);
 
     // Directory containing the index
     store::Directory& directory_;

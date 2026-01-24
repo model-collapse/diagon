@@ -80,9 +80,7 @@ public:
     explicit MergeTreeIndexAggregatorMinMax(size_t columns_count)
         : granule_(std::make_shared<MergeTreeIndexGranuleMinMax>(columns_count)) {}
 
-    bool empty() const override {
-        return granule_->empty();
-    }
+    bool empty() const override { return granule_->empty(); }
 
     MergeTreeIndexGranulePtr getGranuleAndReset() override {
         auto result = granule_;
@@ -130,9 +128,7 @@ public:
         return true;
     }
 
-    std::string getDescription() const override {
-        return "MinMax condition";
-    }
+    std::string getDescription() const override { return "MinMax condition"; }
 
     void setRange(double min_threshold, double max_threshold) {
         min_threshold_ = min_threshold;

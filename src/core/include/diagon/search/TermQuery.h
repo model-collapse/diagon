@@ -21,10 +21,12 @@ namespace search {
 class Term {
 public:
     Term(const std::string& field, const std::string& text)
-        : field_(field), bytes_(text) {}
+        : field_(field)
+        , bytes_(text) {}
 
     Term(const std::string& field, const util::BytesRef& bytes)
-        : field_(field), bytes_(bytes) {}
+        : field_(field)
+        , bytes_(bytes) {}
 
     const std::string& field() const { return field_; }
     const util::BytesRef& bytes() const { return bytes_; }
@@ -71,10 +73,8 @@ public:
 
     // ==================== Query Interface ====================
 
-    std::unique_ptr<Weight> createWeight(
-        IndexSearcher& searcher,
-        ScoreMode scoreMode,
-        float boost) const override;
+    std::unique_ptr<Weight> createWeight(IndexSearcher& searcher, ScoreMode scoreMode,
+                                         float boost) const override;
 
     std::string toString(const std::string& field) const override;
 

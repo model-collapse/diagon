@@ -51,10 +51,14 @@ enum class StorageTier : uint8_t {
 
 constexpr const char* toString(StorageTier tier) {
     switch (tier) {
-        case StorageTier::HOT: return "hot";
-        case StorageTier::WARM: return "warm";
-        case StorageTier::COLD: return "cold";
-        case StorageTier::FROZEN: return "frozen";
+        case StorageTier::HOT:
+            return "hot";
+        case StorageTier::WARM:
+            return "warm";
+        case StorageTier::COLD:
+            return "cold";
+        case StorageTier::FROZEN:
+            return "frozen";
     }
     return "unknown";
 }

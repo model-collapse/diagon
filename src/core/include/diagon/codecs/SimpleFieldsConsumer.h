@@ -65,9 +65,8 @@ public:
      * @param terms Map of term → posting list
      *              Posting list format: [docID, freq, docID, freq, ...]
      */
-    void writeField(
-        const std::string& fieldName,
-        const std::unordered_map<std::string, std::vector<int>>& terms);
+    void writeField(const std::string& fieldName,
+                    const std::unordered_map<std::string, std::vector<int>>& terms);
 
     /**
      * Close and flush all data
@@ -77,9 +76,7 @@ public:
     /**
      * Get list of files created
      */
-    const std::vector<std::string>& getFiles() const {
-        return files_;
-    }
+    const std::vector<std::string>& getFiles() const { return files_; }
 
 private:
     // Segment write state

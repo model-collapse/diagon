@@ -2,9 +2,10 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/util/packed/DirectWriter.h"
-#include "diagon/util/packed/DirectMonotonicWriter.h"
-#include "diagon/store/ByteBuffersIndexOutput.h"
+
 #include "diagon/store/ByteBuffersIndexInput.h"
+#include "diagon/store/ByteBuffersIndexOutput.h"
+#include "diagon/util/packed/DirectMonotonicWriter.h"
 
 #include <gtest/gtest.h>
 

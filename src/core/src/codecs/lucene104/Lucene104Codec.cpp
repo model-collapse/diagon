@@ -24,9 +24,7 @@ Lucene104Codec::Lucene104Codec()
 namespace {
 struct Lucene104CodecRegistrar {
     Lucene104CodecRegistrar() {
-        Codec::registerCodec("Lucene104", []() {
-            return std::make_unique<Lucene104Codec>();
-        });
+        Codec::registerCodec("Lucene104", []() { return std::make_unique<Lucene104Codec>(); });
     }
 };
 

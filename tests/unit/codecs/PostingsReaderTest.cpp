@@ -1,14 +1,15 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/codecs/lucene104/Lucene104PostingsWriter.h"
 #include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
-#include "diagon/index/SegmentWriteState.h"
+#include "diagon/codecs/lucene104/Lucene104PostingsWriter.h"
 #include "diagon/index/PostingsEnum.h"
-#include "diagon/store/ByteBuffersIndexOutput.h"
+#include "diagon/index/SegmentWriteState.h"
 #include "diagon/store/ByteBuffersIndexInput.h"
+#include "diagon/store/ByteBuffersIndexOutput.h"
 
 #include <gtest/gtest.h>
+
 #include <vector>
 
 using namespace diagon::codecs::lucene104;
@@ -21,25 +22,13 @@ using namespace diagon::search;
 SegmentWriteState createWriteState() {
     std::vector<FieldInfo> fields;
     FieldInfos fieldInfos(fields);
-    return SegmentWriteState(
-        nullptr,
-        "test_segment",
-        100,
-        fieldInfos,
-        ""
-    );
+    return SegmentWriteState(nullptr, "test_segment", 100, fieldInfos, "");
 }
 
 SegmentReadState createReadState() {
     std::vector<FieldInfo> fields;
     FieldInfos fieldInfos(fields);
-    return SegmentReadState(
-        nullptr,
-        "test_segment",
-        100,
-        fieldInfos,
-        ""
-    );
+    return SegmentReadState(nullptr, "test_segment", 100, fieldInfos, "");
 }
 
 FieldInfo createField(const std::string& name, IndexOptions options) {
@@ -71,18 +60,17 @@ TEST(PostingsReaderTest, RoundTripMultipleDocs) {
     ByteBuffersIndexOutput out("test.doc");
 
     // Write the postings manually
-    out.writeVInt(0);   // first doc delta = 0
-    out.writeVInt(1);   // freq = 1
-    out.writeVInt(5);   // delta = 5
-    out.writeVInt(3);   // freq = 3
-    out.writeVInt(5);   // delta = 5
-    out.writeVInt(2);   // freq = 2
+    out.writeVInt(0);  // first doc delta = 0
+    out.writeVInt(1);  // freq = 1
+    out.writeVInt(5);  // delta = 5
+    out.writeVInt(3);  // freq = 3
+    out.writeVInt(5);  // delta = 5
+    out.writeVInt(2);  // freq = 2
 
     // Create reader with this buffer
     auto readState = createReadState();
     Lucene104PostingsReader reader(readState);
-    reader.setInput(std::make_unique<ByteBuffersIndexInput>(
-        "test.doc", out.toArrayCopy()));
+    reader.setInput(std::make_unique<ByteBuffersIndexInput>("test.doc", out.toArrayCopy()));
 
     // Read postings
     TermState state;
@@ -114,15 +102,14 @@ TEST(PostingsReaderTest, RoundTripMultipleDocs) {
 TEST(PostingsReaderTest, DocsOnlyMode) {
     // Create buffer with docs only (no freqs)
     ByteBuffersIndexOutput out("test.doc");
-    out.writeVInt(0);   // first doc
-    out.writeVInt(5);   // delta
-    out.writeVInt(5);   // delta
+    out.writeVInt(0);  // first doc
+    out.writeVInt(5);  // delta
+    out.writeVInt(5);  // delta
 
     // Create reader
     auto readState = createReadState();
     Lucene104PostingsReader reader(readState);
-    reader.setInput(std::make_unique<ByteBuffersIndexInput>(
-        "test.doc", out.toArrayCopy()));
+    reader.setInput(std::make_unique<ByteBuffersIndexInput>("test.doc", out.toArrayCopy()));
 
     // Read postings (DOCS_ONLY - no frequencies)
     auto field = createField("id", IndexOptions::DOCS);
@@ -152,8 +139,7 @@ TEST(PostingsReaderTest, EmptyPostings) {
 
     auto readState = createReadState();
     Lucene104PostingsReader reader(readState);
-    reader.setInput(std::make_unique<ByteBuffersIndexInput>(
-        "test.doc", out.toArrayCopy()));
+    reader.setInput(std::make_unique<ByteBuffersIndexInput>("test.doc", out.toArrayCopy()));
 
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
     TermState state;
@@ -171,16 +157,15 @@ TEST(PostingsReaderTest, LargeDocIDs) {
     // Create buffer with large doc IDs
     ByteBuffersIndexOutput out("test.doc");
     out.writeVInt(1000000);  // first doc
-    out.writeVInt(1);         // freq
+    out.writeVInt(1);        // freq
     out.writeVInt(1000000);  // delta
-    out.writeVInt(2);         // freq
+    out.writeVInt(2);        // freq
     out.writeVInt(1000000);  // delta
-    out.writeVInt(3);         // freq
+    out.writeVInt(3);        // freq
 
     auto readState = createReadState();
     Lucene104PostingsReader reader(readState);
-    reader.setInput(std::make_unique<ByteBuffersIndexInput>(
-        "test.doc", out.toArrayCopy()));
+    reader.setInput(std::make_unique<ByteBuffersIndexInput>("test.doc", out.toArrayCopy()));
 
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
     TermState state;
@@ -216,8 +201,7 @@ TEST(PostingsReaderTest, ManyDocs) {
 
     auto readState = createReadState();
     Lucene104PostingsReader reader(readState);
-    reader.setInput(std::make_unique<ByteBuffersIndexInput>(
-        "test.doc", out.toArrayCopy()));
+    reader.setInput(std::make_unique<ByteBuffersIndexInput>("test.doc", out.toArrayCopy()));
 
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
     TermState state;
@@ -255,8 +239,7 @@ TEST(PostingsReaderTest, AdvanceBasic) {
 
     auto readState = createReadState();
     Lucene104PostingsReader reader(readState);
-    reader.setInput(std::make_unique<ByteBuffersIndexInput>(
-        "test.doc", out.toArrayCopy()));
+    reader.setInput(std::make_unique<ByteBuffersIndexInput>("test.doc", out.toArrayCopy()));
 
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
     TermState state;
@@ -289,8 +272,7 @@ TEST(PostingsReaderTest, AdvancePastEnd) {
 
     auto readState = createReadState();
     Lucene104PostingsReader reader(readState);
-    reader.setInput(std::make_unique<ByteBuffersIndexInput>(
-        "test.doc", out.toArrayCopy()));
+    reader.setInput(std::make_unique<ByteBuffersIndexInput>("test.doc", out.toArrayCopy()));
 
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
     TermState state;
@@ -311,8 +293,7 @@ TEST(PostingsReaderTest, Cost) {
 
     auto readState = createReadState();
     Lucene104PostingsReader reader(readState);
-    reader.setInput(std::make_unique<ByteBuffersIndexInput>(
-        "test.doc", out.toArrayCopy()));
+    reader.setInput(std::make_unique<ByteBuffersIndexInput>("test.doc", out.toArrayCopy()));
 
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
     TermState state;

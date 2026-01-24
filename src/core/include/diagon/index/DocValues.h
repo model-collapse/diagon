@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "diagon/util/BytesRef.h"
 #include "diagon/search/DocIdSetIterator.h"
+#include "diagon/util/BytesRef.h"
 
 #include <cstdint>
 #include <memory>

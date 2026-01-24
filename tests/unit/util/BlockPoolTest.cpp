@@ -5,6 +5,7 @@
 #include "diagon/util/IntBlockPool.h"
 
 #include <gtest/gtest.h>
+
 #include <cstring>
 
 using namespace diagon::util;
@@ -279,12 +280,7 @@ TEST(IntBlockPoolTest, PostingListSimulation) {
         int freq;
     };
 
-    std::vector<Posting> postings = {
-        {0, 3},
-        {5, 1},
-        {10, 2},
-        {15, 4}
-    };
+    std::vector<Posting> postings = {{0, 3}, {5, 1}, {10, 2}, {15, 4}};
 
     // Store postings
     int startOffset = pool.allocate(postings.size() * 2);

@@ -129,11 +129,8 @@ private:
      * @param docID Document ID
      * @param indexOptions Index options for field
      */
-    void addTermOccurrence(
-        const std::string& fieldName,
-        const std::string& term,
-        int docID,
-        IndexOptions indexOptions);
+    void addTermOccurrence(const std::string& fieldName, const std::string& term, int docID,
+                           IndexOptions indexOptions);
 
     /**
      * Create new posting list for term

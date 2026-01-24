@@ -1,12 +1,14 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/codecs/SimpleFieldsConsumer.h"
 #include "diagon/codecs/SimpleFieldsProducer.h"
-#include "diagon/store/FSDirectory.h"
+
+#include "diagon/codecs/SimpleFieldsConsumer.h"
 #include "diagon/index/SegmentWriteState.h"
+#include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 #include <unordered_map>
 
@@ -35,16 +37,12 @@ protected:
     }
 
     // Helper: Write test data
-    void writeTestData(
-        const std::string& segmentName,
-        const std::unordered_map<std::string, std::vector<int>>& terms
-    ) {
+    void writeTestData(const std::string& segmentName,
+                       const std::unordered_map<std::string, std::vector<int>>& terms) {
         // Create minimal FieldInfos with body field
-        FieldInfo bodyField{
-            .name = "body",
-            .number = 0,
-            .indexOptions = IndexOptions::DOCS_AND_FREQS_AND_POSITIONS
-        };
+        FieldInfo bodyField{.name = "body",
+                            .number = 0,
+                            .indexOptions = IndexOptions::DOCS_AND_FREQS_AND_POSITIONS};
         FieldInfos fieldInfos({bodyField});
 
         index::SegmentWriteState state(dir.get(), segmentName, 1000, fieldInfos, "");
@@ -64,7 +62,7 @@ TEST_F(SimpleFieldsProducerTest, ReadSimpleData) {
     // Write data
     std::unordered_map<std::string, std::vector<int>> terms;
     terms["hello"] = {0, 1, 1, 1};  // doc 0 freq 1, doc 1 freq 1
-    terms["world"] = {0, 2};         // doc 0 freq 2
+    terms["world"] = {0, 2};        // doc 0 freq 2
 
     writeTestData("_0", terms);
 
@@ -97,15 +95,18 @@ TEST_F(SimpleFieldsProducerTest, IterateTerms) {
     // Should iterate in sorted order
     ASSERT_TRUE(termsEnum->next());
     EXPECT_EQ(std::string(reinterpret_cast<const char*>(termsEnum->term().bytes().data()),
-                         termsEnum->term().length()), "apple");
+                          termsEnum->term().length()),
+              "apple");
 
     ASSERT_TRUE(termsEnum->next());
     EXPECT_EQ(std::string(reinterpret_cast<const char*>(termsEnum->term().bytes().data()),
-                         termsEnum->term().length()), "banana");
+                          termsEnum->term().length()),
+              "banana");
 
     ASSERT_TRUE(termsEnum->next());
     EXPECT_EQ(std::string(reinterpret_cast<const char*>(termsEnum->term().bytes().data()),
-                         termsEnum->term().length()), "cherry");
+                          termsEnum->term().length()),
+              "cherry");
 
     EXPECT_FALSE(termsEnum->next());  // No more terms
 }
@@ -126,7 +127,7 @@ TEST_F(SimpleFieldsProducerTest, ReadPostings) {
     ASSERT_TRUE(termsEnum->next());
 
     // Check term stats
-    EXPECT_EQ(termsEnum->docFreq(), 3);  // 3 documents
+    EXPECT_EQ(termsEnum->docFreq(), 3);                // 3 documents
     EXPECT_EQ(termsEnum->totalTermFreq(), 1 + 2 + 3);  // Total freq
 
     // Get postings
@@ -171,7 +172,8 @@ TEST_F(SimpleFieldsProducerTest, SeekExactFound) {
 
     // Verify positioned correctly
     EXPECT_EQ(std::string(reinterpret_cast<const char*>(termsEnum->term().bytes().data()),
-                         termsEnum->term().length()), "banana");
+                          termsEnum->term().length()),
+              "banana");
     EXPECT_EQ(termsEnum->docFreq(), 1);
 }
 
@@ -212,7 +214,8 @@ TEST_F(SimpleFieldsProducerTest, SeekCeilFound) {
     auto status = termsEnum->seekCeil(target);
     EXPECT_EQ(status, TermsEnum::SeekStatus::FOUND);
     EXPECT_EQ(std::string(reinterpret_cast<const char*>(termsEnum->term().bytes().data()),
-                         termsEnum->term().length()), "banana");
+                          termsEnum->term().length()),
+              "banana");
 }
 
 TEST_F(SimpleFieldsProducerTest, SeekCeilNotFoundButPositioned) {
@@ -233,7 +236,8 @@ TEST_F(SimpleFieldsProducerTest, SeekCeilNotFoundButPositioned) {
     auto status = termsEnum->seekCeil(target);
     EXPECT_EQ(status, TermsEnum::SeekStatus::NOT_FOUND);
     EXPECT_EQ(std::string(reinterpret_cast<const char*>(termsEnum->term().bytes().data()),
-                         termsEnum->term().length()), "cherry");
+                          termsEnum->term().length()),
+              "cherry");
 }
 
 TEST_F(SimpleFieldsProducerTest, SeekCeilEnd) {
@@ -373,7 +377,8 @@ TEST_F(SimpleFieldsProducerTest, SingleTerm) {
 
     ASSERT_TRUE(termsEnum->next());
     EXPECT_EQ(std::string(reinterpret_cast<const char*>(termsEnum->term().bytes().data()),
-                         termsEnum->term().length()), "only");
+                          termsEnum->term().length()),
+              "only");
     EXPECT_EQ(termsEnum->docFreq(), 1);
 
     auto postings = termsEnum->postings();

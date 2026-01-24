@@ -12,4 +12,4 @@ const IOContext IOContext::READ = IOContext(IOContext::Type::READ);
 const IOContext IOContext::MERGE = IOContext(IOContext::Type::MERGE);
 const IOContext IOContext::FLUSH = IOContext(IOContext::Type::FLUSH);
 
-} // namespace diagon::store
+}  // namespace diagon::store

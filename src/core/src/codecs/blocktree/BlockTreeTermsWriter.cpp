@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/blocktree/BlockTreeTermsWriter.h"
+
 #include "diagon/util/Exceptions.h"
 
 #include <algorithm>
@@ -11,18 +12,14 @@ namespace diagon {
 namespace codecs {
 namespace blocktree {
 
-BlockTreeTermsWriter::BlockTreeTermsWriter(
-    store::IndexOutput* timOut,
-    store::IndexOutput* tipOut,
-    const index::FieldInfo& fieldInfo,
-    const Config& config)
+BlockTreeTermsWriter::BlockTreeTermsWriter(store::IndexOutput* timOut, store::IndexOutput* tipOut,
+                                           const index::FieldInfo& fieldInfo, const Config& config)
     : timOut_(timOut)
     , tipOut_(tipOut)
     , fieldInfo_(fieldInfo)
     , config_(config)
     , numTerms_(0)
     , finished_(false) {
-
     if (!timOut_ || !tipOut_) {
         throw std::invalid_argument("Output streams cannot be null");
     }
@@ -146,10 +143,8 @@ void BlockTreeTermsWriter::writeFST() {
     tipOut_->writeVInt(0);  // FST size = 0 (placeholder)
 }
 
-int BlockTreeTermsWriter::sharedPrefixLength(
-    const util::BytesRef& a,
-    const util::BytesRef& b) const {
-
+int BlockTreeTermsWriter::sharedPrefixLength(const util::BytesRef& a,
+                                             const util::BytesRef& b) const {
     size_t minLen = std::min(a.length(), b.length());
     int shared = 0;
 

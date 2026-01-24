@@ -21,12 +21,12 @@ class OneMerge;
  * What triggered the merge check
  */
 enum class MergeTrigger {
-    SEGMENT_FLUSH,      // After flushing new segment
-    FULL_FLUSH,         // After full flush
-    COMMIT,             // During commit
-    GET_READER,         // When opening reader
-    CLOSING,            // During close
-    EXPLICIT            // Explicit forceMerge() call
+    SEGMENT_FLUSH,  // After flushing new segment
+    FULL_FLUSH,     // After full flush
+    COMMIT,         // During commit
+    GET_READER,     // When opening reader
+    CLOSING,        // During close
+    EXPLICIT        // Explicit forceMerge() call
 };
 
 /**
@@ -52,24 +52,21 @@ public:
      * @param segmentInfos Current segments
      * @return MergeSpecification or nullptr if no merges needed
      */
-    virtual MergeSpecification* findMerges(
-        MergeTrigger trigger,
-        const SegmentInfos& segmentInfos) = 0;
+    virtual MergeSpecification* findMerges(MergeTrigger trigger,
+                                           const SegmentInfos& segmentInfos) = 0;
 
     /**
      * Find merge to run when segments are needed for searching
      * More aggressive than findMerges()
      */
-    virtual MergeSpecification* findForcedMerges(
-        const SegmentInfos& segmentInfos,
-        int maxSegmentCount,
-        const std::map<SegmentCommitInfo*, bool>& segmentsToMerge) = 0;
+    virtual MergeSpecification*
+    findForcedMerges(const SegmentInfos& segmentInfos, int maxSegmentCount,
+                     const std::map<SegmentCommitInfo*, bool>& segmentsToMerge) = 0;
 
     /**
      * Find merges needed only to reclaim deletes
      */
-    virtual MergeSpecification* findForcedDeletesMerges(
-        const SegmentInfos& segmentInfos) = 0;
+    virtual MergeSpecification* findForcedDeletesMerges(const SegmentInfos& segmentInfos) = 0;
 
     // ==================== Configuration ====================
 
@@ -99,8 +96,7 @@ public:
     /**
      * Check if segment is fully merged (no deletes)
      */
-    virtual bool isMerged(const SegmentInfos& infos,
-                         const SegmentCommitInfo& info) const {
+    virtual bool isMerged(const SegmentInfos& infos, const SegmentCommitInfo& info) const {
         // Stub: would check info.getDelCount() == 0
         return true;
     }

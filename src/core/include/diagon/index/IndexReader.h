@@ -3,13 +3,13 @@
 
 #pragma once
 
+#include "diagon/index/LeafReaderContext.h"
+#include "diagon/util/Exceptions.h"
+
 #include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
-
-#include "diagon/util/Exceptions.h"
-#include "diagon/index/LeafReaderContext.h"
 
 namespace diagon {
 namespace index {
@@ -59,9 +59,7 @@ public:
     std::vector<LeafReaderContext> leaves() const override;
     bool isTopLevel() const override { return true; }
 
-    const LeafReaderContext& leafContext() const {
-        return ctx_;
-    }
+    const LeafReaderContext& leafContext() const { return ctx_; }
 
 private:
     LeafReaderContext ctx_;
@@ -74,19 +72,15 @@ private:
  */
 class CompositeReaderContext : public IndexReaderContext {
 public:
-    explicit CompositeReaderContext(CompositeReader* reader,
-                                   std::vector<LeafReaderContext> leaves)
-        : reader_(reader), leaves_(std::move(leaves)) {}
+    explicit CompositeReaderContext(CompositeReader* reader, std::vector<LeafReaderContext> leaves)
+        : reader_(reader)
+        , leaves_(std::move(leaves)) {}
 
     IndexReader* reader() const override;
 
-    std::vector<LeafReaderContext> leaves() const override {
-        return leaves_;
-    }
+    std::vector<LeafReaderContext> leaves() const override { return leaves_; }
 
-    bool isTopLevel() const override {
-        return true;
-    }
+    bool isTopLevel() const override { return true; }
 
 private:
     CompositeReader* reader_;
@@ -154,9 +148,7 @@ public:
     /**
      * Increment reference count
      */
-    void incRef() {
-        refCount_.fetch_add(1, std::memory_order_relaxed);
-    }
+    void incRef() { refCount_.fetch_add(1, std::memory_order_relaxed); }
 
     /**
      * Try to increment reference count
@@ -165,8 +157,7 @@ public:
     bool tryIncRef() {
         int count = refCount_.load(std::memory_order_relaxed);
         while (count > 0) {
-            if (refCount_.compare_exchange_weak(count, count + 1,
-                                               std::memory_order_relaxed)) {
+            if (refCount_.compare_exchange_weak(count, count + 1, std::memory_order_relaxed)) {
                 return true;
             }
         }
@@ -190,9 +181,7 @@ public:
     /**
      * Get current reference count
      */
-    int getRefCount() const {
-        return refCount_.load(std::memory_order_relaxed);
-    }
+    int getRefCount() const { return refCount_.load(std::memory_order_relaxed); }
 
 protected:
     /**
@@ -207,17 +196,13 @@ protected:
     /**
      * Mark reader as closed
      */
-    void setClosed() {
-        closed_.store(true, std::memory_order_release);
-    }
+    void setClosed() { closed_.store(true, std::memory_order_release); }
 
     /**
      * Called when closing (refCount reaches 0)
      * Subclasses should override to release resources
      */
-    virtual void doClose() {
-        setClosed();
-    }
+    virtual void doClose() { setClosed(); }
 
 private:
     std::atomic<bool> closed_{false};
@@ -380,10 +365,8 @@ public:
     // ==================== Context ====================
 
     std::unique_ptr<IndexReaderContext> getContext() const override {
-        return std::make_unique<CompositeReaderContext>(
-            const_cast<CompositeReader*>(this),
-            leaves()
-        );
+        return std::make_unique<CompositeReaderContext>(const_cast<CompositeReader*>(this),
+                                                        leaves());
     }
 
     std::vector<LeafReaderContext> leaves() const override {
@@ -393,11 +376,7 @@ public:
 
         for (const auto& sub : getSequentialSubReaders()) {
             for (const auto& ctx : sub->leaves()) {
-                result.push_back(LeafReaderContext(
-                    ctx.reader,
-                    docBase + ctx.docBase,
-                    leafOrd++
-                ));
+                result.push_back(LeafReaderContext(ctx.reader, docBase + ctx.docBase, leafOrd++));
             }
             // Add sub-reader's total size after processing all its leaves
             docBase += sub->maxDoc();

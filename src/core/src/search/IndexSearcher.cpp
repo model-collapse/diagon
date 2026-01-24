@@ -2,12 +2,13 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/search/IndexSearcher.h"
+
+#include "diagon/index/IndexReader.h"
 #include "diagon/search/Collector.h"
+#include "diagon/search/Scorer.h"
 #include "diagon/search/TopDocs.h"
 #include "diagon/search/TopScoreDocCollector.h"
 #include "diagon/search/Weight.h"
-#include "diagon/search/Scorer.h"
-#include "diagon/index/IndexReader.h"
 
 namespace diagon {
 namespace search {
@@ -22,13 +23,9 @@ public:
     explicit ScorerScorable(Scorer* scorer)
         : scorer_(scorer) {}
 
-    float score() override {
-        return scorer_->score();
-    }
+    float score() override { return scorer_->score(); }
 
-    int docID() override {
-        return scorer_->docID();
-    }
+    int docID() override { return scorer_->docID(); }
 
 private:
     Scorer* scorer_;

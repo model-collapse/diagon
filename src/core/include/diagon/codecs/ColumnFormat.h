@@ -21,8 +21,8 @@ class SegmentReadState;
  * Data part type for column storage
  */
 enum class DataPartType {
-    WIDE,      // Separate file per column + marks
-    COMPACT    // Single data.bin with shared marks
+    WIDE,    // Separate file per column + marks
+    COMPACT  // Single data.bin with shared marks
 };
 
 /**
@@ -63,23 +63,20 @@ public:
      *
      * NOTE: Stub - returns nullptr until column storage is implemented
      */
-    virtual std::unique_ptr<ColumnsConsumer> fieldsConsumer(
-        SegmentWriteState& state) = 0;
+    virtual std::unique_ptr<ColumnsConsumer> fieldsConsumer(SegmentWriteState& state) = 0;
 
     /**
      * Create producer for reading columns
      *
      * NOTE: Stub - returns nullptr until column storage is implemented
      */
-    virtual std::unique_ptr<ColumnsProducer> fieldsProducer(
-        SegmentReadState& state) = 0;
+    virtual std::unique_ptr<ColumnsProducer> fieldsProducer(SegmentReadState& state) = 0;
 
     /**
      * Should use wide or compact format?
      * Based on segment size thresholds
      */
-    virtual DataPartType selectPartType(int64_t estimatedBytes,
-                                        int32_t estimatedDocs) const = 0;
+    virtual DataPartType selectPartType(int64_t estimatedBytes, int32_t estimatedDocs) const = 0;
 
     // ==================== Factory ====================
 
@@ -88,7 +85,8 @@ public:
                                std::function<std::unique_ptr<ColumnFormat>()> factory);
 
 private:
-    static std::unordered_map<std::string, std::function<std::unique_ptr<ColumnFormat>()>>& getRegistry();
+    static std::unordered_map<std::string, std::function<std::unique_ptr<ColumnFormat>()>>&
+    getRegistry();
 };
 
 /**

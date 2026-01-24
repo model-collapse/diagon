@@ -3,13 +3,13 @@
 
 #pragma once
 
+#include "diagon/index/FieldInfo.h"  // Use canonical enum definitions
+#include "diagon/util/BytesRef.h"
+
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
-
-#include "diagon/util/BytesRef.h"
-#include "diagon/index/FieldInfo.h"  // Use canonical enum definitions
 
 namespace diagon {
 namespace document {
@@ -25,16 +25,14 @@ namespace document {
 struct FieldType {
     index::IndexOptions indexOptions = index::IndexOptions::NONE;
     index::DocValuesType docValuesType = index::DocValuesType::NONE;
-    bool stored = false;      // Store original value
-    bool tokenized = false;   // Apply analysis/tokenization
-    bool omitNorms = false;   // Omit length normalization
+    bool stored = false;     // Store original value
+    bool tokenized = false;  // Apply analysis/tokenization
+    bool omitNorms = false;  // Omit length normalization
 
     FieldType() = default;
 
     // Helper constructors
-    static FieldType notIndexed() {
-        return FieldType{};
-    }
+    static FieldType notIndexed() { return FieldType{}; }
 
     static FieldType storedOnly() {
         FieldType ft;

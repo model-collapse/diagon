@@ -3,8 +3,8 @@
 
 #include "diagon/util/packed/DirectWriter.h"
 
-#include <stdexcept>
 #include <algorithm>
+#include <stdexcept>
 
 namespace diagon {
 namespace util {
@@ -36,7 +36,6 @@ DirectWriter::DirectWriter(store::IndexOutput* output, int64_t numValues, int bi
     , buffer_(0)
     , bufferSize_(0)
     , byteAligned_(false) {
-
     if (!output_) {
         throw std::invalid_argument("Output cannot be null");
     }
@@ -127,11 +126,7 @@ void DirectWriter::writeByteFastPath(int64_t value) {
 
 // ==================== DirectReader ====================
 
-std::vector<int64_t> DirectReader::read(
-    store::IndexInput* input,
-    int bitsPerValue,
-    int64_t count) {
-
+std::vector<int64_t> DirectReader::read(store::IndexInput* input, int bitsPerValue, int64_t count) {
     if (count == 0 || bitsPerValue == 0) {
         return std::vector<int64_t>(count, 0);
     }
@@ -167,11 +162,7 @@ std::vector<int64_t> DirectReader::read(
     return result;
 }
 
-int64_t DirectReader::getInstance(
-    store::IndexInput* input,
-    int bitsPerValue,
-    int64_t index) {
-
+int64_t DirectReader::getInstance(store::IndexInput* input, int bitsPerValue, int64_t index) {
     if (bitsPerValue == 0) {
         return 0;
     }
@@ -180,11 +171,7 @@ int64_t DirectReader::getInstance(
     return readValue(input, bitsPerValue, bitPosition);
 }
 
-int64_t DirectReader::readValue(
-    store::IndexInput* input,
-    int bitsPerValue,
-    int64_t bitPosition) {
-
+int64_t DirectReader::readValue(store::IndexInput* input, int bitsPerValue, int64_t bitPosition) {
     // Calculate byte position and bit offset
     int64_t bytePosition = bitPosition / 8;
     int bitOffset = bitPosition % 8;

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/SimpleFieldsConsumer.h"
+
 #include "diagon/util/Exceptions.h"
 
 #include <algorithm>
@@ -18,7 +19,6 @@ static const int32_t VERSION = 1;
 
 SimpleFieldsConsumer::SimpleFieldsConsumer(const index::SegmentWriteState& state)
     : state_(state) {
-
     // Create output file
     std::string fileName = getPostingsFileName();
     output_ = state_.directory->createOutput(fileName, state_.context);
@@ -57,9 +57,7 @@ void SimpleFieldsConsumer::writeHeader() {
 }
 
 void SimpleFieldsConsumer::writeField(
-    const std::string& fieldName,
-    const std::unordered_map<std::string, std::vector<int>>& terms) {
-
+    const std::string& fieldName, const std::unordered_map<std::string, std::vector<int>>& terms) {
     ensureOpen();
 
     // Sort terms for consistent ordering

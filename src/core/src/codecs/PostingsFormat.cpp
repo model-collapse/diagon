@@ -11,12 +11,13 @@ namespace codecs {
 
 std::unordered_map<std::string, std::function<std::unique_ptr<PostingsFormat>()>>&
 PostingsFormat::getRegistry() {
-    static std::unordered_map<std::string, std::function<std::unique_ptr<PostingsFormat>()>> registry;
+    static std::unordered_map<std::string, std::function<std::unique_ptr<PostingsFormat>()>>
+        registry;
     return registry;
 }
 
 void PostingsFormat::registerFormat(const std::string& name,
-                                   std::function<std::unique_ptr<PostingsFormat>()> factory) {
+                                    std::function<std::unique_ptr<PostingsFormat>()> factory) {
     getRegistry()[name] = factory;
 }
 

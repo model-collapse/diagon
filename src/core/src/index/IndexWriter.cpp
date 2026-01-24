@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/IndexWriter.h"
+
 #include "diagon/store/IndexOutput.h"
 
 #include <filesystem>
@@ -21,14 +22,13 @@ IndexWriterConfig::IndexWriterConfig() = default;
 // ==================== IndexWriter ====================
 
 IndexWriter::IndexWriter(Directory& dir, const IndexWriterConfig& config)
-    : directory_(dir), config_(config) {
-
+    : directory_(dir)
+    , config_(config) {
     // Obtain write lock
     try {
         writeLock_ = directory_.obtainLock("write.lock");
     } catch (const LockObtainFailedException&) {
-        throw LockObtainFailedException(
-            "Cannot obtain write lock - another IndexWriter is open");
+        throw LockObtainFailedException("Cannot obtain write lock - another IndexWriter is open");
     }
 
     // Initialize index

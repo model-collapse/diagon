@@ -40,7 +40,9 @@ struct LeafReaderContext {
      * Constructor
      */
     LeafReaderContext(LeafReader* r, int base = 0, int ordinal = 0)
-        : reader(r), docBase(base), ord(ordinal) {}
+        : reader(r)
+        , docBase(base)
+        , ord(ordinal) {}
 };
 
 }  // namespace index

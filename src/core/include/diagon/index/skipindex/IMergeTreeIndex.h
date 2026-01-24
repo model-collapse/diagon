@@ -33,7 +33,9 @@ struct IndexDescription {
     size_t granularity;  // How many data granules per index granule
 
     IndexDescription(const std::string& name_, IndexType type_, size_t granularity_ = 1)
-        : name(name_), type(type_), granularity(granularity_) {}
+        : name(name_)
+        , type(type_)
+        , granularity(granularity_) {}
 };
 
 /**
@@ -58,23 +60,17 @@ public:
     /**
      * Index file name: "skp_idx_<name>.idx"
      */
-    std::string getFileName() const {
-        return "skp_idx_" + index_.name;
-    }
+    std::string getFileName() const { return "skp_idx_" + index_.name; }
 
     /**
      * File extension
      */
-    virtual std::string getFileExtension() const {
-        return ".idx";
-    }
+    virtual std::string getFileExtension() const { return ".idx"; }
 
     /**
      * How many data granules per index granule
      */
-    size_t getGranularity() const {
-        return index_.granularity;
-    }
+    size_t getGranularity() const { return index_.granularity; }
 
     // ==================== Factory Methods ====================
 
@@ -95,17 +91,11 @@ public:
 
     // ==================== Properties ====================
 
-    const IndexDescription& getIndexDescription() const {
-        return index_;
-    }
+    const IndexDescription& getIndexDescription() const { return index_; }
 
-    std::string getName() const {
-        return index_.name;
-    }
+    std::string getName() const { return index_.name; }
 
-    IndexType getType() const {
-        return index_.type;
-    }
+    IndexType getType() const { return index_.type; }
 
 private:
     IndexDescription index_;

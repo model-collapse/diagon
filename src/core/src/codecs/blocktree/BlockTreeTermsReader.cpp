@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/blocktree/BlockTreeTermsReader.h"
+
 #include "diagon/util/Exceptions.h"
 
 #include <algorithm>
@@ -13,15 +14,12 @@ namespace blocktree {
 
 // ==================== BlockTreeTermsReader ====================
 
-BlockTreeTermsReader::BlockTreeTermsReader(
-    store::IndexInput* timIn,
-    store::IndexInput* tipIn,
-    const index::FieldInfo& fieldInfo)
+BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::IndexInput* tipIn,
+                                           const index::FieldInfo& fieldInfo)
     : timIn_(timIn)
     , tipIn_(tipIn)
     , fieldInfo_(fieldInfo)
     , numTerms_(0) {
-
     if (!timIn_ || !tipIn_) {
         throw std::invalid_argument("Input streams cannot be null");
     }
@@ -81,9 +79,8 @@ void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
 
         // Copy prefix
         if (prefixLen > 0) {
-            std::copy(block.prefixData.data(),
-                     block.prefixData.data() + prefixLen,
-                     termBytes.begin());
+            std::copy(block.prefixData.data(), block.prefixData.data() + prefixLen,
+                      termBytes.begin());
         }
 
         // Read suffix
@@ -155,12 +152,8 @@ bool SegmentTermsEnum::seekExact(const util::BytesRef& text) {
 
     // Binary search within block
     auto it = std::lower_bound(
-        currentBlock_.terms.begin(),
-        currentBlock_.terms.end(),
-        text,
-        [](const util::BytesRef& a, const util::BytesRef& b) {
-            return a < b;
-        });
+        currentBlock_.terms.begin(), currentBlock_.terms.end(), text,
+        [](const util::BytesRef& a, const util::BytesRef& b) { return a < b; });
 
     if (it != currentBlock_.terms.end() && *it == text) {
         currentTermIndex_ = static_cast<int>(it - currentBlock_.terms.begin());
@@ -177,12 +170,8 @@ index::TermsEnum::SeekStatus SegmentTermsEnum::seekCeil(const util::BytesRef& te
 
     // Binary search for ceiling
     auto it = std::lower_bound(
-        currentBlock_.terms.begin(),
-        currentBlock_.terms.end(),
-        text,
-        [](const util::BytesRef& a, const util::BytesRef& b) {
-            return a < b;
-        });
+        currentBlock_.terms.begin(), currentBlock_.terms.end(), text,
+        [](const util::BytesRef& a, const util::BytesRef& b) { return a < b; });
 
     if (it == currentBlock_.terms.end()) {
         return SeekStatus::END;

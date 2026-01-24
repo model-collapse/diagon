@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/DocumentsWriterPerThread.h"
+
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
 
@@ -38,7 +39,8 @@ TEST(DocumentsWriterPerThreadTest, AddMultipleDocuments) {
 
     for (int i = 0; i < 10; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "document " + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(std::make_unique<TextField>("body", "document " + std::to_string(i),
+                                            TextField::TYPE_STORED));
         dwpt.addDocument(doc);
     }
 
@@ -56,7 +58,8 @@ TEST(DocumentsWriterPerThreadTest, FlushByDocumentCount) {
     // Add 4 documents - should not trigger flush
     for (int i = 0; i < 4; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(
+            std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
         needsFlush = dwpt.addDocument(doc);
     }
 
@@ -74,7 +77,7 @@ TEST(DocumentsWriterPerThreadTest, FlushByDocumentCount) {
 
 TEST(DocumentsWriterPerThreadTest, FlushByRAMLimit) {
     DocumentsWriterPerThread::Config config;
-    config.ramBufferSizeMB = 1;  // Small RAM limit (1MB)
+    config.ramBufferSizeMB = 1;      // Small RAM limit (1MB)
     config.maxBufferedDocs = 10000;  // High doc limit
     DocumentsWriterPerThread dwpt(config);
 
@@ -106,7 +109,8 @@ TEST(DocumentsWriterPerThreadTest, Flush) {
     // Add some documents
     for (int i = 0; i < 5; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(
+            std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
         dwpt.addDocument(doc);
     }
 
@@ -142,7 +146,8 @@ TEST(DocumentsWriterPerThreadTest, MultipleFlushes) {
     // First flush
     for (int i = 0; i < 3; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(
+            std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
         dwpt.addDocument(doc);
     }
 
@@ -154,7 +159,8 @@ TEST(DocumentsWriterPerThreadTest, MultipleFlushes) {
     // Second flush
     for (int i = 0; i < 3; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(
+            std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
         dwpt.addDocument(doc);
     }
 
@@ -170,7 +176,8 @@ TEST(DocumentsWriterPerThreadTest, Reset) {
     // Add documents
     for (int i = 0; i < 5; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
+        doc.add(
+            std::make_unique<TextField>("body", "doc" + std::to_string(i), TextField::TYPE_STORED));
         dwpt.addDocument(doc);
     }
 
@@ -234,7 +241,8 @@ TEST(DocumentsWriterPerThreadTest, BytesUsedIncreases) {
     // Add documents - bytes should increase
     for (int i = 0; i < 10; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("body", "document content here", TextField::TYPE_STORED));
+        doc.add(
+            std::make_unique<TextField>("body", "document content here", TextField::TYPE_STORED));
         dwpt.addDocument(doc);
     }
 

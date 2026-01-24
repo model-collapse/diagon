@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/FreqProxTermsWriter.h"
+
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
 
@@ -68,9 +69,8 @@ TEST(FieldInfosBuilderTest, DocValuesTypeConflict) {
     builder.updateDocValuesType("field", DocValuesType::NUMERIC);
 
     // Try to change type (should throw)
-    EXPECT_THROW(
-        builder.updateDocValuesType("field", DocValuesType::BINARY),
-        std::invalid_argument);
+    EXPECT_THROW(builder.updateDocValuesType("field", DocValuesType::BINARY),
+                 std::invalid_argument);
 }
 
 TEST(FieldInfosBuilderTest, GetFieldNumber) {
@@ -187,10 +187,10 @@ TEST(FreqProxTermsWriterTest, MultipleDocsSameTerm) {
     // Verify "hello" appears in docs 0 and 2
     auto helloPostings = writer.getPostingList("hello");
     EXPECT_EQ(helloPostings.size(), 4);  // 2 docs * 2 values
-    EXPECT_EQ(helloPostings[0], 0);  // doc 0
-    EXPECT_EQ(helloPostings[1], 1);  // freq
-    EXPECT_EQ(helloPostings[2], 2);  // doc 2
-    EXPECT_EQ(helloPostings[3], 1);  // freq
+    EXPECT_EQ(helloPostings[0], 0);      // doc 0
+    EXPECT_EQ(helloPostings[1], 1);      // freq
+    EXPECT_EQ(helloPostings[2], 2);      // doc 2
+    EXPECT_EQ(helloPostings[3], 1);      // freq
 
     // Verify "world" appears in doc 1
     auto worldPostings = writer.getPostingList("world");

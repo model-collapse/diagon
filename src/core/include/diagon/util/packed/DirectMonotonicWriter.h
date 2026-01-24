@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "diagon/store/IndexOutput.h"
 #include "diagon/store/IndexInput.h"
+#include "diagon/store/IndexOutput.h"
 
 #include <cstdint>
 #include <vector>
@@ -73,11 +73,8 @@ public:
      * @param numValues Number of values to encode
      * @param blockShift Block size = 1 << blockShift (typically 4 for 16 values)
      */
-    DirectMonotonicWriter(
-        store::IndexOutput* meta,
-        store::IndexOutput* data,
-        int64_t numValues,
-        int blockShift);
+    DirectMonotonicWriter(store::IndexOutput* meta, store::IndexOutput* data, int64_t numValues,
+                          int blockShift);
 
     /**
      * Add a value to the sequence.
@@ -103,7 +100,13 @@ private:
         int64_t dataOffset;    // File pointer to packed data
         int bitsPerValue;      // Bits required for deviations
 
-        Block() : min(0), max(0), avgSlope(0), minDeviation(0), dataOffset(0), bitsPerValue(0) {}
+        Block()
+            : min(0)
+            , max(0)
+            , avgSlope(0)
+            , minDeviation(0)
+            , dataOffset(0)
+            , bitsPerValue(0) {}
     };
 
     store::IndexOutput* meta_;
@@ -137,11 +140,8 @@ public:
      * @param index Index of value to retrieve
      * @return Value at index
      */
-    static int64_t get(
-        const DirectMonotonicWriter::Meta& meta,
-        store::IndexInput* metaIn,
-        store::IndexInput* dataIn,
-        int64_t index);
+    static int64_t get(const DirectMonotonicWriter::Meta& meta, store::IndexInput* metaIn,
+                       store::IndexInput* dataIn, int64_t index);
 
     /**
      * Read all values into a vector.
@@ -151,10 +151,8 @@ public:
      * @param dataIn Input for packed data
      * @return Vector of all values
      */
-    static std::vector<int64_t> readAll(
-        const DirectMonotonicWriter::Meta& meta,
-        store::IndexInput* metaIn,
-        store::IndexInput* dataIn);
+    static std::vector<int64_t> readAll(const DirectMonotonicWriter::Meta& meta,
+                                        store::IndexInput* metaIn, store::IndexInput* dataIn);
 
 private:
     struct Block {
@@ -165,10 +163,8 @@ private:
         int bitsPerValue;
     };
 
-    static Block readBlockMeta(
-        const DirectMonotonicWriter::Meta& meta,
-        store::IndexInput* metaIn,
-        int64_t blockIndex);
+    static Block readBlockMeta(const DirectMonotonicWriter::Meta& meta, store::IndexInput* metaIn,
+                               int64_t blockIndex);
 };
 
 }  // namespace packed

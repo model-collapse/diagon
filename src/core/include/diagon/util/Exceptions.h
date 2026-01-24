@@ -80,4 +80,4 @@ public:
         : IOException(message) {}
 };
 
-} // namespace diagon
+}  // namespace diagon

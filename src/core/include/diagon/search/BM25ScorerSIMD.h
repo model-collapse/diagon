@@ -3,16 +3,16 @@
 
 #pragma once
 
+#include "diagon/index/PostingsEnum.h"
 #include "diagon/search/BM25Similarity.h"
 #include "diagon/search/Scorer.h"
-#include "diagon/index/PostingsEnum.h"
 
 #ifdef DIAGON_HAVE_AVX2
-#include <immintrin.h>
+#    include <immintrin.h>
 #endif
 
-#include <memory>
 #include <cmath>
+#include <memory>
 
 namespace diagon {
 namespace search {
@@ -39,11 +39,8 @@ public:
      * @param k1 BM25 k1 parameter (default 1.2)
      * @param b BM25 b parameter (default 0.75)
      */
-    BM25ScorerSIMD(const Weight& weight,
-                   std::unique_ptr<index::PostingsEnum> postings,
-                   float idf,
-                   float k1 = 1.2f,
-                   float b = 0.75f);
+    BM25ScorerSIMD(const Weight& weight, std::unique_ptr<index::PostingsEnum> postings, float idf,
+                   float k1 = 1.2f, float b = 0.75f);
 
     // Scorer interface
     int nextDoc() override;
@@ -117,12 +114,9 @@ private:
  * Factory function to create optimal BM25 scorer
  * Automatically selects SIMD or scalar implementation
  */
-std::unique_ptr<BM25ScorerSIMD> createBM25Scorer(
-    const Weight& weight,
-    std::unique_ptr<index::PostingsEnum> postings,
-    float idf,
-    float k1 = 1.2f,
-    float b = 0.75f);
+std::unique_ptr<BM25ScorerSIMD> createBM25Scorer(const Weight& weight,
+                                                 std::unique_ptr<index::PostingsEnum> postings,
+                                                 float idf, float k1 = 1.2f, float b = 0.75f);
 
 }  // namespace search
 }  // namespace diagon

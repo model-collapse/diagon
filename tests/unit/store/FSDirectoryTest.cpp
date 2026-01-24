@@ -2,9 +2,11 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/store/FSDirectory.h"
+
 #include "diagon/util/Exceptions.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 
 using namespace diagon;
@@ -17,9 +19,7 @@ protected:
         std::filesystem::create_directories(test_dir);
     }
 
-    void TearDown() override {
-        std::filesystem::remove_all(test_dir);
-    }
+    void TearDown() override { std::filesystem::remove_all(test_dir); }
 
     std::filesystem::path test_dir;
 };
@@ -58,10 +58,7 @@ TEST_F(FSDirectoryTest, CreateOutputFileAlreadyExists) {
     output1->close();
 
     // Should throw FileAlreadyExistsException
-    EXPECT_THROW(
-        dir->createOutput("test.bin", IOContext::DEFAULT),
-        FileAlreadyExistsException
-    );
+    EXPECT_THROW(dir->createOutput("test.bin", IOContext::DEFAULT), FileAlreadyExistsException);
 }
 
 TEST_F(FSDirectoryTest, OpenInput) {
@@ -81,10 +78,7 @@ TEST_F(FSDirectoryTest, OpenInput) {
 TEST_F(FSDirectoryTest, OpenInputFileNotFound) {
     auto dir = FSDirectory::open(test_dir);
 
-    EXPECT_THROW(
-        dir->openInput("nonexistent.bin", IOContext::DEFAULT),
-        FileNotFoundException
-    );
+    EXPECT_THROW(dir->openInput("nonexistent.bin", IOContext::DEFAULT), FileNotFoundException);
 }
 
 TEST_F(FSDirectoryTest, DeleteFile) {
@@ -103,10 +97,7 @@ TEST_F(FSDirectoryTest, DeleteFile) {
 TEST_F(FSDirectoryTest, DeleteFileNotFound) {
     auto dir = FSDirectory::open(test_dir);
 
-    EXPECT_THROW(
-        dir->deleteFile("nonexistent.bin"),
-        FileNotFoundException
-    );
+    EXPECT_THROW(dir->deleteFile("nonexistent.bin"), FileNotFoundException);
 }
 
 TEST_F(FSDirectoryTest, FileLength) {
@@ -124,10 +115,7 @@ TEST_F(FSDirectoryTest, FileLength) {
 TEST_F(FSDirectoryTest, FileLengthNotFound) {
     auto dir = FSDirectory::open(test_dir);
 
-    EXPECT_THROW(
-        dir->fileLength("nonexistent.bin"),
-        FileNotFoundException
-    );
+    EXPECT_THROW(dir->fileLength("nonexistent.bin"), FileNotFoundException);
 }
 
 TEST_F(FSDirectoryTest, ListAll) {
@@ -218,10 +206,7 @@ TEST_F(FSDirectoryTest, LockExclusive) {
     ASSERT_NE(nullptr, lock1);
 
     // Second lock should fail
-    EXPECT_THROW(
-        dir->obtainLock("write.lock"),
-        LockObtainFailedException
-    );
+    EXPECT_THROW(dir->obtainLock("write.lock"), LockObtainFailedException);
 
     // Release first lock
     lock1->close();
@@ -239,10 +224,7 @@ TEST_F(FSDirectoryTest, Close) {
     EXPECT_TRUE(dir->isClosed());
 
     // Operations after close should throw
-    EXPECT_THROW(
-        dir->listAll(),
-        AlreadyClosedException
-    );
+    EXPECT_THROW(dir->listAll(), AlreadyClosedException);
 }
 
 TEST_F(FSDirectoryTest, GetPath) {

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/util/FST.h"
+
 #include "diagon/util/Exceptions.h"
 
 #include <algorithm>
@@ -12,7 +13,8 @@ namespace util {
 
 // ==================== FST ====================
 
-FST::FST() : root_(std::make_unique<Node>()) {}
+FST::FST()
+    : root_(std::make_unique<Node>()) {}
 
 FST::Output FST::get(const BytesRef& input) const {
     if (!root_) {
@@ -73,9 +75,7 @@ FST::Output FST::getLongestPrefixMatch(const BytesRef& input, int& prefixLen) co
 const FST::Arc* FST::Node::findArc(uint8_t label) const {
     // Binary search for arc with matching label
     auto it = std::lower_bound(arcs.begin(), arcs.end(), label,
-                               [](const Arc& arc, uint8_t val) {
-                                   return arc.label < val;
-                               });
+                               [](const Arc& arc, uint8_t val) { return arc.label < val; });
 
     if (it != arcs.end() && it->label == label) {
         return &(*it);
@@ -102,8 +102,7 @@ void FST::Builder::add(const BytesRef& input, Output output) {
     // Find common prefix with last input
     size_t prefixLen = 0;
     size_t minLen = std::min(lastInput_.length(), input.length());
-    while (prefixLen < minLen &&
-           lastInput_[prefixLen] == input[prefixLen]) {
+    while (prefixLen < minLen && lastInput_[prefixLen] == input[prefixLen]) {
         prefixLen++;
     }
 
