@@ -246,11 +246,13 @@ target_link_libraries(diagon_core
         ZLIB::ZLIB
 )
 
-if(TARGET zstd::zstd)
+# Link ZSTD (try zstd::libzstd first, then fallback to zstd::zstd)
+if(TARGET zstd::libzstd)
+    target_link_libraries(diagon_core PUBLIC zstd::libzstd)
+elseif(TARGET zstd::zstd)
     target_link_libraries(diagon_core PUBLIC zstd::zstd)
 else()
-    target_link_libraries(diagon_core PUBLIC ${ZSTD_LIBRARY})
-    target_include_directories(diagon_core PUBLIC ${ZSTD_INCLUDE_DIR})
+    message(FATAL_ERROR "ZSTD target not found")
 endif()
 
 if(TARGET LZ4::LZ4)

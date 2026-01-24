@@ -23,17 +23,19 @@ if(NOT TARGET ZLIB::ZLIB)
 endif()
 
 # ZSTD - Required for compression
-if(NOT TARGET zstd::zstd)
+# Check for different possible target names (zstd::libzstd from package, zstd::zstd from fallback)
+if(NOT TARGET zstd::libzstd AND NOT TARGET zstd::zstd)
     find_package(zstd QUIET)
     if(NOT zstd_FOUND)
         # Try alternative package names
         find_package(zstd QUIET CONFIG)
         if(NOT zstd_FOUND)
+            # Fallback: manually find library and create imported target
             find_library(ZSTD_LIBRARY NAMES zstd)
             find_path(ZSTD_INCLUDE_DIR NAMES zstd.h)
             if(ZSTD_LIBRARY AND ZSTD_INCLUDE_DIR)
-                add_library(zstd::zstd UNKNOWN IMPORTED)
-                set_target_properties(zstd::zstd PROPERTIES
+                add_library(zstd::libzstd UNKNOWN IMPORTED)
+                set_target_properties(zstd::libzstd PROPERTIES
                     IMPORTED_LOCATION "${ZSTD_LIBRARY}"
                     INTERFACE_INCLUDE_DIRECTORIES "${ZSTD_INCLUDE_DIR}"
                 )
@@ -44,8 +46,7 @@ if(NOT TARGET zstd::zstd)
             endif()
         else()
             set(HAVE_ZSTD TRUE CACHE BOOL "ZSTD library found" FORCE)
-            get_target_property(ZSTD_LIBRARY zstd::zstd LOCATION)
-            message(STATUS "Found ZSTD: ${ZSTD_LIBRARY}")
+            message(STATUS "Found ZSTD (config)")
         endif()
     else()
         set(HAVE_ZSTD TRUE CACHE BOOL "ZSTD library found" FORCE)

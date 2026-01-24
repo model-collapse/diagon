@@ -136,12 +136,12 @@ TEST_F(DirectoryReaderTest, GetLeaves) {
     for (int i = 0; i < static_cast<int>(leaves.size()); i++) {
         const auto& ctx = leaves[i];
 
-        EXPECT_NE(ctx.reader(), nullptr);
-        EXPECT_EQ(ctx.ord(), i);
-        EXPECT_EQ(ctx.docBase(), expectedDocBase);
+        EXPECT_NE(ctx.reader, nullptr);
+        EXPECT_EQ(ctx.ord, i);
+        EXPECT_EQ(ctx.docBase, expectedDocBase);
 
-        totalDocs += ctx.reader()->maxDoc();
-        expectedDocBase += ctx.reader()->maxDoc();
+        totalDocs += ctx.reader->maxDoc();
+        expectedDocBase += ctx.reader->maxDoc();
     }
     EXPECT_EQ(totalDocs, 10);
 }
@@ -183,7 +183,7 @@ TEST_F(DirectoryReaderTest, AccessTermsViaLeaves) {
     // Access terms through leaf readers
     auto leaves = reader->leaves();
     for (const auto& ctx : leaves) {
-        auto leafReader = ctx.reader();
+        auto leafReader = ctx.reader;
 
         // Get terms for "_all" field (Phase 3: all fields combined)
         auto terms = leafReader->terms("_all");
@@ -244,7 +244,7 @@ TEST_F(DirectoryReaderTest, SegmentReadersAreClosedOnDirectoryReaderClose) {
     // Get a leaf reader
     auto leaves = reader->leaves();
     ASSERT_GT(leaves.size(), 0);
-    auto leafReader = leaves[0].reader();
+    auto leafReader = leaves[0].reader;
 
     // Leaf should be accessible
     EXPECT_GT(leafReader->maxDoc(), 0);

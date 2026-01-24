@@ -12,11 +12,14 @@ include(GoogleTest)
 function(add_diagon_test TEST_NAME)
     add_executable(${TEST_NAME} ${ARGN})
 
+    # Link against diagon_core which transitively provides all dependencies
+    # Plus directly link compression libraries since compression code is header-only
     target_link_libraries(${TEST_NAME}
         PRIVATE
             diagon_core
             GTest::gtest
             GTest::gtest_main
+            ZLIB::ZLIB
     )
 
     target_include_directories(${TEST_NAME}
