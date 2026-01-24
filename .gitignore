@@ -1,0 +1,233 @@
+# ==================== Build Artifacts ====================
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+CTestTestfile.cmake
+DartConfiguration.tcl
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+!cmake/*.cmake
+
+# Build directories
+build/
+Build/
+out/
+dist/
+
+# Compiled binaries
+*.o
+*.so
+*.so.*
+*.a
+*.dylib
+*.dll
+*.exe
+
+# Testing
+Testing/
+CTestTestfile.cmake
+*_tests.cmake
+*_include.cmake
+
+# Benchmarks
+benchmarks/IndexingBenchmark
+benchmarks/SearchBenchmark
+benchmarks/SIMDBenchmark
+benchmarks/CMakeFiles/
+benchmarks/Makefile
+benchmarks/cmake_install.cmake
+
+# Tests
+tests/*/Test
+tests/*Test
+tests/CMakeFiles/
+tests/Makefile
+tests/cmake_install.cmake
+
+# Generated configuration
+DiagonConfig.cmake
+DiagonConfigVersion.cmake
+
+# ==================== IDEs and Editors ====================
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# CLion
+.idea/
+cmake-build-*/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.sln.docstates
+*.sln
+*.vcxproj*
+*.filters
+
+# Vim
+*.swp
+*.swo
+*~
+.*.sw?
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Eclipse
+.cproject
+.project
+.settings/
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+
+# ==================== Operating System ====================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ==================== Language-Specific ====================
+
+# C/C++
+*.d
+*.dSYM/
+*.su
+*.idb
+*.pdb
+*.ilk
+*.obj
+*.lib
+*.exp
+
+# Python (for build scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# ==================== Package Managers ====================
+
+# vcpkg
+vcpkg_installed/
+.vcpkg/
+
+# Conan
+conaninfo.txt
+conanbuildinfo.*
+conan.lock
+
+# ==================== Documentation ====================
+
+# Doxygen
+html/
+latex/
+doc/html/
+doc/latex/
+
+# ==================== Logs and Temporary Files ====================
+
+*.log
+*.tmp
+*.temp
+*.pid
+*.seed
+*.pid.lock
+
+# Core dumps
+core
+core.*
+
+# ==================== Project-Specific ====================
+
+# Index test data
+/test_index/
+/test_data/
+*.idx
+*.tmp_*
+
+# Performance profiles
+*.prof
+*.perf
+perf.data*
+callgrind.out.*
+
+# Coverage reports
+*.gcov
+*.gcda
+*.gcno
+coverage/
+htmlcov/
+
+# Benchmark results
+benchmark_results/
+*.bench
+
+# Plan and review documents (generated during development)
+PHASE_*.md
+*_COMPLETE.md
+*_PLAN.md
+*_PROGRESS.md
+*_REVIEW.md
+CONCERNS_*.md
+IMPLEMENTATION_*.md
+ENUM_*.md
+
+# ==================== Security ====================
+
+# Credentials and secrets
+*.key
+*.pem
+*.crt
+*.p12
+secrets/
+.env
+.env.*
+credentials.json
+
+# ==================== Misc ====================
+
+# Backup files
+*.bak
+*.backup
+*.orig
+*.rej
+
+# Compressed files
+*.tar
+*.tar.gz
+*.zip
+*.7z
+*.rar

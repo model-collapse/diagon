@@ -1,8 +1,9 @@
 # Diagon Search Engine
 
+[![CI](https://github.com/model-collapse/diagon/workflows/CI/badge.svg)](https://github.com/model-collapse/diagon/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![C++](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
-[![Build](https://img.shields.io/badge/build-in_progress-yellow.svg)](BUILD.md)
+[![codecov](https://codecov.io/gh/model-collapse/diagon/branch/main/graph/badge.svg)](https://codecov.io/gh/model-collapse/diagon)
 
 **Diagon** is a high-performance C++ search engine combining Apache Lucene's inverted index architecture with ClickHouse's columnar storage for hybrid text search and analytical queries.
 

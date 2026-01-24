@@ -1,0 +1,164 @@
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  # ==================== PR Checks ====================
+  pr-checks:
+    name: PR Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commit messages
+        run: |
+          echo "Checking commit messages..."
+          git log --format=%s origin/${{ github.base_ref }}..HEAD | while read msg; do
+            if [ ${#msg} -gt 72 ]; then
+              echo "ERROR: Commit message too long (>72 chars): $msg"
+              exit 1
+            fi
+          done
+
+      - name: Check for merge conflicts
+        run: |
+          if git diff --name-only --diff-filter=U | grep .; then
+            echo "ERROR: Merge conflicts detected"
+            exit 1
+          fi
+
+      - name: Check for large files
+        run: |
+          large_files=$(find . -type f -size +1M -not -path "./.git/*" -not -path "./build/*")
+          if [ -n "$large_files" ]; then
+            echo "ERROR: Large files detected (>1MB):"
+            echo "$large_files"
+            exit 1
+          fi
+
+  # ==================== Code Quality ====================
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-tidy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy-14
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            liblz4-dev \
+            libzstd-dev \
+            zlib1g-dev
+
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DDIAGON_BUILD_TESTS=OFF \
+            -DDIAGON_BUILD_BENCHMARKS=OFF
+
+      - name: Run clang-tidy
+        run: |
+          # Run clang-tidy on changed files only
+          git diff --name-only --diff-filter=d origin/${{ github.base_ref }}...HEAD | \
+            grep -E '\.(cpp|h)$' | \
+            xargs -I {} clang-tidy-14 -p build {} || true
+
+  # ==================== Security Scan ====================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run security scan
+        uses: securego/gosec@master
+        continue-on-error: true
+
+      - name: Check for secrets
+        run: |
+          if grep -r -E "(password|secret|token|api[_-]?key)" --include="*.cpp" --include="*.h" .; then
+            echo "WARNING: Potential secrets found in code"
+          fi
+
+  # ==================== Documentation Check ====================
+  documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for missing documentation
+        run: |
+          echo "Checking for public API documentation..."
+          # Check that all public headers have doxygen comments
+          missing_docs=$(find src/core/include -name "*.h" -exec grep -L "///" {} \;)
+          if [ -n "$missing_docs" ]; then
+            echo "WARNING: Files missing documentation:"
+            echo "$missing_docs"
+          fi
+
+      - name: Check README updates
+        if: contains(github.event.pull_request.files.*.filename, 'src/')
+        run: |
+          if ! git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q "README.md"; then
+            echo "NOTE: Consider updating README.md for significant changes"
+          fi
+
+  # ==================== Build Matrix ====================
+  build-matrix:
+    name: Build All Configurations
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { simd: ON,  tests: ON,  benchmarks: ON,  build_type: Release }
+          - { simd: ON,  tests: ON,  benchmarks: OFF, build_type: Debug }
+          - { simd: OFF, tests: ON,  benchmarks: OFF, build_type: Release }
+          - { simd: ON,  tests: OFF, benchmarks: ON,  build_type: Release }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            liblz4-dev \
+            libzstd-dev \
+            zlib1g-dev \
+            libgtest-dev \
+            libbenchmark-dev
+
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} \
+            -DDIAGON_BUILD_TESTS=${{ matrix.config.tests }} \
+            -DDIAGON_BUILD_BENCHMARKS=${{ matrix.config.benchmarks }} \
+            -DDIAGON_ENABLE_SIMD=${{ matrix.config.simd }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        if: matrix.config.tests == 'ON'
+        working-directory: build
+        run: ctest --output-on-failure --parallel 4
