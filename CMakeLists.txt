@@ -60,6 +60,12 @@ if(DIAGON_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
+# ==================== Benchmarks ====================
+
+if(DIAGON_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
+endif()
+
 # ==================== Installation ====================
 
 include(GNUInstallDirs)

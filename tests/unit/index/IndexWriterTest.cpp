@@ -3,6 +3,8 @@
 
 #include "diagon/index/IndexWriter.h"
 #include "diagon/store/FSDirectory.h"
+#include "diagon/document/Document.h"
+#include "diagon/document/Field.h"
 
 #include <gtest/gtest.h>
 #include <filesystem>
@@ -12,6 +14,7 @@
 using namespace diagon;
 using namespace diagon::index;
 using namespace diagon::store;
+using namespace diagon::document;
 
 class IndexWriterTest : public ::testing::Test {
 protected:
@@ -28,6 +31,13 @@ protected:
 
     std::filesystem::path test_dir;
     std::unique_ptr<FSDirectory> dir;
+
+    // Helper to create a simple document
+    Document createDocument(const std::string& content) {
+        Document doc;
+        doc.add(std::make_unique<TextField>("body", content, TextField::TYPE_STORED));
+        return doc;
+    }
 };
 
 // ==================== IndexWriterConfig Tests ====================
@@ -192,7 +202,8 @@ TEST_F(IndexWriterTest, OperationsAfterCloseThrow) {
 
     writer->close();
 
-    EXPECT_THROW(writer->addDocument(), AlreadyClosedException);
+    Document doc = createDocument("test");
+    EXPECT_THROW(writer->addDocument(doc), AlreadyClosedException);
     EXPECT_THROW(writer->updateDocument(), AlreadyClosedException);
     EXPECT_THROW(writer->deleteDocuments(), AlreadyClosedException);
     EXPECT_THROW(writer->commit(), AlreadyClosedException);
@@ -215,11 +226,13 @@ TEST_F(IndexWriterTest, AddDocumentIncrementsSequenceNumber) {
     IndexWriterConfig config;
     auto writer = std::make_unique<IndexWriter>(*dir, config);
 
-    int64_t seqNo1 = writer->addDocument();
+    Document doc1 = createDocument("test1");
+    int64_t seqNo1 = writer->addDocument(doc1);
     EXPECT_EQ(1, seqNo1);
     EXPECT_EQ(2, writer->getSequenceNumber());
 
-    int64_t seqNo2 = writer->addDocument();
+    Document doc2 = createDocument("test2");
+    int64_t seqNo2 = writer->addDocument(doc2);
     EXPECT_EQ(2, seqNo2);
     EXPECT_EQ(3, writer->getSequenceNumber());
 }
@@ -256,11 +269,13 @@ TEST_F(IndexWriterTest, SequenceNumbersAreMonotonic) {
     auto writer = std::make_unique<IndexWriter>(*dir, config);
 
     std::vector<int64_t> seqNos;
-    seqNos.push_back(writer->addDocument());
+    Document doc1 = createDocument("test1");
+    seqNos.push_back(writer->addDocument(doc1));
     seqNos.push_back(writer->updateDocument());
     seqNos.push_back(writer->deleteDocuments());
     seqNos.push_back(writer->commit());
-    seqNos.push_back(writer->addDocument());
+    Document doc2 = createDocument("test2");
+    seqNos.push_back(writer->addDocument(doc2));
 
     // Check all sequence numbers are unique and increasing
     for (size_t i = 1; i < seqNos.size(); i++) {
@@ -362,7 +377,9 @@ TEST_F(IndexWriterTest, ConcurrentAddDocument) {
     for (int t = 0; t < numThreads; t++) {
         threads.emplace_back([&writer, &seqNos, t, opsPerThread]() {
             for (int i = 0; i < opsPerThread; i++) {
-                seqNos[t * opsPerThread + i] = writer->addDocument();
+                Document doc;
+                doc.add(std::make_unique<TextField>("body", "test", TextField::TYPE_STORED));
+                seqNos[t * opsPerThread + i] = writer->addDocument(doc);
             }
         });
     }
@@ -438,7 +455,9 @@ TEST_F(IndexWriterTest, DestructorWithCommitOnClose) {
 
     {
         auto writer = std::make_unique<IndexWriter>(*dir, config);
-        writer->addDocument();
+        Document doc = Document();
+        doc.add(std::make_unique<TextField>("body", "test", TextField::TYPE_STORED));
+        writer->addDocument(doc);
         // Destructor should commit
     }
 
@@ -454,7 +473,9 @@ TEST_F(IndexWriterTest, DestructorWithoutCommitOnClose) {
 
     {
         auto writer = std::make_unique<IndexWriter>(*dir, config);
-        writer->addDocument();
+        Document doc = Document();
+        doc.add(std::make_unique<TextField>("body", "test", TextField::TYPE_STORED));
+        writer->addDocument(doc);
         // Destructor should not commit
     }
 
@@ -472,7 +493,9 @@ TEST_F(IndexWriterTest, HighSequenceNumbers) {
 
     // Generate many sequence numbers
     for (int i = 0; i < 10000; i++) {
-        writer->addDocument();
+        Document doc = Document();
+        doc.add(std::make_unique<TextField>("body", "test", TextField::TYPE_STORED));
+        writer->addDocument(doc);
     }
 
     EXPECT_GT(writer->getSequenceNumber(), 10000);
@@ -482,7 +505,9 @@ TEST_F(IndexWriterTest, ReopenAfterClose) {
     IndexWriterConfig config;
 
     auto writer1 = std::make_unique<IndexWriter>(*dir, config);
-    writer1->addDocument();
+    Document doc = Document();
+    doc.add(std::make_unique<TextField>("body", "test", TextField::TYPE_STORED));
+    writer1->addDocument(doc);
     writer1->close();
 
     // Reopen

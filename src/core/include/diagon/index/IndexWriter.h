@@ -8,6 +8,9 @@
 #include <mutex>
 #include <string>
 
+#include "diagon/document/Document.h"
+#include "diagon/index/DocumentsWriter.h"
+#include "diagon/index/SegmentInfo.h"
 #include "diagon/store/Directory.h"
 #include "diagon/store/Lock.h"
 #include "diagon/util/Exceptions.h"
@@ -18,7 +21,6 @@ namespace index {
 using namespace diagon::store;
 
 // Forward declarations (to be implemented in future tasks)
-class Document;
 class Term;
 class Query;
 
@@ -158,21 +160,19 @@ public:
     IndexWriter& operator=(IndexWriter&&) = delete;
 
     // ==================== Document Operations ====================
-    // NOTE: Stub implementations - full functionality requires Codec architecture
 
     /**
      * Add a document
+     * @param doc Document to add
      * @return sequence number (transient, for ordering)
-     *
-     * NOTE: Stub implementation - returns sequence number but does not persist document
      */
-    int64_t addDocument();
+    int64_t addDocument(const document::Document& doc);
 
     /**
      * Update document (delete by term, then add)
      * @return sequence number
      *
-     * NOTE: Stub implementation - returns sequence number but does not perform update
+     * NOTE: Stub implementation - delete functionality not yet implemented
      */
     int64_t updateDocument();
 
@@ -180,7 +180,7 @@ public:
      * Delete documents
      * @return sequence number
      *
-     * NOTE: Stub implementation - returns sequence number but does not perform deletion
+     * NOTE: Stub implementation - delete functionality not yet implemented
      */
     int64_t deleteDocuments();
 
@@ -188,16 +188,14 @@ public:
 
     /**
      * Commit changes (flush + sync)
+     * Writes segments_N file to disk
      * @return sequence number
-     *
-     * NOTE: Stub implementation - acquires commit lock and updates sequence
      */
     int64_t commit();
 
     /**
-     * Flush without committing
-     *
-     * NOTE: Stub implementation - placeholder for future implementation
+     * Flush pending documents to segments
+     * Does not write segments_N file (use commit for that)
      */
     void flush();
 
@@ -237,6 +235,23 @@ public:
         return nextSeqNo_.load(std::memory_order_relaxed);
     }
 
+    /**
+     * Get number of documents in RAM buffer
+     */
+    int getNumDocsInRAM() const;
+
+    /**
+     * Get total number of documents added
+     */
+    int getNumDocsAdded() const;
+
+    /**
+     * Get segment infos (for testing)
+     */
+    const SegmentInfos& getSegmentInfos() const {
+        return segmentInfos_;
+    }
+
     // ==================== Lifecycle ====================
 
     /**
@@ -257,6 +272,10 @@ private:
     IndexWriterConfig config_;
     std::unique_ptr<Lock> writeLock_;
 
+    // Indexing pipeline
+    std::unique_ptr<DocumentsWriter> documentsWriter_;
+    SegmentInfos segmentInfos_;
+
     // Sequence numbers
     std::atomic<int64_t> nextSeqNo_{1};
 
@@ -268,6 +287,8 @@ private:
     // Helper methods
     void ensureOpen() const;
     int64_t nextSequenceNumber();
+    void initializeIndex();
+    void writeSegmentsFile();
 };
 
 }  // namespace index

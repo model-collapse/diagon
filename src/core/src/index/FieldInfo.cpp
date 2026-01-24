@@ -183,17 +183,51 @@ FieldInfo* FieldInfosBuilder::getFieldInfo(const std::string& fieldName) {
 }
 
 void FieldInfosBuilder::updateIndexOptions(const std::string& fieldName, IndexOptions indexOptions) {
-    auto it = byName_.find(fieldName);
-    if (it == byName_.end()) {
-        throw std::invalid_argument("Field not found: " + fieldName);
-    }
+    // Get or create field
+    getOrAdd(fieldName);
 
+    auto it = byName_.find(fieldName);
     FieldInfo& info = it->second;
 
     // Can only upgrade index options, not downgrade
     if (indexOptions > info.indexOptions) {
         info.indexOptions = indexOptions;
     }
+}
+
+void FieldInfosBuilder::updateDocValuesType(const std::string& fieldName, DocValuesType docValuesType) {
+    // Skip NONE
+    if (docValuesType == DocValuesType::NONE) {
+        return;
+    }
+
+    // Get or create field
+    getOrAdd(fieldName);
+
+    auto it = byName_.find(fieldName);
+    FieldInfo& info = it->second;
+
+    // Check for conflicts
+    if (info.docValuesType != DocValuesType::NONE &&
+        info.docValuesType != docValuesType) {
+        throw std::invalid_argument(
+            "Cannot change DocValuesType for field: " + fieldName);
+    }
+
+    info.docValuesType = docValuesType;
+}
+
+int32_t FieldInfosBuilder::getFieldNumber(const std::string& fieldName) const {
+    auto it = byName_.find(fieldName);
+    if (it == byName_.end()) {
+        return -1;
+    }
+    return it->second.number;
+}
+
+void FieldInfosBuilder::reset() {
+    byName_.clear();
+    nextFieldNumber_ = 0;
 }
 
 std::unique_ptr<FieldInfos> FieldInfosBuilder::finish() {

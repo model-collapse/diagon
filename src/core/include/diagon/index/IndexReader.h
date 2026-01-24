@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "diagon/util/Exceptions.h"
+#include "diagon/index/LeafReaderContext.h"
 
 namespace diagon {
 namespace index {
@@ -31,26 +32,6 @@ class Bits;
 class CacheHelper;
 
 // ==================== Context Classes ====================
-
-/**
- * Simple context struct for a LeafReader
- * Contains: reader, docBase, ord
- * Used as value type in leaves() iteration
- *
- * Based on: org.apache.lucene.index.LeafReaderContext
- */
-struct LeafReaderContext {
-    LeafReader* reader_;
-    int docBase_;          // Global doc ID offset
-    int ord_;              // Ordinal in parent
-
-    LeafReaderContext(LeafReader* reader, int docBase = 0, int ord = 0)
-        : reader_(reader), docBase_(docBase), ord_(ord) {}
-
-    LeafReader* reader() const { return reader_; }
-    int docBase() const { return docBase_; }
-    int ord() const { return ord_; }
-};
 
 /**
  * Base context for IndexReader
@@ -350,7 +331,7 @@ public:
     }
 
     std::vector<LeafReaderContext> leaves() const override {
-        return {LeafReaderContext(const_cast<LeafReader*>(this))};
+        return {LeafReaderContext(const_cast<LeafReader*>(this), 0, 0)};
     }
 };
 
@@ -413,8 +394,8 @@ public:
         for (const auto& sub : getSequentialSubReaders()) {
             for (const auto& ctx : sub->leaves()) {
                 result.push_back(LeafReaderContext(
-                    ctx.reader(),
-                    docBase + ctx.docBase(),
+                    ctx.reader,
+                    docBase + ctx.docBase,
                     leafOrd++
                 ));
             }

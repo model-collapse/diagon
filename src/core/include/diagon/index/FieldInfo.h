@@ -356,6 +356,29 @@ public:
     void updateIndexOptions(const std::string& fieldName, IndexOptions indexOptions);
 
     /**
+     * Update field doc values type
+     * Creates field if it doesn't exist
+     */
+    void updateDocValuesType(const std::string& fieldName, DocValuesType docValuesType);
+
+    /**
+     * Get field number (returns -1 if not found)
+     */
+    int32_t getFieldNumber(const std::string& fieldName) const;
+
+    /**
+     * Get field count
+     */
+    int32_t getFieldCount() const {
+        return static_cast<int32_t>(byName_.size());
+    }
+
+    /**
+     * Reset for reuse
+     */
+    void reset();
+
+    /**
      * Build final FieldInfos
      */
     std::unique_ptr<FieldInfos> finish();

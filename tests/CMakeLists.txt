@@ -33,10 +33,15 @@ endfunction()
 
 # ==================== Unit Tests ====================
 
+# Document tests
+add_diagon_test(DocumentTest unit/document/DocumentTest.cpp)
+
 # Util tests
 add_diagon_test(BytesRefTest unit/util/BytesRefTest.cpp)
 add_diagon_test(BitSetTest unit/util/BitSetTest.cpp)
 add_diagon_test(NumericUtilsTest unit/util/NumericUtilsTest.cpp)
+add_diagon_test(FSTTest unit/util/FSTTest.cpp)
+add_diagon_test(BlockPoolTest unit/util/BlockPoolTest.cpp)
 
 # Store tests
 add_diagon_test(IOContextTest unit/store/IOContextTest.cpp)
@@ -47,11 +52,20 @@ add_diagon_test(FSDirectoryTest unit/store/FSDirectoryTest.cpp)
 add_diagon_test(FieldInfoTest unit/index/FieldInfoTest.cpp)
 add_diagon_test(IndexReaderTest unit/index/IndexReaderTest.cpp)
 add_diagon_test(IndexWriterTest unit/index/IndexWriterTest.cpp)
+add_diagon_test(IndexWriterIntegrationTest unit/index/IndexWriterIntegrationTest.cpp)
 add_diagon_test(MergeTest unit/index/MergeTest.cpp)
 add_diagon_test(SkipIndexTest unit/index/SkipIndexTest.cpp)
+add_diagon_test(FreqProxTermsWriterTest unit/index/FreqProxTermsWriterTest.cpp)
+add_diagon_test(DocumentsWriterPerThreadTest unit/index/DocumentsWriterPerThreadTest.cpp)
+add_diagon_test(DocumentsWriterTest unit/index/DocumentsWriterTest.cpp)
+add_diagon_test(SegmentInfoTest unit/index/SegmentInfoTest.cpp)
+add_diagon_test(SegmentFlushTest unit/index/SegmentFlushTest.cpp)
 
 # Codec tests
 add_diagon_test(CodecTest unit/codecs/CodecTest.cpp)
+add_diagon_test(PostingsWriterTest unit/codecs/PostingsWriterTest.cpp)
+add_diagon_test(PostingsReaderTest unit/codecs/PostingsReaderTest.cpp)
+add_diagon_test(BlockTreeTest unit/codecs/BlockTreeTest.cpp)
 
 # Column tests
 add_diagon_test(ColumnTest unit/columns/ColumnTest.cpp)
@@ -67,6 +81,12 @@ add_diagon_test(GranularityTest unit/granularity/GranularityTest.cpp)
 
 # Search tests
 add_diagon_test(SearchTest unit/search/SearchTest.cpp)
+add_diagon_test(TopScoreDocCollectorTest unit/search/TopScoreDocCollectorTest.cpp)
+
+# TopScoreDocCollectorTest needs proper NaN handling, disable -ffast-math
+if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
+    target_compile_options(TopScoreDocCollectorTest PRIVATE -fno-fast-math)
+endif()
 
 # Filter tests
 add_diagon_test(FilterTest unit/search/FilterTest.cpp)
@@ -80,4 +100,15 @@ add_diagon_test(SIMDStorageTest unit/simd/SIMDStorageTest.cpp)
 # Observability tests
 add_diagon_test(ObservabilityTest unit/observability/ObservabilityTest.cpp)
 
+# Util tests
+add_diagon_test(VByteTest unit/util/VByteTest.cpp)
+
 message(STATUS "Diagon Tests configured")
+add_diagon_test(DirectWriterTest unit/util/packed/DirectWriterTest.cpp)
+
+## Phase 4 tests
+add_diagon_test(SegmentInfosReadTest unit/index/SegmentInfosReadTest.cpp)
+add_diagon_test(SimpleFieldsProducerTest unit/codecs/SimpleFieldsProducerTest.cpp)
+add_diagon_test(SegmentReaderTest unit/index/SegmentReaderTest.cpp)
+add_diagon_test(DirectoryReaderTest unit/index/DirectoryReaderTest.cpp)
+add_diagon_test(IndexSearcherTest unit/search/IndexSearcherTest.cpp)
