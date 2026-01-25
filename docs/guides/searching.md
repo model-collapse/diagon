@@ -808,5 +808,5 @@ std::cout << explanation->toString() << "\n";
 - [Quick Start Guide](quick-start.md)
 - [Indexing Guide](indexing.md)
 - [Performance Guide](performance.md)
-- [Search API Reference](../api/search.md)
-- [Core API Reference](../api/core.md)
+- [Search API Reference](../reference/search.md)
+- [Core API Reference](../reference/core.md)

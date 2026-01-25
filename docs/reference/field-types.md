@@ -621,5 +621,5 @@ doc.addField(std::make_unique<ArrayNumericField>(
 - [Array Fields Example](../examples/array-fields-example.cpp) - Comprehensive usage example
 - [Indexing Guide](../guides/indexing.md) - Complete indexing workflow
 - [Searching Guide](../guides/searching.md) - Querying different field types
-- [Core API Reference](../api/core.md) - Complete API documentation
+- [Core API Reference](core.md) - Complete API documentation
 - [Performance Guide](../guides/performance.md) - Field type performance characteristics

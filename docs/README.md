@@ -9,20 +9,18 @@ Welcome to the Diagon Search Engine documentation. This guide will help you unde
 - **[Indexing Guide](guides/indexing.md)** - Learn how to index documents
 - **[Search Guide](guides/searching.md)** - Execute queries and filters
 - **[Performance Guide](guides/performance.md)** - Optimize for speed and efficiency
-- **[Compression Guide](guides/compression.md)** - Understand compression options
 
-### API Documentation
-- **[Core APIs](api/core.md)** - IndexWriter, IndexReader, IndexSearcher
-- **[Search APIs](api/search.md)** - Query execution, Scorer, Weight
-- **[Column Storage](api/columns.md)** - Column-oriented data structures
-- **[Compression](api/compression.md)** - LZ4, ZSTD codecs
-- **[SIMD Optimization](api/simd.md)** - AVX2 accelerated scoring
+### API Reference
+- **[API Reference Index](reference/README.md)** - Complete API documentation
+  - [Core APIs](reference/core.md) - IndexWriter, IndexReader, IndexSearcher
+  - [Field Types](reference/field-types.md) - TextField, StringField, NumericDocValuesField, Array fields
+  - [Compression](reference/compression.md) - LZ4, ZSTD codecs
+  - [SIMD Optimization](reference/simd.md) - AVX2 accelerated scoring
 
 ### Examples
 - **[Basic Indexing](examples/basic-indexing.md)** - Simple indexing examples
 - **[Text Search](examples/text-search.md)** - Full-text search examples
 - **[Hybrid Queries](examples/hybrid-queries.md)** - Combine text and filters
-- **[Advanced Usage](examples/advanced-usage.md)** - Complex scenarios
 
 ### Developer Documentation
 - **[Architecture Overview](../design/00_ARCHITECTURE_OVERVIEW.md)** - System design

@@ -492,4 +492,4 @@ int main() {
 - [Text Search Examples](text-search.md)
 - [Searching Guide](../guides/searching.md)
 - [Performance Guide](../guides/performance.md)
-- [Search API Reference](../api/search.md)
+- [Core API Reference](../reference/core.md)

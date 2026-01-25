@@ -912,4 +912,4 @@ writer->commit();
 - [Quick Start Guide](quick-start.md)
 - [Searching Guide](searching.md)
 - [Performance Guide](performance.md)
-- [Core API Reference](../api/core.md)
+- [Core API Reference](../reference/core.md)

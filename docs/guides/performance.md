@@ -692,6 +692,6 @@ top -p $(pgrep my_search_app)
 ## See Also
 
 - [Quick Start Guide](quick-start.md)
-- [SIMD API Reference](../api/simd.md)
-- [Compression API Reference](../api/compression.md)
+- [SIMD API Reference](../reference/simd.md)
+- [Compression API Reference](../reference/compression.md)
 - [Architecture Overview](../../design/00_ARCHITECTURE_OVERVIEW.md)

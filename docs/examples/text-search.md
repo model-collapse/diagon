@@ -459,4 +459,4 @@ int main() {
 
 - [Searching Guide](../guides/searching.md)
 - [Hybrid Query Examples](hybrid-queries.md)
-- [Search API Reference](../api/search.md)
+- [Core API Reference](../reference/core.md)

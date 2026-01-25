@@ -179,7 +179,7 @@ Diagon supports three field types:
 - **[Indexing Guide](indexing.md)** - Learn about advanced indexing features
 - **[Search Guide](searching.md)** - Explore query types and scoring
 - **[Performance Guide](performance.md)** - Optimize for your use case
-- **[API Documentation](../api/core.md)** - Detailed API reference
+- **[API Documentation](../reference/core.md)** - Detailed API reference
 
 ## Common Issues
 
