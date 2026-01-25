@@ -46,6 +46,11 @@ add_diagon_test(NumericUtilsTest unit/util/NumericUtilsTest.cpp)
 add_diagon_test(FSTTest unit/util/FSTTest.cpp)
 add_diagon_test(BlockPoolTest unit/util/BlockPoolTest.cpp)
 
+# NumericUtilsTest needs proper NaN/Infinity handling, disable -ffast-math
+if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
+    target_compile_options(NumericUtilsTest PRIVATE -fno-fast-math)
+endif()
+
 # Store tests
 add_diagon_test(IOContextTest unit/store/IOContextTest.cpp)
 add_diagon_test(IndexInputOutputTest unit/store/IndexInputOutputTest.cpp)
