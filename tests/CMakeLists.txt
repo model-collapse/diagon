@@ -38,6 +38,7 @@ endfunction()
 
 # Document tests
 add_diagon_test(DocumentTest unit/document/DocumentTest.cpp)
+add_diagon_test(ArrayFieldTest unit/document/ArrayFieldTest.cpp)
 
 # Util tests
 add_diagon_test(BytesRefTest unit/util/BytesRefTest.cpp)
@@ -58,6 +59,7 @@ add_diagon_test(FSDirectoryTest unit/store/FSDirectoryTest.cpp)
 
 # Index tests
 add_diagon_test(FieldInfoTest unit/index/FieldInfoTest.cpp)
+add_diagon_test(IndexMappingTest unit/index/IndexMappingTest.cpp)
 add_diagon_test(IndexReaderTest unit/index/IndexReaderTest.cpp)
 add_diagon_test(IndexWriterTest unit/index/IndexWriterTest.cpp)
 add_diagon_test(IndexWriterIntegrationTest unit/index/IndexWriterIntegrationTest.cpp)

@@ -24,9 +24,11 @@ set(DIAGON_CORE_SOURCES
 
     # Document (User-facing API for documents and fields)
     src/document/Field.cpp
+    src/document/ArrayField.cpp
 
-    # Index (FieldInfo - Module 10, IndexReader/Writer - Module 01)
+    # Index (FieldInfo - Module 10, IndexReader/Writer - Module 01, IndexMapping - Module 15)
     src/index/FieldInfo.cpp
+    src/index/IndexMapping.cpp
     src/index/IndexReader.cpp
     src/index/IndexWriter.cpp
     src/index/FreqProxTermsWriter.cpp
@@ -82,10 +84,12 @@ set(DIAGON_CORE_HEADERS
     # Document
     include/diagon/document/IndexableField.h
     include/diagon/document/Field.h
+    include/diagon/document/ArrayField.h
     include/diagon/document/Document.h
 
     # Index
     include/diagon/index/FieldInfo.h
+    include/diagon/index/IndexMapping.h
     include/diagon/index/IndexReader.h
     include/diagon/index/SegmentWriteState.h
     include/diagon/index/PostingsEnum.h

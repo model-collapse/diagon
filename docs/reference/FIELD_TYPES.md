@@ -4,10 +4,17 @@ Complete reference for supported field types in Diagon.
 
 ## Overview
 
-Diagon provides three main field classes for different use cases:
+Diagon provides field classes for single-valued and multi-valued (array) data:
+
+### Single-Valued Fields
 - **TextField**: Full-text searchable fields (tokenized)
 - **StringField**: Exact-match keyword fields (not tokenized)
 - **NumericDocValuesField**: Numeric values for filtering and sorting
+
+### Multi-Valued (Array) Fields
+- **ArrayTextField**: Multi-valued text fields (tokenized, full-text search)
+- **ArrayStringField**: Multi-valued keywords (exact match, not tokenized)
+- **ArrayNumericField**: Multi-valued numeric values (range queries, sorting)
 
 All fields are based on `IndexableField` with configurable `FieldType` properties.
 
@@ -475,8 +482,143 @@ Document createBlogPost(const BlogPost& post) {
 
 ---
 
+## Multi-Valued (Array) Fields
+
+### ArrayTextField
+
+Multi-valued text field with tokenization and full-text search.
+
+```cpp
+#include <diagon/document/ArrayField.h>
+
+// Create array of text values
+doc.addField(std::make_unique<ArrayTextField>(
+    "tags",
+    std::vector<std::string>{"high performance", "gaming", "portable"},
+    false  // stored
+));
+```
+
+**Characteristics**:
+- Each value tokenized separately
+- Positions continuous across values (phrase queries work)
+- Values NOT deduplicated (bag semantics)
+- Storage: SORTED_SET with positions
+
+### ArrayStringField
+
+Multi-valued keyword field for exact matching.
+
+```cpp
+// Create array of keywords
+doc.addField(std::make_unique<ArrayStringField>(
+    "categories",
+    std::vector<std::string>{"electronics", "computers", "laptops"},
+    true  // stored
+));
+
+// Get sorted, deduplicated values
+auto sorted = field.getSortedUniqueValues();
+```
+
+**Characteristics**:
+- Not tokenized (each value is single term)
+- Values sorted and deduplicated within document
+- Efficient for faceting and filtering
+- Storage: SORTED_SET (ordinal-based)
+
+### ArrayNumericField
+
+Multi-valued numeric field for range queries and aggregations.
+
+```cpp
+// Create array of numeric values
+doc.addField(std::make_unique<ArrayNumericField>(
+    "ratings",
+    std::vector<int64_t>{5, 4, 5, 3, 4}
+));
+
+// Get sorted values (NOT deduplicated)
+auto sorted = field.getSortedValues();
+```
+
+**Characteristics**:
+- Sorted but NOT deduplicated (allows duplicates for aggregations)
+- Stored in column format (not inverted index)
+- Efficient range queries
+- Storage: SORTED_NUMERIC
+
+### Schema Declaration
+
+**IMPORTANT**: Array fields must be explicitly declared in index mapping.
+
+```cpp
+#include <diagon/index/IndexMapping.h>
+
+IndexMapping mapping;
+
+// Single-valued fields
+mapping.addField("title", IndexOptions::DOCS_AND_FREQS_AND_POSITIONS,
+                DocValuesType::NONE, true, true, false);
+
+// Multi-valued (array) fields - EXPLICIT DECLARATION
+mapping.addArrayField("tags", ArrayElementType::TEXT, false);      // Array(Text)
+mapping.addArrayField("categories", ArrayElementType::STRING, true); // Array(String)
+mapping.addArrayField("ratings", ArrayElementType::NUMERIC, false);  // Array(Int64)
+
+// Check if field is multi-valued
+bool isArray = mapping.isMultiValued("tags");  // true
+```
+
+### Array Field Comparison
+
+| Feature | ArrayTextField | ArrayStringField | ArrayNumericField |
+|---------|----------------|------------------|-------------------|
+| **Tokenized** | ✅ Yes | ❌ No | ❌ No |
+| **Deduplication** | ❌ No (bag) | ✅ Yes (set) | ❌ No |
+| **Sorted** | ❌ No | ✅ Yes | ✅ Yes |
+| **Phrase queries** | ✅ Yes | ❌ No | ❌ No |
+| **Range queries** | ❌ No | ❌ No | ✅ Yes |
+| **Storage** | SORTED_SET | SORTED_SET | SORTED_NUMERIC |
+| **Use case** | Tags, keywords | Categories, facets | Ratings, prices |
+
+### Example Usage
+
+See [Array Fields Example](../examples/array-fields-example.cpp) for complete usage.
+
+```cpp
+// E-commerce product with arrays
+Document doc;
+
+// Single-valued
+doc.addField(std::make_unique<TextField>("title", "Gaming Laptop", true));
+doc.addField(std::make_unique<NumericDocValuesField>("price", 149999));
+
+// Multi-valued arrays
+doc.addField(std::make_unique<ArrayStringField>(
+    "categories",
+    std::vector<std::string>{"electronics", "computers", "laptops"},
+    true
+));
+
+doc.addField(std::make_unique<ArrayTextField>(
+    "tags",
+    std::vector<std::string>{"high performance", "gaming"},
+    false
+));
+
+doc.addField(std::make_unique<ArrayNumericField>(
+    "ratings",
+    std::vector<int64_t>{5, 5, 4, 5, 3}
+));
+```
+
+---
+
 ## See Also
 
+- [Multi-Valued Fields Design](../../design/15_MULTI_VALUED_FIELDS.md) - Complete design specification
+- [Array Fields Example](../examples/array-fields-example.cpp) - Comprehensive usage example
 - [Indexing Guide](../guides/indexing.md) - Complete indexing workflow
 - [Searching Guide](../guides/searching.md) - Querying different field types
 - [Core API Reference](../api/core.md) - Complete API documentation

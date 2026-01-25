@@ -143,6 +143,10 @@ struct FieldInfo {
     DocValuesSkipIndexType docValuesSkipIndex{DocValuesSkipIndexType::NONE};  // Skip index type
     int64_t dvGen{-1};  // Doc values generation (-1 if none)
 
+    // ==================== Multi-Valued Configuration ====================
+
+    bool multiValued{false};  // True if field can contain multiple values (array)
+
     // ==================== Point Values (Spatial/Numeric) ====================
 
     int32_t pointDimensionCount{0};       // Number of dimensions (0 if none)
@@ -204,6 +208,11 @@ struct FieldInfo {
      * Does this field have point values?
      */
     bool hasPointValues() const { return pointDimensionCount > 0; }
+
+    /**
+     * Is this field multi-valued (array)?
+     */
+    bool isMultiValued() const { return multiValued; }
 
     /**
      * Get attribute value
