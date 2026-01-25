@@ -72,6 +72,14 @@ FST::Output FST::getLongestPrefixMatch(const BytesRef& input, int& prefixLen) co
     return lastFinalOutput;
 }
 
+FST::Node::~Node() {
+    // Recursively delete all child nodes
+    for (Arc& arc : arcs) {
+        delete arc.target;
+        arc.target = nullptr;
+    }
+}
+
 const FST::Arc* FST::Node::findArc(uint8_t label) const {
     // Binary search for arc with matching label
     auto it = std::lower_bound(arcs.begin(), arcs.end(), label,
@@ -98,16 +106,7 @@ FST::Builder::~Builder() {
 }
 
 void FST::Builder::deleteNodeRecursive(Node* node) {
-    if (node == nullptr) {
-        return;
-    }
-
-    // Recursively delete all children
-    for (Arc& arc : node->arcs) {
-        deleteNodeRecursive(arc.target);
-    }
-
-    // Delete this node
+    // Node destructor now handles recursive deletion of children
     delete node;
 }
 

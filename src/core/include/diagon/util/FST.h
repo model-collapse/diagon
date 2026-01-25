@@ -62,6 +62,11 @@ public:
         bool isFinal = false;
 
         /**
+         * Destructor - recursively deletes all child nodes.
+         */
+        ~Node();
+
+        /**
          * Find arc with given label.
          */
         const Arc* findArc(uint8_t label) const;
