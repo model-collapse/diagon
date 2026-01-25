@@ -89,6 +89,28 @@ FST::Builder::Builder()
     : root_(new Node())
     , finished_(false) {}
 
+FST::Builder::~Builder() {
+    // Clean up tree if not transferred to FST via finish()
+    if (root_ != nullptr) {
+        deleteNodeRecursive(root_);
+        root_ = nullptr;
+    }
+}
+
+void FST::Builder::deleteNodeRecursive(Node* node) {
+    if (node == nullptr) {
+        return;
+    }
+
+    // Recursively delete all children
+    for (Arc& arc : node->arcs) {
+        deleteNodeRecursive(arc.target);
+    }
+
+    // Delete this node
+    delete node;
+}
+
 void FST::Builder::add(const BytesRef& input, Output output) {
     if (finished_) {
         throw std::runtime_error("FST already finished");

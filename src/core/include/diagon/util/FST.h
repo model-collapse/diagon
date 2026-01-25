@@ -111,6 +111,17 @@ public:
         Builder();
 
         /**
+         * Destructor - cleans up any nodes not transferred to FST.
+         */
+        ~Builder();
+
+        // Disable copy/move
+        Builder(const Builder&) = delete;
+        Builder& operator=(const Builder&) = delete;
+        Builder(Builder&&) = delete;
+        Builder& operator=(Builder&&) = delete;
+
+        /**
          * Add input → output mapping.
          * Inputs must be added in sorted order.
          *
@@ -133,6 +144,11 @@ public:
         bool finished_;
 
         Node* addNode();
+
+        /**
+         * Recursively delete node and all its children.
+         */
+        void deleteNodeRecursive(Node* node);
     };
 
     /**
