@@ -8,12 +8,9 @@
 namespace diagon {
 namespace index {
 
-void IndexMapping::addField(const std::string& name,
-                           IndexOptions indexOptions,
-                           DocValuesType docValuesType,
-                           bool stored,
-                           bool tokenized,
-                           bool omitNorms) {
+void IndexMapping::addField(const std::string& name, IndexOptions indexOptions,
+                            DocValuesType docValuesType, bool stored, bool tokenized,
+                            bool omitNorms) {
     if (fields_.find(name) != fields_.end()) {
         throw std::invalid_argument("Field '" + name + "' already exists in mapping");
     }
@@ -31,8 +28,7 @@ void IndexMapping::addField(const std::string& name,
     fields_[name] = std::move(mapping);
 }
 
-void IndexMapping::addArrayField(const std::string& name,
-                                 ArrayElementType elementType,
+void IndexMapping::addArrayField(const std::string& name, ArrayElementType elementType,
                                  bool stored) {
     if (fields_.find(name) != fields_.end()) {
         throw std::invalid_argument("Field '" + name + "' already exists in mapping");
@@ -47,26 +43,26 @@ void IndexMapping::addArrayField(const std::string& name,
     // Configure based on element type
     // Note: stored flag is tracked in FieldType at document level, not in schema
     switch (elementType) {
-    case ArrayElementType::TEXT:
-        // ArrayTextField: tokenized, full-text search
-        mapping.info.indexOptions = IndexOptions::DOCS_AND_FREQS_AND_POSITIONS;
-        mapping.info.docValuesType = DocValuesType::SORTED_SET;
-        mapping.info.omitNorms = false;
-        break;
+        case ArrayElementType::TEXT:
+            // ArrayTextField: tokenized, full-text search
+            mapping.info.indexOptions = IndexOptions::DOCS_AND_FREQS_AND_POSITIONS;
+            mapping.info.docValuesType = DocValuesType::SORTED_SET;
+            mapping.info.omitNorms = false;
+            break;
 
-    case ArrayElementType::STRING:
-        // ArrayStringField: exact match, not tokenized
-        mapping.info.indexOptions = IndexOptions::DOCS;
-        mapping.info.docValuesType = DocValuesType::SORTED_SET;
-        mapping.info.omitNorms = true;
-        break;
+        case ArrayElementType::STRING:
+            // ArrayStringField: exact match, not tokenized
+            mapping.info.indexOptions = IndexOptions::DOCS;
+            mapping.info.docValuesType = DocValuesType::SORTED_SET;
+            mapping.info.omitNorms = true;
+            break;
 
-    case ArrayElementType::NUMERIC:
-        // ArrayNumericField: numeric values only
-        mapping.info.indexOptions = IndexOptions::NONE;
-        mapping.info.docValuesType = DocValuesType::SORTED_NUMERIC;
-        mapping.info.omitNorms = true;
-        break;
+        case ArrayElementType::NUMERIC:
+            // ArrayNumericField: numeric values only
+            mapping.info.indexOptions = IndexOptions::NONE;
+            mapping.info.docValuesType = DocValuesType::SORTED_NUMERIC;
+            mapping.info.omitNorms = true;
+            break;
     }
 
     fields_[name] = std::move(mapping);

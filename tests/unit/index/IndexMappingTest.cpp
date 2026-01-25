@@ -15,8 +15,8 @@ protected:
 // ==================== Single-Valued Fields ====================
 
 TEST_F(IndexMappingTest, AddSingleValuedField) {
-    mapping.addField("title", IndexOptions::DOCS_AND_FREQS_AND_POSITIONS, DocValuesType::NONE,
-                     true, true, false);
+    mapping.addField("title", IndexOptions::DOCS_AND_FREQS_AND_POSITIONS, DocValuesType::NONE, true,
+                     true, false);
 
     EXPECT_TRUE(mapping.hasField("title"));
     EXPECT_FALSE(mapping.isMultiValued("title"));
@@ -43,10 +43,9 @@ TEST_F(IndexMappingTest, AddNumericField) {
 TEST_F(IndexMappingTest, AddDuplicateFieldThrows) {
     mapping.addField("title", IndexOptions::DOCS, DocValuesType::NONE, true, false, false);
 
-    EXPECT_THROW(
-        mapping.addField("title", IndexOptions::DOCS_AND_FREQS, DocValuesType::NONE, false, true,
-                         false),
-        std::invalid_argument);
+    EXPECT_THROW(mapping.addField("title", IndexOptions::DOCS_AND_FREQS, DocValuesType::NONE, false,
+                                  true, false),
+                 std::invalid_argument);
 }
 
 // ==================== Array Fields ====================
@@ -115,8 +114,8 @@ TEST_F(IndexMappingTest, AddDuplicateArrayFieldThrows) {
 // ==================== Mixed Fields ====================
 
 TEST_F(IndexMappingTest, MixedSingleAndArrayFields) {
-    mapping.addField("title", IndexOptions::DOCS_AND_FREQS_AND_POSITIONS, DocValuesType::NONE,
-                     true, true, false);
+    mapping.addField("title", IndexOptions::DOCS_AND_FREQS_AND_POSITIONS, DocValuesType::NONE, true,
+                     true, false);
     mapping.addArrayField("tags", ArrayElementType::TEXT, false);
     mapping.addField("price", IndexOptions::NONE, DocValuesType::NUMERIC, false, false, true);
     mapping.addArrayField("categories", ArrayElementType::STRING, true);

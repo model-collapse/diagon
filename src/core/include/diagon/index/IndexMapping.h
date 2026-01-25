@@ -16,9 +16,9 @@ namespace index {
  * Element type for array fields
  */
 enum class ArrayElementType : uint8_t {
-    TEXT,     // TextField - tokenized, full-text search
-    STRING,   // StringField - exact match, not tokenized
-    NUMERIC   // NumericDocValuesField - numeric values
+    TEXT,    // TextField - tokenized, full-text search
+    STRING,  // StringField - exact match, not tokenized
+    NUMERIC  // NumericDocValuesField - numeric values
 };
 
 /**
@@ -43,12 +43,9 @@ public:
      * @param tokenized Apply tokenization
      * @param omitNorms Omit length normalization
      */
-    void addField(const std::string& name,
-                  IndexOptions indexOptions,
-                  DocValuesType docValuesType = DocValuesType::NONE,
-                  bool stored = false,
-                  bool tokenized = false,
-                  bool omitNorms = false);
+    void addField(const std::string& name, IndexOptions indexOptions,
+                  DocValuesType docValuesType = DocValuesType::NONE, bool stored = false,
+                  bool tokenized = false, bool omitNorms = false);
 
     /**
      * Add multi-valued (array) field
