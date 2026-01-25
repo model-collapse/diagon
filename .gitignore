@@ -167,8 +167,8 @@ doc/latex/
 *.pid.lock
 
 # Core dumps
-core
-core.*
+/core
+/core.*
 
 # ==================== Project-Specific ====================
 
