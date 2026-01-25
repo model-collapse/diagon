@@ -6,6 +6,7 @@
 #include "diagon/storage/LifecyclePolicy.h"
 #include "diagon/storage/StorageTier.h"
 
+#include <algorithm>
 #include <chrono>
 #include <map>
 #include <memory>
