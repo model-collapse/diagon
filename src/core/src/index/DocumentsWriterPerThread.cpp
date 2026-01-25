@@ -106,8 +106,8 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
         segmentInfo->setFieldInfos(std::move(*fieldInfosPtr));
 
         // Create segment write state - reference FieldInfos from SegmentInfo
-        SegmentWriteState state(directory_, segmentName, numDocsInRAM_,
-                                 segmentInfo->fieldInfos(), "");
+        SegmentWriteState state(directory_, segmentName, numDocsInRAM_, segmentInfo->fieldInfos(),
+                                "");
 
         // Create codec consumer
         codecs::SimpleFieldsConsumer consumer(state);
