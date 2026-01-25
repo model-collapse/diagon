@@ -78,7 +78,7 @@ jobs:
 
       - name: Run tests
         working-directory: build
-        run: ctest --output-on-failure --parallel 4
+        run: ctest --output-on-failure -j1
 
       - name: Run benchmarks (Release only)
         if: matrix.build_type == 'Release'
@@ -124,7 +124,7 @@ jobs:
 
       - name: Run tests
         working-directory: build
-        run: ctest --output-on-failure --parallel 4
+        run: ctest --output-on-failure -j1
 
   # ==================== Sanitizers ====================
   sanitizers:
@@ -166,7 +166,7 @@ jobs:
 
       - name: Run tests with sanitizers
         working-directory: build
-        run: ctest --output-on-failure --parallel 4
+        run: ctest --output-on-failure -j1
 
   # ==================== Coverage ====================
   coverage:
