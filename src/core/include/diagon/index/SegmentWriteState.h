@@ -41,7 +41,7 @@ struct SegmentWriteState {
     /**
      * FieldInfos describing all fields in this segment.
      */
-    FieldInfos fieldInfos;
+    const FieldInfos& fieldInfos;
 
     /**
      * Unique suffix for any postings files written for this segment.
@@ -91,7 +91,7 @@ struct SegmentReadState {
     /**
      * FieldInfos describing all fields in this segment.
      */
-    FieldInfos fieldInfos;
+    const FieldInfos& fieldInfos;
 
     /**
      * Unique suffix for any postings files written for this segment.

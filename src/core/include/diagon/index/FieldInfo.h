@@ -234,6 +234,19 @@ public:
      */
     explicit FieldInfos(std::vector<FieldInfo> infos);
 
+    /**
+     * Default constructor for empty FieldInfos
+     */
+    FieldInfos() = default;
+
+    // Delete copy operations (byName_ contains pointers into byNumber_)
+    FieldInfos(const FieldInfos&) = delete;
+    FieldInfos& operator=(const FieldInfos&) = delete;
+
+    // Allow move operations
+    FieldInfos(FieldInfos&&) noexcept = default;
+    FieldInfos& operator=(FieldInfos&&) noexcept = default;
+
     // ==================== Lookup ====================
 
     /**

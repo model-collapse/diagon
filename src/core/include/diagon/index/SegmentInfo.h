@@ -131,7 +131,7 @@ public:
      * Set field infos
      * Phase 4: Allow setting FieldInfos
      */
-    void setFieldInfos(const FieldInfos& fieldInfos) { fieldInfos_ = fieldInfos; }
+    void setFieldInfos(FieldInfos&& fieldInfos) { fieldInfos_ = std::move(fieldInfos); }
 
 private:
     std::string name_;                                // Segment name
