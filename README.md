@@ -102,6 +102,8 @@ See [BUILD.md](BUILD.md) for detailed build instructions.
 ## Usage Example
 
 ```cpp
+#include <diagon/document/Document.h>
+#include <diagon/document/Field.h>
 #include <diagon/index/IndexWriter.h>
 #include <diagon/search/IndexSearcher.h>
 #include <diagon/store/FSDirectory.h>
@@ -110,28 +112,38 @@ using namespace diagon;
 
 int main() {
     // Open directory
-    auto dir = FSDirectory::open("/tmp/index");
+    auto dir = store::FSDirectory::open("/tmp/index");
 
     // Create writer
-    IndexWriterConfig config;
+    index::IndexWriterConfig config;
     config.setRAMBufferSizeMB(256);
-    auto writer = IndexWriter::create(dir.get(), config);
+    auto writer = index::IndexWriter::create(dir.get(), config);
 
-    // Add documents
-    Document doc;
-    doc.addField("title", "Diagon Search Engine", FieldType::TEXT);
-    doc.addField("price", 99.99, FieldType::NUMERIC);
-    doc.addField("category", "software", FieldType::KEYWORD);
+    // Create document with different field types
+    document::Document doc;
+
+    // TextField: Full-text searchable (tokenized)
+    doc.addField(std::make_unique<document::TextField>(
+        "title", "Diagon Search Engine", true));  // stored
+
+    // StringField: Exact-match keyword (not tokenized)
+    doc.addField(std::make_unique<document::StringField>(
+        "category", "software", true));  // stored
+
+    // NumericDocValuesField: Numeric values for filtering/sorting
+    doc.addField(std::make_unique<document::NumericDocValuesField>(
+        "price", 9999));  // $99.99 in cents
+
     writer->addDocument(doc);
     writer->commit();
 
     // Open reader and searcher
-    auto reader = DirectoryReader::open(dir.get());
-    IndexSearcher searcher(reader.get());
+    auto reader = index::DirectoryReader::open(dir.get());
+    search::IndexSearcher searcher(reader.get());
 
-    // Text search with filter
-    auto query = TermQuery::create("title", "search");
-    auto filter = RangeFilter::create("price", 0, 100);
+    // Text search with numeric filter
+    auto query = search::TermQuery::create("title", "search");
+    auto filter = search::RangeFilter::create("price", 0, 10000);  // $0-$100
     auto results = searcher.search(query.get(), filter.get(), 10);
 
     // Process results
@@ -144,6 +156,8 @@ int main() {
 }
 ```
 
+> **Note**: See [Field Types Reference](docs/reference/FIELD_TYPES.md) for complete documentation on TextField, StringField, and NumericDocValuesField.
+
 ## Documentation
 
 Comprehensive documentation is available in the `docs/` directory:
@@ -155,6 +169,7 @@ Comprehensive documentation is available in the `docs/` directory:
 - **[Performance Guide](docs/guides/performance.md)** - Optimize for speed and efficiency
 
 ### API Reference
+- **[Field Types Reference](docs/reference/FIELD_TYPES.md)** - Complete guide to TextField, StringField, NumericDocValuesField
 - **[Core APIs](docs/api/core.md)** - IndexWriter, IndexReader, IndexSearcher
 - **[SIMD APIs](docs/api/simd.md)** - AVX2 accelerated BM25 scoring
 - **[Compression APIs](docs/api/compression.md)** - LZ4 and ZSTD codecs
