@@ -1,5 +1,7 @@
 # Diagon Documentation
 
+> **DIAGON**: **D**iverse **I**ndex **A**rchitecture for **G**ranular **O**LAP **a**nd **N**atural language search
+
 Welcome to the Diagon Search Engine documentation. This guide will help you understand, build, and use Diagon in your projects.
 
 ## Documentation Structure

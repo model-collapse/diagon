@@ -5,7 +5,11 @@
 [![C++](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
 [![codecov](https://codecov.io/gh/model-collapse/diagon/branch/main/graph/badge.svg)](https://codecov.io/gh/model-collapse/diagon)
 
+> **DIAGON**: **D**iverse **I**ndex **A**rchitecture for **G**ranular **O**LAP **a**nd **N**atural language search
+
 **Diagon** is a high-performance C++ search engine combining Apache Lucene's inverted index architecture with ClickHouse's columnar storage for hybrid text search and analytical queries.
+
+Just like Diagon Alley serves diverse needs of wizards with specialized shops, DIAGON serves diverse query needs with specialized indexes: structured analytics (Granular OLAP) and unstructured exploration (Natural language search).
 
 ## Features
 
@@ -156,7 +160,7 @@ int main() {
 }
 ```
 
-> **Note**: See [Field Types Reference](docs/reference/FIELD_TYPES.md) for complete documentation on TextField, StringField, and NumericDocValuesField.
+> **Note**: See [Field Types Reference](docs/reference/field-types.md) for complete documentation on TextField, StringField, and NumericDocValuesField.
 
 ## Documentation
 
@@ -169,10 +173,10 @@ Comprehensive documentation is available in the `docs/` directory:
 - **[Performance Guide](docs/guides/performance.md)** - Optimize for speed and efficiency
 
 ### API Reference
-- **[Field Types Reference](docs/reference/FIELD_TYPES.md)** - Complete guide to TextField, StringField, NumericDocValuesField
-- **[Core APIs](docs/api/core.md)** - IndexWriter, IndexReader, IndexSearcher
-- **[SIMD APIs](docs/api/simd.md)** - AVX2 accelerated BM25 scoring
-- **[Compression APIs](docs/api/compression.md)** - LZ4 and ZSTD codecs
+- **[Field Types Reference](docs/reference/field-types.md)** - Complete guide to TextField, StringField, NumericDocValuesField, Array fields
+- **[Core APIs](docs/reference/core.md)** - IndexWriter, IndexReader, IndexSearcher
+- **[SIMD APIs](docs/reference/simd.md)** - AVX2 accelerated BM25 scoring
+- **[Compression APIs](docs/reference/compression.md)** - LZ4 and ZSTD codecs
 
 ### Examples
 - **[Basic Indexing](docs/examples/basic-indexing.md)** - Indexing documents from various sources

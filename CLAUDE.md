@@ -4,11 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Purpose
 
-This is a **design and implementation workspace** for Lucene++, a C++ search engine library combining:
+This is a **design and implementation workspace** for **DIAGON** (**D**iverse **I**ndex **A**rchitecture for **G**ranular **O**LAP **a**nd **N**atural language search), a C++ search engine library combining:
 - **Apache Lucene**: Inverted index architecture for full-text search
 - **ClickHouse**: Columnar storage with granule-based indexing for OLAP workloads
 
 The goal is to create a production-grade hybrid search engine with both text search and analytical query capabilities.
+
+Just like Diagon Alley serves diverse needs of wizards with specialized shops, DIAGON serves diverse query needs with specialized indexes: structured analytics (Granular OLAP) and unstructured exploration (Natural language search).
 
 ## Project Structure
 
@@ -155,7 +157,7 @@ When implementation begins:
 
 ## Comparison with Related Systems
 
-| Feature | Lucene++ | Apache Lucene | ClickHouse |
+| Feature | DIAGON | Apache Lucene | ClickHouse |
 |---------|----------|---------------|------------|
 | Language | C++ | Java | C++ |
 | Inverted Index | ✓ | ✓ | ✗ |
@@ -225,4 +227,4 @@ When extending the design:
 2. **Don't invent**: Copy proven patterns from production systems
 3. **Hybrid carefully**: When combining Lucene + ClickHouse concepts, document why
 4. **Performance first**: Both source systems are highly optimized, learn from them
-5. **Test against source**: Lucene++ should match or exceed source system performance
+5. **Test against source**: DIAGON should match or exceed source system performance
