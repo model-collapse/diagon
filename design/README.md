@@ -29,10 +29,10 @@ This document clarifies the fundamental architectural difference between:
 
 ## Documentation Status
 
-**Progress**: 14/14 core modules complete (100%) ✅
+**Progress**: 15/15 core modules complete (100%) ✅
 **Quality**: Production-grade, based on actual Lucene & ClickHouse codebases + cutting-edge research
 
-### ✅ Complete Designs (14 modules)
+### ✅ Complete Designs (15 modules)
 
 #### [00_ARCHITECTURE_OVERVIEW.md](./00_ARCHITECTURE_OVERVIEW.md)
 **System architecture and module organization**
@@ -257,6 +257,27 @@ This document clarifies the fundamental architectural difference between:
 - **Dynamic selection**: Choose strategy based on estimated selectivity and query complexity
 - **See**: [RESEARCH_SIMD_FILTER_STRATEGIES.md](./RESEARCH_SIMD_FILTER_STRATEGIES.md) for detailed cost model
 
+#### [15_MULTI_VALUED_FIELDS.md](./15_MULTI_VALUED_FIELDS.md) ✨ **NEW**
+**Multi-valued (array) field support with explicit schema**
+- Explicit array type declaration: `Array(TextField)`, `Array(StringField)`, `Array(NumericDocValues)`
+- IndexMapping API for schema definition
+- Three array field classes: ArrayTextField, ArrayStringField, ArrayNumericField
+- Hybrid storage: Lucene SORTED_SET/SORTED_NUMERIC + ClickHouse two-component arrays
+- Sorted and deduplicated values within documents
+- Array-specific queries: ArrayContainsAll, ArrayContainsAny, ArraySize
+- Flat storage format with offset tables
+- Multi-stream serialization for nested types
+
+**Based on**:
+- Lucene SORTED_SET/SORTED_NUMERIC DocValues
+- ClickHouse Array(T) parametric types and ColumnArray storage
+
+**Key Features**:
+- Type safety: Element types validated at index time
+- Efficient storage: Deduplication for strings, sorted values for numerics
+- Rich queries: Contains, size, range queries on array elements
+- Backward compatible: Single-valued fields continue to work
+
 ---
 
 ## Code References
@@ -355,7 +376,7 @@ Key concepts:
 
 ### Design Phase ✅ COMPLETE
 
-All 14 core modules have been designed with production-grade specifications:
+All 15 core modules have been designed with production-grade specifications:
 - ✅ 00_ARCHITECTURE_OVERVIEW.md
 - ✅ 01_INDEX_READER_WRITER.md
 - ✅ 02_CODEC_ARCHITECTURE.md
@@ -370,7 +391,9 @@ All 14 core modules have been designed with production-grade specifications:
 - ✅ 10_FIELD_INFO.md
 - ✅ 11_SKIP_INDEXES.md
 - ✅ 12_STORAGE_TIERS.md
-- ✅ 13_SIMD_POSTINGS_FORMAT.md (NEW - Research-based)
+- ✅ 13_SIMD_POSTINGS_FORMAT.md (Research-based)
+- ✅ 14_UNIFIED_SIMD_STORAGE.md (Unified SIMD architecture)
+- ✅ 15_MULTI_VALUED_FIELDS.md (NEW - Array field support)
 
 ### Implementation Phase (Next)
 
@@ -467,10 +490,14 @@ For design discussions:
 
 ---
 
-**Last Updated**: 2026-01-23
+**Last Updated**: 2026-01-25
 **Status**: ✅ **Design phase 100% complete - ALL refinements addressed - READY FOR IMPLEMENTATION**
 **Design Refinement**: 13/13 critical items complete (100%)
 **Latest Additions**:
+- ✅ 15_MULTI_VALUED_FIELDS.md - **NEW** Array field support with explicit schema (2026-01-25)
+  - Explicit array type declaration: `Array(TextField)`, `Array(StringField)`, `Array(NumericDocValues)`
+  - Hybrid storage: Lucene SORTED_SET/SORTED_NUMERIC + ClickHouse ColumnArray
+  - Array-specific queries and efficient storage with deduplication
 - ✅ All critical gaps from Principal SDE review addressed (~4,573 lines added)
 - ✅ BUILD_SYSTEM.md - Production CMake build system with cross-platform support
 - ✅ TESTING_STRATEGY.md - Comprehensive testing approach (unit, integration, stress, benchmarks)
