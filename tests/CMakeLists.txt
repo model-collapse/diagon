@@ -45,6 +45,7 @@ add_diagon_test(SparseVectorFieldTest unit/document/SparseVectorFieldTest.cpp)
 add_diagon_test(SparseVectorTest unit/sparse/SparseVectorTest.cpp)
 add_diagon_test(SindiScorerTest unit/sparse/SindiScorerTest.cpp)
 add_diagon_test(SindiIndexTest unit/sparse/SindiIndexTest.cpp)
+add_diagon_test(QBlockIndexTest unit/sparse/QBlockIndexTest.cpp)
 
 # Util tests
 add_diagon_test(BytesRefTest unit/util/BytesRefTest.cpp)

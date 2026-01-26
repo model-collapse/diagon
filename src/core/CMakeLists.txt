@@ -75,6 +75,7 @@ set(DIAGON_CORE_SOURCES
     src/sparse/SparseVector.cpp
     src/sparse/SindiScorer.cpp
     src/sparse/SindiIndex.cpp
+    src/sparse/QBlockIndex.cpp
 )
 
 # Platform-specific mmap implementation
@@ -221,6 +222,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/sparse/SparseVector.h
     include/diagon/sparse/SindiScorer.h
     include/diagon/sparse/SindiIndex.h
+    include/diagon/sparse/QBlockIndex.h
 
     # Storage Tiers
     include/diagon/storage/StorageTier.h
