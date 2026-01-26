@@ -72,6 +72,41 @@ add_diagon_benchmark(ColumnarIngestionBenchmark
     ColumnarIngestionBenchmark.cpp
 )
 
+# ==================== Standalone Benchmarks ====================
+
+# Helper function for standalone benchmarks (no Google Benchmark dependency)
+function(add_standalone_benchmark BENCHMARK_NAME)
+    add_executable(${BENCHMARK_NAME} ${ARGN})
+
+    target_link_libraries(${BENCHMARK_NAME}
+        PRIVATE
+            diagon_core
+    )
+
+    target_include_directories(${BENCHMARK_NAME}
+        PRIVATE
+            ${CMAKE_SOURCE_DIR}/src/core/include
+    )
+
+    # Register as benchmark target
+    add_custom_target(run_${BENCHMARK_NAME}
+        COMMAND ${BENCHMARK_NAME}
+        DEPENDS ${BENCHMARK_NAME}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Running benchmark: ${BENCHMARK_NAME}"
+    )
+endfunction()
+
+# Bloom Filter Benchmark (standalone, uses MSMarco dataset)
+add_standalone_benchmark(BloomFilterBenchmark
+    BloomFilterBenchmark.cpp
+)
+
+# Block-Max Quantized Index Benchmark (standalone, uses MSMarco dataset)
+add_standalone_benchmark(BlockMaxQuantizedIndexBenchmark
+    BlockMaxQuantizedIndexBenchmark.cpp
+)
+
 # ==================== Combined Benchmark Target ====================
 
 add_custom_target(run_all_benchmarks
