@@ -8,6 +8,7 @@
 #include <cmath>
 #include <iostream>
 #include <numeric>
+#include <stdexcept>
 #include <unordered_map>
 
 namespace diagon {
@@ -366,6 +367,30 @@ size_t BlockMaxQuantizedIndex::memoryUsageBytes() const {
     }
 
     return total;
+}
+
+const SparseDoc& BlockMaxQuantizedIndex::getDocument(doc_id_t doc_id) const {
+    if (doc_id >= forward_index_.size()) {
+        throw std::out_of_range("Document ID " + std::to_string(doc_id) +
+                                " is out of range (max: " + std::to_string(forward_index_.size() - 1) + ")");
+    }
+    return forward_index_[doc_id];
+}
+
+std::vector<SparseDoc> BlockMaxQuantizedIndex::getDocuments(const std::vector<doc_id_t>& doc_ids) const {
+    std::vector<SparseDoc> result;
+    result.reserve(doc_ids.size());
+
+    for (doc_id_t doc_id : doc_ids) {
+        if (doc_id < forward_index_.size()) {
+            result.push_back(forward_index_[doc_id]);
+        } else {
+            // Return empty document for invalid IDs (or could throw exception)
+            result.push_back(SparseDoc());
+        }
+    }
+
+    return result;
 }
 
 } // namespace index

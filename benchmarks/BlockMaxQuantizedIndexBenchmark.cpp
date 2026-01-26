@@ -209,6 +209,11 @@ double calculateRecall(const std::vector<doc_id_t>& results,
     return static_cast<double>(hits) / std::min(k, ground_truth.size());
 }
 
+// Forward declaration
+void testDocumentRetrieval(const BlockMaxQuantizedIndex& index,
+                           const std::vector<SparseDoc>& queries,
+                           const BenchmarkConfig& config);
+
 BenchmarkResults runBenchmark(const BenchmarkConfig& config) {
     BenchmarkResults results;
 
@@ -304,7 +309,87 @@ BenchmarkResults runBenchmark(const BenchmarkConfig& config) {
         std::cout << "  Recall@" << config.top_k << ": " << (qr.recall_at_k * 100.0) << "%" << std::endl;
     }
 
+    // Test document retrieval
+    testDocumentRetrieval(index, queries, config);
+
     return results;
+}
+
+void testDocumentRetrieval(const BlockMaxQuantizedIndex& index,
+                           const std::vector<SparseDoc>& queries,
+                           const BenchmarkConfig& config) {
+    std::cout << "\n========================================" << std::endl;
+    std::cout << "Testing Direct Document Retrieval" << std::endl;
+    std::cout << "========================================" << std::endl;
+
+    // Query to get some document IDs
+    BlockMaxQuantizedIndex::QueryParams query_params;
+    query_params.top_k = 5;
+    query_params.alpha = 0.5f;
+
+    std::cout << "Running sample query to get document IDs..." << std::endl;
+    auto result_ids = const_cast<BlockMaxQuantizedIndex&>(index).query(queries[0], query_params);
+
+    std::cout << "  Found " << result_ids.size() << " results" << std::endl;
+
+    // Test single document retrieval
+    if (!result_ids.empty()) {
+        std::cout << "\nTesting single document retrieval:" << std::endl;
+        doc_id_t first_doc_id = result_ids[0];
+
+        auto start = std::chrono::high_resolution_clock::now();
+        const auto& doc = index.getDocument(first_doc_id);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        double retrieval_time = std::chrono::duration<double, std::micro>(end - start).count();
+
+        std::cout << "  Doc ID: " << first_doc_id << std::endl;
+        std::cout << "  Num terms: " << doc.size() << std::endl;
+        std::cout << "  Retrieval time: " << retrieval_time << " µs" << std::endl;
+
+        // Show first few terms
+        std::cout << "  First 5 terms: ";
+        for (size_t i = 0; i < std::min(size_t(5), doc.size()); ++i) {
+            std::cout << "(" << doc[i].term << "," << doc[i].score << ") ";
+        }
+        std::cout << std::endl;
+    }
+
+    // Test batch document retrieval
+    if (result_ids.size() >= 3) {
+        std::cout << "\nTesting batch document retrieval:" << std::endl;
+        std::vector<doc_id_t> batch_ids(result_ids.begin(), result_ids.begin() + 3);
+
+        auto start = std::chrono::high_resolution_clock::now();
+        auto batch_docs = index.getDocuments(batch_ids);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        double batch_time = std::chrono::duration<double, std::micro>(end - start).count();
+
+        std::cout << "  Batch size: " << batch_ids.size() << std::endl;
+        std::cout << "  Retrieved: " << batch_docs.size() << " documents" << std::endl;
+        std::cout << "  Batch retrieval time: " << batch_time << " µs" << std::endl;
+        std::cout << "  Avg per doc: " << (batch_time / batch_docs.size()) << " µs" << std::endl;
+
+        size_t total_terms = 0;
+        for (const auto& doc : batch_docs) {
+            total_terms += doc.size();
+        }
+        std::cout << "  Total terms retrieved: " << total_terms << std::endl;
+    }
+
+    // Test error handling
+    std::cout << "\nTesting error handling:" << std::endl;
+    try {
+        doc_id_t invalid_id = index.numDocuments() + 1000;
+        std::cout << "  Attempting to retrieve invalid doc ID " << invalid_id << "..." << std::endl;
+        const auto& invalid_doc = index.getDocument(invalid_id);
+        std::cout << "  ERROR: Should have thrown exception!" << std::endl;
+    } catch (const std::out_of_range& e) {
+        std::cout << "  ✓ Correctly threw exception: " << e.what() << std::endl;
+    }
+
+    std::cout << "\n========================================" << std::endl;
 }
 
 void printResults(const BenchmarkResults& results, const BenchmarkConfig& config) {

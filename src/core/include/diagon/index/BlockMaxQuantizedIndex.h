@@ -104,6 +104,18 @@ public:
     size_t numTerms() const { return num_terms_; }
     size_t memoryUsageBytes() const;
 
+    /**
+     * Direct document retrieval
+     * Returns the sparse document by ID (from forward index)
+     */
+    const SparseDoc& getDocument(doc_id_t doc_id) const;
+
+    /**
+     * Batch document retrieval
+     * Returns multiple documents by their IDs
+     */
+    std::vector<SparseDoc> getDocuments(const std::vector<doc_id_t>& doc_ids) const;
+
 private:
     // Configuration
     Config config_;
