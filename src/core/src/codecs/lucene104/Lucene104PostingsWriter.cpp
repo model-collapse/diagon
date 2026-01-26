@@ -161,6 +161,15 @@ int64_t Lucene104PostingsWriter::getFilePointer() const {
     return docOut_ ? docOut_->getFilePointer() : 0;
 }
 
+std::vector<uint8_t> Lucene104PostingsWriter::getBytes() const {
+    // Cast to ByteBuffersIndexOutput to access toArrayCopy()
+    auto* bufOut = dynamic_cast<store::ByteBuffersIndexOutput*>(docOut_.get());
+    if (bufOut) {
+        return bufOut->toArrayCopy();
+    }
+    return std::vector<uint8_t>();
+}
+
 }  // namespace lucene104
 }  // namespace codecs
 }  // namespace diagon

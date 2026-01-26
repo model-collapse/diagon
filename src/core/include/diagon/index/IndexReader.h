@@ -3,7 +3,9 @@
 
 #pragma once
 
+#include "diagon/index/CacheHelper.h"
 #include "diagon/index/LeafReaderContext.h"
+#include "diagon/util/Bits.h"
 #include "diagon/util/Exceptions.h"
 
 #include <atomic>
@@ -12,6 +14,12 @@
 #include <vector>
 
 namespace diagon {
+
+// Forward declaration for codecs
+namespace codecs {
+class StoredFieldsReader;
+}
+
 namespace index {
 
 // Forward declarations
@@ -26,10 +34,7 @@ class BinaryDocValues;
 class SortedDocValues;
 class SortedSetDocValues;
 class SortedNumericDocValues;
-class StoredFieldsReader;
 class PointValues;
-class Bits;
-class CacheHelper;
 
 // ==================== Context Classes ====================
 
@@ -266,7 +271,7 @@ public:
     /**
      * Get stored fields reader
      */
-    virtual StoredFieldsReader* storedFieldsReader() const = 0;
+    virtual codecs::StoredFieldsReader* storedFieldsReader() const = 0;
 
     // ==================== Norms ====================
 
@@ -287,7 +292,7 @@ public:
      * Get live docs (deleted docs bitmap)
      * Returns nullptr if no deletions
      */
-    virtual const Bits* getLiveDocs() const = 0;
+    virtual const util::Bits* getLiveDocs() const = 0;
 
     // ==================== Points (Numeric/Geo Indexes) ====================
 

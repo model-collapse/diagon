@@ -60,9 +60,26 @@ public:
     const std::string& name() const { return name_; }
 
     /**
-     * Get maximum document ID (= document count)
+     * Get maximum document ID (= document count, including deleted)
      */
     int maxDoc() const { return maxDoc_; }
+
+    /**
+     * Get number of deleted documents
+     * Phase 3: Track deletions
+     */
+    int delCount() const { return delCount_; }
+
+    /**
+     * Set number of deleted documents
+     * Phase 3: Track deletions
+     */
+    void setDelCount(int delCount) { delCount_ = delCount; }
+
+    /**
+     * Check if segment has deletions
+     */
+    bool hasDeletions() const { return delCount_ > 0; }
 
     /**
      * Get codec name
@@ -135,7 +152,8 @@ public:
 
 private:
     std::string name_;                                // Segment name
-    int maxDoc_;                                      // Document count
+    int maxDoc_;                                      // Document count (including deleted)
+    int delCount_{0};                                 // Number of deleted documents
     std::string codecName_;                           // Codec name
     std::vector<std::string> files_;                  // Files in segment
     std::map<std::string, std::string> diagnostics_;  // Diagnostics
@@ -271,11 +289,6 @@ public:
      */
     static SegmentInfos readLatestCommit(store::Directory& dir);
 
-private:
-    std::vector<std::shared_ptr<SegmentInfo>> segments_;  // Segment list
-    int64_t generation_{0};                               // Generation counter
-    int64_t version_{0};                                  // Version counter
-
     /**
      * Find maximum generation number in directory
      *
@@ -283,6 +296,11 @@ private:
      * @return Max generation, or -1 if no segments files
      */
     static int64_t findMaxGeneration(store::Directory& dir);
+
+private:
+    std::vector<std::shared_ptr<SegmentInfo>> segments_;  // Segment list
+    int64_t generation_{0};                               // Generation counter
+    int64_t version_{0};                                  // Version counter
 };
 
 }  // namespace index

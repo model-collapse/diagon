@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "diagon/codecs/NumericDocValuesWriter.h"
+#include "diagon/codecs/StoredFieldsWriter.h"
 #include "diagon/document/Document.h"
 #include "diagon/index/FieldInfo.h"
 #include "diagon/index/FreqProxTermsWriter.h"
@@ -145,6 +147,12 @@ private:
     // In-memory posting list builder
     FreqProxTermsWriter termsWriter_;
 
+    // Numeric doc values writer (lazy initialized)
+    std::unique_ptr<codecs::NumericDocValuesWriter> docValuesWriter_;
+
+    // Stored fields writer (lazy initialized)
+    std::unique_ptr<codecs::StoredFieldsWriter> storedFieldsWriter_;
+
     // Document count in RAM
     int numDocsInRAM_{0};
 
@@ -159,6 +167,9 @@ private:
 
     // Segment generation counter (for flush) - atomic for thread safety
     static std::atomic<int> nextSegmentNumber_;
+
+    // Helper method to compute norms from posting lists
+    std::vector<int64_t> computeNorms(const std::string& fieldName, int numDocs);
 };
 
 }  // namespace index

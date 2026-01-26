@@ -125,9 +125,12 @@ public:
 
             // Decode norm to field length
             float fieldLength = decodeNorm(norm);
-            float avgFieldLength = fieldLength;  // Simplified for Phase 4
 
-            // BM25 formula
+            // Use a reasonable default average field length
+            // Phase 5 will compute this from collection statistics
+            float avgFieldLength = 50.0f;  // Typical document has ~50 terms
+
+            // BM25 formula with length normalization
             float k = k1_ * (1.0f - b_ + b_ * fieldLength / avgFieldLength);
             return idf_ * freq * (k1_ + 1.0f) / (freq + k);
         }
@@ -138,9 +141,20 @@ public:
         float b_;
 
         float decodeNorm(long norm) const {
-            // Phase 4: Simplified - just use 1.0
-            // Phase 5 will add proper norm encoding/decoding
-            return 1.0f;
+            // Decode norm to field length
+            // Encoding: norm = 127 / sqrt(length)
+            // Decoding: length = (127 / norm)^2
+
+            if (norm == 0) {
+                return 1.0f;  // Default for deleted/missing docs
+            }
+            if (norm == 127) {
+                return 1.0f;  // Single term document
+            }
+
+            float normFloat = static_cast<float>(norm);
+            float length = 127.0f / normFloat;
+            return length * length;  // Return length (not sqrt(length))
         }
     };
 
@@ -159,11 +173,21 @@ private:
 
     /**
      * Decode Lucene norm to field length
-     * Phase 4: Simplified - returns 1.0
+     *
+     * Encoding: norm = 127 / sqrt(length)
+     * Decoding: length = (127 / norm)^2
      */
     static float decodeNorm(long norm) {
-        // TODO Phase 5: Implement proper norm decoding
-        return 1.0f;
+        if (norm == 0) {
+            return 1.0f;  // Default for deleted/missing docs
+        }
+        if (norm == 127) {
+            return 1.0f;  // Single term document
+        }
+
+        float normFloat = static_cast<float>(norm);
+        float length = 127.0f / normFloat;
+        return length * length;  // Return length (not sqrt(length))
     }
 };
 

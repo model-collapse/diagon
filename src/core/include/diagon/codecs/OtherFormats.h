@@ -59,24 +59,10 @@ public:
 };
 
 // ==================== NormsFormat ====================
-
-class NormsFormat {
-public:
-    virtual ~NormsFormat() = default;
-    virtual std::string getName() const = 0;
-
-    // TODO: Add normsConsumer/normsProducer when norms are implemented
-};
+// Now implemented in NormsFormat.h
 
 // ==================== LiveDocsFormat ====================
-
-class LiveDocsFormat {
-public:
-    virtual ~LiveDocsFormat() = default;
-    virtual std::string getName() const = 0;
-
-    // TODO: Add read/write methods for deleted documents bitset
-};
+// Now implemented in LiveDocsFormat.h
 
 // ==================== PointsFormat ====================
 

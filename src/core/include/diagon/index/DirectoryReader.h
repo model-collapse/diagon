@@ -49,6 +49,21 @@ public:
     static std::shared_ptr<DirectoryReader> open(store::Directory& dir);
 
     /**
+     * If the index has changed since oldReader was opened, open and return a new reader;
+     * else, return nullptr.
+     *
+     * This method is typically far less costly than opening a fully new DirectoryReader
+     * as it shares resources (segment readers) with the provided oldReader when possible.
+     *
+     * The provided reader is NOT closed (you are responsible for doing so).
+     *
+     * @param oldReader Previous reader to check against
+     * @return nullptr if no changes; else, a new DirectoryReader instance
+     * @throws IOException if there is an IO error
+     */
+    static std::shared_ptr<DirectoryReader> openIfChanged(std::shared_ptr<DirectoryReader> oldReader);
+
+    /**
      * Destructor
      */
     ~DirectoryReader() override;
@@ -62,9 +77,19 @@ public:
 
     /**
      * Get reader cache helper
+     *
+     * For DirectoryReader, this is invalidated whenever the index changes:
+     * - New segments added
+     * - Segments merged
+     * - Deletions applied
+     *
+     * Safe to cache:
+     * - Total document counts
+     * - Index statistics
+     * - Reader-level aggregations
      */
     CacheHelper* getReaderCacheHelper() const override {
-        return nullptr;  // Phase 4: No caching support
+        return const_cast<CacheHelper*>(&readerCacheHelper_);
     }
 
     // ==================== DirectoryReader-specific methods ====================
@@ -96,6 +121,12 @@ protected:
      */
     void doClose() override;
 
+    /**
+     * Subclass implementation of openIfChanged
+     * @return new reader if changed, nullptr if not changed
+     */
+    virtual std::shared_ptr<DirectoryReader> doOpenIfChanged();
+
 private:
     /**
      * Private constructor - use open() factory method
@@ -109,6 +140,26 @@ private:
     static std::vector<std::shared_ptr<SegmentReader>>
     createSegmentReaders(store::Directory& dir, const SegmentInfos& sis);
 
+    /**
+     * Create SegmentReaders for new SegmentInfos, reusing readers where possible
+     * @param dir Directory
+     * @param newInfos New segment infos
+     * @param oldReaders Old segment readers to potentially reuse
+     * @param oldInfos Old segment infos (for matching)
+     * @return New segment readers (mix of reused and newly opened)
+     */
+    static std::vector<std::shared_ptr<SegmentReader>>
+    createSegmentReadersWithReuse(store::Directory& dir, const SegmentInfos& newInfos,
+                                    const std::vector<std::shared_ptr<SegmentReader>>& oldReaders,
+                                    const SegmentInfos& oldInfos);
+
+    /**
+     * Find matching segment in old readers list
+     * @return index of matching segment, or -1 if not found
+     */
+    static int findSegment(const std::shared_ptr<SegmentInfo>& target,
+                           const SegmentInfos& oldInfos);
+
     // Directory containing the index
     store::Directory& directory_;
 
@@ -117,6 +168,10 @@ private:
 
     // Segment metadata from segments_N file
     SegmentInfos segmentInfos_;
+
+    // Cache helper (Phase 5)
+    // Invalidated when index changes (new segments, merges, deletions)
+    CacheHelper readerCacheHelper_;
 };
 
 }  // namespace index

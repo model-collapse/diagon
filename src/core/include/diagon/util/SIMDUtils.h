@@ -80,7 +80,21 @@ public:
         // GCC/Clang builtin: __builtin_prefetch(addr, rw, locality)
         // rw=0 for read, rw=1 for write
         // locality: 0=NTA, 1=LOW, 2=MEDIUM, 3=HIGH
-        __builtin_prefetch(addr, 0, static_cast<int>(locality));
+        // Note: locality must be a compile-time constant
+        switch (locality) {
+            case Locality::HIGH:
+                __builtin_prefetch(addr, 0, 3);
+                break;
+            case Locality::MEDIUM:
+                __builtin_prefetch(addr, 0, 2);
+                break;
+            case Locality::LOW:
+                __builtin_prefetch(addr, 0, 1);
+                break;
+            case Locality::NTA:
+                __builtin_prefetch(addr, 0, 0);
+                break;
+        }
 #elif defined(_MSC_VER)
         // MSVC intrinsics
         switch (locality) {
@@ -114,7 +128,21 @@ public:
      */
     static inline void write(void* addr, Locality locality = Locality::HIGH) {
 #if defined(__GNUC__) || defined(__clang__)
-        __builtin_prefetch(addr, 1, static_cast<int>(locality));
+        // Note: locality must be a compile-time constant
+        switch (locality) {
+            case Locality::HIGH:
+                __builtin_prefetch(addr, 1, 3);
+                break;
+            case Locality::MEDIUM:
+                __builtin_prefetch(addr, 1, 2);
+                break;
+            case Locality::LOW:
+                __builtin_prefetch(addr, 1, 1);
+                break;
+            case Locality::NTA:
+                __builtin_prefetch(addr, 1, 0);
+                break;
+        }
 #elif defined(_MSC_VER)
         // MSVC doesn't distinguish read/write prefetch, use read variant
         read(addr, locality);

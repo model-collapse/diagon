@@ -86,5 +86,95 @@ DirectoryReader::createSegmentReaders(store::Directory& dir, const SegmentInfos&
     return readers;
 }
 
+// ==================== Reader Reopening (NRT) ====================
+
+std::shared_ptr<DirectoryReader> DirectoryReader::openIfChanged(
+    std::shared_ptr<DirectoryReader> oldReader) {
+    if (!oldReader) {
+        return nullptr;
+    }
+
+    oldReader->ensureOpen();
+    return oldReader->doOpenIfChanged();
+}
+
+std::shared_ptr<DirectoryReader> DirectoryReader::doOpenIfChanged() {
+    ensureOpen();
+
+    // Read latest commit from directory
+    int64_t latestGeneration = SegmentInfos::findMaxGeneration(directory_);
+
+    if (latestGeneration < 0) {
+        // No index exists
+        return nullptr;
+    }
+
+    // Check if generation has changed
+    if (latestGeneration == segmentInfos_.getGeneration()) {
+        // No changes
+        return nullptr;
+    }
+
+    // Read new SegmentInfos
+    std::string fileName = SegmentInfos::getSegmentsFileName(latestGeneration);
+    SegmentInfos newInfos = SegmentInfos::read(directory_, fileName);
+
+    // Create segment readers, reusing old ones where possible
+    auto newReaders =
+        createSegmentReadersWithReuse(directory_, newInfos, segmentReaders_, segmentInfos_);
+
+    // Create new DirectoryReader
+    return std::shared_ptr<DirectoryReader>(
+        new DirectoryReader(directory_, std::move(newReaders), newInfos));
+}
+
+std::vector<std::shared_ptr<SegmentReader>>
+DirectoryReader::createSegmentReadersWithReuse(
+    store::Directory& dir, const SegmentInfos& newInfos,
+    const std::vector<std::shared_ptr<SegmentReader>>& oldReaders, const SegmentInfos& oldInfos) {
+
+    std::vector<std::shared_ptr<SegmentReader>> readers;
+    readers.reserve(newInfos.size());
+
+    for (int i = 0; i < newInfos.size(); i++) {
+        auto newSegInfo = newInfos.info(i);
+
+        // Try to find matching segment in old readers
+        int oldIdx = findSegment(newSegInfo, oldInfos);
+
+        if (oldIdx >= 0 && oldIdx < static_cast<int>(oldReaders.size())) {
+            // Check if segment is identical (name matches and no new deletions)
+            auto oldSegInfo = oldInfos.info(oldIdx);
+
+            if (newSegInfo->name() == oldSegInfo->name() &&
+                newSegInfo->delCount() == oldSegInfo->delCount() &&
+                newSegInfo->maxDoc() == oldSegInfo->maxDoc()) {
+                // Segment unchanged - reuse reader
+                auto reusedReader = oldReaders[oldIdx];
+                reusedReader->incRef();  // Increment ref count for new reader
+                readers.push_back(reusedReader);
+                continue;
+            }
+        }
+
+        // Segment changed or new - open new reader
+        auto newReader = SegmentReader::open(dir, newSegInfo);
+        readers.push_back(newReader);
+    }
+
+    return readers;
+}
+
+int DirectoryReader::findSegment(const std::shared_ptr<SegmentInfo>& target,
+                                  const SegmentInfos& oldInfos) {
+    // Search for segment by name
+    for (int i = 0; i < oldInfos.size(); i++) {
+        if (oldInfos.info(i)->name() == target->name()) {
+            return i;
+        }
+    }
+    return -1;  // Not found
+}
+
 }  // namespace index
 }  // namespace diagon

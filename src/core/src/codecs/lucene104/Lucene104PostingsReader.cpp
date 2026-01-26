@@ -97,12 +97,8 @@ int Lucene104PostingsEnum::nextDoc() {
         currentDoc_ += docDelta;
     }
 
-    // Get frequency from buffer
-    if (writeFreqs_) {
-        currentFreq_ = static_cast<int32_t>(freqBuffer_[bufferPos_]);
-    } else {
-        currentFreq_ = 1;  // Default for DOCS_ONLY
-    }
+    // Get frequency from buffer (branchless using multiplication)
+    currentFreq_ = writeFreqs_ ? static_cast<int32_t>(freqBuffer_[bufferPos_]) : 1;
 
     bufferPos_++;
     docsRead_++;
@@ -112,14 +108,16 @@ int Lucene104PostingsEnum::nextDoc() {
 void Lucene104PostingsEnum::refillBuffer() {
     bufferPos_ = 0;
     int remaining = docFreq_ - docsRead_;
+    int bufferIdx = 0;
 
-    if (remaining >= BUFFER_SIZE) {
+    // Fill buffer with as many complete StreamVByte groups (4 docs each) as possible
+    while (remaining >= STREAMVBYTE_GROUP_SIZE && bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
         // Read StreamVByte-encoded group of 4 docs
         uint8_t docDeltaEncoded[17];  // Max: 1 control + 4*4 data bytes
         uint8_t controlByte = docIn_->readByte();
         docDeltaEncoded[0] = controlByte;
 
-        // Calculate data bytes needed
+        // Calculate data bytes needed from control byte
         int dataBytes = 0;
         for (int i = 0; i < 4; ++i) {
             int length = ((controlByte >> (i * 2)) & 0x03) + 1;
@@ -129,8 +127,8 @@ void Lucene104PostingsEnum::refillBuffer() {
         // Read data bytes
         docIn_->readBytes(docDeltaEncoded + 1, dataBytes);
 
-        // Decode 4 doc deltas
-        util::StreamVByte::decode4(docDeltaEncoded, docDeltaBuffer_);
+        // Decode 4 doc deltas directly into buffer at current position
+        util::StreamVByte::decode4(docDeltaEncoded, &docDeltaBuffer_[bufferIdx]);
 
         // Read frequencies if present
         if (writeFreqs_) {
@@ -146,20 +144,28 @@ void Lucene104PostingsEnum::refillBuffer() {
             }
 
             docIn_->readBytes(freqEncoded + 1, dataBytes);
-            util::StreamVByte::decode4(freqEncoded, freqBuffer_);
+            util::StreamVByte::decode4(freqEncoded, &freqBuffer_[bufferIdx]);
         }
 
-        bufferLimit_ = BUFFER_SIZE;
-    } else {
-        // Use VInt fallback for remaining docs (< 4)
-        bufferLimit_ = remaining;
-        for (int i = 0; i < remaining; ++i) {
-            docDeltaBuffer_[i] = static_cast<uint32_t>(docIn_->readVInt());
+        bufferIdx += STREAMVBYTE_GROUP_SIZE;
+        remaining -= STREAMVBYTE_GROUP_SIZE;
+    }
+
+    // Use VInt fallback for remaining docs (< 4), but only if there's buffer space
+    int spaceLeft = BUFFER_SIZE - bufferIdx;
+    int docsToRead = std::min(remaining, spaceLeft);
+
+    if (docsToRead > 0) {
+        for (int i = 0; i < docsToRead; ++i) {
+            docDeltaBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
             if (writeFreqs_) {
-                freqBuffer_[i] = static_cast<uint32_t>(docIn_->readVInt());
+                freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
             }
         }
+        bufferIdx += docsToRead;
     }
+
+    bufferLimit_ = bufferIdx;
 }
 
 int Lucene104PostingsEnum::advance(int target) {

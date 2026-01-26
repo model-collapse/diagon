@@ -241,13 +241,15 @@ std::vector<SearchResult> QBlockIndex::search(const SparseVector& query, int k) 
 
     // Step 1: Collect all candidate blocks with gains
     struct BlockCandidate {
+        const std::vector<std::shared_ptr<columns::ColumnVector<uint32_t>>>* windows;  // Pointer to all windows
         uint32_t term;
         uint32_t bin;
-        float gain;
+        int32_t gain;  // Use int32 like reference code
         float weight;
 
-        BlockCandidate(uint32_t t, uint32_t b, float g, float w)
-            : term(t), bin(b), gain(g), weight(w) {}
+        BlockCandidate(const std::vector<std::shared_ptr<columns::ColumnVector<uint32_t>>>* w,
+                      uint32_t t, uint32_t b, int32_t g, float wt)
+            : windows(w), term(t), bin(b), gain(g), weight(wt) {}
 
         bool operator<(const BlockCandidate& other) const {
             return gain < other.gain;  // Min-heap (invert for max)
@@ -259,24 +261,26 @@ std::vector<SearchResult> QBlockIndex::search(const SparseVector& query, int k) 
 
     float total_mass = 0.0f;
 
+    // Build candidate list with gains
     for (const auto& query_elem : query) {
         uint32_t term = query_elem.index;
         float query_weight = query_elem.value;
 
         if (term >= blocks_.size()) continue;
 
-        // Compute gains for all bins of this term
-        std::vector<float> gains;
-        computeBlockGains(query_weight, term, gains);
+        const auto& term_blocks = blocks_[term];
+        const auto& term_block_sizes = block_sizes_[term];
 
         for (uint32_t bin = 0; bin < config_.num_bins; ++bin) {
             // Skip empty blocks
-            if (block_sizes_[term][bin] == 0) continue;
+            if (term_block_sizes[bin] == 0) continue;
 
-            float gain = gains[bin];
-            float weight = gain;  // Same for now
+            // Gain calculation (int32 like reference, scaled by 1000 for precision)
+            constexpr float GAIN_SCALE = 1000.0f;
+            int32_t gain = static_cast<int32_t>(quant_val_[bin] * query_weight * GAIN_SCALE);
+            float weight = quant_val_[bin] * query_weight;  // Unscaled for selection
 
-            candidates.emplace_back(term, bin, gain, weight);
+            candidates.emplace_back(&term_blocks[bin], term, bin, gain, weight);
             total_mass += weight;
         }
     }
@@ -285,106 +289,128 @@ std::vector<SearchResult> QBlockIndex::search(const SparseVector& query, int k) 
         return {};
     }
 
-    // Step 2: Select blocks based on mode
-    std::vector<BlockCandidate> selected_blocks;
+    // Step 2: Select blocks based on mode (returns iterators like reference)
+    auto end_it = candidates.end();
 
     if (config_.selection_mode == Config::TOP_K) {
         // Select fixed top-k blocks by gain
         int num_select = std::min(config_.fixed_top_k, static_cast<int>(candidates.size()));
-        std::partial_sort(candidates.begin(),
-                         candidates.begin() + num_select,
-                         candidates.end(),
-                         [](const auto& a, const auto& b) { return a.gain > b.gain; });
-        selected_blocks.assign(candidates.begin(), candidates.begin() + num_select);
+        auto cmp = [](const auto& a, const auto& b) { return a.gain > b.gain; };
+        if (num_select > 0) {
+            std::partial_sort(candidates.begin(),
+                            candidates.begin() + num_select,
+                            candidates.end(), cmp);
+            end_it = candidates.begin() + num_select;
+        }
 
     } else if (config_.selection_mode == Config::MAX_RATIO) {
-        // Threshold by alpha * max_gain
-        float max_gain = 0.0f;
+        // Threshold by alpha * max_weight (use unscaled weight, not scaled gain)
+        float max_weight = 0.0f;
         for (const auto& cand : candidates) {
-            max_gain = std::max(max_gain, cand.gain);
+            max_weight = std::max(max_weight, cand.weight);
         }
-        float threshold = max_gain * config_.alpha;
+        float threshold = max_weight * config_.alpha;
 
-        for (const auto& cand : candidates) {
-            if (cand.gain >= threshold) {
-                selected_blocks.push_back(cand);
-            }
-        }
+        // Partition: selected blocks at front
+        end_it = std::partition(candidates.begin(), candidates.end(),
+                               [threshold](const auto& c) { return c.weight >= threshold; });
 
     } else {  // ALPHA_MASS (default)
-        // Select blocks until reaching alpha% of total mass
+        // Select blocks until reaching alpha% of total mass (like reference)
         float target_mass = total_mass * config_.alpha;
 
         // Sort by gain descending
         std::sort(candidates.begin(), candidates.end(),
                  [](const auto& a, const auto& b) { return a.gain > b.gain; });
 
+        // Select until reaching target mass
         float current_mass = 0.0f;
-        for (const auto& cand : candidates) {
-            selected_blocks.push_back(cand);
-            current_mass += cand.weight;
+        end_it = candidates.begin();
+        for (auto it = candidates.begin(); it != candidates.end(); ++it) {
+            current_mass += it->weight;
+            end_it = it + 1;
             if (current_mass >= target_mass) break;
         }
     }
 
-    // Step 3: ScatterAdd - accumulate scores window by window
-    std::vector<float> score_buf(num_documents_, 0.0f);
+    // Step 3: ScatterAdd - window by window processing (like reference)
+    std::vector<int32_t> score_buf(num_documents_, 0);  // Use int32 like reference
+    int32_t* __restrict buf = score_buf.data();  // Restrict pointer
+
+    // Result collection
+    std::vector<SearchResult> results;
+    results.reserve(num_documents_);
+
+    // Touched blocks tracking for cleanup
+    std::vector<const columns::ColumnVector<uint32_t>*> touched_blocks;
+    touched_blocks.reserve((end_it - candidates.begin()) + 2);
+
+    constexpr size_t PF = 48;  // Prefetch distance
 
     for (uint32_t window_id = 0; window_id < num_windows_; ++window_id) {
         uint32_t window_offset = window_id * config_.window_size;
-        uint32_t window_end = std::min(window_offset + config_.window_size, num_documents_);
 
         // Part 1: Score accumulation
-        for (const auto& block : selected_blocks) {
-            const auto& doc_ids_col = blocks_[block.term][block.bin][window_id];
-            const auto& doc_ids = doc_ids_col->getData();
+        for (auto block_it = candidates.begin(); block_it != end_it; ++block_it) {
+            const auto& block_col = (*block_it->windows)[window_id];
+            const auto& docs = block_col->getData();
 
-            if (doc_ids.empty()) continue;
+            if (docs.empty()) continue;
 
-            float gain = block.gain;
+            touched_blocks.push_back(block_col.get());
 
-            // Prefetch-optimized scatter-add
-            constexpr size_t PREFETCH_DISTANCE = 48;
-            const size_t n = doc_ids.size();
-
-            // Prefetch first batch
-            size_t pf_count = std::min(n, PREFETCH_DISTANCE);
-            if (config_.use_prefetch) {
-                for (size_t p = 0; p < pf_count; ++p) {
-                    uint32_t global_doc_id = window_offset + doc_ids[p];
-                    __builtin_prefetch(&score_buf[global_doc_id], 1, 0);
+            // Prefetch next block's data
+            if (config_.use_prefetch && (block_it + 1) != end_it) {
+                const auto& next_block_col = (*(block_it + 1)->windows)[window_id];
+                if (!next_block_col->getData().empty()) {
+                    __builtin_prefetch(next_block_col->getData().data(), 0, 1);
                 }
             }
 
-            // Main loop with prefetch
-            size_t i = 0;
-            for (; i + PREFETCH_DISTANCE < n; ++i) {
-                if (config_.use_prefetch) {
-                    uint32_t pf_doc_id = window_offset + doc_ids[i + PREFETCH_DISTANCE];
-                    __builtin_prefetch(&score_buf[pf_doc_id], 1, 0);
-                }
+            const size_t n = docs.size();
+            const int32_t gain = block_it->gain;
 
-                uint32_t global_doc_id = window_offset + doc_ids[i];
-                score_buf[global_doc_id] += gain;
+            // Prefetch first PF elements
+            size_t pf_count = std::min(n, PF);
+            if (config_.use_prefetch) {
+                for (size_t p = 0; p < pf_count; ++p) {
+                    __builtin_prefetch(&buf[window_offset + docs[p]], 1, 0);
+                }
+            }
+
+            // Main loop: prefetch ahead while processing
+            size_t i = 0;
+            for (; i + PF < n; ++i) {
+                if (config_.use_prefetch) {
+                    __builtin_prefetch(&buf[window_offset + docs[i + PF]], 1, 0);
+                }
+                buf[window_offset + docs[i]] += gain;
             }
 
             // Tail loop
             for (; i < n; ++i) {
-                uint32_t global_doc_id = window_offset + doc_ids[i];
-                score_buf[global_doc_id] += gain;
+                buf[window_offset + docs[i]] += gain;
             }
         }
-    }
 
-    // Step 4: Extract top-k results
-    std::vector<SearchResult> results;
-    results.reserve(num_documents_);
-
-    for (uint32_t doc_id = 0; doc_id < num_documents_; ++doc_id) {
-        if (score_buf[doc_id] > 0.0f) {
-            results.emplace_back(doc_id, score_buf[doc_id]);
+        // Part 2: Collect scores and reset (score_buf already hot from Part 1)
+        constexpr float GAIN_SCALE = 1000.0f;
+        for (const auto* block_col : touched_blocks) {
+            for (uint32_t local_doc_id : block_col->getData()) {
+                uint32_t global_doc_id = window_offset + local_doc_id;
+                int32_t score = buf[global_doc_id];
+                if (score > 0) {
+                    // Scale back to float
+                    results.emplace_back(global_doc_id, static_cast<float>(score) / GAIN_SCALE);
+                }
+                buf[global_doc_id] = 0;  // Reset after collection
+            }
         }
+
+        touched_blocks.clear();
     }
+
+    // Step 4: Sort and take top-k
 
     // Sort by score descending and take top-k
     std::partial_sort(results.begin(),

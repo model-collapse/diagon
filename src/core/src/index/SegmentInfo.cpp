@@ -178,6 +178,10 @@ SegmentInfos SegmentInfos::read(store::Directory& dir, const std::string& fileNa
         int64_t sizeInBytes = input->readLong();
         segmentInfo->setSizeInBytes(sizeInBytes);
 
+        // Read delCount (Phase 3)
+        int32_t delCount = input->readInt();
+        segmentInfo->setDelCount(delCount);
+
         // Read FieldInfos (Phase 4)
         int32_t numFields = input->readInt();
         std::vector<FieldInfo> fieldInfos;

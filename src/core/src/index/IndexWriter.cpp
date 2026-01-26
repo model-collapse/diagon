@@ -3,12 +3,22 @@
 
 #include "diagon/index/IndexWriter.h"
 
+#include "diagon/codecs/LiveDocsFormat.h"
+#include "diagon/index/SegmentMerger.h"
+#include "diagon/index/SegmentReader.h"
+#include "diagon/index/Term.h"
+#include "diagon/index/Terms.h"
+#include "diagon/index/TermsEnum.h"
+#include "diagon/index/PostingsEnum.h"
 #include "diagon/store/IndexOutput.h"
+#include "diagon/util/BitSet.h"
 
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -83,22 +93,40 @@ int64_t IndexWriter::addDocument(const document::Document& doc) {
     return nextSequenceNumber();
 }
 
-int64_t IndexWriter::updateDocument() {
+int64_t IndexWriter::deleteDocuments(const Term& term) {
     ensureOpen();
 
-    // TODO: When Term, Document, and Codec are available:
-    // - Apply deletion to matching term
-    // - Add new document (atomic within segment)
+    // Apply deletions to all existing segments
+    applyDeletes(term);
 
     return nextSequenceNumber();
 }
 
-int64_t IndexWriter::deleteDocuments() {
+int64_t IndexWriter::updateDocument(const Term& term, const document::Document& doc) {
     ensureOpen();
 
-    // TODO: When Term/Query and Codec are available:
-    // - Apply deletion to matching documents
-    // - Update deletion markers
+    // Delete old documents matching term
+    applyDeletes(term);
+
+    // Add new document
+    int segmentsCreated = documentsWriter_->addDocument(doc);
+
+    // If segments were created, add them to SegmentInfos
+    if (segmentsCreated > 0) {
+        for (const auto& segmentInfo : documentsWriter_->getSegmentInfos()) {
+            // Check if this segment is new (not already in segmentInfos_)
+            bool isNew = true;
+            for (int i = 0; i < segmentInfos_.size(); i++) {
+                if (segmentInfos_.info(i)->name() == segmentInfo->name()) {
+                    isNew = false;
+                    break;
+                }
+            }
+            if (isNew) {
+                segmentInfos_.add(segmentInfo);
+            }
+        }
+    }
 
     return nextSequenceNumber();
 }
@@ -107,6 +135,12 @@ int64_t IndexWriter::commit() {
     ensureOpen();
 
     std::lock_guard<std::mutex> lock(commitLock_);
+
+    return commitInternal();
+}
+
+int64_t IndexWriter::commitInternal() {
+    // Internal commit implementation (caller must hold commitLock_)
 
     // Flush pending documents
     flush();
@@ -150,10 +184,32 @@ void IndexWriter::flush() {
 void IndexWriter::rollback() {
     ensureOpen();
 
-    // TODO: When codec architecture is available:
-    // - Discard pending changes in DocumentsWriter
-    // - Revert to last committed state
-    // - Close writer
+    std::lock_guard<std::mutex> lock(commitLock_);
+
+    // 1. Discard all pending documents in DocumentsWriter
+    documentsWriter_->reset();
+
+    // 2. Reset to last committed state (if exists)
+    try {
+        // Try to read the latest commit from disk
+        auto committedInfos = SegmentInfos::readLatestCommit(directory_);
+
+        // Replace in-memory segment list with committed state
+        segmentInfos_ = committedInfos;
+    } catch (const IOException&) {
+        // No committed state exists - this is a new index
+        // Clear all segments and start fresh
+        segmentInfos_.clear();
+    }
+
+    // 3. Close without committing
+    closed_.store(true, std::memory_order_release);
+
+    // Release write lock
+    if (writeLock_) {
+        writeLock_->close();
+        writeLock_.reset();
+    }
 }
 
 void IndexWriter::forceMerge(int maxNumSegments) {
@@ -163,16 +219,73 @@ void IndexWriter::forceMerge(int maxNumSegments) {
         throw std::invalid_argument("maxNumSegments must be >= 1");
     }
 
-    // TODO: When merge infrastructure is available:
-    // - Trigger merge policy to merge down to maxNumSegments
-    // - Wait for merges to complete
+    std::lock_guard<std::mutex> lock(commitLock_);
+
+    // 1. Flush all pending documents first
+    flush();
+
+    // 2. Merge segments until we reach maxNumSegments or less
+    while (segmentInfos_.size() > maxNumSegments) {
+        // Need at least 2 segments to merge
+        if (segmentInfos_.size() < 2) {
+            break;
+        }
+
+        // Get two oldest segments (simple strategy for Phase 2)
+        auto seg1 = segmentInfos_.info(0);
+        auto seg2 = segmentInfos_.info(1);
+
+        // Generate name for merged segment
+        static int mergeCounter = 0;
+        std::string mergedName = "_merged_" + std::to_string(mergeCounter++);
+
+        // 3. Perform merge using SegmentMerger
+        SegmentMerger merger(directory_, mergedName, {seg1, seg2});
+        auto mergedSegment = merger.merge();
+
+        // 4. Remove old segments from list
+        segmentInfos_.remove(0);  // Remove seg1
+        segmentInfos_.remove(0);  // Remove seg2 (now at index 0 after first removal)
+
+        // 5. Add merged segment to list
+        segmentInfos_.add(mergedSegment);
+
+        // 6. Delete old segment files
+        deleteSegmentFiles(seg1);
+        deleteSegmentFiles(seg2);
+    }
+
+    // 7. Commit the merged index (use internal method since we already hold the lock)
+    commitInternal();
+}
+
+void IndexWriter::deleteSegmentFiles(std::shared_ptr<SegmentInfo> segment) {
+    // Delete all files belonging to this segment
+    for (const auto& file : segment->files()) {
+        try {
+            directory_.deleteFile(file);
+        } catch (const std::exception&) {
+            // Ignore errors - file might already be deleted or not exist
+        }
+    }
+
+    // Also try to delete the .liv file if it exists
+    if (segment->hasDeletions()) {
+        try {
+            std::string livFileName = segment->name() + ".liv";
+            directory_.deleteFile(livFileName);
+        } catch (const std::exception&) {
+            // Ignore errors
+        }
+    }
 }
 
 void IndexWriter::waitForMerges() {
     ensureOpen();
 
-    // TODO: When MergeScheduler is available:
-    // - Wait for all pending merges to complete
+    // Phase 2 implementation: All merges are synchronous (via forceMerge)
+    // This method is a no-op until background merging is implemented in Phase 4
+    // with MergeScheduler and asynchronous merge threads
 }
 
 void IndexWriter::close() {
@@ -252,14 +365,9 @@ void IndexWriter::initializeIndex() {
             if (!indexExists) {
                 throw IOException("Index does not exist - cannot append");
             }
-            // Start from next generation after existing index
-            segmentInfos_ = SegmentInfos();
-            if (maxGeneration >= 0) {
-                // Set generation to next value
-                for (int64_t i = 0; i <= maxGeneration; i++) {
-                    segmentInfos_.incrementGeneration();
-                }
-            }
+            // Load existing index and prepare for next generation
+            segmentInfos_ = SegmentInfos::readLatestCommit(directory_);
+            segmentInfos_.incrementGeneration();
             break;
 
         case IndexWriterConfig::OpenMode::CREATE_OR_APPEND:
@@ -267,14 +375,9 @@ void IndexWriter::initializeIndex() {
                 // Create new index
                 segmentInfos_ = SegmentInfos();
             } else {
-                // Append to existing index - start from next generation
-                segmentInfos_ = SegmentInfos();
-                if (maxGeneration >= 0) {
-                    // Set generation to next value
-                    for (int64_t i = 0; i <= maxGeneration; i++) {
-                        segmentInfos_.incrementGeneration();
-                    }
-                }
+                // Load existing index and prepare for next generation
+                segmentInfos_ = SegmentInfos::readLatestCommit(directory_);
+                segmentInfos_.incrementGeneration();
             }
             break;
     }
@@ -332,6 +435,9 @@ void IndexWriter::writeSegmentsFile() {
         // Write size in bytes
         output->writeLong(segmentInfo->sizeInBytes());
 
+        // Write delCount (Phase 3)
+        output->writeInt(segmentInfo->delCount());
+
         // Write FieldInfos (Phase 4)
         const auto& fieldInfos = segmentInfo->fieldInfos();
         output->writeInt(static_cast<int32_t>(fieldInfos.size()));
@@ -359,6 +465,87 @@ void IndexWriter::writeSegmentsFile() {
 
     // Sync the file
     directory_.sync({filename});
+}
+
+void IndexWriter::applyDeletes(const Term& term) {
+    // Apply deletions to all existing segments
+    for (int i = 0; i < segmentInfos_.size(); i++) {
+        auto segmentInfo = segmentInfos_.info(i);
+
+        try {
+            // Open segment reader
+            auto reader = SegmentReader::open(directory_, segmentInfo);
+
+            // Get terms for the field
+            Terms* terms = reader->terms(term.field());
+            if (!terms) {
+                continue;  // Field doesn't exist in this segment
+            }
+
+            // Get terms enum and seek to term
+            std::unique_ptr<TermsEnum> termsEnum = terms->iterator();
+            if (!termsEnum->seekExact(term.bytes())) {
+                continue;  // Term doesn't exist in this segment
+            }
+
+            // Get postings enum to iterate over matching documents
+            std::unique_ptr<PostingsEnum> postings = termsEnum->postings();
+            if (!postings) {
+                continue;
+            }
+
+            // Load or create live docs bitset
+            std::unique_ptr<util::BitSet> liveDocs;
+            int maxDoc = segmentInfo->maxDoc();
+
+            // Check if segment already has deletions
+            if (segmentInfo->hasDeletions()) {
+                // Load existing live docs
+                codecs::LiveDocsFormat format;
+                liveDocs = format.readLiveDocs(directory_, segmentInfo->name(), maxDoc);
+                if (!liveDocs) {
+                    // Failed to load - create new one
+                    liveDocs = std::make_unique<util::BitSet>(maxDoc);
+                    for (int d = 0; d < maxDoc; d++) {
+                        liveDocs->set(d);  // All live initially
+                    }
+                }
+            } else {
+                // No deletions yet - create new bitset with all docs live
+                liveDocs = std::make_unique<util::BitSet>(maxDoc);
+                for (int d = 0; d < maxDoc; d++) {
+                    liveDocs->set(d);
+                }
+            }
+
+            // Collect documents to delete
+            int deletedCount = 0;
+            int docID;
+            while ((docID = postings->nextDoc()) != PostingsEnum::NO_MORE_DOCS) {
+                if (liveDocs->get(docID)) {
+                    liveDocs->clear(docID);  // Mark as deleted
+                    deletedCount++;
+                }
+            }
+
+            if (deletedCount > 0) {
+                // Update delCount
+                int newDelCount = segmentInfo->delCount() + deletedCount;
+                segmentInfo->setDelCount(newDelCount);
+
+                // Write updated .liv file
+                codecs::LiveDocsFormat format;
+                format.writeLiveDocs(directory_, segmentInfo->name(), *liveDocs, newDelCount);
+            }
+
+            // Close reader
+            reader->decRef();
+
+        } catch (const std::exception& e) {
+            // Segment might be corrupted or missing - skip it
+            continue;
+        }
+    }
 }
 
 }  // namespace index

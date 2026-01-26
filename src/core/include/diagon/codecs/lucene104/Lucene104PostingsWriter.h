@@ -104,6 +104,13 @@ public:
      */
     int64_t getFilePointer() const;
 
+    /**
+     * Get the bytes written to the .doc file (for testing).
+     * Only works with ByteBuffersIndexOutput.
+     * @return Vector of bytes written
+     */
+    std::vector<uint8_t> getBytes() const;
+
 private:
     // Output file for doc IDs and frequencies
     std::unique_ptr<store::IndexOutput> docOut_;

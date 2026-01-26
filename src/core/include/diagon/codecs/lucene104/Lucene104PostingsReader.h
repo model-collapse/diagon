@@ -76,7 +76,8 @@ private:
  * PostingsEnum implementation for Lucene104 format.
  *
  * Phase 2a Update: Reads StreamVByte-encoded doc deltas and frequencies for 2-3× speedup.
- * Buffers groups of 4 docs decoded with SIMD, serves them one by one.
+ * Optimized buffering: Buffers up to 32 docs (8 StreamVByte groups) to amortize decode overhead.
+ * Serves docs one by one with minimal per-doc cost.
  */
 class Lucene104PostingsEnum : public index::PostingsEnum {
 public:
@@ -113,15 +114,18 @@ private:
     int currentFreq_;
     int docsRead_;
 
-    // StreamVByte buffering (Phase 2a)
-    static constexpr int BUFFER_SIZE = 4;
+    // StreamVByte buffering (Phase 2a optimized)
+    // Buffer 32 docs (8 StreamVByte groups of 4) to amortize refill overhead
+    static constexpr int BUFFER_SIZE = 32;
+    static constexpr int STREAMVBYTE_GROUP_SIZE = 4;
     uint32_t docDeltaBuffer_[BUFFER_SIZE];
     uint32_t freqBuffer_[BUFFER_SIZE];
     int bufferPos_;
     int bufferLimit_;
 
     /**
-     * Refill buffer by reading next group of 4 docs using StreamVByte.
+     * Refill buffer by reading multiple StreamVByte groups (up to 32 docs).
+     * Decodes groups of 4 docs each, filling up to BUFFER_SIZE.
      * Falls back to VInt for remaining docs (< 4).
      */
     void refillBuffer();

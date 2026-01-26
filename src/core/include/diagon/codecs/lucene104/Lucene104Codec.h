@@ -6,6 +6,7 @@
 #include "diagon/codecs/Codec.h"
 #include "diagon/codecs/ColumnFormat.h"
 #include "diagon/codecs/DocValuesFormat.h"
+#include "diagon/codecs/LiveDocsFormat.h"
 #include "diagon/codecs/OtherFormats.h"
 #include "diagon/codecs/PostingsFormat.h"
 
@@ -98,15 +99,11 @@ public:
     std::string getName() const override { return "Lucene104SegmentInfoFormat"; }
 };
 
-class Lucene104NormsFormat : public NormsFormat {
-public:
-    std::string getName() const override { return "Lucene104NormsFormat"; }
-};
+// NormsFormat is now implemented in Lucene104NormsWriter.h
+// No need for stub here
 
-class Lucene104LiveDocsFormat : public LiveDocsFormat {
-public:
-    std::string getName() const override { return "Lucene104LiveDocsFormat"; }
-};
+// LiveDocsFormat is now a concrete class (see codecs/LiveDocsFormat.h)
+// No need for Lucene104LiveDocsFormat stub
 
 class Lucene104PointsFormat : public PointsFormat {
 public:

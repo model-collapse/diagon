@@ -15,6 +15,7 @@ class IOContext;
 
 namespace index {
 class FieldInfos;
+class SegmentInfo;
 }  // namespace index
 
 }  // namespace diagon
@@ -23,7 +24,6 @@ namespace diagon {
 namespace codecs {
 
 // Forward declarations (to be implemented in future tasks)
-class SegmentInfo;
 class BufferedUpdates;
 
 /**
@@ -36,9 +36,9 @@ struct SegmentWriteState {
     std::string segmentName;
     std::string segmentSuffix;  // For multi-format support
     store::IOContext& context;
+    index::SegmentInfo* segmentInfo{nullptr};  // Optional
 
     // TODO: Add when implemented:
-    // SegmentInfo& segmentInfo;
     // FieldInfos& fieldInfos;
     // BufferedUpdates* deletes;    // May be nullptr
 
@@ -60,9 +60,9 @@ struct SegmentReadState {
     std::string segmentName;
     std::string segmentSuffix;
     store::IOContext& context;
+    index::SegmentInfo* segmentInfo{nullptr};  // Optional
 
     // TODO: Add when implemented:
-    // SegmentInfo& segmentInfo;
     // FieldInfos& fieldInfos;
 
     SegmentReadState(store::Directory& dir, const std::string& name, const std::string& suffix,

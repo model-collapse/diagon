@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104Codec.h"
+#include "diagon/codecs/lucene104/Lucene104NormsWriter.h"
 
 namespace diagon {
 namespace codecs {
@@ -16,7 +17,7 @@ Lucene104Codec::Lucene104Codec()
     , fieldInfosFormat_(std::make_unique<Lucene104FieldInfosFormat>())
     , segmentInfoFormat_(std::make_unique<Lucene104SegmentInfoFormat>())
     , normsFormat_(std::make_unique<Lucene104NormsFormat>())
-    , liveDocsFormat_(std::make_unique<Lucene104LiveDocsFormat>())
+    , liveDocsFormat_(std::make_unique<LiveDocsFormat>())
     , pointsFormat_(std::make_unique<Lucene104PointsFormat>())
     , vectorFormat_(std::make_unique<Lucene104VectorFormat>()) {}
 

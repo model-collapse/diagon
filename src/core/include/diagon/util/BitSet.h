@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "diagon/util/Bits.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -33,7 +35,7 @@ namespace diagon::util {
  *
  * @note Ghost bits (past numBits) must always be clear to maintain invariants.
  */
-class BitSet {
+class BitSet : public Bits {
 public:
     /**
      * @brief Creates a BitSet with the specified number of bits, all initially clear.
@@ -62,24 +64,28 @@ public:
      */
     [[nodiscard]] std::unique_ptr<BitSet> clone() const;
 
-    /**
-     * @brief Returns the number of bits in this set.
-     * @return Number of bits
-     */
-    [[nodiscard]] size_t length() const noexcept { return num_bits_; }
-
-    /**
-     * @brief Returns the number of bits in this set (alias for length).
-     * @return Number of bits
-     */
-    [[nodiscard]] size_t size() const noexcept { return num_bits_; }
+    // ==================== Bits Interface ====================
 
     /**
      * @brief Gets the value of the bit at the specified index.
      * @param index Bit index (0 to numBits-1)
      * @return true if the bit is set, false otherwise
      */
-    [[nodiscard]] bool get(size_t index) const noexcept;
+    [[nodiscard]] bool get(size_t index) const noexcept override;
+
+    /**
+     * @brief Returns the number of bits in this set.
+     * @return Number of bits
+     */
+    [[nodiscard]] size_t length() const noexcept override { return num_bits_; }
+
+    // ==================== Additional BitSet Methods ====================
+
+    /**
+     * @brief Returns the number of bits in this set (alias for length).
+     * @return Number of bits
+     */
+    [[nodiscard]] size_t size() const noexcept { return num_bits_; }
 
     /**
      * @brief Sets the bit at the specified index to 1.

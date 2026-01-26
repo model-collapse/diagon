@@ -3,6 +3,7 @@
 
 #include "diagon/search/TermQuery.h"
 
+#include "diagon/index/DocValues.h"
 #include "diagon/index/IndexReader.h"
 #include "diagon/index/PostingsEnum.h"
 #include "diagon/index/Terms.h"
@@ -26,10 +27,12 @@ namespace search {
 class TermScorer : public Scorer {
 public:
     TermScorer(const Weight& weight, std::unique_ptr<index::PostingsEnum> postings,
-               const BM25Similarity::SimScorer& simScorer)
+               const BM25Similarity::SimScorer& simScorer,
+               index::NumericDocValues* norms)
         : weight_(weight)
         , postings_(std::move(postings))
         , simScorer_(simScorer)
+        , norms_(norms)
         , doc_(-1)
         , freq_(0) {}
 
@@ -62,9 +65,12 @@ public:
     // ==================== Scorer ====================
 
     float score() const override {
-        // BM25 score using term frequency
-        // norm = 1 (simplified for Phase 4)
-        return simScorer_.score(static_cast<float>(freq_), 1L);
+        // BM25 score using term frequency and document norms
+        long norm = 1L;  // Default norm if not available
+        if (norms_ && norms_->advanceExact(doc_)) {
+            norm = norms_->longValue();
+        }
+        return simScorer_.score(static_cast<float>(freq_), norm);
     }
 
     const Weight& getWeight() const override { return weight_; }
@@ -73,6 +79,7 @@ private:
     const Weight& weight_;
     std::unique_ptr<index::PostingsEnum> postings_;
     BM25Similarity::SimScorer simScorer_;
+    index::NumericDocValues* norms_;  // Non-owning pointer to norms
     int doc_;
     int freq_;
 };
@@ -145,8 +152,11 @@ public:
             return nullptr;
         }
 
+        // Get norms for BM25 length normalization
+        auto* norms = context.reader->getNormValues(query_.getTerm().field());
+
         // Create scorer (takes ownership of postings)
-        return std::make_unique<TermScorer>(*this, std::move(postings), simScorer_);
+        return std::make_unique<TermScorer>(*this, std::move(postings), simScorer_, norms);
     }
 
     const Query& getQuery() const override { return query_; }

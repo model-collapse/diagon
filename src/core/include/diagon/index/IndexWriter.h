@@ -20,8 +20,8 @@ namespace index {
 
 using namespace diagon::store;
 
-// Forward declarations (to be implemented in future tasks)
-class Term;
+// Forward declarations
+class Term;  // Defined in Term.h
 class Query;
 
 // ==================== IndexWriterConfig ====================
@@ -159,20 +159,20 @@ public:
     int64_t addDocument(const document::Document& doc);
 
     /**
-     * Update document (delete by term, then add)
+     * Delete all documents matching the given term
+     * @param term Term to match for deletion
      * @return sequence number
-     *
-     * NOTE: Stub implementation - delete functionality not yet implemented
      */
-    int64_t updateDocument();
+    int64_t deleteDocuments(const Term& term);
 
     /**
-     * Delete documents
+     * Update document (delete by term, then add new document atomically)
+     * Atomic at the segment level: all matching documents are deleted, then new document is added
+     * @param term Term to match for deletion (identifies documents to replace)
+     * @param doc New document to add
      * @return sequence number
-     *
-     * NOTE: Stub implementation - delete functionality not yet implemented
      */
-    int64_t deleteDocuments();
+    int64_t updateDocument(const Term& term, const document::Document& doc);
 
     // ==================== Commit & Merge ====================
 
@@ -271,6 +271,9 @@ private:
     int64_t nextSequenceNumber();
     void initializeIndex();
     void writeSegmentsFile();
+    void applyDeletes(const Term& term);
+    void deleteSegmentFiles(std::shared_ptr<SegmentInfo> segment);
+    int64_t commitInternal();  // Internal commit (caller must hold commitLock_)
 };
 
 }  // namespace index

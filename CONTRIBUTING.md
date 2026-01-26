@@ -14,8 +14,9 @@ Thank you for your interest in contributing to Diagon! This document provides gu
 
 ## Code of Conduct
 
-This project follows a standard open-source code of conduct:
+This project adheres to the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to the project maintainers.
 
+Key principles:
 - **Be respectful**: Treat all contributors with respect and professionalism
 - **Be constructive**: Provide helpful feedback and constructive criticism
 - **Be collaborative**: Work together to improve the project
@@ -295,6 +296,113 @@ fixed stuff
 - `perf`: Performance improvement
 - `test`: Adding tests
 - `chore`: Maintenance tasks
+
+## Storage Directories
+
+Diagon supports multiple storage directory implementations for different use cases:
+
+### FSDirectory (Buffered I/O)
+
+Standard filesystem directory with 8KB buffering. Use for:
+- Writing operations (indexing, merging)
+- Mixed read/write workloads
+- Small files or limited memory
+- Cross-platform compatibility
+
+```cpp
+auto dir = diagon::store::FSDirectory::open("/path/to/index");
+auto input = dir->openInput("data.bin", IOContext::DEFAULT);
+```
+
+### MMapDirectory (Memory-Mapped I/O)
+
+Zero-copy memory-mapped file access for read-heavy workloads. Use for:
+- Read-only operations (searching, analyzing)
+- Large files with random access patterns
+- High-performance search queries
+- Systems with sufficient RAM
+
+```cpp
+auto dir = diagon::store::MMapDirectory::open("/path/to/index");
+
+// Configure chunk size (default: 16GB on 64-bit, 256MB on 32-bit)
+auto custom_dir = diagon::store::MMapDirectory::open("/path/to/index", 30);  // 1GB chunks
+
+// Enable preload (load all pages into RAM immediately)
+dir->setPreload(true);
+
+// Enable fallback to FSDirectory on mmap failure
+dir->setUseFallback(true);
+
+auto input = dir->openInput("data.bin", IOContext::READ);
+```
+
+**Performance characteristics:**
+- Sequential reads: 10-20% faster than FSDirectory
+- Random reads: 2-3× faster than FSDirectory
+- Clone operations: ~100× faster (zero-copy)
+
+**Configuration:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `chunk_power` | 34 (64-bit)<br>28 (32-bit) | Power-of-2 for chunk size<br>Valid range: 20-40 (1MB-1TB) |
+| `preload` | `false` | Load all pages into RAM on open |
+| `use_fallback` | `false` | Fall back to FSDirectory on mmap failure |
+
+**IOContext read advice:**
+- `IOContext::MERGE` → SEQUENTIAL (aggressive read-ahead)
+- `IOContext::READ` → RANDOM (disable read-ahead)
+- `IOContext::DEFAULT` → NORMAL (default OS behavior)
+
+**Platform support:**
+- ✅ Linux (POSIX mmap)
+- ✅ macOS (POSIX mmap)
+- ⏸️ Windows (deferred to future release)
+
+**Fallback mechanism:**
+
+When `setUseFallback(true)` is enabled, MMapDirectory automatically falls back to FSDirectory if memory mapping fails (e.g., ENOMEM, platform not supported). Useful for:
+- 32-bit systems with limited address space
+- Restrictive ulimit configurations
+- Testing environments
+
+```cpp
+auto dir = diagon::store::MMapDirectory::open("/path/to/index");
+dir->setUseFallback(true);
+
+// If mmap fails, will automatically use buffered I/O with warning to stderr
+auto input = dir->openInput("data.bin", IOContext::DEFAULT);
+```
+
+**System requirements:**
+
+For best performance with MMapDirectory:
+- Check virtual memory limits: `ulimit -v`
+- Check max memory mappings (Linux): `sysctl vm.max_map_count`
+- Recommended: `vm.max_map_count >= 262144` (default on most systems)
+
+### ByteBuffersDirectory (In-Memory)
+
+In-memory directory for testing. Use for:
+- Unit tests
+- Temporary indexes
+- Development and debugging
+
+```cpp
+auto dir = std::make_unique<diagon::store::ByteBuffersDirectory>();
+```
+
+### Choosing a Directory
+
+| Use Case | Recommended Directory |
+|----------|----------------------|
+| Indexing documents | FSDirectory |
+| Search queries (read-only) | MMapDirectory |
+| Testing | ByteBuffersDirectory |
+| Small indexes (<1GB) | FSDirectory |
+| Large indexes (>10GB) | MMapDirectory (read), FSDirectory (write) |
+| 32-bit systems | FSDirectory or MMapDirectory with small chunks |
 
 ## Questions?
 
