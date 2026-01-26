@@ -4,6 +4,7 @@
 #pragma once
 
 #include "diagon/columns/ColumnVector.h"
+#include "diagon/sparse/SearchResult.h"
 #include "diagon/sparse/SindiScorer.h"
 #include "diagon/sparse/SparseVector.h"
 #include "diagon/store/Directory.h"
@@ -15,22 +16,6 @@
 
 namespace diagon {
 namespace sparse {
-
-/**
- * Search result for sparse vector queries
- */
-struct SearchResult {
-    uint32_t doc_id;  // Document ID
-    float score;      // Similarity score
-
-    SearchResult() : doc_id(0), score(0.0f) {}  // Default constructor
-    SearchResult(uint32_t id, float s) : doc_id(id), score(s) {}
-
-    // Sort by score descending
-    bool operator<(const SearchResult& other) const {
-        return score > other.score;  // Higher score first
-    }
-};
 
 /**
  * SindiIndex - SIMD-optimized sparse vector index
@@ -273,6 +258,38 @@ public:
      */
     uint64_t numPostings() const { return num_postings_; }
 
+    // ==================== Forward Index (Document Retrieval) ====================
+
+    /**
+     * Get document by ID
+     *
+     * Returns the sparse vector for a document using CSR format lookup.
+     * Efficient O(1) access via indptr_ offset array.
+     *
+     * @param doc_id Document ID [0, num_documents)
+     * @return Sparse vector for the document
+     * @throws std::out_of_range if doc_id is invalid
+     */
+    SparseVector getDocument(uint32_t doc_id) const;
+
+    /**
+     * Prefetch document for cache optimization
+     *
+     * Hints CPU to load document data into cache before access.
+     * Use before calling getDocument() in batch processing.
+     *
+     * @param doc_id Document ID to prefetch
+     */
+    void prefetchDocument(uint32_t doc_id) const;
+
+    /**
+     * Check if forward index is available
+     *
+     * Forward index is built during build() and loaded during load().
+     * Required for getDocument() and prefetchDocument().
+     */
+    bool hasForwardIndex() const { return !forward_indptr_.empty(); }
+
 private:
     // ==================== Configuration ====================
 
@@ -320,6 +337,35 @@ private:
      * Memory-mapped directory (nullptr if use_mmap=false)
      */
     std::unique_ptr<store::MMapDirectory> mmap_dir_;
+
+    // ==================== Forward Index (CSR Format) ====================
+
+    /**
+     * CSR indptr: Start/end offsets for each document
+     *
+     * Size: [num_documents + 1]
+     * For document i:
+     *   - Start offset: forward_indptr_[i]
+     *   - End offset: forward_indptr_[i+1]
+     *   - Number of terms: forward_indptr_[i+1] - forward_indptr_[i]
+     */
+    std::vector<uint32_t> forward_indptr_;
+
+    /**
+     * CSR indices: Term IDs (concatenated across all documents)
+     *
+     * Size: [total_postings]
+     * For document i: forward_indices_[forward_indptr_[i] : forward_indptr_[i+1]]
+     */
+    std::vector<uint32_t> forward_indices_;
+
+    /**
+     * CSR values: Weights (parallel to indices)
+     *
+     * Size: [total_postings]
+     * For document i: forward_values_[forward_indptr_[i] : forward_indptr_[i+1]]
+     */
+    std::vector<float> forward_values_;
 
     // ==================== Query Processing ====================
 

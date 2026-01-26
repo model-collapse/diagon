@@ -197,6 +197,36 @@ void QBlockIndex::build(const std::vector<SparseVector>& documents) {
             }
         }
     }
+
+    // Step 6: Build forward index (CSR format)
+    forward_indptr_.resize(num_documents_ + 1, 0);
+    forward_indices_.reserve(num_postings_);
+    forward_values_.reserve(num_postings_);
+
+    // Calculate offsets (indptr) by counting terms per document
+    for (uint32_t doc_id = 0; doc_id < num_documents_; ++doc_id) {
+        const auto& doc = documents[doc_id];
+        // Count only valid terms (same filters as inverted index building)
+        uint32_t count = 0;
+        for (const auto& elem : doc) {
+            if (elem.index < max_dimension && elem.value > 0.0f) {
+                count++;
+            }
+        }
+        forward_indptr_[doc_id + 1] = forward_indptr_[doc_id] + count;
+    }
+
+    // Fill indices and values by iterating through documents
+    for (uint32_t doc_id = 0; doc_id < num_documents_; ++doc_id) {
+        const auto& doc = documents[doc_id];
+        for (const auto& elem : doc) {
+            // Only include valid terms (same filters as inverted index building)
+            if (elem.index < max_dimension && elem.value > 0.0f) {
+                forward_indices_.push_back(elem.index);
+                forward_values_.push_back(elem.value);
+            }
+        }
+    }
 }
 
 // ==================== Persistence ====================
@@ -422,6 +452,47 @@ std::vector<SearchResult> QBlockIndex::search(const SparseVector& query, int k) 
     }
 
     return results;
+}
+
+// ==================== Forward Index ====================
+
+SparseVector QBlockIndex::getDocument(uint32_t doc_id) const {
+    if (doc_id >= num_documents_) {
+        throw std::out_of_range("Document ID " + std::to_string(doc_id) +
+                               " out of range [0, " + std::to_string(num_documents_) + ")");
+    }
+
+    if (!hasForwardIndex()) {
+        throw std::runtime_error("Forward index not available. Call build() first.");
+    }
+
+    // Get offsets from indptr
+    uint32_t start = forward_indptr_[doc_id];
+    uint32_t end = forward_indptr_[doc_id + 1];
+    uint32_t num_terms = end - start;
+
+    // Construct sparse vector from CSR format
+    std::vector<SparseElement> elements;
+    elements.reserve(num_terms);
+
+    for (uint32_t i = start; i < end; ++i) {
+        elements.emplace_back(forward_indices_[i], forward_values_[i]);
+    }
+
+    return SparseVector(elements);
+}
+
+void QBlockIndex::prefetchDocument(uint32_t doc_id) const {
+    if (doc_id >= num_documents_ || !hasForwardIndex()) {
+        return;  // Silently ignore invalid prefetch
+    }
+
+    uint32_t offset = forward_indptr_[doc_id];
+
+    // Prefetch indices and values arrays at the document's offset
+    // Hint: 0 = read, 1 = temporal locality (will be used soon)
+    __builtin_prefetch(&forward_indices_[offset], 0, 1);
+    __builtin_prefetch(&forward_values_[offset], 0, 1);
 }
 
 }  // namespace sparse
