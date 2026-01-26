@@ -331,7 +331,15 @@ private:
 
 ### Phase 3: SINDI Index Implementation (Week 3)
 
-#### Task 3.1: SIMD Score Accumulation
+#### Design Corrections
+
+**Key improvements over initial plan**:
+1. **Use ColumnVector** for storage (not std::vector) - enables mmap
+2. **Leverage MMapDirectory** for zero-copy access
+3. **Add prefetch** from existing SIMDUtils.h
+4. **Unified format** with QBlock (same .col files)
+
+#### Task 3.1: SIMD Score Accumulation with Prefetch
 
 **Files to create**:
 - `src/core/include/diagon/sparse/SindiScorer.h`
@@ -343,14 +351,15 @@ namespace diagon::sparse {
 
 class SindiScorer {
 public:
-    // SIMD-optimized dot product accumulation
+    // SIMD-optimized dot product accumulation with prefetch
     // Uses AVX2 for 8x float processing
     static void accumulateScoresAVX2(
         const uint32_t* doc_ids,
         const float* doc_weights,
         size_t count,
         float query_weight,
-        std::vector<float>& scores);
+        std::vector<float>& scores,
+        bool use_prefetch = true);
 
     // Scalar fallback
     static void accumulateScoresScalar(
@@ -366,21 +375,43 @@ public:
         const float* doc_weights,
         size_t count,
         float query_weight,
-        std::vector<float>& scores);
+        std::vector<float>& scores,
+        bool use_simd = true,
+        bool use_prefetch = true);
+
+private:
+    // Prefetch distance (elements ahead)
+    static constexpr size_t PREFETCH_DISTANCE = 8;
 };
 
 }  // namespace diagon::sparse
 ```
 
-**Complexity**: ~300 lines
+**Key optimization**: Prefetch next cache line while processing current:
+```cpp
+for (size_t i = 0; i < count; i += 8) {
+    // Prefetch next iteration
+    if (i + PREFETCH_DISTANCE < count) {
+        util::simd::Prefetch::read(&doc_ids[i + PREFETCH_DISTANCE]);
+        util::simd::Prefetch::read(&doc_weights[i + PREFETCH_DISTANCE]);
+    }
 
-#### Task 3.2: SINDI Index Structure
+    // Process current with AVX2
+    __m256i ids = _mm256_loadu_si256((__m256i*)&doc_ids[i]);
+    __m256 weights = _mm256_loadu_ps(&doc_weights[i]);
+    // ... accumulation ...
+}
+```
+
+**Complexity**: ~350 lines
+
+#### Task 3.2: SINDI Index Structure with ColumnVector
 
 **Files to create**:
 - `src/core/include/diagon/sparse/SindiIndex.h`
 - `src/core/src/sparse/SindiIndex.cpp`
 
-**Implementation**:
+**Implementation** (leveraging ColumnVector + MMap):
 ```cpp
 namespace diagon::sparse {
 
@@ -390,19 +421,28 @@ public:
         int block_size = 128;        // Documents per block
         bool use_block_max = true;   // Enable block-max WAND
         bool use_simd = true;        // Enable SIMD acceleration
+        bool use_mmap = true;        // Enable mmap for index files
+        bool use_prefetch = true;    // Enable prefetch hints
+        int chunk_power = 30;        // MMap chunk size (1GB default)
     };
 
-    // Block with maximum score precomputed
-    struct PostingBlock {
-        std::vector<uint32_t> doc_ids;
-        std::vector<float> weights;
-        float max_weight;  // For block-max WAND
+    // Block metadata (stored separately)
+    struct BlockMetadata {
+        uint32_t offset;      // Offset in doc_ids/weights arrays
+        uint32_t count;       // Number of docs in block
+        float max_weight;     // For block-max WAND
     };
 
     explicit SindiIndex(const Config& config);
 
-    // Build index
+    // Build index from documents
     void build(const std::vector<sparse::SparseVector>& documents);
+
+    // Load existing index from directory
+    void load(store::Directory* directory, const std::string& segment);
+
+    // Save index to directory
+    void save(store::Directory* directory, const std::string& segment);
 
     // Search with SIMD acceleration and WAND pruning
     std::vector<SearchResult> search(const sparse::SparseVector& query,
@@ -411,22 +451,51 @@ public:
 private:
     Config config_;
 
-    // Posting lists: [term] -> blocks
-    std::vector<std::vector<PostingBlock>> postings_;
+    // Posting lists: [term] -> ColumnVector (can be mmap'd)
+    // Using ColumnVector allows:
+    // - Zero-copy mmap access via MMapDirectory
+    // - Compression (LZ4/ZSTD) if needed
+    // - Consistent format with QBlock
+    std::vector<std::shared_ptr<columns::ColumnVector<uint32_t>>> term_doc_ids_;
+    std::vector<std::shared_ptr<columns::ColumnVector<float>>> term_weights_;
 
-    // Maximum weights per term (for WAND)
-    std::vector<float> max_weights_;
+    // Block metadata: [term] -> [block_metadata]
+    std::vector<std::vector<BlockMetadata>> term_blocks_;
+
+    // Maximum weights per term (for WAND upper bound)
+    std::vector<float> max_term_weights_;
+
+    // MMap directory for loading index (optional)
+    std::unique_ptr<store::MMapDirectory> mmap_dir_;
 
     // Query processing with WAND
     std::vector<SearchResult> searchWithWand(
         const sparse::SparseVector& query,
         int k) const;
+
+    // Block-max WAND optimization
+    float computeUpperBound(const std::vector<size_t>& term_indices,
+                           const std::vector<float>& query_weights,
+                           size_t skip_term) const;
 };
 
 }  // namespace diagon::sparse
 ```
 
-**Complexity**: ~400 lines
+**Storage format** (unified with QBlock):
+```
+<index_dir>/
+├── _0.sindi/
+│   ├── doc_ids_term_0.col      # ColumnVector<uint32_t> for term 0
+│   ├── weights_term_0.col      # ColumnVector<float> for term 0
+│   ├── doc_ids_term_1.col
+│   ├── weights_term_1.col
+│   ├── ...
+│   ├── block_meta.bin          # Block metadata
+│   └── term_stats.bin          # Max weights per term
+```
+
+**Complexity**: ~500 lines
 
 ### Phase 4: Integration & Testing (Week 4)
 
