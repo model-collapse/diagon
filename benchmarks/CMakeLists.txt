@@ -66,10 +66,16 @@ add_diagon_benchmark(PostingsOptimizationBenchmark
     PostingsOptimizationBenchmark.cpp
 )
 
+# ==================== Columnar Ingestion Benchmarks ====================
+
+add_diagon_benchmark(ColumnarIngestionBenchmark
+    ColumnarIngestionBenchmark.cpp
+)
+
 # ==================== Combined Benchmark Target ====================
 
 add_custom_target(run_all_benchmarks
-    DEPENDS run_IndexingBenchmark run_SearchBenchmark run_SIMDBenchmark run_MMapDirectoryBenchmark run_PostingsFormatBenchmark run_PostingsOptimizationBenchmark
+    DEPENDS run_IndexingBenchmark run_SearchBenchmark run_SIMDBenchmark run_MMapDirectoryBenchmark run_PostingsFormatBenchmark run_PostingsOptimizationBenchmark run_ColumnarIngestionBenchmark
     COMMENT "Running all benchmarks"
 )
 
