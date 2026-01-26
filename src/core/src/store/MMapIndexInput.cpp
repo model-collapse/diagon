@@ -4,6 +4,7 @@
 #include "diagon/store/MMapIndexInput.h"
 
 #include "diagon/util/Exceptions.h"
+#include "diagon/util/SIMDUtils.h"
 
 #include <algorithm>
 #include <cstring>
@@ -153,6 +154,14 @@ void MMapIndexInput::readBytes(uint8_t* buffer, size_t length) {
         // Calculate how much we can read from this chunk
         size_t available_in_chunk = chunk.length - chunk_offset;
         size_t to_copy = std::min(remaining, available_in_chunk);
+
+        // Prefetch next chunk if we're about to cross boundary
+        // This reduces cache miss penalty for sequential reads spanning chunks
+        if (chunk_offset + to_copy >= chunk.length && chunk_idx + 1 < static_cast<int>(num_chunks_)) {
+            // Prefetch first cache line of next chunk into L1 cache
+            util::simd::Prefetch::read(chunks_[chunk_idx + 1].data,
+                                       util::simd::Prefetch::Locality::HIGH);
+        }
 
         // Copy data
         std::memcpy(buffer + buffer_offset, chunk.data + chunk_offset, to_copy);

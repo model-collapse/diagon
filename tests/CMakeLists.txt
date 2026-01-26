@@ -133,6 +133,7 @@ add_diagon_test(ObservabilityTest unit/observability/ObservabilityTest.cpp)
 
 # Util tests
 add_diagon_test(VByteTest unit/util/VByteTest.cpp)
+add_diagon_test(SIMDUtilsTest unit/util/SIMDUtilsTest.cpp)
 
 message(STATUS "Diagon Tests configured")
 add_diagon_test(DirectWriterTest unit/util/packed/DirectWriterTest.cpp)
