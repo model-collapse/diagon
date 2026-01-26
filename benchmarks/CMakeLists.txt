@@ -50,10 +50,16 @@ add_diagon_benchmark(SIMDBenchmark
     SIMDBenchmark.cpp
 )
 
+# ==================== MMap Directory Benchmarks ====================
+
+add_diagon_benchmark(MMapDirectoryBenchmark
+    MMapDirectoryBenchmark.cpp
+)
+
 # ==================== Combined Benchmark Target ====================
 
 add_custom_target(run_all_benchmarks
-    DEPENDS run_IndexingBenchmark run_SearchBenchmark run_SIMDBenchmark
+    DEPENDS run_IndexingBenchmark run_SearchBenchmark run_SIMDBenchmark run_MMapDirectoryBenchmark
     COMMENT "Running all benchmarks"
 )
 

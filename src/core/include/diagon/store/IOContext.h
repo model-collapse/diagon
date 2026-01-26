@@ -44,6 +44,23 @@ struct IOContext {
         FLUSH
     };
 
+    /**
+     * @brief Read advice for memory-mapped files.
+     *
+     * Provides hints to the OS about expected access patterns.
+     * Maps to posix_madvise() on Linux/macOS, file flags on Windows.
+     */
+    enum class ReadAdvice {
+        /** Normal caching (default OS behavior) */
+        NORMAL,
+
+        /** Sequential access with read-ahead */
+        SEQUENTIAL,
+
+        /** Random access, disable read-ahead */
+        RANDOM
+    };
+
     /** The type of I/O operation */
     Type type;
 
@@ -93,6 +110,31 @@ struct IOContext {
         IOContext ctx(Type::FLUSH);
         ctx.flushSize = size;
         return ctx;
+    }
+
+    /**
+     * @brief Converts IOContext type to appropriate ReadAdvice.
+     *
+     * Mapping:
+     * - MERGE/FLUSH → SEQUENTIAL (large sequential reads/writes)
+     * - READONCE → SEQUENTIAL (single-pass sequential read)
+     * - READ → RANDOM (multiple random accesses expected)
+     * - DEFAULT → NORMAL (let OS decide)
+     *
+     * @return ReadAdvice appropriate for this context
+     */
+    ReadAdvice getReadAdvice() const {
+        switch (type) {
+            case Type::MERGE:
+            case Type::FLUSH:
+            case Type::READONCE:
+                return ReadAdvice::SEQUENTIAL;
+            case Type::READ:
+                return ReadAdvice::RANDOM;
+            case Type::DEFAULT:
+            default:
+                return ReadAdvice::NORMAL;
+        }
     }
 
     // Common pre-defined contexts

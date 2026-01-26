@@ -56,6 +56,10 @@ endif()
 add_diagon_test(IOContextTest unit/store/IOContextTest.cpp)
 add_diagon_test(IndexInputOutputTest unit/store/IndexInputOutputTest.cpp)
 add_diagon_test(FSDirectoryTest unit/store/FSDirectoryTest.cpp)
+add_diagon_test(MMapDirectoryTest unit/store/MMapDirectoryTest.cpp)
+add_diagon_test(MMapPlatformTest unit/store/MMapPlatformTest.cpp)
+add_diagon_test(MMapDirectoryIntegrationTest unit/store/MMapDirectoryIntegrationTest.cpp)
+add_diagon_test(MMapDirectoryFallbackTest unit/store/MMapDirectoryFallbackTest.cpp)
 
 # Index tests
 add_diagon_test(FieldInfoTest unit/index/FieldInfoTest.cpp)
@@ -70,12 +74,24 @@ add_diagon_test(DocumentsWriterPerThreadTest unit/index/DocumentsWriterPerThread
 add_diagon_test(DocumentsWriterTest unit/index/DocumentsWriterTest.cpp)
 add_diagon_test(SegmentInfoTest unit/index/SegmentInfoTest.cpp)
 add_diagon_test(SegmentFlushTest unit/index/SegmentFlushTest.cpp)
+add_diagon_test(DeletionIntegrationTest unit/index/DeletionIntegrationTest.cpp)
+add_diagon_test(TieredMergePolicyTest unit/index/TieredMergePolicyTest.cpp)
+add_diagon_test(ReaderReopenTest unit/index/ReaderReopenTest.cpp)
+add_diagon_test(CacheHelperTest unit/index/CacheHelperTest.cpp)
 
 # Codec tests
 add_diagon_test(CodecTest unit/codecs/CodecTest.cpp)
+add_diagon_test(NumericDocValuesWriterTest unit/codecs/NumericDocValuesWriterTest.cpp)
+add_diagon_test(NumericDocValuesReaderTest unit/codecs/NumericDocValuesReaderTest.cpp)
+add_diagon_test(NumericDocValuesIntegrationTest unit/codecs/NumericDocValuesIntegrationTest.cpp)
+add_diagon_test(StoredFieldsWriterTest unit/codecs/StoredFieldsWriterTest.cpp)
+add_diagon_test(StoredFieldsReaderTest unit/codecs/StoredFieldsReaderTest.cpp)
+add_diagon_test(StoredFieldsIntegrationTest unit/codecs/StoredFieldsIntegrationTest.cpp)
+add_diagon_test(LiveDocsFormatTest unit/codecs/LiveDocsFormatTest.cpp)
 add_diagon_test(PostingsWriterTest unit/codecs/PostingsWriterTest.cpp)
 add_diagon_test(PostingsReaderTest unit/codecs/PostingsReaderTest.cpp)
 add_diagon_test(BlockTreeTest unit/codecs/BlockTreeTest.cpp)
+add_diagon_test(NormsTest unit/codecs/NormsTest.cpp)
 
 # Column tests
 add_diagon_test(ColumnTest unit/columns/ColumnTest.cpp)

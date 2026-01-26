@@ -21,6 +21,8 @@ set(DIAGON_CORE_SOURCES
     src/store/IndexInput.cpp
     src/store/IndexOutput.cpp
     src/store/FSDirectory.cpp
+    src/store/MMapDirectory.cpp
+    src/store/MMapIndexInput.cpp
 
     # Document (User-facing API for documents and fields)
     src/document/Field.cpp
@@ -37,17 +39,26 @@ set(DIAGON_CORE_SOURCES
     src/index/SegmentInfo.cpp
     src/index/SegmentReader.cpp
     src/index/DirectoryReader.cpp
+    src/index/TieredMergePolicy.cpp
+    src/index/SegmentMerger.cpp
 
     # Codecs (Codec architecture - Module 02)
     src/codecs/Codec.cpp
     src/codecs/PostingsFormat.cpp
     src/codecs/DocValuesFormat.cpp
     src/codecs/ColumnFormat.cpp
+    src/codecs/NumericDocValuesWriter.cpp
+    src/codecs/NumericDocValuesReader.cpp
+    src/codecs/StoredFieldsWriter.cpp
+    src/codecs/StoredFieldsReader.cpp
+    src/codecs/LiveDocsFormat.cpp
     src/codecs/SimpleFieldsConsumer.cpp
     src/codecs/SimpleFieldsProducer.cpp
     src/codecs/lucene104/Lucene104Codec.cpp
     src/codecs/lucene104/Lucene104PostingsWriter.cpp
     src/codecs/lucene104/Lucene104PostingsReader.cpp
+    src/codecs/lucene104/Lucene104NormsWriter.cpp
+    src/codecs/lucene104/Lucene104NormsReader.cpp
     src/codecs/blocktree/BlockTreeTermsWriter.cpp
     src/codecs/blocktree/BlockTreeTermsReader.cpp
 
@@ -58,9 +69,17 @@ set(DIAGON_CORE_SOURCES
     src/search/BM25ScorerSIMD.cpp
 )
 
+# Platform-specific mmap implementation
+if(UNIX)
+    list(APPEND DIAGON_CORE_SOURCES src/store/PosixMMapIndexInput.cpp)
+elseif(WIN32)
+    list(APPEND DIAGON_CORE_SOURCES src/store/WindowsMMapIndexInput.cpp)
+endif()
+
 set(DIAGON_CORE_HEADERS
     # Util
     include/diagon/util/BytesRef.h
+    include/diagon/util/Bits.h
     include/diagon/util/BitSet.h
     include/diagon/util/NumericUtils.h
     include/diagon/util/Exceptions.h
@@ -79,6 +98,10 @@ set(DIAGON_CORE_HEADERS
     include/diagon/store/ByteBuffersIndexOutput.h
     include/diagon/store/ByteBuffersIndexInput.h
     include/diagon/store/FSDirectory.h
+    include/diagon/store/MMapDirectory.h
+    include/diagon/store/MMapIndexInput.h
+    include/diagon/store/PosixMMapIndexInput.h
+    include/diagon/store/WindowsMMapIndexInput.h
     include/diagon/store/Lock.h
 
     # Document
@@ -88,6 +111,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/document/Document.h
 
     # Index
+    include/diagon/index/CacheHelper.h
     include/diagon/index/FieldInfo.h
     include/diagon/index/IndexMapping.h
     include/diagon/index/IndexReader.h
@@ -103,12 +127,14 @@ set(DIAGON_CORE_HEADERS
     include/diagon/index/OneMerge.h
     include/diagon/index/MergeScheduler.h
     include/diagon/index/TieredMergePolicy.h
+    include/diagon/index/SegmentMerger.h
     include/diagon/index/FreqProxTermsWriter.h
     include/diagon/index/DocumentsWriterPerThread.h
     include/diagon/index/DocumentsWriter.h
     include/diagon/index/SegmentInfo.h
     include/diagon/index/SegmentReader.h
     include/diagon/index/DirectoryReader.h
+    include/diagon/index/Term.h
 
     # Skip Indexes
     include/diagon/index/skipindex/IMergeTreeIndexGranule.h
@@ -122,6 +148,12 @@ set(DIAGON_CORE_HEADERS
     include/diagon/codecs/PostingsFormat.h
     include/diagon/codecs/DocValuesFormat.h
     include/diagon/codecs/ColumnFormat.h
+    include/diagon/codecs/NumericDocValuesWriter.h
+    include/diagon/codecs/NumericDocValuesReader.h
+    include/diagon/codecs/StoredFieldsWriter.h
+    include/diagon/codecs/StoredFieldsReader.h
+    include/diagon/codecs/LiveDocsFormat.h
+    include/diagon/codecs/NormsFormat.h
     include/diagon/codecs/OtherFormats.h
     include/diagon/codecs/SegmentState.h
     include/diagon/codecs/SimpleFieldsConsumer.h
@@ -129,6 +161,8 @@ set(DIAGON_CORE_HEADERS
     include/diagon/codecs/lucene104/Lucene104Codec.h
     include/diagon/codecs/lucene104/Lucene104PostingsWriter.h
     include/diagon/codecs/lucene104/Lucene104PostingsReader.h
+    include/diagon/codecs/lucene104/Lucene104NormsWriter.h
+    include/diagon/codecs/lucene104/Lucene104NormsReader.h
     include/diagon/codecs/blocktree/BlockTreeTermsWriter.h
     include/diagon/codecs/blocktree/BlockTreeTermsReader.h
 

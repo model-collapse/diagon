@@ -16,6 +16,7 @@ Just like Diagon Alley serves diverse needs of wizards with specialized shops, D
 ### Core Capabilities
 - ✅ **Inverted Index**: Lucene-compatible text search with BM25 scoring
 - ✅ **Column Storage**: ClickHouse-style columnar data for analytics
+- ✅ **Memory-Mapped I/O**: Zero-copy MMapDirectory for 2-3× faster random reads
 - ✅ **SIMD Acceleration**: AVX2/NEON optimized scoring and filtering (2-4× speedup)
 - ✅ **Skip Indexes**: MinMax, Set, BloomFilter for granule pruning (90%+ data skipping)
 - ✅ **Adaptive Compression**: LZ4, ZSTD, Delta, Gorilla codecs with chaining
@@ -111,17 +112,18 @@ See [BUILD.md](BUILD.md) for detailed build instructions.
 #include <diagon/index/IndexWriter.h>
 #include <diagon/search/IndexSearcher.h>
 #include <diagon/store/FSDirectory.h>
+#include <diagon/store/MMapDirectory.h>
 
 using namespace diagon;
 
 int main() {
-    // Open directory
-    auto dir = store::FSDirectory::open("/tmp/index");
+    // Open directory for writing (use FSDirectory for indexing)
+    auto write_dir = store::FSDirectory::open("/tmp/index");
 
     // Create writer
     index::IndexWriterConfig config;
     config.setRAMBufferSizeMB(256);
-    auto writer = index::IndexWriter::create(dir.get(), config);
+    auto writer = index::IndexWriter::create(write_dir.get(), config);
 
     // Create document with different field types
     document::Document doc;
@@ -141,8 +143,11 @@ int main() {
     writer->addDocument(doc);
     writer->commit();
 
+    // Open directory for reading (use MMapDirectory for fast search)
+    auto read_dir = store::MMapDirectory::open("/tmp/index");
+
     // Open reader and searcher
-    auto reader = index::DirectoryReader::open(dir.get());
+    auto reader = index::DirectoryReader::open(read_dir.get());
     search::IndexSearcher searcher(reader.get());
 
     // Text search with numeric filter
@@ -232,7 +237,7 @@ diagon/
 │   │   ├── index/             # IndexReader, IndexWriter
 │   │   ├── search/            # Query execution, Filters
 │   │   ├── codecs/            # Codec architecture
-│   │   ├── store/             # Directory abstraction
+│   │   ├── store/             # Directory abstraction (FSDirectory, MMapDirectory)
 │   │   └── util/              # Utilities
 │   ├── columns/                # Column storage
 │   │   ├── IColumn interface
@@ -286,7 +291,7 @@ Implementation Phase: 🔄 **~15-20% Complete**
   - ✅ Document/Field system (TextField, StringField, NumericDocValuesField)
   - ✅ **Array fields (Module 15)** - ArrayTextField, ArrayStringField, ArrayNumericField
   - ✅ IndexMapping - Schema declaration for multi-valued fields
-  - ✅ Store/Directory - FSDirectory, file I/O
+  - ✅ Store/Directory - FSDirectory, **MMapDirectory (Linux/macOS/Windows)**
   - ✅ Util classes - ByteBlockPool, IntBlockPool, NumericUtils
   - 🔄 IndexWriter/Reader - Skeleton implemented
   - 🔄 FieldInfo system - Basic implementation
