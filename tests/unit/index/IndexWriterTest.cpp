@@ -5,6 +5,7 @@
 
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/Term.h"
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
@@ -199,9 +200,10 @@ TEST_F(IndexWriterTest, OperationsAfterCloseThrow) {
     writer->close();
 
     Document doc = createDocument("test");
+    Term term("field", "value");
     EXPECT_THROW(writer->addDocument(doc), AlreadyClosedException);
-    EXPECT_THROW(writer->updateDocument(), AlreadyClosedException);
-    EXPECT_THROW(writer->deleteDocuments(), AlreadyClosedException);
+    EXPECT_THROW(writer->updateDocument(term, doc), AlreadyClosedException);
+    EXPECT_THROW(writer->deleteDocuments(term), AlreadyClosedException);
     EXPECT_THROW(writer->commit(), AlreadyClosedException);
     EXPECT_THROW(writer->flush(), AlreadyClosedException);
     EXPECT_THROW(writer->rollback(), AlreadyClosedException);
@@ -237,7 +239,9 @@ TEST_F(IndexWriterTest, UpdateDocumentIncrementsSequenceNumber) {
     IndexWriterConfig config;
     auto writer = std::make_unique<IndexWriter>(*dir, config);
 
-    int64_t seqNo = writer->updateDocument();
+    Term term("field", "value");
+    Document doc = createDocument("test");
+    int64_t seqNo = writer->updateDocument(term, doc);
     EXPECT_EQ(1, seqNo);
     EXPECT_EQ(2, writer->getSequenceNumber());
 }
@@ -246,7 +250,8 @@ TEST_F(IndexWriterTest, DeleteDocumentsIncrementsSequenceNumber) {
     IndexWriterConfig config;
     auto writer = std::make_unique<IndexWriter>(*dir, config);
 
-    int64_t seqNo = writer->deleteDocuments();
+    Term term("field", "value");
+    int64_t seqNo = writer->deleteDocuments(term);
     EXPECT_EQ(1, seqNo);
     EXPECT_EQ(2, writer->getSequenceNumber());
 }
@@ -266,9 +271,10 @@ TEST_F(IndexWriterTest, SequenceNumbersAreMonotonic) {
 
     std::vector<int64_t> seqNos;
     Document doc1 = createDocument("test1");
+    Term term("field", "value");
     seqNos.push_back(writer->addDocument(doc1));
-    seqNos.push_back(writer->updateDocument());
-    seqNos.push_back(writer->deleteDocuments());
+    seqNos.push_back(writer->updateDocument(term, doc1));
+    seqNos.push_back(writer->deleteDocuments(term));
     seqNos.push_back(writer->commit());
     Document doc2 = createDocument("test2");
     seqNos.push_back(writer->addDocument(doc2));

@@ -3,7 +3,10 @@
 
 #include "diagon/index/IndexReader.h"
 
+#include "diagon/codecs/StoredFieldsReader.h"
+#include "diagon/index/CacheHelper.h"
 #include "diagon/index/FieldInfo.h"
+#include "diagon/util/Bits.h"
 
 #include <gtest/gtest.h>
 
@@ -23,6 +26,14 @@ public:
         // Create minimal FieldInfos
         std::vector<FieldInfo> infos;
         fieldInfos_ = std::make_unique<FieldInfos>(std::move(infos));
+    }
+
+    // Context methods (from IndexReader base)
+    std::vector<LeafReaderContext> leaves() const override {
+        return {LeafReaderContext(const_cast<MockLeafReader*>(this), 0, 0)};
+    }
+    std::unique_ptr<IndexReaderContext> getContext() const override {
+        return std::make_unique<LeafReaderContextWrapper>(const_cast<MockLeafReader*>(this));
     }
 
     // Statistics
@@ -47,10 +58,10 @@ public:
     SortedNumericDocValues* getSortedNumericDocValues(const std::string& /*field*/) const override {
         return nullptr;
     }
-    StoredFieldsReader* storedFieldsReader() const override { return nullptr; }
+    diagon::codecs::StoredFieldsReader* storedFieldsReader() const override { return nullptr; }
     NumericDocValues* getNormValues(const std::string& /*field*/) const override { return nullptr; }
     const FieldInfos& getFieldInfos() const override { return *fieldInfos_; }
-    const Bits* getLiveDocs() const override { return nullptr; }
+    const diagon::util::Bits* getLiveDocs() const override { return nullptr; }
     PointValues* getPointValues(const std::string& /*field*/) const override { return nullptr; }
     CacheHelper* getCoreCacheHelper() const override { return nullptr; }
     CacheHelper* getReaderCacheHelper() const override { return nullptr; }
@@ -69,6 +80,38 @@ class MockCompositeReader : public CompositeReader {
 public:
     explicit MockCompositeReader(std::vector<std::shared_ptr<IndexReader>> subReaders)
         : subReaders_(std::move(subReaders)) {}
+
+    // Context methods (from IndexReader base)
+    std::vector<LeafReaderContext> leaves() const override {
+        std::vector<LeafReaderContext> result;
+        int docBase = 0;
+        for (const auto& subReader : subReaders_) {
+            // Recursively get leaves from sub-readers
+            auto subLeaves = subReader->leaves();
+            for (const auto& leafCtx : subLeaves) {
+                // Adjust docBase and add to result with correct ordinal
+                result.emplace_back(leafCtx.reader, docBase + leafCtx.docBase, static_cast<int>(result.size()));
+            }
+            docBase += subReader->maxDoc();
+        }
+        return result;
+    }
+    std::unique_ptr<IndexReaderContext> getContext() const override {
+        // Return a simple context wrapper for MockCompositeReader
+        class MockCompositeContext : public IndexReaderContext {
+        public:
+            explicit MockCompositeContext(const MockCompositeReader* reader) : reader_(reader) {}
+
+            IndexReader* reader() const override { return const_cast<MockCompositeReader*>(reader_); }
+            std::vector<LeafReaderContext> leaves() const override { return reader_->leaves(); }
+            bool isTopLevel() const override { return true; }
+
+        private:
+            const MockCompositeReader* reader_;
+        };
+
+        return std::make_unique<MockCompositeContext>(this);
+    }
 
     std::vector<std::shared_ptr<IndexReader>> getSequentialSubReaders() const override {
         return subReaders_;
