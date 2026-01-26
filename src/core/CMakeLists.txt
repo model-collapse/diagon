@@ -58,6 +58,7 @@ set(DIAGON_CORE_SOURCES
     src/codecs/lucene104/Lucene104Codec.cpp
     src/codecs/lucene104/Lucene104PostingsWriter.cpp
     src/codecs/lucene104/Lucene104PostingsReader.cpp
+    src/codecs/lucene104/Lucene104PostingsReaderOptimized.cpp
     src/codecs/lucene104/Lucene104NormsWriter.cpp
     src/codecs/lucene104/Lucene104NormsReader.cpp
     src/codecs/blocktree/BlockTreeTermsWriter.cpp
@@ -164,6 +165,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/codecs/lucene104/Lucene104Codec.h
     include/diagon/codecs/lucene104/Lucene104PostingsWriter.h
     include/diagon/codecs/lucene104/Lucene104PostingsReader.h
+    include/diagon/codecs/lucene104/Lucene104PostingsReaderOptimized.h
     include/diagon/codecs/lucene104/Lucene104NormsWriter.h
     include/diagon/codecs/lucene104/Lucene104NormsReader.h
     include/diagon/codecs/blocktree/BlockTreeTermsWriter.h

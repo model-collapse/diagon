@@ -56,10 +56,20 @@ add_diagon_benchmark(MMapDirectoryBenchmark
     MMapDirectoryBenchmark.cpp
 )
 
+# ==================== Postings Format Benchmarks ====================
+
+add_diagon_benchmark(PostingsFormatBenchmark
+    PostingsFormatBenchmark.cpp
+)
+
+add_diagon_benchmark(PostingsOptimizationBenchmark
+    PostingsOptimizationBenchmark.cpp
+)
+
 # ==================== Combined Benchmark Target ====================
 
 add_custom_target(run_all_benchmarks
-    DEPENDS run_IndexingBenchmark run_SearchBenchmark run_SIMDBenchmark run_MMapDirectoryBenchmark
+    DEPENDS run_IndexingBenchmark run_SearchBenchmark run_SIMDBenchmark run_MMapDirectoryBenchmark run_PostingsFormatBenchmark run_PostingsOptimizationBenchmark
     COMMENT "Running all benchmarks"
 )
 
