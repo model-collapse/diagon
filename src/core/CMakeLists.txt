@@ -12,6 +12,7 @@ set(DIAGON_CORE_SOURCES
     src/util/FST.cpp
     src/util/ByteBlockPool.cpp
     src/util/IntBlockPool.cpp
+    src/util/StreamVByte.cpp
     src/util/packed/DirectWriter.cpp
     src/util/packed/DirectMonotonicWriter.cpp
 
@@ -84,6 +85,8 @@ set(DIAGON_CORE_HEADERS
     include/diagon/util/NumericUtils.h
     include/diagon/util/Exceptions.h
     include/diagon/util/VByte.h
+    include/diagon/util/StreamVByte.h
+    include/diagon/util/SIMDUtils.h
     include/diagon/util/FST.h
     include/diagon/util/ByteBlockPool.h
     include/diagon/util/IntBlockPool.h
