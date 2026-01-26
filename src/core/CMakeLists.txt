@@ -45,6 +45,7 @@ set(DIAGON_CORE_SOURCES
     src/index/DirectoryReader.cpp
     src/index/TieredMergePolicy.cpp
     src/index/SegmentMerger.cpp
+    src/index/skipindex/MergeTreeIndexBloomFilter.cpp
 
     # Codecs (Codec architecture - Module 02)
     src/codecs/Codec.cpp
@@ -158,6 +159,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/index/skipindex/IMergeTreeIndexCondition.h
     include/diagon/index/skipindex/IMergeTreeIndex.h
     include/diagon/index/skipindex/MergeTreeIndexMinMax.h
+    include/diagon/index/skipindex/MergeTreeIndexBloomFilter.h
 
     # Codecs
     include/diagon/codecs/Codec.h
