@@ -73,6 +73,8 @@ set(DIAGON_CORE_SOURCES
 
     # Sparse (Sparse vector support)
     src/sparse/SparseVector.cpp
+    src/sparse/SindiScorer.cpp
+    src/sparse/SindiIndex.cpp
 )
 
 # Platform-specific mmap implementation
@@ -217,6 +219,8 @@ set(DIAGON_CORE_HEADERS
 
     # Sparse
     include/diagon/sparse/SparseVector.h
+    include/diagon/sparse/SindiScorer.h
+    include/diagon/sparse/SindiIndex.h
 
     # Storage Tiers
     include/diagon/storage/StorageTier.h
@@ -257,6 +261,14 @@ if(DIAGON_ENABLE_SIMD AND HAVE_AVX2)
     set_source_files_properties(
         src/search/BM25ScorerSIMD.cpp
         PROPERTIES COMPILE_FLAGS "-mavx2 -mfma"
+    )
+endif()
+
+# SindiScorer needs AVX2 instructions
+if(DIAGON_ENABLE_SIMD AND HAVE_AVX2)
+    set_source_files_properties(
+        src/sparse/SindiScorer.cpp
+        PROPERTIES COMPILE_FLAGS "-mavx2"
     )
 endif()
 
