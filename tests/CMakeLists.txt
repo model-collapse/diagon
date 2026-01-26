@@ -54,6 +54,7 @@ add_diagon_test(BitSetTest unit/util/BitSetTest.cpp)
 add_diagon_test(NumericUtilsTest unit/util/NumericUtilsTest.cpp)
 add_diagon_test(FSTTest unit/util/FSTTest.cpp)
 add_diagon_test(BlockPoolTest unit/util/BlockPoolTest.cpp)
+add_diagon_test(BloomFilterTest unit/util/BloomFilterTest.cpp)
 
 # NumericUtilsTest needs proper NaN/Infinity handling, disable -ffast-math
 if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")

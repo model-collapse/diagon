@@ -13,6 +13,8 @@ set(DIAGON_CORE_SOURCES
     src/util/ByteBlockPool.cpp
     src/util/IntBlockPool.cpp
     src/util/StreamVByte.cpp
+    src/util/BloomFilter.cpp
+    src/util/CityHash.cpp
     src/util/packed/DirectWriter.cpp
     src/util/packed/DirectMonotonicWriter.cpp
 
@@ -98,6 +100,8 @@ set(DIAGON_CORE_HEADERS
     include/diagon/util/FST.h
     include/diagon/util/ByteBlockPool.h
     include/diagon/util/IntBlockPool.h
+    include/diagon/util/BloomFilter.h
+    include/diagon/util/CityHash.h
     include/diagon/util/packed/DirectWriter.h
     include/diagon/util/packed/DirectMonotonicWriter.h
 
