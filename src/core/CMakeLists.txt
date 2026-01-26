@@ -28,6 +28,7 @@ set(DIAGON_CORE_SOURCES
     # Document (User-facing API for documents and fields)
     src/document/Field.cpp
     src/document/ArrayField.cpp
+    src/document/SparseVectorField.cpp
 
     # Index (FieldInfo - Module 10, IndexReader/Writer - Module 01, IndexMapping - Module 15)
     src/index/FieldInfo.cpp
@@ -69,6 +70,9 @@ set(DIAGON_CORE_SOURCES
     src/search/TermQuery.cpp
     src/search/IndexSearcher.cpp
     src/search/BM25ScorerSIMD.cpp
+
+    # Sparse (Sparse vector support)
+    src/sparse/SparseVector.cpp
 )
 
 # Platform-specific mmap implementation
@@ -112,6 +116,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/document/IndexableField.h
     include/diagon/document/Field.h
     include/diagon/document/ArrayField.h
+    include/diagon/document/SparseVectorField.h
     include/diagon/document/Document.h
 
     # Index
@@ -209,6 +214,9 @@ set(DIAGON_CORE_HEADERS
     include/diagon/search/TopScoreDocCollector.h
     include/diagon/search/TermQuery.h
     include/diagon/search/BM25Similarity.h
+
+    # Sparse
+    include/diagon/sparse/SparseVector.h
 
     # Storage Tiers
     include/diagon/storage/StorageTier.h

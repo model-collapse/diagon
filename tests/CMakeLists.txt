@@ -39,6 +39,10 @@ endfunction()
 # Document tests
 add_diagon_test(DocumentTest unit/document/DocumentTest.cpp)
 add_diagon_test(ArrayFieldTest unit/document/ArrayFieldTest.cpp)
+add_diagon_test(SparseVectorFieldTest unit/document/SparseVectorFieldTest.cpp)
+
+# Sparse tests
+add_diagon_test(SparseVectorTest unit/sparse/SparseVectorTest.cpp)
 
 # Util tests
 add_diagon_test(BytesRefTest unit/util/BytesRefTest.cpp)
@@ -78,6 +82,10 @@ add_diagon_test(DeletionIntegrationTest unit/index/DeletionIntegrationTest.cpp)
 add_diagon_test(TieredMergePolicyTest unit/index/TieredMergePolicyTest.cpp)
 add_diagon_test(ReaderReopenTest unit/index/ReaderReopenTest.cpp)
 add_diagon_test(CacheHelperTest unit/index/CacheHelperTest.cpp)
+add_diagon_test(IndexWriterRollbackTest unit/index/IndexWriterRollbackTest.cpp)
+add_diagon_test(ForceMergeTest unit/index/ForceMergeTest.cpp)
+add_diagon_test(ForceMergeDebugTest unit/index/ForceMergeDebugTest.cpp)
+add_diagon_test(NormsIntegrationTest unit/index/NormsIntegrationTest.cpp)
 
 # Codec tests
 add_diagon_test(CodecTest unit/codecs/CodecTest.cpp)
@@ -90,6 +98,9 @@ add_diagon_test(StoredFieldsIntegrationTest unit/codecs/StoredFieldsIntegrationT
 add_diagon_test(LiveDocsFormatTest unit/codecs/LiveDocsFormatTest.cpp)
 add_diagon_test(PostingsWriterTest unit/codecs/PostingsWriterTest.cpp)
 add_diagon_test(PostingsReaderTest unit/codecs/PostingsReaderTest.cpp)
+add_diagon_test(StreamVBytePostingsDebugTest unit/codecs/StreamVBytePostingsDebugTest.cpp)
+add_diagon_test(StreamVBytePostingsRoundTripTest unit/codecs/StreamVBytePostingsRoundTripTest.cpp)
+add_diagon_test(PostingsWriterReaderRoundTripTest unit/codecs/PostingsWriterReaderRoundTripTest.cpp)
 add_diagon_test(BlockTreeTest unit/codecs/BlockTreeTest.cpp)
 add_diagon_test(NormsTest unit/codecs/NormsTest.cpp)
 
@@ -113,6 +124,7 @@ add_diagon_test(GranularityTest unit/granularity/GranularityTest.cpp)
 # Search tests
 add_diagon_test(SearchTest unit/search/SearchTest.cpp)
 add_diagon_test(TopScoreDocCollectorTest unit/search/TopScoreDocCollectorTest.cpp)
+add_diagon_test(BM25NormsIntegrationTest unit/search/BM25NormsIntegrationTest.cpp)
 
 # TopScoreDocCollectorTest needs proper NaN handling, disable -ffast-math
 if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
@@ -137,6 +149,10 @@ add_diagon_test(StreamVByteTest unit/util/StreamVByteTest.cpp)
 add_diagon_test(SIMDUtilsTest unit/util/SIMDUtilsTest.cpp)
 
 message(STATUS "Diagon Tests configured")
+
+# Integration tests
+add_diagon_test(BasicEndToEndTest integration/BasicEndToEndTest.cpp)
+
 add_diagon_test(DirectWriterTest unit/util/packed/DirectWriterTest.cpp)
 
 ## Phase 4 tests
