@@ -86,7 +86,7 @@ TEST_F(BM25ScorerSIMDTest, ScalarScoring) {
     }
 }
 
-#ifdef DIAGON_HAVE_AVX2
+#if defined(DIAGON_HAVE_AVX2) || defined(DIAGON_HAVE_NEON)
 
 TEST_F(BM25ScorerSIMDTest, SIMDCorrectnessVsScalar) {
     // Test SIMD scoring matches scalar scoring
@@ -96,16 +96,23 @@ TEST_F(BM25ScorerSIMDTest, SIMDCorrectnessVsScalar) {
     // Create scorer
     auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_);
 
-    // Test frequencies
-    alignas(32) int freqs[8] = {1, 2, 3, 5, 10, 20, 50, 100};
-    alignas(32) long norms[8] = {1, 1, 1, 1, 1, 1, 1, 1};
-    alignas(32) float scores[8];
+    // Test frequencies (batch size depends on platform)
+    constexpr int BATCH = DIAGON_BM25_BATCH_SIZE;
+    alignas(32) int freqs[BATCH];
+    alignas(32) long norms[BATCH];
+    alignas(32) float scores[BATCH];
+
+    // Initialize test data
+    for (int i = 0; i < BATCH; ++i) {
+        freqs[i] = (i + 1) * 10;  // 10, 20, 30, ...
+        norms[i] = 1;
+    }
 
     // Compute SIMD scores
     scorer->scoreBatch(freqs, norms, scores);
 
     // Verify against scalar computation
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < BATCH; i++) {
         float expected = computeExpectedScore(freqs[i], norms[i]);
         EXPECT_TRUE(approxEqual(scores[i], expected))
             << "i=" << i << ", freq=" << freqs[i] << ", expected=" << expected
@@ -119,14 +126,14 @@ TEST_F(BM25ScorerSIMDTest, SIMDUniformNorm) {
     TestDummyWeight weight;
     auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_);
 
-    alignas(32) int freqs[8] = {1, 2, 3, 5, 10, 20, 50, 100};
-    alignas(32) float scores[8];
+    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {1, 2, 3, 5, 10, 20, 50, 100};
+    alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
 
     // Compute with uniform norm
     scorer->scoreBatchUniformNorm(freqs, 1L, scores);
 
     // Verify against scalar
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
         float expected = computeExpectedScore(freqs[i], 1L);
         EXPECT_TRUE(approxEqual(scores[i], expected))
             << "i=" << i << ", freq=" << freqs[i] << ", expected=" << expected
@@ -140,13 +147,13 @@ TEST_F(BM25ScorerSIMDTest, ZeroFrequencies) {
     TestDummyWeight weight;
     auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_);
 
-    alignas(32) int freqs[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-    alignas(32) long norms[8] = {1, 1, 1, 1, 1, 1, 1, 1};
-    alignas(32) float scores[8];
+    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0};
+    alignas(32) long norms[DIAGON_BM25_BATCH_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1};
+    alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
 
     scorer->scoreBatch(freqs, norms, scores);
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
         EXPECT_FLOAT_EQ(scores[i], 0.0f) << "i=" << i;
     }
 }
@@ -157,13 +164,13 @@ TEST_F(BM25ScorerSIMDTest, MixedFrequencies) {
     TestDummyWeight weight;
     auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_);
 
-    alignas(32) int freqs[8] = {0, 1, 0, 5, 0, 20, 0, 100};
-    alignas(32) long norms[8] = {1, 1, 1, 1, 1, 1, 1, 1};
-    alignas(32) float scores[8];
+    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {0, 1, 0, 5, 0, 20, 0, 100};
+    alignas(32) long norms[DIAGON_BM25_BATCH_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1};
+    alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
 
     scorer->scoreBatch(freqs, norms, scores);
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
         float expected = computeExpectedScore(freqs[i], norms[i]);
         EXPECT_TRUE(approxEqual(scores[i], expected))
             << "i=" << i << ", freq=" << freqs[i] << ", expected=" << expected
@@ -177,9 +184,9 @@ TEST_F(BM25ScorerSIMDTest, HighFrequencies) {
     TestDummyWeight weight;
     auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_);
 
-    alignas(32) int freqs[8] = {100, 200, 500, 1000, 2000, 5000, 10000, 20000};
-    alignas(32) long norms[8] = {1, 1, 1, 1, 1, 1, 1, 1};
-    alignas(32) float scores[8];
+    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {100, 200, 500, 1000, 2000, 5000, 10000, 20000};
+    alignas(32) long norms[DIAGON_BM25_BATCH_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1};
+    alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
 
     scorer->scoreBatch(freqs, norms, scores);
 
@@ -192,7 +199,7 @@ TEST_F(BM25ScorerSIMDTest, HighFrequencies) {
     }
 
     // Verify against scalar
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
         float expected = computeExpectedScore(freqs[i], norms[i]);
         EXPECT_TRUE(approxEqual(scores[i], expected)) << "i=" << i << ", freq=" << freqs[i];
     }
@@ -212,16 +219,16 @@ TEST_F(BM25ScorerSIMDTest, DifferentParameters) {
         {0.5f, 0.5f},   // Low k1 and b
     };
 
-    alignas(32) int freqs[8] = {1, 2, 3, 5, 10, 20, 50, 100};
-    alignas(32) long norms[8] = {1, 1, 1, 1, 1, 1, 1, 1};
-    alignas(32) float scores[8];
+    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {1, 2, 3, 5, 10, 20, 50, 100};
+    alignas(32) long norms[DIAGON_BM25_BATCH_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1};
+    alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
 
     for (const auto& [k1, b] : params) {
         auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1, b);
         scorer->scoreBatch(freqs, norms, scores);
 
         // Verify against scalar with same parameters
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
             float k = k1 * (1.0f - b + b * 1.0f / 1.0f);
             float expected = idf_ * freqs[i] * (k1 + 1.0f) / (freqs[i] + k);
 
@@ -242,7 +249,7 @@ TEST_F(BM25ScorerSIMDTest, Alignment) {
     std::vector<uint8_t> buffer(sizeof(int) * 8 + 1);
     int* unaligned_freqs = reinterpret_cast<int*>(buffer.data() + 1);
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
         unaligned_freqs[i] = (i + 1) * 10;
     }
 
@@ -253,7 +260,7 @@ TEST_F(BM25ScorerSIMDTest, Alignment) {
     scorer->scoreBatch(unaligned_freqs, norms.data(), scores.data());
 
     // Verify correctness
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
         float expected = computeExpectedScore(unaligned_freqs[i], norms[i]);
         EXPECT_TRUE(approxEqual(scores[i], expected))
             << "i=" << i << ", freq=" << unaligned_freqs[i];
@@ -271,11 +278,11 @@ TEST_F(BM25ScorerSIMDTest, RandomData) {
 
     // Test 100 batches of random data
     for (int batch = 0; batch < 100; batch++) {
-        alignas(32) int freqs[8];
-        alignas(32) long norms[8];
-        alignas(32) float scores[8];
+        alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE];
+        alignas(32) long norms[DIAGON_BM25_BATCH_SIZE];
+        alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
 
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
             freqs[i] = freq_dist(rng);
             norms[i] = 1L;
         }
@@ -283,7 +290,7 @@ TEST_F(BM25ScorerSIMDTest, RandomData) {
         scorer->scoreBatch(freqs, norms, scores);
 
         // Verify against scalar
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
             float expected = computeExpectedScore(freqs[i], norms[i]);
             EXPECT_TRUE(approxEqual(scores[i], expected))
                 << "batch=" << batch << ", i=" << i << ", freq=" << freqs[i]
@@ -292,7 +299,7 @@ TEST_F(BM25ScorerSIMDTest, RandomData) {
     }
 }
 
-#endif  // DIAGON_HAVE_AVX2
+#endif  // DIAGON_HAVE_AVX2 || DIAGON_HAVE_NEON
 
 // ==================== Performance Hint Tests ====================
 

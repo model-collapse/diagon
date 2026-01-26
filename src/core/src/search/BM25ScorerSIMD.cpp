@@ -17,16 +17,21 @@ BM25ScorerSIMD::BM25ScorerSIMD(const Weight& weight, std::unique_ptr<index::Post
     , b_(b)
     , k1_plus_1_(k1 + 1.0f) {
 #ifdef DIAGON_HAVE_AVX2
-    // Precompute SIMD constants
+    // Precompute SIMD constants (AVX2: 8 floats)
     idf_vec_ = _mm256_set1_ps(idf_);
     k1_vec_ = _mm256_set1_ps(k1_);
     b_vec_ = _mm256_set1_ps(b_);
     k1_plus_1_vec_ = _mm256_set1_ps(k1_plus_1_);
     one_minus_b_vec_ = _mm256_set1_ps(1.0f - b_);
-
-    // Phase 4: Simplified - avgFieldLength = 1.0
-    // Phase 5 will use actual field statistics
     avgFieldLength_vec_ = _mm256_set1_ps(1.0f);
+#elif defined(DIAGON_HAVE_NEON)
+    // Precompute SIMD constants (NEON: 4 floats)
+    idf_vec_ = vdupq_n_f32(idf_);
+    k1_vec_ = vdupq_n_f32(k1_);
+    b_vec_ = vdupq_n_f32(b_);
+    k1_plus_1_vec_ = vdupq_n_f32(k1_plus_1_);
+    one_minus_b_vec_ = vdupq_n_f32(1.0f - b_);
+    avgFieldLength_vec_ = vdupq_n_f32(1.0f);
 #endif
 }
 
@@ -174,6 +179,98 @@ __m256 BM25ScorerSIMD::int32ToFloat(__m256i int_vec) const {
 }
 
 #endif  // DIAGON_HAVE_AVX2
+
+// ==================== ARM NEON Implementation ====================
+
+#ifdef DIAGON_HAVE_NEON
+
+void BM25ScorerSIMD::scoreBatch(const int* freqs, const long* norms, float* scores) const {
+    // Load 4 frequencies as integers
+    IntVec freq_ints = vld1q_s32(freqs);
+
+    // Convert frequencies to floats
+    FloatVec freq_floats = int32ToFloat(freq_ints);
+
+    // Load and decode 4 norms
+    // Phase 4: Simplified - all norms decode to 1.0
+    FloatVec fieldLengths = vdupq_n_f32(1.0f);
+
+    // Compute k = k1 * (1 - b + b * fieldLength / avgFieldLength)
+    // k = k1 * (1 - b + b * fieldLength)  [since avgFieldLength = 1.0 in Phase 4]
+    FloatVec b_times_fieldLength = vmulq_f32(b_vec_, fieldLengths);
+    FloatVec one_minus_b_plus_term = vaddq_f32(one_minus_b_vec_, b_times_fieldLength);
+    FloatVec k = vmulq_f32(k1_vec_, one_minus_b_plus_term);
+
+    // Compute numerator = idf * freq * (k1 + 1)
+    FloatVec numerator = vmulq_f32(idf_vec_, freq_floats);
+    numerator = vmulq_f32(numerator, k1_plus_1_vec_);
+
+    // Compute denominator = freq + k
+    FloatVec denominator = vaddq_f32(freq_floats, k);
+
+    // Compute score = numerator / denominator
+    // NEON doesn't have direct division, use reciprocal estimate + Newton-Raphson
+    FloatVec recip = vrecpeq_f32(denominator);  // Initial estimate
+    recip = vmulq_f32(vrecpsq_f32(denominator, recip), recip);  // Newton-Raphson iteration
+    FloatVec score_vec = vmulq_f32(numerator, recip);
+
+    // Store results
+    vst1q_f32(scores, score_vec);
+}
+
+void BM25ScorerSIMD::scoreBatchUniformNorm(const int* freqs, long norm, float* scores) const {
+    // Load 4 frequencies as integers
+    IntVec freq_ints = vld1q_s32(freqs);
+
+    // Convert frequencies to floats
+    FloatVec freq_floats = int32ToFloat(freq_ints);
+
+    // Uniform field length (same for all 4 documents)
+    // Phase 4: Simplified - norm decodes to 1.0
+    FloatVec fieldLength = vdupq_n_f32(1.0f);
+
+    // Compute k = k1 * (1 - b + b * fieldLength / avgFieldLength)
+    // Use FMA if available (ARMv8.2+)
+#ifdef __ARM_FEATURE_FMA
+    // k = k1 * (one_minus_b + b * fieldLength)
+    FloatVec k = vfmaq_f32(one_minus_b_vec_, b_vec_, fieldLength);
+    k = vmulq_f32(k1_vec_, k);
+#else
+    FloatVec b_times_fieldLength = vmulq_f32(b_vec_, fieldLength);
+    FloatVec one_minus_b_plus_term = vaddq_f32(one_minus_b_vec_, b_times_fieldLength);
+    FloatVec k = vmulq_f32(k1_vec_, one_minus_b_plus_term);
+#endif
+
+    // Compute numerator = idf * freq * (k1 + 1)
+    FloatVec numerator = vmulq_f32(idf_vec_, freq_floats);
+    numerator = vmulq_f32(numerator, k1_plus_1_vec_);
+
+    // Compute denominator = freq + k
+    FloatVec denominator = vaddq_f32(freq_floats, k);
+
+    // Compute score = numerator / denominator
+    // Use reciprocal with Newton-Raphson refinement for better accuracy
+    FloatVec recip = vrecpeq_f32(denominator);
+    recip = vmulq_f32(vrecpsq_f32(denominator, recip), recip);
+    FloatVec score_vec = vmulq_f32(numerator, recip);
+
+    // Store results
+    vst1q_f32(scores, score_vec);
+}
+
+BM25ScorerSIMD::FloatVec BM25ScorerSIMD::decodeNormsVec(const IntVec norms_vec) const {
+    // Phase 4: Simplified - all norms decode to 1.0
+    return vdupq_n_f32(1.0f);
+}
+
+BM25ScorerSIMD::FloatVec BM25ScorerSIMD::int32ToFloat(IntVec int_vec) const {
+    // Convert 4 x int32 to 4 x float
+    return vcvtq_f32_s32(int_vec);
+}
+
+#endif  // DIAGON_HAVE_NEON
+
+// ==================== Factory Function ====================
 
 std::unique_ptr<BM25ScorerSIMD> createBM25Scorer(const Weight& weight,
                                                  std::unique_ptr<index::PostingsEnum> postings,
