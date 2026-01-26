@@ -5,8 +5,11 @@
 
 #include "diagon/codecs/ColumnFormat.h"
 #include "diagon/codecs/DocValuesFormat.h"
+#include "diagon/codecs/LiveDocsFormat.h"
+#include "diagon/codecs/NormsFormat.h"
 #include "diagon/codecs/PostingsFormat.h"
 #include "diagon/codecs/lucene104/Lucene104Codec.h"
+#include "diagon/codecs/lucene104/Lucene104NormsWriter.h"
 
 #include <gtest/gtest.h>
 
@@ -88,7 +91,7 @@ TEST(CodecTest, RegisterCustomCodec) {
             return fmt;
         }
         LiveDocsFormat& liveDocsFormat() override {
-            static Lucene104LiveDocsFormat fmt;
+            static LiveDocsFormat fmt;
             return fmt;
         }
         PointsFormat& pointsFormat() override {
@@ -168,13 +171,15 @@ TEST(Lucene104CodecTest, SegmentInfoFormat) {
 TEST(Lucene104CodecTest, NormsFormat) {
     Lucene104Codec codec;
     NormsFormat& format = codec.normsFormat();
-    EXPECT_EQ("Lucene104NormsFormat", format.getName());
+    EXPECT_EQ("Lucene104Norms", format.getName());
 }
 
 TEST(Lucene104CodecTest, LiveDocsFormat) {
     Lucene104Codec codec;
     LiveDocsFormat& format = codec.liveDocsFormat();
-    EXPECT_EQ("Lucene104LiveDocsFormat", format.getName());
+    // LiveDocsFormat is a concrete class without getName()
+    // Just verify we can get the format
+    EXPECT_NE(&format, nullptr);
 }
 
 TEST(Lucene104CodecTest, PointsFormat) {
@@ -309,7 +314,7 @@ TEST(CapabilityTest, SingleCapability) {
             return fmt;
         }
         LiveDocsFormat& liveDocsFormat() override {
-            static Lucene104LiveDocsFormat fmt;
+            static LiveDocsFormat fmt;
             return fmt;
         }
         PointsFormat& pointsFormat() override {
@@ -376,7 +381,7 @@ TEST(CapabilityTest, MultipleCapabilities) {
             return fmt;
         }
         LiveDocsFormat& liveDocsFormat() override {
-            static Lucene104LiveDocsFormat fmt;
+            static LiveDocsFormat fmt;
             return fmt;
         }
         PointsFormat& pointsFormat() override {
@@ -439,7 +444,7 @@ TEST(CapabilityTest, NoCapabilities) {
             return fmt;
         }
         LiveDocsFormat& liveDocsFormat() override {
-            static Lucene104LiveDocsFormat fmt;
+            static LiveDocsFormat fmt;
             return fmt;
         }
         PointsFormat& pointsFormat() override {

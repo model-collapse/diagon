@@ -7,6 +7,7 @@
 #include "diagon/codecs/ColumnFormat.h"
 #include "diagon/codecs/DocValuesFormat.h"
 #include "diagon/codecs/LiveDocsFormat.h"
+#include "diagon/codecs/NormsFormat.h"
 #include "diagon/codecs/OtherFormats.h"
 #include "diagon/codecs/PostingsFormat.h"
 
