@@ -5,6 +5,7 @@
 
 #include "diagon/store/ByteBuffersIndexOutput.h"
 #include "diagon/util/Exceptions.h"
+#include "diagon/util/StreamVByte.h"
 
 #include <stdexcept>
 
@@ -24,7 +25,10 @@ Lucene104PostingsWriter::Lucene104PostingsWriter(index::SegmentWriteState& state
     , docCount_(0)
     , totalTermFreq_(0)
     , segmentName_(state.segmentName)
-    , segmentSuffix_(state.segmentSuffix) {
+    , segmentSuffix_(state.segmentSuffix)
+    , docDeltaBuffer_{}  // Zero-initialize
+    , freqBuffer_{}      // Zero-initialize
+    , bufferPos_(0) {
     // Create .doc output file
     std::string docFileName = segmentName_;
     if (!segmentSuffix_.empty()) {
@@ -65,6 +69,7 @@ void Lucene104PostingsWriter::startTerm() {
     lastDocID_ = 0;
     docCount_ = 0;
     totalTermFreq_ = 0;
+    bufferPos_ = 0;  // Reset StreamVByte buffer
 }
 
 void Lucene104PostingsWriter::startDoc(int docID, int freq) {
@@ -81,13 +86,14 @@ void Lucene104PostingsWriter::startDoc(int docID, int freq) {
         throw std::invalid_argument("freq must be > 0");
     }
 
-    // Write doc delta (delta encoding for compression)
+    // Buffer doc delta and frequency for StreamVByte encoding
     int docDelta = docID - lastDocID_;
-    docOut_->writeVInt(docDelta);
+    docDeltaBuffer_[bufferPos_] = static_cast<uint32_t>(docDelta);
+    freqBuffer_[bufferPos_] = static_cast<uint32_t>(freq);
+    bufferPos_++;
 
-    // Write frequency if required
+    // Update state
     if (writeFreqs_) {
-        docOut_->writeVInt(freq);
         totalTermFreq_ += freq;
     } else {
         totalTermFreq_ = -1;  // Not tracked for DOCS_ONLY
@@ -95,9 +101,26 @@ void Lucene104PostingsWriter::startDoc(int docID, int freq) {
 
     lastDocID_ = docID;
     docCount_++;
+
+    // Flush when buffer is full
+    if (bufferPos_ >= BUFFER_SIZE) {
+        flushBuffer();
+    }
 }
 
 TermState Lucene104PostingsWriter::finishTerm() {
+    // Flush any remaining buffered data
+    if (bufferPos_ > 0) {
+        // If we have fewer than 4 docs remaining, use VInt fallback
+        for (int i = 0; i < bufferPos_; ++i) {
+            docOut_->writeVInt(static_cast<int32_t>(docDeltaBuffer_[i]));
+            if (writeFreqs_) {
+                docOut_->writeVInt(static_cast<int32_t>(freqBuffer_[i]));
+            }
+        }
+        bufferPos_ = 0;
+    }
+
     TermState state;
     state.docStartFP = docStartFP_;
     state.docFreq = docCount_;
@@ -105,6 +128,26 @@ TermState Lucene104PostingsWriter::finishTerm() {
     state.skipOffset = -1;  // No skip list in Phase 2 MVP
 
     return state;
+}
+
+void Lucene104PostingsWriter::flushBuffer() {
+    if (bufferPos_ != BUFFER_SIZE) {
+        return;  // Only flush when buffer is full (4 docs)
+    }
+
+    // Encode doc deltas using StreamVByte
+    uint8_t docDeltaEncoded[17];  // Max: 1 control + 4*4 data bytes
+    int docDeltaBytes = util::StreamVByte::encode(docDeltaBuffer_, BUFFER_SIZE, docDeltaEncoded);
+    docOut_->writeBytes(docDeltaEncoded, docDeltaBytes);
+
+    // Encode frequencies using StreamVByte (if required)
+    if (writeFreqs_) {
+        uint8_t freqEncoded[17];
+        int freqBytes = util::StreamVByte::encode(freqBuffer_, BUFFER_SIZE, freqEncoded);
+        docOut_->writeBytes(freqEncoded, freqBytes);
+    }
+
+    bufferPos_ = 0;  // Reset buffer
 }
 
 void Lucene104PostingsWriter::close() {

@@ -229,15 +229,20 @@ TEST(PostingsWriterTest, FilePointerProgression) {
     writer.startTerm();
     int64_t startFP = writer.getFilePointer();
 
+    // Phase 2a: With StreamVByte buffering, file pointer doesn't advance
+    // until buffer flushes (4 docs) or finishTerm() is called
     writer.startDoc(0, 1);
     int64_t afterDoc1 = writer.getFilePointer();
-    EXPECT_GT(afterDoc1, startFP);
+    EXPECT_EQ(afterDoc1, startFP);  // No write yet (buffer not full)
 
     writer.startDoc(5, 3);
     int64_t afterDoc2 = writer.getFilePointer();
-    EXPECT_GT(afterDoc2, afterDoc1);
+    EXPECT_EQ(afterDoc2, startFP);  // Still no write (buffer not full)
 
+    // After finishTerm, remaining buffered docs are written
     writer.finishTerm();
+    int64_t afterFinish = writer.getFilePointer();
+    EXPECT_GT(afterFinish, startFP);  // Now data is written
 }
 
 TEST(PostingsWriterTest, LargeDocIDs) {

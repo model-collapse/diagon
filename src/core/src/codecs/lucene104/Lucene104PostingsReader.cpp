@@ -5,6 +5,7 @@
 
 #include "diagon/store/ByteBuffersIndexInput.h"
 #include "diagon/util/Exceptions.h"
+#include "diagon/util/StreamVByte.h"
 
 namespace diagon {
 namespace codecs {
@@ -66,7 +67,11 @@ Lucene104PostingsEnum::Lucene104PostingsEnum(store::IndexInput* docIn, const Ter
     , writeFreqs_(writeFreqs)
     , currentDoc_(-1)
     , currentFreq_(1)
-    , docsRead_(0) {
+    , docsRead_(0)
+    , docDeltaBuffer_{}  // Zero-initialize
+    , freqBuffer_{}      // Zero-initialize
+    , bufferPos_(0)
+    , bufferLimit_(0) {
     // Seek to start of this term's postings
     docIn_->seek(termState.docStartFP);
 }
@@ -77,8 +82,13 @@ int Lucene104PostingsEnum::nextDoc() {
         return NO_MORE_DOCS;
     }
 
-    // Read doc delta (VInt encoded)
-    int docDelta = docIn_->readVInt();
+    // Refill buffer if empty
+    if (bufferPos_ >= bufferLimit_) {
+        refillBuffer();
+    }
+
+    // Get doc delta from buffer
+    int docDelta = static_cast<int32_t>(docDeltaBuffer_[bufferPos_]);
 
     // Update current doc (delta encoding)
     if (currentDoc_ == -1) {
@@ -87,15 +97,69 @@ int Lucene104PostingsEnum::nextDoc() {
         currentDoc_ += docDelta;
     }
 
-    // Read frequency if present
+    // Get frequency from buffer
     if (writeFreqs_) {
-        currentFreq_ = docIn_->readVInt();
+        currentFreq_ = static_cast<int32_t>(freqBuffer_[bufferPos_]);
     } else {
         currentFreq_ = 1;  // Default for DOCS_ONLY
     }
 
+    bufferPos_++;
     docsRead_++;
     return currentDoc_;
+}
+
+void Lucene104PostingsEnum::refillBuffer() {
+    bufferPos_ = 0;
+    int remaining = docFreq_ - docsRead_;
+
+    if (remaining >= BUFFER_SIZE) {
+        // Read StreamVByte-encoded group of 4 docs
+        uint8_t docDeltaEncoded[17];  // Max: 1 control + 4*4 data bytes
+        uint8_t controlByte = docIn_->readByte();
+        docDeltaEncoded[0] = controlByte;
+
+        // Calculate data bytes needed
+        int dataBytes = 0;
+        for (int i = 0; i < 4; ++i) {
+            int length = ((controlByte >> (i * 2)) & 0x03) + 1;
+            dataBytes += length;
+        }
+
+        // Read data bytes
+        docIn_->readBytes(docDeltaEncoded + 1, dataBytes);
+
+        // Decode 4 doc deltas
+        util::StreamVByte::decode4(docDeltaEncoded, docDeltaBuffer_);
+
+        // Read frequencies if present
+        if (writeFreqs_) {
+            uint8_t freqEncoded[17];
+            controlByte = docIn_->readByte();
+            freqEncoded[0] = controlByte;
+
+            // Calculate data bytes for frequencies
+            dataBytes = 0;
+            for (int i = 0; i < 4; ++i) {
+                int length = ((controlByte >> (i * 2)) & 0x03) + 1;
+                dataBytes += length;
+            }
+
+            docIn_->readBytes(freqEncoded + 1, dataBytes);
+            util::StreamVByte::decode4(freqEncoded, freqBuffer_);
+        }
+
+        bufferLimit_ = BUFFER_SIZE;
+    } else {
+        // Use VInt fallback for remaining docs (< 4)
+        bufferLimit_ = remaining;
+        for (int i = 0; i < remaining; ++i) {
+            docDeltaBuffer_[i] = static_cast<uint32_t>(docIn_->readVInt());
+            if (writeFreqs_) {
+                freqBuffer_[i] = static_cast<uint32_t>(docIn_->readVInt());
+            }
+        }
+    }
 }
 
 int Lucene104PostingsEnum::advance(int target) {

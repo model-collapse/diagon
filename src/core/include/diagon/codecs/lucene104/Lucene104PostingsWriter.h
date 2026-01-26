@@ -37,9 +37,9 @@ struct TermState {
 /**
  * Writes posting lists for a single field using Lucene104 format.
  *
- * Simplified implementation for Phase 2:
- * - VByte delta encoding for doc IDs
- * - VByte encoding for term frequencies
+ * Phase 2a Update: StreamVByte encoding for 2-3× speedup
+ * - StreamVByte encoding for doc deltas and frequencies (groups of 4)
+ * - SIMD-accelerated encoding with control bytes
  * - Single .doc file (no .pos, .pay files yet)
  * - Skip lists deferred to Phase 2.1
  *
@@ -47,11 +47,13 @@ struct TermState {
  *
  * File format (.doc file):
  * - For each term:
- *   - docFreq: VInt
- *   - totalTermFreq: VLong
- *   - for each doc:
- *     - docDelta: VInt (delta from last doc ID)
- *     - freq: VInt (term frequency in this doc)
+ *   - docFreq: VInt (metadata, not StreamVByte)
+ *   - totalTermFreq: VLong (metadata, not StreamVByte)
+ *   - for each group of 4 docs:
+ *     - controlByte: uint8 (2 bits per integer length)
+ *     - docDeltas: 4-16 bytes (delta-encoded doc IDs, StreamVByte format)
+ *     - freqs: 4-16 bytes (term frequencies, StreamVByte format, if indexed)
+ *   - remaining docs (< 4): VInt fallback
  */
 class Lucene104PostingsWriter {
 public:
@@ -119,6 +121,18 @@ private:
     // Segment info
     std::string segmentName_;
     std::string segmentSuffix_;
+
+    // StreamVByte buffering (Phase 2a)
+    static constexpr int BUFFER_SIZE = 4;  // StreamVByte processes 4 integers at a time
+    uint32_t docDeltaBuffer_[BUFFER_SIZE];
+    uint32_t freqBuffer_[BUFFER_SIZE];
+    int bufferPos_;
+
+    /**
+     * Flush buffered doc deltas and frequencies using StreamVByte encoding.
+     * Called when buffer fills or at end of term.
+     */
+    void flushBuffer();
 };
 
 }  // namespace lucene104
