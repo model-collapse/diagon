@@ -96,6 +96,7 @@ set(DIAGON_CORE_SOURCES
     src/analysis/ASCIIFoldingFilter.cpp
     src/analysis/SynonymFilter.cpp
     src/analysis/AnalyzerFactory.cpp
+    src/analysis/analysis_c.cpp
 )
 
 # Platform-specific mmap implementation
@@ -280,6 +281,7 @@ set(DIAGON_CORE_HEADERS
     include/analysis/StopFilter.h
     include/analysis/ASCIIFoldingFilter.h
     include/analysis/SynonymFilter.h
+    include/diagon/analysis_c.h
 )
 
 # ==================== Conditional SIMD Sources ====================
