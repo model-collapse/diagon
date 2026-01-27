@@ -7,6 +7,8 @@
 #include "diagon/codecs/SegmentState.h"
 #include "diagon/util/Exceptions.h"
 
+#include <atomic>
+
 namespace diagon {
 namespace index {
 
@@ -94,21 +96,28 @@ NumericDocValues* SegmentReader::getNumericDocValues(const std::string& field) c
         return nullptr;  // Field doesn't have numeric doc values
     }
 
-    // Check if we already have a cached NumericDocValues object
-    auto it = numericDocValuesCache_.find(field);
-    if (it != numericDocValuesCache_.end()) {
-        return it->second.get();
-    }
+    // FIX: Do NOT cache NumericDocValues iterators - they are stateful!
+    // Creating fresh iterators for each query prevents:
+    // 1. State persistence across queries (docID_ remaining at last position)
+    // 2. Integer overflow when nextDoc() increments past NO_MORE_DOCS
+    //
+    // Performance note: This trades memory allocation cost for correctness.
+    // The cost is small since we're only loading int64 arrays from disk once
+    // (the DocValuesReader itself is still cached).
 
     // Load doc values reader if not already loaded
     loadDocValuesReader();
 
-    // Get NumericDocValues from reader
+    // Get fresh NumericDocValues iterator for this query
     if (docValuesReader_) {
         auto dv = docValuesReader_->getNumeric(field);
         if (dv) {
+            // Store in cache for lifecycle management (will be freed when reader closes)
+            // Use a unique key to prevent reuse
+            static std::atomic<uint64_t> requestId{0};
+            std::string cacheKey = field + "_" + std::to_string(requestId.fetch_add(1));
             NumericDocValues* dvPtr = dv.get();
-            numericDocValuesCache_[field] = std::move(dv);
+            numericDocValuesCache_[cacheKey] = std::move(dv);
             return dvPtr;
         }
     }

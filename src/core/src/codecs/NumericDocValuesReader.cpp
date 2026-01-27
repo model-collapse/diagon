@@ -125,6 +125,12 @@ MemoryNumericDocValues::MemoryNumericDocValues(std::vector<int64_t> values)
     , maxDoc_(static_cast<int>(values_.size())) {}
 
 int MemoryNumericDocValues::nextDoc() {
+    // Guard against incrementing past NO_MORE_DOCS
+    // Without this check, INT_MAX + 1 = INT_MIN (overflow)
+    if (docID_ == search::DocIdSetIterator::NO_MORE_DOCS) {
+        return docID_;
+    }
+
     docID_++;
     if (docID_ >= maxDoc_) {
         docID_ = search::DocIdSetIterator::NO_MORE_DOCS;
@@ -133,6 +139,11 @@ int MemoryNumericDocValues::nextDoc() {
 }
 
 int MemoryNumericDocValues::advance(int target) {
+    // Guard against advancing when already exhausted
+    if (docID_ == search::DocIdSetIterator::NO_MORE_DOCS) {
+        return docID_;
+    }
+
     if (target < docID_) {
         throw std::runtime_error("Cannot advance backwards");
     }

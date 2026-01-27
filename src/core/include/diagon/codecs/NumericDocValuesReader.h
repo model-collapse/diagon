@@ -140,6 +140,12 @@ public:
     // NumericDocValues interface
     int64_t longValue() const override;
 
+    // Reset iterator to initial state (docID = -1)
+    // Call this before reusing a cached iterator
+    void reset() override {
+        docID_ = -1;
+    }
+
 private:
     std::vector<int64_t> values_;
     int docID_{-1};

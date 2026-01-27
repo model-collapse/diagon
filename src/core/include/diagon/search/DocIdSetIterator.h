@@ -51,6 +51,12 @@ public:
      * Used for query optimization
      */
     virtual int64_t cost() const = 0;
+
+    /**
+     * Reset iterator to initial state
+     * Default implementation does nothing (for compatibility)
+     */
+    virtual void reset() {}
 };
 
 }  // namespace search
