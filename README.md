@@ -15,6 +15,11 @@ Just like Diagon Alley serves diverse needs of wizards with specialized shops, D
 
 ### Core Capabilities
 - ✅ **Inverted Index**: Lucene-compatible text search with BM25 scoring
+- ✅ **Text Analysis Framework**: Full analyzer system with 8 built-in analyzers (NEW!)
+  - 6 tokenizers: Whitespace, Keyword, Standard (ICU), Jieba (Chinese), etc.
+  - 4 token filters: Lowercase, Stop words (EN/ZH), ASCII folding, Synonyms
+  - Chinese support via Jieba with 5 segmentation modes
+  - Per-field analyzer configuration
 - ✅ **Column Storage**: ClickHouse-style columnar data for analytics
 - ✅ **Memory-Mapped I/O**: Zero-copy MMapDirectory for 2-3× faster random reads
 - ✅ **SIMD Acceleration**: AVX2/NEON optimized scoring and filtering (2-4× speedup)
@@ -180,6 +185,7 @@ Comprehensive documentation is available in the `docs/` directory:
 ### API Reference
 - **[Field Types Reference](docs/reference/field-types.md)** - Complete guide to TextField, StringField, NumericDocValuesField, Array fields
 - **[Core APIs](docs/reference/core.md)** - IndexWriter, IndexReader, IndexSearcher
+- **[Analysis APIs](docs/designs/ANALYZER_FRAMEWORK.md)** - Text analysis framework with 8 built-in analyzers (NEW!)
 - **[SIMD APIs](docs/reference/simd.md)** - AVX2 accelerated BM25 scoring
 - **[Compression APIs](docs/reference/compression.md)** - LZ4 and ZSTD codecs
 
@@ -300,9 +306,10 @@ Implementation Phase: 🔄 **~15-20% Complete**
   - 44 test files, 51 tests configured
   - CI running tests on Linux/macOS
   - 35 array field tests passing
-- [x] Core implementations (~15-20%) 🔄
+- [x] Core implementations (~20-25%) 🔄
   - ✅ Document/Field system (TextField, StringField, NumericDocValuesField)
   - ✅ **Array fields (Module 15)** - ArrayTextField, ArrayStringField, ArrayNumericField
+  - ✅ **Text Analysis Framework** - 8 analyzers, 6 tokenizers, 4 filters, Chinese support
   - ✅ IndexMapping - Schema declaration for multi-valued fields
   - ✅ Store/Directory - FSDirectory, **MMapDirectory (Linux/macOS/Windows)**
   - ✅ Util classes - ByteBlockPool, IntBlockPool, NumericUtils
@@ -410,6 +417,6 @@ Diagon is built upon the foundational work of:
 
 ---
 
-**Status**: 🔄 Active Development - ~15-20% Complete (Core + Tests)
+**Status**: 🔄 Active Development - ~20-25% Complete (Core + Tests + Analysis)
 **Version**: 1.0.0-alpha
-**Last Updated**: 2026-01-26
+**Last Updated**: 2026-01-27
