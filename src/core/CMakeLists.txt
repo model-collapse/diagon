@@ -87,6 +87,10 @@ set(DIAGON_CORE_SOURCES
     # Analysis (Text analysis framework)
     src/analysis/Token.cpp
     src/analysis/Analyzer.cpp
+    src/analysis/WhitespaceTokenizer.cpp
+    src/analysis/KeywordTokenizer.cpp
+    src/analysis/LowercaseFilter.cpp
+    src/analysis/AnalyzerFactory.cpp
 )
 
 # Platform-specific mmap implementation
@@ -263,6 +267,9 @@ set(DIAGON_CORE_HEADERS
     include/analysis/Tokenizer.h
     include/analysis/TokenFilter.h
     include/analysis/Analyzer.h
+    include/analysis/WhitespaceTokenizer.h
+    include/analysis/KeywordTokenizer.h
+    include/analysis/LowercaseFilter.h
 )
 
 # ==================== Conditional SIMD Sources ====================
