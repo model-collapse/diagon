@@ -5,6 +5,7 @@
 
 #include "diagon/document/Document.h"
 #include "diagon/index/DocumentsWriter.h"
+#include "diagon/index/MergePolicy.h"
 #include "diagon/index/SegmentInfo.h"
 #include "diagon/store/Directory.h"
 #include "diagon/store/Lock.h"
@@ -102,12 +103,25 @@ public:
 
     bool getUseCompoundFile() const { return useCompoundFile_; }
 
+    // ==================== Merge Policy ====================
+
+    /**
+     * Set merge policy (default: TieredMergePolicy)
+     */
+    IndexWriterConfig& setMergePolicy(std::unique_ptr<MergePolicy> policy) {
+        mergePolicy_ = std::move(policy);
+        return *this;
+    }
+
+    MergePolicy* getMergePolicy() const { return mergePolicy_.get(); }
+
 private:
     double ramBufferSizeMB_{16.0};
     int maxBufferedDocs_{-1};  // Disabled
     OpenMode openMode_{OpenMode::CREATE_OR_APPEND};
     bool commitOnClose_{true};
     bool useCompoundFile_{true};
+    std::unique_ptr<MergePolicy> mergePolicy_;  // nullptr = use default TieredMergePolicy
 };
 
 // ==================== IndexWriter ====================
@@ -258,6 +272,9 @@ private:
     std::unique_ptr<DocumentsWriter> documentsWriter_;
     SegmentInfos segmentInfos_;
 
+    // Merge policy
+    std::unique_ptr<MergePolicy> mergePolicy_;
+
     // Sequence numbers
     std::atomic<int64_t> nextSeqNo_{1};
 
@@ -274,6 +291,7 @@ private:
     void applyDeletes(const Term& term);
     void deleteSegmentFiles(std::shared_ptr<SegmentInfo> segment);
     int64_t commitInternal();  // Internal commit (caller must hold commitLock_)
+    void executeMerges(MergeSpecification* spec);  // Execute a set of merges
 };
 
 }  // namespace index

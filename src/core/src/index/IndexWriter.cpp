@@ -4,11 +4,14 @@
 #include "diagon/index/IndexWriter.h"
 
 #include "diagon/codecs/LiveDocsFormat.h"
+#include "diagon/index/MergeSpecification.h"
+#include "diagon/index/OneMerge.h"
 #include "diagon/index/SegmentMerger.h"
 #include "diagon/index/SegmentReader.h"
 #include "diagon/index/Term.h"
 #include "diagon/index/Terms.h"
 #include "diagon/index/TermsEnum.h"
+#include "diagon/index/TieredMergePolicy.h"
 #include "diagon/index/PostingsEnum.h"
 #include "diagon/store/IndexOutput.h"
 #include "diagon/util/BitSet.h"
@@ -43,6 +46,15 @@ IndexWriter::IndexWriter(Directory& dir, const IndexWriterConfig& config)
 
     // Initialize index
     initializeIndex();
+
+    // Initialize merge policy (use provided or create default TieredMergePolicy)
+    if (config_.getMergePolicy()) {
+        // Use user-provided policy (clone it)
+        mergePolicy_ = std::make_unique<TieredMergePolicy>(*static_cast<TieredMergePolicy*>(config_.getMergePolicy()));
+    } else {
+        // Use default TieredMergePolicy
+        mergePolicy_ = std::make_unique<TieredMergePolicy>();
+    }
 
     // Create DocumentsWriter
     DocumentsWriter::Config dwConfig;
@@ -145,6 +157,13 @@ int64_t IndexWriter::commitInternal() {
     // Flush pending documents
     flush();
 
+    // Check for segments with high deletions and merge them
+    std::unique_ptr<MergeSpecification> deletesMerges(
+        mergePolicy_->findForcedDeletesMerges(segmentInfos_));
+    if (deletesMerges && !deletesMerges->empty()) {
+        executeMerges(deletesMerges.get());
+    }
+
     // Write segments_N file
     writeSegmentsFile();
 
@@ -224,38 +243,16 @@ void IndexWriter::forceMerge(int maxNumSegments) {
     // 1. Flush all pending documents first
     flush();
 
-    // 2. Merge segments until we reach maxNumSegments or less
-    while (segmentInfos_.size() > maxNumSegments) {
-        // Need at least 2 segments to merge
-        if (segmentInfos_.size() < 2) {
-            break;
-        }
+    // 2. Use TieredMergePolicy to find forced merges
+    std::unique_ptr<MergeSpecification> spec(
+        mergePolicy_->findForcedMerges(segmentInfos_, maxNumSegments, {}));
 
-        // Get two oldest segments (simple strategy for Phase 2)
-        auto seg1 = segmentInfos_.info(0);
-        auto seg2 = segmentInfos_.info(1);
-
-        // Generate name for merged segment
-        static int mergeCounter = 0;
-        std::string mergedName = "_merged_" + std::to_string(mergeCounter++);
-
-        // 3. Perform merge using SegmentMerger
-        SegmentMerger merger(directory_, mergedName, {seg1, seg2});
-        auto mergedSegment = merger.merge();
-
-        // 4. Remove old segments from list
-        segmentInfos_.remove(0);  // Remove seg1
-        segmentInfos_.remove(0);  // Remove seg2 (now at index 0 after first removal)
-
-        // 5. Add merged segment to list
-        segmentInfos_.add(mergedSegment);
-
-        // 6. Delete old segment files
-        deleteSegmentFiles(seg1);
-        deleteSegmentFiles(seg2);
+    // 3. Execute merges if any were found
+    if (spec && !spec->empty()) {
+        executeMerges(spec.get());
     }
 
-    // 7. Commit the merged index (use internal method since we already hold the lock)
+    // 4. Commit the merged index (use internal method since we already hold the lock)
     commitInternal();
 }
 
@@ -544,6 +541,61 @@ void IndexWriter::applyDeletes(const Term& term) {
         } catch (const std::exception& e) {
             // Segment might be corrupted or missing - skip it
             continue;
+        }
+    }
+}
+
+void IndexWriter::executeMerges(MergeSpecification* spec) {
+    // Execute each merge in the specification
+    // Note: This is a synchronous implementation. Background merging would be added in Phase 4
+    // with MergeScheduler and separate merge threads.
+
+    static int mergeCounter = 0;
+
+    for (const auto& oneMerge : spec->getMerges()) {
+        // Get segments to merge (cast from SegmentCommitInfo* back to SegmentInfo*)
+        std::vector<std::shared_ptr<SegmentInfo>> segmentsToMerge;
+        for (auto* segCommit : oneMerge->getSegments()) {
+            // Cast back to SegmentInfo* (temporary until SegmentCommitInfo is implemented)
+            auto* segInfo = reinterpret_cast<SegmentInfo*>(segCommit);
+
+            // Find the matching segment in segmentInfos_
+            for (int i = 0; i < segmentInfos_.size(); i++) {
+                if (segmentInfos_.info(i)->name() == segInfo->name()) {
+                    segmentsToMerge.push_back(segmentInfos_.info(i));
+                    break;
+                }
+            }
+        }
+
+        if (segmentsToMerge.size() < 2) {
+            continue;  // Need at least 2 segments to merge
+        }
+
+        // Generate name for merged segment
+        std::string mergedName = "_merged_" + std::to_string(mergeCounter++);
+
+        // Perform merge using SegmentMerger
+        SegmentMerger merger(directory_, mergedName, segmentsToMerge);
+        auto mergedSegment = merger.merge();
+
+        // Remove old segments from list (iterate backwards to avoid index shifts)
+        for (int i = segmentInfos_.size() - 1; i >= 0; i--) {
+            auto segment = segmentInfos_.info(i);
+            for (const auto& toMerge : segmentsToMerge) {
+                if (segment->name() == toMerge->name()) {
+                    segmentInfos_.remove(i);
+                    break;
+                }
+            }
+        }
+
+        // Add merged segment to list
+        segmentInfos_.add(mergedSegment);
+
+        // Delete old segment files
+        for (const auto& segment : segmentsToMerge) {
+            deleteSegmentFiles(segment);
         }
     }
 }
