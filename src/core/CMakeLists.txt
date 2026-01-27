@@ -92,6 +92,9 @@ set(DIAGON_CORE_SOURCES
     src/analysis/StandardTokenizer.cpp
     src/analysis/JiebaTokenizer.cpp
     src/analysis/LowercaseFilter.cpp
+    src/analysis/StopFilter.cpp
+    src/analysis/ASCIIFoldingFilter.cpp
+    src/analysis/SynonymFilter.cpp
     src/analysis/AnalyzerFactory.cpp
 )
 
@@ -274,6 +277,9 @@ set(DIAGON_CORE_HEADERS
     include/analysis/StandardTokenizer.h
     include/analysis/JiebaTokenizer.h
     include/analysis/LowercaseFilter.h
+    include/analysis/StopFilter.h
+    include/analysis/ASCIIFoldingFilter.h
+    include/analysis/SynonymFilter.h
 )
 
 # ==================== Conditional SIMD Sources ====================
