@@ -115,6 +115,36 @@ if(NOT TARGET ICU::uc OR NOT TARGET ICU::i18n)
     endif()
 endif()
 
+# cppjieba - Required for Chinese text segmentation (JiebaTokenizer)
+# Using FetchContent to download header-only library
+include(FetchContent)
+FetchContent_Declare(
+    cppjieba
+    GIT_REPOSITORY https://github.com/yanyiwu/cppjieba.git
+    GIT_TAG master
+    GIT_SHALLOW TRUE
+)
+
+FetchContent_GetProperties(cppjieba)
+if(NOT cppjieba_POPULATED)
+    message(STATUS "Fetching cppjieba...")
+    FetchContent_Populate(cppjieba)
+    message(STATUS "cppjieba downloaded to ${cppjieba_SOURCE_DIR}")
+
+    # cppjieba is header-only, create interface library
+    add_library(cppjieba INTERFACE)
+    # Add include directories for cppjieba and its dependency limonp
+    target_include_directories(cppjieba INTERFACE
+        "${cppjieba_SOURCE_DIR}/include"
+        "${cppjieba_SOURCE_DIR}/deps/limonp/include"
+    )
+
+    # Set dict path for runtime use
+    set(CPPJIEBA_DICT_DIR "${cppjieba_SOURCE_DIR}/dict" CACHE PATH "cppjieba dictionary directory")
+    message(STATUS "cppjieba dictionaries at: ${CPPJIEBA_DICT_DIR}")
+    set(HAVE_CPPJIEBA TRUE CACHE BOOL "cppjieba library found" FORCE)
+endif()
+
 # ==================== Optional Dependencies ====================
 
 # Google Test - For unit tests

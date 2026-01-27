@@ -90,6 +90,7 @@ set(DIAGON_CORE_SOURCES
     src/analysis/WhitespaceTokenizer.cpp
     src/analysis/KeywordTokenizer.cpp
     src/analysis/StandardTokenizer.cpp
+    src/analysis/JiebaTokenizer.cpp
     src/analysis/LowercaseFilter.cpp
     src/analysis/AnalyzerFactory.cpp
 )
@@ -271,6 +272,7 @@ set(DIAGON_CORE_HEADERS
     include/analysis/WhitespaceTokenizer.h
     include/analysis/KeywordTokenizer.h
     include/analysis/StandardTokenizer.h
+    include/analysis/JiebaTokenizer.h
     include/analysis/LowercaseFilter.h
 )
 
@@ -372,6 +374,29 @@ if(TARGET ICU::uc AND TARGET ICU::i18n)
     target_link_libraries(diagon_core PUBLIC ICU::uc ICU::i18n)
 else()
     message(FATAL_ERROR "ICU libraries not found")
+endif()
+
+# Link cppjieba (for Chinese text segmentation)
+# cppjieba is header-only, linking brings in include directories
+if(TARGET cppjieba)
+    target_link_libraries(diagon_core PRIVATE cppjieba)
+
+    # Add dictionary path as compile definition
+    if(DEFINED CPPJIEBA_DICT_DIR)
+        target_compile_definitions(diagon_core PRIVATE
+            CPPJIEBA_DICT_DIR="${CPPJIEBA_DICT_DIR}")
+    endif()
+
+    # Also link for static library if building
+    if(DIAGON_BUILD_STATIC)
+        target_link_libraries(diagon_core_static PRIVATE cppjieba)
+        if(DEFINED CPPJIEBA_DICT_DIR)
+            target_compile_definitions(diagon_core_static PRIVATE
+                CPPJIEBA_DICT_DIR="${CPPJIEBA_DICT_DIR}")
+        endif()
+    endif()
+else()
+    message(FATAL_ERROR "cppjieba not found")
 endif()
 
 # ==================== Compiler Features ====================

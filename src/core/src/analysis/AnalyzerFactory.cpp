@@ -2,6 +2,7 @@
 #include "analysis/WhitespaceTokenizer.h"
 #include "analysis/KeywordTokenizer.h"
 #include "analysis/StandardTokenizer.h"
+#include "analysis/JiebaTokenizer.h"
 #include "analysis/LowercaseFilter.h"
 
 namespace diagon {
@@ -60,9 +61,18 @@ std::unique_ptr<Analyzer> AnalyzerFactory::createStandard() {
 }
 
 std::unique_ptr<Analyzer> AnalyzerFactory::createChinese(const std::string& dictPath) {
-    // Not implemented yet - requires Jieba integration
-    // For now, return whitespace analyzer as placeholder
-    return createWhitespace();
+    // Jieba tokenizer with MIX mode (MP + HMM for best accuracy)
+    auto tokenizer = std::make_unique<JiebaTokenizer>(JiebaMode::MIX, dictPath);
+
+    // No filters for now - Chinese text doesn't need lowercase
+    // (can add StopFilter later for Chinese stop words)
+    std::vector<std::unique_ptr<TokenFilter>> filters;
+
+    return std::make_unique<CompositeAnalyzer>(
+        "chinese",
+        std::move(tokenizer),
+        std::move(filters)
+    );
 }
 
 } // namespace analysis
