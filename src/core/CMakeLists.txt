@@ -72,6 +72,7 @@ set(DIAGON_CORE_SOURCES
     # Search (Query execution - Module 07)
     src/search/TopScoreDocCollector.cpp
     src/search/TermQuery.cpp
+    src/search/NumericRangeQuery.cpp
     src/search/IndexSearcher.cpp
     src/search/BM25ScorerSIMD.cpp
 
@@ -224,6 +225,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/search/Collector.h
     include/diagon/search/TopScoreDocCollector.h
     include/diagon/search/TermQuery.h
+    include/diagon/search/NumericRangeQuery.h
     include/diagon/search/BM25Similarity.h
 
     # Sparse
