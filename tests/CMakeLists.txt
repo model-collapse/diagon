@@ -132,6 +132,7 @@ add_diagon_test(SearchTest unit/search/SearchTest.cpp)
 add_diagon_test(TopScoreDocCollectorTest unit/search/TopScoreDocCollectorTest.cpp)
 add_diagon_test(BM25NormsIntegrationTest unit/search/BM25NormsIntegrationTest.cpp)
 add_diagon_test(NumericRangeQueryTest unit/search/NumericRangeQueryTest.cpp)
+add_diagon_test(BooleanQueryTest unit/search/BooleanQueryTest.cpp)
 
 # TopScoreDocCollectorTest needs proper NaN handling, disable -ffast-math
 if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")

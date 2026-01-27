@@ -73,6 +73,7 @@ set(DIAGON_CORE_SOURCES
     src/search/TopScoreDocCollector.cpp
     src/search/TermQuery.cpp
     src/search/NumericRangeQuery.cpp
+    src/search/BooleanQuery.cpp
     src/search/IndexSearcher.cpp
     src/search/BM25ScorerSIMD.cpp
 
@@ -221,6 +222,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/search/Filter.h
     include/diagon/search/DocIdSet.h
     include/diagon/search/BooleanClause.h
+    include/diagon/search/BooleanQuery.h
     include/diagon/search/TopDocs.h
     include/diagon/search/Collector.h
     include/diagon/search/TopScoreDocCollector.h
