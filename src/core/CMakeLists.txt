@@ -89,6 +89,7 @@ set(DIAGON_CORE_SOURCES
     src/analysis/Analyzer.cpp
     src/analysis/WhitespaceTokenizer.cpp
     src/analysis/KeywordTokenizer.cpp
+    src/analysis/StandardTokenizer.cpp
     src/analysis/LowercaseFilter.cpp
     src/analysis/AnalyzerFactory.cpp
 )
@@ -269,6 +270,7 @@ set(DIAGON_CORE_HEADERS
     include/analysis/Analyzer.h
     include/analysis/WhitespaceTokenizer.h
     include/analysis/KeywordTokenizer.h
+    include/analysis/StandardTokenizer.h
     include/analysis/LowercaseFilter.h
 )
 
@@ -363,6 +365,13 @@ endif()
 
 if(HAVE_ZSTD)
     target_compile_definitions(diagon_core PUBLIC HAVE_ZSTD)
+endif()
+
+# Link ICU libraries (for text analysis)
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(diagon_core PUBLIC ICU::uc ICU::i18n)
+else()
+    message(FATAL_ERROR "ICU libraries not found")
 endif()
 
 # ==================== Compiler Features ====================

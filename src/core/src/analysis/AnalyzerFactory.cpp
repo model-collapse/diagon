@@ -1,6 +1,7 @@
 #include "analysis/Analyzer.h"
 #include "analysis/WhitespaceTokenizer.h"
 #include "analysis/KeywordTokenizer.h"
+#include "analysis/StandardTokenizer.h"
 #include "analysis/LowercaseFilter.h"
 
 namespace diagon {
@@ -45,10 +46,17 @@ std::unique_ptr<Analyzer> AnalyzerFactory::createSimple() {
 }
 
 std::unique_ptr<Analyzer> AnalyzerFactory::createStandard() {
-    // For now, standard analyzer is same as simple
-    // Once we have StandardTokenizer (ICU-based), this will use that
-    // and add stop word filtering
-    return createSimple();
+    // Standard tokenizer (ICU-based) + lowercase filter
+    auto tokenizer = std::make_unique<StandardTokenizer>();
+
+    std::vector<std::unique_ptr<TokenFilter>> filters;
+    filters.push_back(std::make_unique<LowercaseFilter>());
+
+    return std::make_unique<CompositeAnalyzer>(
+        "standard",
+        std::move(tokenizer),
+        std::move(filters)
+    );
 }
 
 std::unique_ptr<Analyzer> AnalyzerFactory::createChinese(const std::string& dictPath) {

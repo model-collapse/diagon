@@ -85,6 +85,36 @@ if(NOT TARGET LZ4::LZ4)
     endif()
 endif()
 
+# ICU - Required for text analysis (StandardTokenizer)
+if(NOT TARGET ICU::uc OR NOT TARGET ICU::i18n)
+    find_package(ICU COMPONENTS uc i18n QUIET)
+    if(NOT ICU_FOUND)
+        # Try manually finding ICU
+        find_library(ICU_UC_LIBRARY NAMES icuuc)
+        find_library(ICU_I18N_LIBRARY NAMES icui18n)
+        find_path(ICU_INCLUDE_DIR NAMES unicode/unistr.h)
+        if(ICU_UC_LIBRARY AND ICU_I18N_LIBRARY AND ICU_INCLUDE_DIR)
+            add_library(ICU::uc UNKNOWN IMPORTED)
+            set_target_properties(ICU::uc PROPERTIES
+                IMPORTED_LOCATION "${ICU_UC_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+            )
+            add_library(ICU::i18n UNKNOWN IMPORTED)
+            set_target_properties(ICU::i18n PROPERTIES
+                IMPORTED_LOCATION "${ICU_I18N_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
+            )
+            message(STATUS "Found ICU: ${ICU_UC_LIBRARY}")
+            set(HAVE_ICU TRUE CACHE BOOL "ICU library found" FORCE)
+        else()
+            message(FATAL_ERROR "ICU not found. Please install libicu-dev")
+        endif()
+    else()
+        set(HAVE_ICU TRUE CACHE BOOL "ICU library found" FORCE)
+        message(STATUS "Found ICU: ${ICU_VERSION}")
+    endif()
+endif()
+
 # ==================== Optional Dependencies ====================
 
 # Google Test - For unit tests
