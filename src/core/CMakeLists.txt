@@ -83,6 +83,10 @@ set(DIAGON_CORE_SOURCES
     src/sparse/SindiScorer.cpp
     src/sparse/SindiIndex.cpp
     src/sparse/QBlockIndex.cpp
+
+    # Analysis (Text analysis framework)
+    src/analysis/Token.cpp
+    src/analysis/Analyzer.cpp
 )
 
 # Platform-specific mmap implementation
@@ -253,6 +257,12 @@ set(DIAGON_CORE_HEADERS
     # Observability
     include/diagon/observability/Metrics.h
     include/diagon/observability/HealthCheck.h
+
+    # Analysis
+    include/analysis/Token.h
+    include/analysis/Tokenizer.h
+    include/analysis/TokenFilter.h
+    include/analysis/Analyzer.h
 )
 
 # ==================== Conditional SIMD Sources ====================
