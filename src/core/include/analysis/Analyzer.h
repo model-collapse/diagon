@@ -121,9 +121,26 @@ public:
     /**
      * Create a Chinese analyzer (jieba tokenizer + chinese stop).
      *
-     * @param dictPath Path to Jieba dictionary files
+     * @param dictPath Path to Jieba dictionary files (empty = use default)
      */
-    static std::unique_ptr<Analyzer> createChinese(const std::string& dictPath);
+    static std::unique_ptr<Analyzer> createChinese(const std::string& dictPath = "");
+
+    /**
+     * Create an English analyzer (standard tokenizer + lowercase + english stop + ascii folding).
+     */
+    static std::unique_ptr<Analyzer> createEnglish();
+
+    /**
+     * Create a multilingual analyzer (standard tokenizer + lowercase + ascii folding).
+     * Good for mixed-language text.
+     */
+    static std::unique_ptr<Analyzer> createMultilingual();
+
+    /**
+     * Create a search analyzer (standard tokenizer + lowercase + stop + ascii folding).
+     * Optimized for search queries.
+     */
+    static std::unique_ptr<Analyzer> createSearch();
 };
 
 } // namespace analysis
