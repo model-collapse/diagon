@@ -4,6 +4,7 @@
 #include "diagon/search/NumericRangeQuery.h"
 
 #include "diagon/index/DocValues.h"
+#include "diagon/index/FieldInfo.h"
 #include "diagon/index/IndexReader.h"
 #include "diagon/index/LeafReaderContext.h"
 #include "diagon/search/IndexSearcher.h"
@@ -203,14 +204,12 @@ public:
 
         // Detect field type from FieldInfo attributes
         bool isDoubleField = false;
-        auto* fieldInfos = context.reader->getFieldInfos();
-        if (fieldInfos) {
-            auto* fieldInfo = fieldInfos->fieldInfo(query_.getField());
-            if (fieldInfo) {
-                auto numericType = fieldInfo->getAttribute("numeric_type");
-                if (numericType && *numericType == "DOUBLE") {
-                    isDoubleField = true;
-                }
+        const auto& fieldInfos = context.reader->getFieldInfos();
+        auto* fieldInfo = fieldInfos.fieldInfo(query_.getField());
+        if (fieldInfo) {
+            auto numericType = fieldInfo->getAttribute("numeric_type");
+            if (numericType && *numericType == "DOUBLE") {
+                isDoubleField = true;
             }
         }
 
