@@ -54,7 +54,7 @@ public:
      */
     struct Config {
         size_t num_quantization_bins = 256;  // Number of quantization bins
-        size_t window_size = 65536;           // Documents per window
+        size_t window_size = 500000;          // Documents per window (0.5M for normal CPU)
         float max_score = 3.0f;               // Maximum score for quantization
 
         Config() = default;
@@ -66,7 +66,7 @@ public:
     struct QueryParams {
         size_t top_k = 10;           // Number of results to return
         size_t top_k_prime = 50;     // Candidates for reranking
-        float alpha = 0.5f;          // Block selection parameter (0.0-1.0)
+        float alpha = 0.3f;          // Block selection parameter (0.0-1.0, 0.3 recommended)
         bool alpha_mass = true;      // Use alpha-mass (true) or max-ratio (false)
 
         QueryParams() = default;

@@ -239,7 +239,7 @@ BenchmarkResults runBenchmark(const BenchmarkConfig& config) {
 
     BlockMaxQuantizedIndex::Config index_config;
     index_config.num_quantization_bins = 256;
-    index_config.window_size = 1000000;  // 1M window size
+    index_config.window_size = 500000;  // 0.5M window size (optimal for normal CPU)
     index_config.max_score = 3.0f;
 
     BlockMaxQuantizedIndex index(index_config);

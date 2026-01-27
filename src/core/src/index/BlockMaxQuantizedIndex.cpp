@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/BlockMaxQuantizedIndex.h"
+#include "diagon/index/TopKHolderOptimized.h"
 
 #include <algorithm>
 #include <chrono>
@@ -232,10 +233,8 @@ void BlockMaxQuantizedIndex::scatterAdd(const std::vector<BlockWithScore>& block
                                        std::vector<std::pair<int32_t, doc_id_t>>& candidates,
                                        size_t top_k_prime,
                                        QueryStats* stats) {
-    // Use a min-heap to maintain top-k' candidates
-    auto cmp = [](const std::pair<int32_t, doc_id_t>& a, const std::pair<int32_t, doc_id_t>& b) {
-        return a.first > b.first;  // Min-heap
-    };
+    // Use TopKHolderOptimized for efficient batch processing
+    TopKHolderOptimized<doc_id_t, int32_t> topk_holder(top_k_prime);
 
     // Process each window
     for (size_t window_id = 0; window_id < num_windows_; ++window_id) {
@@ -253,7 +252,35 @@ void BlockMaxQuantizedIndex::scatterAdd(const std::vector<BlockWithScore>& block
 
             int32_t gain = static_cast<int32_t>(block_entry.gain * 1000.0f);  // Scale for precision
 
-            for (doc_id_t local_doc_id : block.documents) {
+            const auto& docs = block.documents;
+            size_t n = docs.size();
+
+            // Software prefetch optimization (from QBlock)
+            // Prefetch distance: 48 elements ahead to hide memory latency
+            constexpr size_t kPrefetchDistance = 48;
+
+            // Initial prefetch: first 48 buffer locations
+            size_t pf_count = std::min(n, kPrefetchDistance);
+            for (size_t p = 0; p < pf_count; ++p) {
+                __builtin_prefetch(&score_buf[docs[p]], 1, 0);
+            }
+
+            // Main loop: prefetch i+48 while processing i
+            size_t j = 0;
+            for (; j + kPrefetchDistance < n; ++j) {
+                __builtin_prefetch(&score_buf[docs[j + kPrefetchDistance]], 1, 0);
+
+                doc_id_t local_doc_id = docs[j];
+                if (score_buf[local_doc_id] == 0) {
+                    touched_docs.push_back(local_doc_id);
+                }
+                score_buf[local_doc_id] += gain;
+                stats->score_operations++;
+            }
+
+            // Tail loop: remaining elements without prefetch
+            for (; j < n; ++j) {
+                doc_id_t local_doc_id = docs[j];
                 if (score_buf[local_doc_id] == 0) {
                     touched_docs.push_back(local_doc_id);
                 }
@@ -262,32 +289,26 @@ void BlockMaxQuantizedIndex::scatterAdd(const std::vector<BlockWithScore>& block
             }
         }
 
-        // Extract candidates from this window and maintain top-k' heap
+        // Extract candidates from this window using TopKHolderOptimized
         for (doc_id_t local_doc_id : touched_docs) {
             int32_t score = score_buf[local_doc_id];
             doc_id_t global_doc_id = window_offset + local_doc_id;
 
-            if (candidates.size() < top_k_prime) {
-                candidates.emplace_back(score, global_doc_id);
-                if (candidates.size() == top_k_prime) {
-                    std::make_heap(candidates.begin(), candidates.end(), cmp);
-                }
-            } else if (score > candidates.front().first) {
-                std::pop_heap(candidates.begin(), candidates.end(), cmp);
-                candidates.back() = {score, global_doc_id};
-                std::push_heap(candidates.begin(), candidates.end(), cmp);
-            }
+            // TopKHolderOptimized handles threshold checking and batched sorting
+            topk_holder.add(score, global_doc_id);
 
             // Reset score buffer
             score_buf[local_doc_id] = 0;
         }
     }
 
-    // Sort candidates by score (descending)
-    std::sort(candidates.begin(), candidates.end(),
-              [](const auto& a, const auto& b) {
-                  return a.first > b.first;
-              });
+    // Get top-k' candidates (already sorted by TopKHolderOptimized)
+    auto [doc_ids, scores] = topk_holder.topKWithScores();
+    candidates.clear();
+    candidates.reserve(doc_ids.size());
+    for (size_t i = 0; i < doc_ids.size(); ++i) {
+        candidates.emplace_back(scores[i], doc_ids[i]);
+    }
 }
 
 void BlockMaxQuantizedIndex::rerank(const std::vector<std::pair<int32_t, doc_id_t>>& candidates,
@@ -295,30 +316,18 @@ void BlockMaxQuantizedIndex::rerank(const std::vector<std::pair<int32_t, doc_id_
                                    std::vector<doc_id_t>& results,
                                    size_t top_k,
                                    QueryStats* stats) {
-    // Exact scoring for candidates
-    std::vector<std::pair<float, doc_id_t>> scored_candidates;
-    scored_candidates.reserve(candidates.size());
+    // Use TopKHolderOptimized for exact scoring
+    TopKHolderOptimized<doc_id_t, float> topk_holder(top_k);
 
     for (const auto& [approx_score, doc_id] : candidates) {
         if (doc_id >= forward_index_.size()) continue;
 
         float exact_score = dotProduct(query, forward_index_[doc_id]);
-        scored_candidates.emplace_back(exact_score, doc_id);
+        topk_holder.add(exact_score, doc_id);
     }
 
-    // Sort by exact score
-    std::sort(scored_candidates.begin(), scored_candidates.end(),
-              [](const auto& a, const auto& b) {
-                  return a.first > b.first;
-              });
-
-    // Extract top-k
-    results.clear();
-    results.reserve(top_k);
-
-    for (size_t i = 0; i < std::min(top_k, scored_candidates.size()); ++i) {
-        results.push_back(scored_candidates[i].second);
-    }
+    // Get top-k results (already sorted by TopKHolderOptimized)
+    results = topk_holder.topK();
 }
 
 float BlockMaxQuantizedIndex::dotProduct(const SparseDoc& query, const SparseDoc& doc) const {
