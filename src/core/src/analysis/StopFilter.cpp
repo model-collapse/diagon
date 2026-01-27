@@ -38,11 +38,11 @@ void StopFilter::loadStopWords(StopWordSet stopWordSet) {
 std::unordered_set<std::string> StopFilter::getEnglishStopWords() {
     // Common English stop words (Lucene standard set)
     return {
-        "a", "an", "and", "are", "as", "at", "be", "but", "by",
-        "for", "if", "in", "into", "is", "it",
+        "a", "an", "and", "are", "as", "at", "be", "been", "but", "by",
+        "for", "had", "has", "have", "if", "in", "into", "is", "it",
         "no", "not", "of", "on", "or", "such",
         "that", "the", "their", "then", "there", "these",
-        "they", "this", "to", "was", "will", "with"
+        "they", "this", "to", "was", "were", "will", "with"
     };
 }
 

@@ -1,4 +1,6 @@
 #include "analysis/LowercaseFilter.h"
+#include <unicode/unistr.h>
+#include <unicode/ustring.h>
 #include <algorithm>
 #include <cctype>
 
@@ -6,9 +8,12 @@ namespace diagon {
 namespace analysis {
 
 std::string LowercaseFilter::toLowercase(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+    // Use ICU for proper Unicode lowercasing
+    icu::UnicodeString ustr = icu::UnicodeString::fromUTF8(str);
+    ustr.toLower();
+
+    std::string result;
+    ustr.toUTF8String(result);
     return result;
 }
 

@@ -134,6 +134,16 @@ add_diagon_test(BM25NormsIntegrationTest unit/search/BM25NormsIntegrationTest.cp
 add_diagon_test(NumericRangeQueryTest unit/search/NumericRangeQueryTest.cpp)
 add_diagon_test(BooleanQueryTest unit/search/BooleanQueryTest.cpp)
 
+# Analysis tests
+add_diagon_test(TokenTest unit/analysis/TokenTest.cpp)
+add_diagon_test(WhitespaceTokenizerTest unit/analysis/WhitespaceTokenizerTest.cpp)
+add_diagon_test(KeywordTokenizerTest unit/analysis/KeywordTokenizerTest.cpp)
+add_diagon_test(LowercaseFilterTest unit/analysis/LowercaseFilterTest.cpp)
+add_diagon_test(StopFilterTest unit/analysis/StopFilterTest.cpp)
+add_diagon_test(ASCIIFoldingFilterTest unit/analysis/ASCIIFoldingFilterTest.cpp)
+add_diagon_test(CompositeAnalyzerTest unit/analysis/CompositeAnalyzerTest.cpp)
+add_diagon_test(AnalyzerFactoryTest unit/analysis/AnalyzerFactoryTest.cpp)
+
 # TopScoreDocCollectorTest needs proper NaN handling, disable -ffast-math
 if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
     target_compile_options(TopScoreDocCollectorTest PRIVATE -fno-fast-math)
