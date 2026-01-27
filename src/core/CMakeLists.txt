@@ -75,6 +75,7 @@ set(DIAGON_CORE_SOURCES
     src/search/NumericRangeQuery.cpp
     src/search/DoubleRangeQuery.cpp
     src/search/BooleanQuery.cpp
+    src/search/MatchAllDocsQuery.cpp
     src/search/IndexSearcher.cpp
     src/search/BM25ScorerSIMD.cpp
 
@@ -97,6 +98,9 @@ set(DIAGON_CORE_SOURCES
     src/analysis/SynonymFilter.cpp
     src/analysis/AnalyzerFactory.cpp
     src/analysis/analysis_c.cpp
+
+    # C API (Main C API for language bindings)
+    src/c_api/diagon_c_api.cpp
 )
 
 # Platform-specific mmap implementation
@@ -244,6 +248,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/search/TermQuery.h
     include/diagon/search/NumericRangeQuery.h
     include/diagon/search/DoubleRangeQuery.h
+    include/diagon/search/MatchAllDocsQuery.h
     include/diagon/search/BM25Similarity.h
 
     # Sparse
@@ -282,6 +287,9 @@ set(DIAGON_CORE_HEADERS
     include/analysis/ASCIIFoldingFilter.h
     include/analysis/SynonymFilter.h
     include/diagon/analysis_c.h
+
+    # C API
+    include/diagon/c_api/diagon_c_api.h
 )
 
 # ==================== Conditional SIMD Sources ====================
