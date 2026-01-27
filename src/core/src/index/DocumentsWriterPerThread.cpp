@@ -152,6 +152,31 @@ bool DocumentsWriterPerThread::addDocument(const document::Document& doc) {
             if (fieldType.stored) {
                 // Get or create field info
                 fieldInfosBuilder_.getOrAdd(field->name());
+
+                // Propagate numeric type to field metadata if present
+                if (fieldType.numericType != document::NumericType::NONE) {
+                    std::string numericTypeStr;
+                    switch (fieldType.numericType) {
+                        case document::NumericType::LONG:
+                            numericTypeStr = "LONG";
+                            break;
+                        case document::NumericType::DOUBLE:
+                            numericTypeStr = "DOUBLE";
+                            break;
+                        case document::NumericType::INT:
+                            numericTypeStr = "INT";
+                            break;
+                        case document::NumericType::FLOAT:
+                            numericTypeStr = "FLOAT";
+                            break;
+                        default:
+                            break;
+                    }
+                    if (!numericTypeStr.empty()) {
+                        fieldInfosBuilder_.setAttribute(field->name(), "numeric_type", numericTypeStr);
+                    }
+                }
+
                 FieldInfo* fieldInfo = fieldInfosBuilder_.getFieldInfo(field->name());
 
                 if (fieldInfo) {
@@ -189,6 +214,32 @@ bool DocumentsWriterPerThread::addDocument(const document::Document& doc) {
                     // Get or create field number, then get FieldInfo
                     fieldInfosBuilder_.getOrAdd(field->name());
                     fieldInfosBuilder_.updateDocValuesType(field->name(), DocValuesType::NUMERIC);
+
+                    // Propagate numeric type to field metadata if present
+                    if (fieldType.numericType != document::NumericType::NONE) {
+                        std::string numericTypeStr;
+                        switch (fieldType.numericType) {
+                            case document::NumericType::LONG:
+                                numericTypeStr = "LONG";
+                                break;
+                            case document::NumericType::DOUBLE:
+                                numericTypeStr = "DOUBLE";
+                                break;
+                            case document::NumericType::INT:
+                                numericTypeStr = "INT";
+                                break;
+                            case document::NumericType::FLOAT:
+                                numericTypeStr = "FLOAT";
+                                break;
+                            default:
+                                break;
+                        }
+                        if (!numericTypeStr.empty()) {
+                            fieldInfosBuilder_.setAttribute(field->name(), "numeric_type",
+                                                            numericTypeStr);
+                        }
+                    }
+
                     FieldInfo* fieldInfo = fieldInfosBuilder_.getFieldInfo(field->name());
 
                     if (fieldInfo) {

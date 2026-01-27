@@ -366,6 +366,13 @@ public:
     void updateDocValuesType(const std::string& fieldName, DocValuesType docValuesType);
 
     /**
+     * Set field attribute
+     * Creates field if it doesn't exist
+     */
+    void setAttribute(const std::string& fieldName, const std::string& key,
+                      const std::string& value);
+
+    /**
      * Get field number (returns -1 if not found)
      */
     int32_t getFieldNumber(const std::string& fieldName) const;

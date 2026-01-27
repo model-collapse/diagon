@@ -9,6 +9,8 @@
 #include "diagon/search/IndexSearcher.h"
 #include "diagon/search/Scorer.h"
 
+#include <bit>
+#include <cmath>
 #include <limits>
 #include <sstream>
 
@@ -27,7 +29,7 @@ class NumericRangeScorer : public Scorer {
 public:
     NumericRangeScorer(const Weight& weight, index::NumericDocValues* values, int maxDoc,
                        int64_t lowerValue, int64_t upperValue, bool includeLower, bool includeUpper,
-                       float constantScore)
+                       bool isDoubleField, float constantScore)
         : weight_(weight)
         , values_(values)
         , maxDoc_(maxDoc)
@@ -35,6 +37,7 @@ public:
         , upperValue_(upperValue)
         , includeLower_(includeLower)
         , includeUpper_(includeUpper)
+        , isDoubleField_(isDoubleField)
         , constantScore_(constantScore)
         , doc_(-1) {}
 
@@ -115,31 +118,53 @@ public:
 private:
     /**
      * Check if value matches the range
+     * Handles both int64_t (LONG) and double (DOUBLE) types
      */
-    bool matchesRange(int64_t value) const {
-        // Check lower bound
-        if (includeLower_) {
-            if (value < lowerValue_) {
-                return false;
-            }
-        } else {
-            if (value <= lowerValue_) {
-                return false;
-            }
-        }
+    bool matchesRange(int64_t longValue) const {
+        if (isDoubleField_) {
+            // Convert int64_t bit representation to double
+            double value = std::bit_cast<double>(longValue);
+            double lower = std::bit_cast<double>(lowerValue_);
+            double upper = std::bit_cast<double>(upperValue_);
 
-        // Check upper bound
-        if (includeUpper_) {
-            if (value > upperValue_) {
+            // Reject NaN values
+            if (std::isnan(value)) {
                 return false;
             }
-        } else {
-            if (value >= upperValue_) {
-                return false;
-            }
-        }
 
-        return true;
+            // Check lower bound
+            if (includeLower_) {
+                if (value < lower) return false;
+            } else {
+                if (value <= lower) return false;
+            }
+
+            // Check upper bound
+            if (includeUpper_) {
+                if (value > upper) return false;
+            } else {
+                if (value >= upper) return false;
+            }
+
+            return true;
+        } else {
+            // LONG type: direct int64_t comparison
+            // Check lower bound
+            if (includeLower_) {
+                if (longValue < lowerValue_) return false;
+            } else {
+                if (longValue <= lowerValue_) return false;
+            }
+
+            // Check upper bound
+            if (includeUpper_) {
+                if (longValue > upperValue_) return false;
+            } else {
+                if (longValue >= upperValue_) return false;
+            }
+
+            return true;
+        }
     }
 
     const Weight& weight_;
@@ -149,6 +174,7 @@ private:
     int64_t upperValue_;
     bool includeLower_;
     bool includeUpper_;
+    bool isDoubleField_;  // True if field contains double values
     float constantScore_;
     int doc_;
 };
@@ -175,13 +201,27 @@ public:
             return nullptr;
         }
 
+        // Detect field type from FieldInfo attributes
+        bool isDoubleField = false;
+        auto* fieldInfos = context.reader->getFieldInfos();
+        if (fieldInfos) {
+            auto* fieldInfo = fieldInfos->fieldInfo(query_.getField());
+            if (fieldInfo) {
+                auto numericType = fieldInfo->getAttribute("numeric_type");
+                if (numericType && *numericType == "DOUBLE") {
+                    isDoubleField = true;
+                }
+            }
+        }
+
         int maxDoc = context.reader->maxDoc();
 
-        // Create scorer (passes non-owning pointer)
+        // Create scorer with type detection
         return std::make_unique<NumericRangeScorer>(*this, values, maxDoc, query_.getLowerValue(),
                                                      query_.getUpperValue(),
                                                      query_.getIncludeLower(),
-                                                     query_.getIncludeUpper(), constantScore_);
+                                                     query_.getIncludeUpper(), isDoubleField,
+                                                     constantScore_);
     }
 
     const Query& getQuery() const override { return query_; }

@@ -15,6 +15,20 @@ namespace diagon {
 namespace document {
 
 /**
+ * NumericType - Type of numeric field
+ *
+ * Used to track the original type of numeric fields stored as int64_t.
+ * This enables proper interpretation of the bit representation.
+ */
+enum class NumericType {
+    NONE,    // Not a numeric field
+    LONG,    // int64_t value stored directly
+    DOUBLE,  // double value stored as int64_t bits (via bit_cast)
+    INT,     // int32_t value stored as int64_t
+    FLOAT    // float value stored as int64_t bits (via bit_cast)
+};
+
+/**
  * FieldType - Configuration for a field
  *
  * Based on: org.apache.lucene.document.FieldType
@@ -25,6 +39,7 @@ namespace document {
 struct FieldType {
     index::IndexOptions indexOptions = index::IndexOptions::NONE;
     index::DocValuesType docValuesType = index::DocValuesType::NONE;
+    NumericType numericType = NumericType::NONE;  // Track numeric field type
     bool stored = false;     // Store original value
     bool tokenized = false;  // Apply analysis/tokenization
     bool omitNorms = false;  // Omit length normalization

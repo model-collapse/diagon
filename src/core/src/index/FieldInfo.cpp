@@ -228,6 +228,17 @@ void FieldInfosBuilder::updateDocValuesType(const std::string& fieldName,
     info.docValuesType = docValuesType;
 }
 
+void FieldInfosBuilder::setAttribute(const std::string& fieldName, const std::string& key,
+                                     const std::string& value) {
+    // Get or create field
+    getOrAdd(fieldName);
+
+    auto it = byName_.find(fieldName);
+    if (it != byName_.end()) {
+        it->second.putAttribute(key, value);
+    }
+}
+
 int32_t FieldInfosBuilder::getFieldNumber(const std::string& fieldName) const {
     auto it = byName_.find(fieldName);
     if (it == byName_.end()) {

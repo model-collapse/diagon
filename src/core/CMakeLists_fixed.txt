@@ -1,0 +1,209 @@
+# ==================== Core Library ====================
+
+message(STATUS "Configuring Diagon Core Library")
+
+# ==================== Source Files (ONLY files that exist) ====================
+
+set(DIAGON_CORE_SOURCES
+    # Util (Utilities)
+    src/util/BytesRef.cpp
+    src/util/BitSet.cpp
+    src/util/NumericUtils.cpp
+    src/util/FST.cpp
+    src/util/ByteBlockPool.cpp
+    src/util/IntBlockPool.cpp
+    src/util/StreamVByte.cpp
+    src/util/packed/DirectWriter.cpp
+    src/util/packed/DirectMonotonicWriter.cpp
+
+    # Store (Directory abstraction)
+    src/store/IOContext.cpp
+    src/store/Directory.cpp
+    src/store/IndexInput.cpp
+    src/store/IndexOutput.cpp
+    src/store/FSDirectory.cpp
+    src/store/MMapDirectory.cpp
+    src/store/MMapIndexInput.cpp
+    src/store/PosixMMapIndexInput.cpp
+    src/store/WindowsMMapIndexInput.cpp
+
+    # Document
+    src/document/Field.cpp
+    src/document/ArrayField.cpp
+
+    # Index
+    src/index/FieldInfo.cpp
+    src/index/IndexMapping.cpp
+    src/index/IndexReader.cpp
+    src/index/IndexWriter.cpp
+    src/index/FreqProxTermsWriter.cpp
+    src/index/DocumentsWriterPerThread.cpp
+    src/index/DocumentsWriter.cpp
+    src/index/SegmentInfo.cpp
+    src/index/SegmentReader.cpp
+    src/index/DirectoryReader.cpp
+
+    # Codecs
+    src/codecs/Codec.cpp
+    src/codecs/PostingsFormat.cpp
+    src/codecs/DocValuesFormat.cpp
+    src/codecs/ColumnFormat.cpp
+    src/codecs/SimpleFieldsConsumer.cpp
+    src/codecs/SimpleFieldsProducer.cpp
+    src/codecs/lucene104/Lucene104Codec.cpp
+    src/codecs/lucene104/Lucene104PostingsWriter.cpp
+    src/codecs/lucene104/Lucene104PostingsReader.cpp
+    src/codecs/lucene104/Lucene104PostingsReaderOptimized.cpp
+    src/codecs/blocktree/BlockTreeTermsWriter.cpp
+    src/codecs/blocktree/BlockTreeTermsReader.cpp
+
+    # Search
+    src/search/TopScoreDocCollector.cpp
+    src/search/TermQuery.cpp
+    src/search/IndexSearcher.cpp
+    src/search/BM25ScorerSIMD.cpp
+)
+
+set(DIAGON_CORE_HEADERS
+    # Util
+    include/diagon/util/BytesRef.h
+    include/diagon/util/BitSet.h
+    include/diagon/util/NumericUtils.h
+    include/diagon/util/Exceptions.h
+    include/diagon/util/VByte.h
+    include/diagon/util/StreamVByte.h
+    include/diagon/util/SIMDUtils.h
+    include/diagon/util/FST.h
+    include/diagon/util/ByteBlockPool.h
+    include/diagon/util/IntBlockPool.h
+    include/diagon/util/packed/DirectWriter.h
+    include/diagon/util/packed/DirectMonotonicWriter.h
+
+    # Store
+    include/diagon/store/IOContext.h
+    include/diagon/store/Directory.h
+    include/diagon/store/IndexInput.h
+    include/diagon/store/IndexOutput.h
+    include/diagon/store/ByteBuffersIndexOutput.h
+    include/diagon/store/ByteBuffersIndexInput.h
+    include/diagon/store/FSDirectory.h
+    include/diagon/store/MMapDirectory.h
+    include/diagon/store/MMapIndexInput.h
+    include/diagon/store/PosixMMapIndexInput.h
+    include/diagon/store/WindowsMMapIndexInput.h
+    include/diagon/store/Lock.h
+
+    # Document
+    include/diagon/document/IndexableField.h
+    include/diagon/document/Field.h
+    include/diagon/document/ArrayField.h
+    include/diagon/document/Document.h
+
+    # Index
+    include/diagon/index/FieldInfo.h
+    include/diagon/index/IndexMapping.h
+    include/diagon/index/IndexReader.h
+    include/diagon/index/LeafReaderContext.h
+    include/diagon/index/IndexWriter.h
+    include/diagon/index/DocumentsWriter.h
+    include/diagon/index/DocumentsWriterPerThread.h
+    include/diagon/index/FreqProxTermsWriter.h
+    include/diagon/index/SegmentInfo.h
+    include/diagon/index/SegmentReader.h
+    include/diagon/index/DirectoryReader.h
+    include/diagon/index/SegmentWriteState.h
+    include/diagon/index/Terms.h
+    include/diagon/index/TermsEnum.h
+    include/diagon/index/PostingsEnum.h
+    include/diagon/index/DocValues.h
+    include/diagon/index/MergePolicy.h
+    include/diagon/index/MergeScheduler.h
+    include/diagon/index/MergeSpecification.h
+    include/diagon/index/OneMerge.h
+    include/diagon/index/TieredMergePolicy.h
+
+    # Codecs
+    include/diagon/codecs/Codec.h
+    include/diagon/codecs/PostingsFormat.h
+    include/diagon/codecs/DocValuesFormat.h
+    include/diagon/codecs/ColumnFormat.h
+    include/diagon/codecs/FieldsConsumer.h
+    include/diagon/codecs/FieldsProducer.h
+    include/diagon/codecs/SimpleFieldsConsumer.h
+    include/diagon/codecs/SimpleFieldsProducer.h
+    include/diagon/codecs/lucene104/Lucene104Codec.h
+    include/diagon/codecs/lucene104/Lucene104PostingsWriter.h
+    include/diagon/codecs/lucene104/Lucene104PostingsReader.h
+    include/diagon/codecs/blocktree/BlockTreeTermsWriter.h
+    include/diagon/codecs/blocktree/BlockTreeTermsReader.h
+
+    # Search
+    include/diagon/search/Query.h
+    include/diagon/search/Weight.h
+    include/diagon/search/Scorer.h
+    include/diagon/search/TermQuery.h
+    include/diagon/search/IndexSearcher.h
+    include/diagon/search/Similarity.h
+    include/diagon/search/BM25Similarity.h
+    include/diagon/search/TopScoreDocCollector.h
+    include/diagon/search/TopDocs.h
+)
+
+# ==================== Library Target ====================
+
+add_library(diagon_core SHARED ${DIAGON_CORE_SOURCES})
+
+# TopScoreDocCollector needs proper NaN/infinity handling
+if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
+    set_source_files_properties(
+        src/search/TopScoreDocCollector.cpp
+        PROPERTIES COMPILE_FLAGS "-fno-fast-math"
+    )
+endif()
+
+# BM25ScorerSIMD needs AVX2 and FMA instructions
+if(DIAGON_ENABLE_SIMD AND HAVE_AVX2)
+    set_source_files_properties(
+        src/search/BM25ScorerSIMD.cpp
+        PROPERTIES COMPILE_FLAGS "-mavx2 -mfma"
+    )
+endif()
+
+# ==================== Include Directories ====================
+
+target_include_directories(diagon_core
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+
+# ==================== Link Dependencies ====================
+
+target_link_libraries(diagon_core PUBLIC ZLIB::ZLIB)
+
+if(TARGET zstd::libzstd)
+    target_link_libraries(diagon_core PUBLIC zstd::libzstd)
+elseif(TARGET zstd::zstd)
+    target_link_libraries(diagon_core PUBLIC zstd::zstd)
+else()
+    message(FATAL_ERROR "ZSTD target not found")
+endif()
+
+if(TARGET LZ4::LZ4)
+    target_link_libraries(diagon_core PUBLIC LZ4::LZ4)
+else()
+    message(FATAL_ERROR "LZ4 target not found")
+endif()
+
+# ==================== Compiler Properties ====================
+
+set_target_properties(diagon_core PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+    OUTPUT_NAME "diagon_core"
+)
+
+message(STATUS "Diagon Core Library configured")
