@@ -32,7 +32,7 @@ Think of Diagon as **Apache Lucene for C++**, offering low-level primitives and 
 **What Diagon Is NOT:**
 - ❌ Not a distributed search cluster (no node coordination, sharding, or replication)
 - ❌ Not a REST API server (no HTTP endpoints or query DSL)
-- ❌ Not a complete search application (like Elasticsearch or OpenSearch)
+- ❌ Not a complete search application (build your own on top)
 - ✅ **IS** a library of search engine fundamentals (like Apache Lucene or Xapian)
 
 **Use Diagon when you need:**
@@ -417,43 +417,22 @@ Implementation organized into 19 tasks:
 - [x] #18: Test infrastructure ✅
 - [ ] #19: Observability (metrics, logging, tracing)
 
-## Comparison with Related Projects
+## Similar Libraries
 
-| Feature | **Diagon** | Apache Lucene | Elasticsearch/OpenSearch | Xapian |
-|---------|------------|---------------|--------------------------|--------|
-| **Type** | **C++ Library** | Java Library | Complete Search System | C++ Library |
-| **Language** | C++20 | Java 11+ | Java | C++ |
-| **Scope** | Core components | Core components | Full-featured cluster | Core components |
-| **Clustering** | ❌ No (library only) | ❌ No (library only) | ✅ Built-in | ❌ No (library only) |
-| **REST API** | ❌ No (library only) | ❌ No (library only) | ✅ Built-in | ❌ No (library only) |
-| **Inverted Index** | ✅ Lucene-compatible | ✅ Yes | ✅ Yes (via Lucene) | ✅ Yes |
-| **Column Storage** | ✅ ClickHouse-style | ❌ No | ❌ No | ❌ No |
-| **SIMD Acceleration** | ✅ AVX2/NEON | ❌ No | ❌ No | ❌ No |
-| **Text Analysis** | ✅ 8 analyzers | ✅ Extensive | ✅ Extensive | ✅ Basic |
-| **Use Case** | **Embed in C++ apps** | Embed in Java apps | Standalone service | Embed in C++ apps |
+Diagon is a **search engine library** similar to:
 
-**Choose Diagon if you need:**
-- C++ library to embed in your application
-- Full control over search architecture
-- Hybrid inverted + columnar indexing
-- SIMD-accelerated performance
-- No JVM overhead
+| Library | Language | Key Difference from Diagon |
+|---------|----------|----------------------------|
+| **Apache Lucene** | Java | Diagon is C++ with hybrid inverted+columnar indexing |
+| **Xapian** | C++ | Diagon adds columnar storage and SIMD acceleration |
+| **Tantivy** | Rust | Similar goals but Diagon targets C++ ecosystem |
 
-**Choose Elasticsearch/OpenSearch if you need:**
-- Complete ready-to-use search system
-- Distributed clustering out of the box
-- REST API and query DSL
-- Extensive ecosystem and plugins
-
-**Choose Lucene if you need:**
-- Java-based library for JVM applications
-- Mature ecosystem with extensive community support
-- Battle-tested in production (20+ years)
-
-**Choose Xapian if you need:**
-- C++ library with simpler API than Diagon
-- Probabilistic ranking models
-- Smaller footprint and dependencies
+**Why Diagon:**
+- Native C++ with zero JVM overhead
+- Hybrid architecture: inverted index + columnar storage
+- SIMD-accelerated (AVX2/NEON) scoring and filtering
+- Lucene-compatible design patterns
+- Modern C++20 with move semantics and RAII
 
 ## References
 
