@@ -9,7 +9,9 @@
 
 **Diagon** is a high-performance C++ search engine combining Apache Lucene's inverted index architecture with ClickHouse's columnar storage for hybrid text search and analytical queries.
 
-Just like Diagon Alley serves diverse needs of wizards with specialized shops, DIAGON serves diverse query needs with specialized indexes: structured analytics (Granular OLAP) and unstructured exploration (Natural language search).
+DIAGON provides diverse indexing capabilities through specialized index architectures: structured analytics (Granular OLAP) for fast aggregations and unstructured exploration (Natural language search) for full-text queries.
+
+> **Legal Notice**: DIAGON is an independent open source project. It is not affiliated with, endorsed by, or connected to Warner Bros Entertainment Inc., J.K. Rowling, or the Harry Potter franchise.
 
 ## Features
 
