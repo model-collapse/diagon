@@ -1,6 +1,7 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/model-collapse/diagon/main/icon.png" alt="Diagon Logo" width="200"/>
-  <h1>Diagon Search Engine</h1>
+  <h1>Diagon Search Library</h1>
+  <p><em>Fundamental building blocks for high-performance search engines</em></p>
 </div>
 
 <div align="center">
@@ -14,15 +15,37 @@
 
 > **DIAGON**: **D**iverse **I**ndex **A**rchitecture for **G**ranular **O**LAP **a**nd **N**atural language search
 
-**Diagon** is a high-performance C++ search engine combining Apache Lucene's inverted index architecture with ClickHouse's columnar storage for hybrid text search and analytical queries.
+**Diagon** is a high-performance C++ search library providing fundamental components for building search engines. It combines Apache Lucene's inverted index architecture with ClickHouse's columnar storage to enable hybrid text search and analytical queries.
 
-DIAGON provides diverse indexing capabilities through specialized index architectures: structured analytics (Granular OLAP) for fast aggregations and unstructured exploration (Natural language search) for full-text queries.
+Think of Diagon as **Apache Lucene for C++**, offering low-level primitives and core data structures rather than a complete ready-to-use search system. You build your own search engine or application on top of these components.
+
+## What Diagon Provides
+
+**Core Search Primitives:**
+- Inverted indexes with posting lists, term dictionaries, and skip lists
+- Text analysis pipeline (tokenizers, filters, analyzers)
+- Columnar storage with granular indexing
+- Query execution framework (scoring, filtering, collection)
+- Codec system for compression and serialization
+- Storage abstractions (memory-mapped I/O, multi-tier storage)
+
+**What Diagon Is NOT:**
+- ❌ Not a distributed search cluster (no node coordination, sharding, or replication)
+- ❌ Not a REST API server (no HTTP endpoints or query DSL)
+- ❌ Not a complete search application (like Elasticsearch or OpenSearch)
+- ✅ **IS** a library of search engine fundamentals (like Apache Lucene or Xapian)
+
+**Use Diagon when you need:**
+- Full control over search architecture and implementation
+- C++ performance for latency-critical applications
+- Custom search solutions embedded in your application
+- Academic research on search algorithms and data structures
 
 > **Legal Notice**: DIAGON is an independent open source project. It is not affiliated with, endorsed by, or connected to Warner Bros Entertainment Inc., J.K. Rowling, or the Harry Potter franchise.
 
-## Features
+## Library Components
 
-### Core Capabilities
+### Indexing & Storage
 - ✅ **Inverted Index**: Lucene-compatible text search with BM25 scoring
 - ✅ **Text Analysis Framework**: Full analyzer system with 8 built-in analyzers (NEW!)
   - 6 tokenizers: Whitespace, Keyword, Standard (ICU), Jieba (Chinese), etc.
@@ -36,20 +59,20 @@ DIAGON provides diverse indexing capabilities through specialized index architec
 - ✅ **Adaptive Compression**: LZ4, ZSTD, Delta, Gorilla codecs with chaining
 - ✅ **Multi-Tier Storage**: Hot/Warm/Cold/Frozen lifecycle management
 
-### Advanced Features
+### Query & Execution
 - 🔄 **Concurrent Indexing**: DWPT-based parallel document processing
 - 🔄 **Crash Recovery**: WAL-based durability
 - 🔄 **Background Merging**: Tiered merge policy with concurrent scheduler
-- 🔄 **Query Filters**: Non-scoring filters with cache and skip index integration
+- 🔄 **Query Execution**: Non-scoring filters with cache and skip index integration
 - 🔄 **Phrase Queries**: Position-aware matching with slop parameter
 
 ## Architecture
 
-Diagon is a **hybrid** search engine:
+Diagon provides a **hybrid** architecture combining two complementary indexing approaches:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Diagon Search Engine                  │
+│                 Diagon Search Library                    │
 ├─────────────────────────────────────────────────────────┤
 │                                                           │
 │  ┌──────────────────────┐    ┌──────────────────────┐  │
@@ -120,6 +143,8 @@ See [BUILD.md](BUILD.md) for detailed build instructions.
 
 ## Usage Example
 
+Here's how to use Diagon's indexing and search APIs to build a simple search application:
+
 ```cpp
 #include <diagon/document/Document.h>
 #include <diagon/document/Field.h>
@@ -144,7 +169,7 @@ int main() {
 
     // TextField: Full-text searchable (tokenized)
     doc.addField(std::make_unique<document::TextField>(
-        "title", "Diagon Search Engine", true));  // stored
+        "title", "Building Search Applications with Diagon", true));  // stored
 
     // StringField: Exact-match keyword (not tokenized)
     doc.addField(std::make_unique<document::StringField>(
@@ -391,6 +416,44 @@ Implementation organized into 19 tasks:
 ### Testing & Observability (Tasks #18-19) 🔄
 - [x] #18: Test infrastructure ✅
 - [ ] #19: Observability (metrics, logging, tracing)
+
+## Comparison with Related Projects
+
+| Feature | **Diagon** | Apache Lucene | Elasticsearch/OpenSearch | Xapian |
+|---------|------------|---------------|--------------------------|--------|
+| **Type** | **C++ Library** | Java Library | Complete Search System | C++ Library |
+| **Language** | C++20 | Java 11+ | Java | C++ |
+| **Scope** | Core components | Core components | Full-featured cluster | Core components |
+| **Clustering** | ❌ No (library only) | ❌ No (library only) | ✅ Built-in | ❌ No (library only) |
+| **REST API** | ❌ No (library only) | ❌ No (library only) | ✅ Built-in | ❌ No (library only) |
+| **Inverted Index** | ✅ Lucene-compatible | ✅ Yes | ✅ Yes (via Lucene) | ✅ Yes |
+| **Column Storage** | ✅ ClickHouse-style | ❌ No | ❌ No | ❌ No |
+| **SIMD Acceleration** | ✅ AVX2/NEON | ❌ No | ❌ No | ❌ No |
+| **Text Analysis** | ✅ 8 analyzers | ✅ Extensive | ✅ Extensive | ✅ Basic |
+| **Use Case** | **Embed in C++ apps** | Embed in Java apps | Standalone service | Embed in C++ apps |
+
+**Choose Diagon if you need:**
+- C++ library to embed in your application
+- Full control over search architecture
+- Hybrid inverted + columnar indexing
+- SIMD-accelerated performance
+- No JVM overhead
+
+**Choose Elasticsearch/OpenSearch if you need:**
+- Complete ready-to-use search system
+- Distributed clustering out of the box
+- REST API and query DSL
+- Extensive ecosystem and plugins
+
+**Choose Lucene if you need:**
+- Java-based library for JVM applications
+- Mature ecosystem with extensive community support
+- Battle-tested in production (20+ years)
+
+**Choose Xapian if you need:**
+- C++ library with simpler API than Diagon
+- Probabilistic ranking models
+- Smaller footprint and dependencies
 
 ## References
 
