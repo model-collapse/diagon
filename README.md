@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="icon.png" alt="Diagon Logo" width="200"/>
+  <img src="https://raw.githubusercontent.com/model-collapse/diagon/main/icon.png" alt="Diagon Logo" width="200"/>
   <h1>Diagon Search Engine</h1>
 </div>
 
