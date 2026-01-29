@@ -1,9 +1,16 @@
-# Diagon Search Engine
+<div align="center">
+  <img src="icon.png" alt="Diagon Logo" width="200"/>
+  <h1>Diagon Search Engine</h1>
+</div>
+
+<div align="center">
 
 [![CI](https://github.com/model-collapse/diagon/workflows/CI/badge.svg)](https://github.com/model-collapse/diagon/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![C++](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
 [![codecov](https://codecov.io/gh/model-collapse/diagon/branch/main/graph/badge.svg)](https://codecov.io/gh/model-collapse/diagon)
+
+</div>
 
 > **DIAGON**: **D**iverse **I**ndex **A**rchitecture for **G**ranular **O**LAP **a**nd **N**atural language search
 
