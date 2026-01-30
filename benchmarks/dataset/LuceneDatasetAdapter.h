@@ -1,8 +1,7 @@
 #pragma once
 
 #include "diagon/document/Document.h"
-#include "diagon/document/TextField.h"
-#include "diagon/document/StringField.h"
+#include "diagon/document/Field.h"
 #include <fstream>
 #include <string>
 

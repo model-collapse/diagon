@@ -173,9 +173,14 @@ struct BenchmarkConfig {
     size_t max_docs = 0;           // 0 = all
     size_t max_queries = 100;
     size_t top_k = 10;
-    size_t top_k_prime = 50;
+    size_t top_k_prime = 500;      // QBlock uses 500 for 12-bin configuration
     std::vector<float> alphas = {0.3f, 0.5f, 0.7f, 1.0f};
     bool alpha_mass = true;
+
+    // Custom quantization
+    bool use_custom_quantization = false;
+    std::string lut_file;
+    std::string map_file;
 };
 
 struct BenchmarkResults {
@@ -189,6 +194,12 @@ struct BenchmarkResults {
         double avg_blocks_selected = 0.0;
         double avg_score_ops = 0.0;
         double recall_at_k = 0.0;
+        // Phase timing breakdowns (matching QBlock's metrics)
+        double avg_block_selection_ms = 0.0;
+        double avg_scatter_add_ms = 0.0;
+        double avg_scatter_add_part1_ms = 0.0;  // Score accumulation
+        double avg_scatter_add_part2_ms = 0.0;  // TopK processing
+        double avg_reranking_ms = 0.0;
     };
 
     std::vector<QueryResult> query_results;
@@ -242,6 +253,16 @@ BenchmarkResults runBenchmark(const BenchmarkConfig& config) {
     index_config.window_size = 500000;  // 0.5M window size (optimal for normal CPU)
     index_config.max_score = 3.0f;
 
+    // Custom quantization (if enabled)
+    if (config.use_custom_quantization) {
+        index_config.use_custom_quantization = true;
+        index_config.lut_file = config.lut_file;
+        index_config.map_file = config.map_file;
+        std::cout << "Using custom quantization:" << std::endl;
+        std::cout << "  LUT file: " << config.lut_file << std::endl;
+        std::cout << "  Map file: " << config.map_file << std::endl;
+    }
+
     BlockMaxQuantizedIndex index(index_config);
 
     auto build_start = std::chrono::high_resolution_clock::now();
@@ -275,6 +296,12 @@ BenchmarkResults runBenchmark(const BenchmarkConfig& config) {
         double total_blocks_selected = 0.0;
         double total_score_ops = 0.0;
         double total_recall = 0.0;
+        // Phase timing
+        double total_block_selection = 0.0;
+        double total_scatter_add = 0.0;
+        double total_scatter_add_part1 = 0.0;
+        double total_scatter_add_part2 = 0.0;
+        double total_reranking = 0.0;
 
         for (size_t i = 0; i < num_queries; ++i) {
             QueryStats stats;
@@ -283,6 +310,12 @@ BenchmarkResults runBenchmark(const BenchmarkConfig& config) {
             total_query_time += stats.total_ms;
             total_blocks_selected += stats.selected_blocks;
             total_score_ops += stats.score_operations;
+            // Phase timing
+            total_block_selection += stats.block_selection_ms;
+            total_scatter_add += stats.scatter_add_ms;
+            total_scatter_add_part1 += stats.scatter_add_part1_ms;
+            total_scatter_add_part2 += stats.scatter_add_part2_ms;
+            total_reranking += stats.reranking_ms;
 
             if (i < ground_truth.size()) {
                 double recall = calculateRecall(result, ground_truth[i], config.top_k);
@@ -299,6 +332,12 @@ BenchmarkResults runBenchmark(const BenchmarkConfig& config) {
         qr.avg_blocks_selected = total_blocks_selected / num_queries;
         qr.avg_score_ops = total_score_ops / num_queries;
         qr.recall_at_k = total_recall / num_queries;
+        // Phase timing averages
+        qr.avg_block_selection_ms = total_block_selection / num_queries;
+        qr.avg_scatter_add_ms = total_scatter_add / num_queries;
+        qr.avg_scatter_add_part1_ms = total_scatter_add_part1 / num_queries;
+        qr.avg_scatter_add_part2_ms = total_scatter_add_part2 / num_queries;
+        qr.avg_reranking_ms = total_reranking / num_queries;
 
         results.query_results.push_back(qr);
 
@@ -307,6 +346,12 @@ BenchmarkResults runBenchmark(const BenchmarkConfig& config) {
         std::cout << "  Avg blocks selected: " << qr.avg_blocks_selected << std::endl;
         std::cout << "  Avg score ops: " << qr.avg_score_ops << std::endl;
         std::cout << "  Recall@" << config.top_k << ": " << (qr.recall_at_k * 100.0) << "%" << std::endl;
+        std::cout << "\n  Timing Breakdown:" << std::endl;
+        std::cout << "    Block selection:   " << qr.avg_block_selection_ms << " ms" << std::endl;
+        std::cout << "    Scatter-add total: " << qr.avg_scatter_add_ms << " ms" << std::endl;
+        std::cout << "      Part 1 (accum):  " << qr.avg_scatter_add_part1_ms << " ms" << std::endl;
+        std::cout << "      Part 2 (TopK):   " << qr.avg_scatter_add_part2_ms << " ms" << std::endl;
+        std::cout << "    Reranking:         " << qr.avg_reranking_ms << " ms" << std::endl;
     }
 
     // Test document retrieval
@@ -419,6 +464,7 @@ int main(int argc, char** argv) {
     BenchmarkConfig config;
 
     // Parse arguments
+    bool custom_alphas = false;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--max-docs" && i + 1 < argc) {
@@ -429,6 +475,24 @@ int main(int argc, char** argv) {
             config.top_k = std::stoull(argv[++i]);
         } else if (arg == "--top-k-prime" && i + 1 < argc) {
             config.top_k_prime = std::stoull(argv[++i]);
+        } else if (arg == "--lut-file" && i + 1 < argc) {
+            config.lut_file = argv[++i];
+            config.use_custom_quantization = true;
+        } else if (arg == "--map-file" && i + 1 < argc) {
+            config.map_file = argv[++i];
+            config.use_custom_quantization = true;
+        } else if (arg == "--alpha") {
+            // Parse all following alpha values until next argument or end
+            if (!custom_alphas) {
+                config.alphas.clear();
+                custom_alphas = true;
+            }
+            ++i;
+            while (i < argc && argv[i][0] != '-') {
+                config.alphas.push_back(std::stof(argv[i]));
+                ++i;
+            }
+            --i; // Back up one since the outer loop will increment
         }
     }
 
@@ -444,6 +508,16 @@ int main(int argc, char** argv) {
         std::cout << alpha << " ";
     }
     std::cout << std::endl;
+
+    // Debug: show custom quantization config
+    if (config.use_custom_quantization) {
+        std::cout << "Custom quantization: ENABLED" << std::endl;
+        std::cout << "  LUT file: " << config.lut_file << std::endl;
+        std::cout << "  Map file: " << config.map_file << std::endl;
+    } else {
+        std::cout << "Custom quantization: DISABLED" << std::endl;
+    }
+
     std::cout << "========================================\n" << std::endl;
 
     auto results = runBenchmark(config);

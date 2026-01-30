@@ -43,6 +43,8 @@ struct QueryStats {
     size_t score_operations = 0;
     double block_selection_ms = 0.0;
     double scatter_add_ms = 0.0;
+    double scatter_add_part1_ms = 0.0;  // Score accumulation phase
+    double scatter_add_part2_ms = 0.0;  // TopK processing phase
     double reranking_ms = 0.0;
     double total_ms = 0.0;
 };
@@ -55,7 +57,14 @@ public:
     struct Config {
         size_t num_quantization_bins = 256;  // Number of quantization bins
         size_t window_size = 500000;          // Documents per window (0.5M for normal CPU)
+        size_t window_group_size = 15;        // Windows per group (QBlock default: 15)
         float max_score = 3.0f;               // Maximum score for quantization
+        bool enable_on_demand_allocation = true;  // Enable memory-efficient allocation
+
+        // Custom quantization (optional, for performance)
+        bool use_custom_quantization = false;     // Enable custom quantization via LUT
+        std::string lut_file;                      // Path to LUT file (e.g., quant_one_lut.csv)
+        std::string map_file;                      // Path to mapping file (e.g., quant_one_map.csv)
 
         Config() = default;
     };
@@ -123,6 +132,7 @@ private:
     // Index metadata
     size_t num_documents_ = 0;
     size_t num_windows_ = 0;
+    size_t num_window_groups_ = 0;
     size_t num_terms_ = 0;
 
     // Quantized block structure
@@ -130,8 +140,13 @@ private:
         std::vector<doc_id_t> documents;  // Local doc IDs within window
     };
 
-    // Inverted index: [term][block][window] -> QuantizedBlock
-    std::vector<std::vector<std::vector<QuantizedBlock>>> quantized_index_;
+    // Window group structure (holds multiple windows)
+    struct WindowGroup {
+        std::vector<QuantizedBlock> windows;  // Up to window_group_size windows
+    };
+
+    // Inverted index: [term][block][group_id] -> WindowGroup
+    std::vector<std::vector<std::vector<WindowGroup>>> quantized_index_;
 
     // Block sizes: [term][block] -> total doc count
     std::vector<std::vector<uint32_t>> block_sizes_;
@@ -142,18 +157,24 @@ private:
     // Quantization mapping: bin -> score
     std::vector<float> quant_values_;
 
+    // Custom quantization (optional)
+    std::vector<uint8_t> quant_map_;   // 256 -> N bins mapping
+    std::vector<float> quant_lut_;     // N bins -> float values
+
     // Helper methods
     uint8_t quantizeScore(float score) const;
     float dequantizeScore(uint8_t bin) const;
+    void loadCustomQuantization();
 
     struct BlockWithScore {
         term_t term;
         uint8_t block_id;
-        float gain;  // block_max_score * query_weight
-        const std::vector<QuantizedBlock>* blocks;  // Pointer to blocks for this term-block
+        uint32_t gain;   // Integer gain for sorting (matches QBlock)
+        float weight;    // Float weight for mass accumulation (matches QBlock)
+        const std::vector<WindowGroup>* groups;  // Pointer to window groups for this term-block
 
-        BlockWithScore(term_t t, uint8_t bid, float g, const std::vector<QuantizedBlock>* b)
-            : term(t), block_id(bid), gain(g), blocks(b) {}
+        BlockWithScore(term_t t, uint8_t bid, uint32_t g, float w, const std::vector<WindowGroup>* g_ptr)
+            : term(t), block_id(bid), gain(g), weight(w), groups(g_ptr) {}
     };
 
     // Query helper methods

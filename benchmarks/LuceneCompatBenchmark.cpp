@@ -12,7 +12,6 @@
 #include <benchmark/benchmark.h>
 
 #include "diagon/index/IndexWriter.h"
-#include "diagon/index/IndexWriterConfig.h"
 #include "diagon/index/DirectoryReader.h"
 #include "diagon/search/IndexSearcher.h"
 #include "diagon/search/TermQuery.h"
@@ -20,9 +19,7 @@
 #include "diagon/store/FSDirectory.h"
 #include "diagon/store/MMapDirectory.h"
 #include "diagon/document/Document.h"
-#include "diagon/document/TextField.h"
-#include "diagon/document/StringField.h"
-#include "diagon/document/NumericDocValuesField.h"
+#include "diagon/document/Field.h"
 
 #include "dataset/LuceneDatasetAdapter.h"
 #include "dataset/SyntheticGenerator.h"
