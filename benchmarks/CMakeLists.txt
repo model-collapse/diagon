@@ -72,6 +72,12 @@ add_diagon_benchmark(ColumnarIngestionBenchmark
     ColumnarIngestionBenchmark.cpp
 )
 
+# ==================== Lucene Comparison Benchmarks ====================
+
+add_diagon_benchmark(LuceneCompatBenchmark
+    LuceneCompatBenchmark.cpp
+)
+
 # ==================== Standalone Benchmarks ====================
 
 # Helper function for standalone benchmarks (no Google Benchmark dependency)
@@ -110,7 +116,7 @@ add_standalone_benchmark(BlockMaxQuantizedIndexBenchmark
 # ==================== Combined Benchmark Target ====================
 
 add_custom_target(run_all_benchmarks
-    DEPENDS run_IndexingBenchmark run_SearchBenchmark run_SIMDBenchmark run_MMapDirectoryBenchmark run_PostingsFormatBenchmark run_PostingsOptimizationBenchmark run_ColumnarIngestionBenchmark
+    DEPENDS run_IndexingBenchmark run_SearchBenchmark run_SIMDBenchmark run_MMapDirectoryBenchmark run_PostingsFormatBenchmark run_PostingsOptimizationBenchmark run_ColumnarIngestionBenchmark run_LuceneCompatBenchmark
     COMMENT "Running all benchmarks"
 )
 
