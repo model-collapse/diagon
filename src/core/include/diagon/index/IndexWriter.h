@@ -226,7 +226,8 @@ public:
 
     // ==================== Configuration ====================
 
-    const IndexWriterConfig& getConfig() const { return config_; }
+    // Note: IndexWriterConfig is no longer stored to avoid copy issues with unique_ptr
+    // Individual config values are extracted and stored during construction
 
     // ==================== Statistics ====================
 
@@ -265,7 +266,8 @@ public:
 private:
     // Configuration
     Directory& directory_;
-    IndexWriterConfig config_;
+    bool commitOnClose_;
+    IndexWriterConfig::OpenMode openMode_;
     std::unique_ptr<Lock> writeLock_;
 
     // Indexing pipeline

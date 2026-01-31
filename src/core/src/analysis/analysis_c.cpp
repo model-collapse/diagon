@@ -324,8 +324,9 @@ const char* diagon_get_last_error(void) {
     return g_last_error.c_str();
 }
 
-void diagon_clear_error(void) {
-    clear_error();
-}
+// FIXME: Duplicate definition - using the one in diagon_c_api.cpp instead
+// void diagon_clear_error(void) {
+//     clear_error();
+// }
 
 } // extern "C"

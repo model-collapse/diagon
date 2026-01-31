@@ -36,7 +36,8 @@ IndexWriterConfig::IndexWriterConfig() = default;
 
 IndexWriter::IndexWriter(Directory& dir, const IndexWriterConfig& config)
     : directory_(dir)
-    , config_(config) {
+    , commitOnClose_(config.getCommitOnClose())
+    , openMode_(config.getOpenMode()) {
     // Obtain write lock
     try {
         writeLock_ = directory_.obtainLock("write.lock");
@@ -48,9 +49,9 @@ IndexWriter::IndexWriter(Directory& dir, const IndexWriterConfig& config)
     initializeIndex();
 
     // Initialize merge policy (use provided or create default TieredMergePolicy)
-    if (config_.getMergePolicy()) {
+    if (config.getMergePolicy()) {
         // Use user-provided policy (clone it)
-        mergePolicy_ = std::make_unique<TieredMergePolicy>(*static_cast<TieredMergePolicy*>(config_.getMergePolicy()));
+        mergePolicy_ = std::make_unique<TieredMergePolicy>(*static_cast<TieredMergePolicy*>(config.getMergePolicy()));
     } else {
         // Use default TieredMergePolicy
         mergePolicy_ = std::make_unique<TieredMergePolicy>();
@@ -58,9 +59,9 @@ IndexWriter::IndexWriter(Directory& dir, const IndexWriterConfig& config)
 
     // Create DocumentsWriter
     DocumentsWriter::Config dwConfig;
-    dwConfig.dwptConfig.ramBufferSizeMB = static_cast<int64_t>(config_.getRAMBufferSizeMB());
-    if (config_.getMaxBufferedDocs() > 0) {
-        dwConfig.dwptConfig.maxBufferedDocs = config_.getMaxBufferedDocs();
+    dwConfig.dwptConfig.ramBufferSizeMB = static_cast<int64_t>(config.getRAMBufferSizeMB());
+    if (config.getMaxBufferedDocs() > 0) {
+        dwConfig.dwptConfig.maxBufferedDocs = config.getMaxBufferedDocs();
     }
     documentsWriter_ = std::make_unique<DocumentsWriter>(dwConfig, &directory_);
 }
@@ -68,7 +69,7 @@ IndexWriter::IndexWriter(Directory& dir, const IndexWriterConfig& config)
 IndexWriter::~IndexWriter() {
     if (isOpen()) {
         try {
-            if (config_.getCommitOnClose()) {
+            if (commitOnClose_) {
                 commit();
             }
             close();
@@ -343,7 +344,7 @@ void IndexWriter::initializeIndex() {
     }
 
     // Handle open mode
-    switch (config_.getOpenMode()) {
+    switch (openMode_) {
         case IndexWriterConfig::OpenMode::CREATE:
             // Clear existing index if present
             if (indexExists) {

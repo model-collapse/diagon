@@ -1,5 +1,7 @@
-#ifndef MATCH_ALL_QUERY_H
-#define MATCH_ALL_QUERY_H
+// Copyright 2024 Diagon Project
+// Licensed under the Apache License, Version 2.0
+
+#pragma once
 
 #include "diagon/search/Query.h"
 #include "diagon/search/IndexSearcher.h"
@@ -16,16 +18,27 @@ namespace search {
 class MatchAllQuery : public Query {
 public:
     MatchAllQuery() = default;
-    
+
     std::unique_ptr<Query> clone() const override {
         return std::make_unique<MatchAllQuery>();
     }
-    
+
     std::string toString(const std::string& field) const override {
         return "*:*";
     }
-    
-    std::unique_ptr<Weight> createWeight(IndexSearcher* searcher, bool needsScores, float boost) override;
+
+    std::unique_ptr<Weight> createWeight(IndexSearcher& searcher, ScoreMode scoreMode,
+                                         float boost) const override;
+
+    bool equals(const Query& other) const override {
+        // All MatchAllQuery instances are equal
+        return dynamic_cast<const MatchAllQuery*>(&other) != nullptr;
+    }
+
+    size_t hashCode() const override {
+        // All MatchAllQuery instances have same hash
+        return 0;
+    }
 };
 
 /**
@@ -33,20 +46,17 @@ public:
  */
 class MatchAllWeight : public Weight {
 private:
+    const Query* query_;
     float boost_;
-    
+
 public:
-    explicit MatchAllWeight(MatchAllQuery* query, float boost)
-        : Weight(query), boost_(boost) {}
-    
-    std::unique_ptr<Scorer> scorer(index::LeafReaderContext* context) override;
-    
-    float getValueForNormalization() override {
-        return boost_ * boost_;
-    }
-    
-    void normalize(float norm, float boost) override {
-        boost_ = norm * boost;
+    MatchAllWeight(const Query* query, float boost)
+        : query_(query), boost_(boost) {}
+
+    std::unique_ptr<Scorer> scorer(const index::LeafReaderContext& context) const override;
+
+    const Query& getQuery() const override {
+        return *query_;
     }
 };
 
@@ -56,18 +66,19 @@ public:
  */
 class MatchAllScorer : public Scorer {
 private:
+    const Weight* weight_;
     int32_t maxDoc_;
-    int32_t currentDoc_;
+    mutable int32_t currentDoc_;
     float score_;
-    
+
 public:
-    MatchAllScorer(Weight* weight, int32_t maxDoc, float score)
-        : Scorer(weight), maxDoc_(maxDoc), currentDoc_(-1), score_(score) {}
-    
-    int32_t docID() override {
+    MatchAllScorer(const Weight* weight, int32_t maxDoc, float score)
+        : weight_(weight), maxDoc_(maxDoc), currentDoc_(-1), score_(score) {}
+
+    int32_t docID() const override {
         return currentDoc_;
     }
-    
+
     int32_t nextDoc() override {
         currentDoc_++;
         if (currentDoc_ >= maxDoc_) {
@@ -75,7 +86,7 @@ public:
         }
         return currentDoc_;
     }
-    
+
     int32_t advance(int32_t target) override {
         if (target >= maxDoc_) {
             currentDoc_ = NO_MORE_DOCS;
@@ -84,12 +95,20 @@ public:
         }
         return currentDoc_;
     }
-    
-    float score() override {
+
+    int64_t cost() const override {
+        return maxDoc_;
+    }
+
+    float score() const override {
         return score_;
     }
-    
-    float getMaxScore() override {
+
+    const Weight& getWeight() const override {
+        return *weight_;
+    }
+
+    float getMaxScore(int upTo) const override {
         return score_;
     }
 };
@@ -97,4 +116,3 @@ public:
 } // namespace search
 } // namespace diagon
 
-#endif // MATCH_ALL_QUERY_H
