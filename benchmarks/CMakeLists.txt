@@ -18,6 +18,11 @@ function(add_diagon_benchmark BENCHMARK_NAME)
             benchmark::benchmark_main
     )
 
+    # Link ICU directly (needed because diagon_core.so doesn't embed ICU symbols)
+    if(TARGET ICU::uc AND TARGET ICU::i18n)
+        target_link_libraries(${BENCHMARK_NAME} PRIVATE ICU::uc ICU::i18n)
+    endif()
+
     target_include_directories(${BENCHMARK_NAME}
         PRIVATE
             ${CMAKE_SOURCE_DIR}/src/core/include

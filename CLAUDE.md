@@ -31,6 +31,71 @@ DIAGON provides diverse indexing capabilities through specialized index architec
 └── CLAUDE.md                            # This file
 ```
 
+## Build Standard Operating Procedure (SOP)
+
+**CRITICAL**: Always follow this procedure to avoid compilation/linking errors.
+
+**Full Documentation**: See `BUILD_SOP.md` for complete details.
+
+### Quick Build Procedure
+
+```bash
+# 1. ALWAYS start clean
+cd /home/ubuntu/diagon
+rm -rf build && mkdir build && cd build
+
+# 2. Configure (Release mode WITHOUT LTO)
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_CXX_FLAGS="-O3 -march=native" \
+      -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF \
+      -DDIAGON_BUILD_BENCHMARKS=ON \
+      -DDIAGON_BUILD_TESTS=ON \
+      ..
+
+# 3. Build core library first
+make diagon_core -j8
+
+# 4. Verify ICU is linked (CRITICAL CHECK)
+ldd src/core/libdiagon_core.so | grep icu
+# Must show: libicuuc.so and libicui18n.so
+
+# 5. Build benchmarks
+make SearchBenchmark -j8  # or make benchmarks -j8
+
+# 6. Run benchmark
+./benchmarks/SearchBenchmark
+```
+
+### Key Rules
+
+1. **ALWAYS disable LTO**: Use `-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF`
+   - LTO causes `undefined reference to icu_73::...` errors
+   - Performance difference negligible (~2-5%)
+
+2. **ALWAYS start with clean build directory**: `rm -rf build`
+   - Stale CMake cache causes random failures
+   - Don't trust pre-compiled binaries
+
+3. **ALWAYS verify ICU linking**: `ldd libdiagon_core.so | grep icu`
+   - If ICU not shown, benchmarks will fail to link
+
+4. **NEVER use Debug mode for benchmarks**: 10-100x slower
+   - Use Release mode without LTO
+
+5. **Build diagon_core first**: Catches compilation errors early
+
+### Common Errors and Fixes
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `undefined reference to icu_73::...` | Conda ICU 73 vs System ICU 74 mismatch | Use pre-compiled binaries OR rebuild with system-only PATH |
+| `use of deleted function` | C++ code error | Fix code (don't copy unique_ptr, implement virtuals) |
+| `multiple definition of ...` | Duplicate symbols | Make one static or remove duplicate |
+| Pre-compiled binary works but build fails | Stale binaries | `rm -rf build` and rebuild |
+| `ZSTD target not found` | System libs missing | Install: `sudo apt install libzstd-dev` |
+
+See `BUILD_SOP.md` for troubleshooting guide and detailed explanations.
+
 ## Design Methodology
 
 **Critical**: This project follows **production codebase study**, not theoretical design.
