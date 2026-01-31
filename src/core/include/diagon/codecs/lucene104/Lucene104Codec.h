@@ -21,19 +21,15 @@ namespace lucene104 {
 // ==================== Stub Format Implementations ====================
 
 /**
- * Lucene104 PostingsFormat (stub)
+ * Lucene104 PostingsFormat - Production implementation
  */
 class Lucene104PostingsFormat : public PostingsFormat {
 public:
     std::string getName() const override { return "Lucene104PostingsFormat"; }
 
-    std::unique_ptr<FieldsConsumer> fieldsConsumer(SegmentWriteState& state) override {
-        return nullptr;  // Stub
-    }
+    std::unique_ptr<FieldsConsumer> fieldsConsumer(index::SegmentWriteState& state) override;
 
-    std::unique_ptr<FieldsProducer> fieldsProducer(SegmentReadState& state) override {
-        return nullptr;  // Stub
-    }
+    std::unique_ptr<FieldsProducer> fieldsProducer(index::SegmentReadState& state) override;
 };
 
 /**

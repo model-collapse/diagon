@@ -3,6 +3,10 @@
 
 #include "diagon/codecs/SimpleFieldsConsumer.h"
 
+#include "diagon/index/Fields.h"
+#include "diagon/index/Terms.h"
+#include "diagon/index/TermsEnum.h"
+#include "diagon/index/PostingsEnum.h"
 #include "diagon/util/Exceptions.h"
 
 #include <algorithm>
@@ -54,6 +58,52 @@ void SimpleFieldsConsumer::writeHeader() {
 
     // Write placeholder for term count (will update at close)
     output_->writeInt(0);
+}
+
+void SimpleFieldsConsumer::write(index::Fields& fields, index::NormsProducer* norms) {
+    ensureOpen();
+
+    // Note: norms parameter not used yet
+    (void)norms;
+
+    // Iterate over all fields
+    auto fieldIterator = fields.iterator();
+
+    while (fieldIterator->hasNext()) {
+        std::string fieldName = fieldIterator->next();
+
+        // Get terms for this field
+        auto terms = fields.terms(fieldName);
+        if (!terms) {
+            continue;  // Field has no terms
+        }
+
+        // Convert streaming API to batch format for writeField
+        std::unordered_map<std::string, std::vector<int>> termPostings;
+
+        auto termsEnum = terms->iterator();
+        while (termsEnum->next()) {
+            auto termBytes = termsEnum->term();
+            std::string term(reinterpret_cast<const char*>(termBytes.data()), termBytes.length());
+            std::vector<int> postingsList;
+
+            // Get postings for this term
+            auto postingsEnum = termsEnum->postings(false);
+
+            // Iterate over all documents
+            int doc;
+            while ((doc = postingsEnum->nextDoc()) != index::PostingsEnum::NO_MORE_DOCS) {
+                int freq = postingsEnum->freq();
+                postingsList.push_back(doc);
+                postingsList.push_back(freq);
+            }
+
+            termPostings[term] = std::move(postingsList);
+        }
+
+        // Use existing batch implementation
+        writeField(fieldName, termPostings);
+    }
 }
 
 void SimpleFieldsConsumer::writeField(

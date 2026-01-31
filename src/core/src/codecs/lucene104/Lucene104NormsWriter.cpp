@@ -50,16 +50,19 @@ int8_t Lucene104NormsWriter::encodeNormValue(int64_t length) {
 
 // ==================== Constructor/Destructor ====================
 
-Lucene104NormsWriter::Lucene104NormsWriter(SegmentWriteState& state)
+Lucene104NormsWriter::Lucene104NormsWriter(index::SegmentWriteState& state)
     : state_(state) {
     // Open norms data file (.nvd)
-    std::string baseName = state.segmentInfo ? state.segmentInfo->name() : state.segmentName;
+    std::string baseName = state.segmentName;
+    if (!state.segmentSuffix.empty()) {
+        baseName += "_" + state.segmentSuffix;
+    }
     std::string dataName = baseName + ".nvd";
-    data_ = state.directory.createOutput(dataName, state.context);
+    data_ = state.directory->createOutput(dataName, state.context);
 
     // Open norms metadata file (.nvm)
     std::string metaName = baseName + ".nvm";
-    meta_ = state.directory.createOutput(metaName, state.context);
+    meta_ = state.directory->createOutput(metaName, state.context);
 
     // Write metadata header
     meta_->writeString("NORMS_META");
@@ -92,7 +95,7 @@ void Lucene104NormsWriter::addNormsField(const index::FieldInfo& field,
 
     // Collect norms values
     std::vector<int8_t> norms;
-    int maxDoc = state_.segmentInfo ? state_.segmentInfo->maxDoc() : 0;
+    int maxDoc = state_.maxDoc;
     if (maxDoc == 0) {
         throw std::invalid_argument("Cannot write norms for empty segment");
     }
@@ -151,11 +154,11 @@ void Lucene104NormsWriter::close() {
 
 // ==================== Format Implementation ====================
 
-std::unique_ptr<NormsConsumer> Lucene104NormsFormat::normsConsumer(SegmentWriteState& state) {
+std::unique_ptr<NormsConsumer> Lucene104NormsFormat::normsConsumer(index::SegmentWriteState& state) {
     return std::make_unique<Lucene104NormsWriter>(state);
 }
 
-std::unique_ptr<NormsProducer> Lucene104NormsFormat::normsProducer(SegmentReadState& state) {
+std::unique_ptr<NormsProducer> Lucene104NormsFormat::normsProducer(index::SegmentReadState& state) {
     return std::make_unique<Lucene104NormsReader>(state);
 }
 

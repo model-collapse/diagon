@@ -91,11 +91,30 @@ private:
         TopScoreLeafCollector(TopScoreDocCollector* parent,
                               const index::LeafReaderContext& context);
 
+        ~TopScoreLeafCollector();
+
         void setScorer(Scorable* scorer) override { scorer_ = scorer; }
 
         void collect(int doc) override;
 
+        void finishSegment();  // Flush remaining batch
+
     private:
+        void collectSingle(int doc, float score);
+        void flushBatch();
+
+#if defined(DIAGON_HAVE_AVX512)
+        static constexpr int BATCH_SIZE = 16;  // AVX512: 16 floats
+        alignas(64) int docBatch_[BATCH_SIZE];
+        alignas(64) float scoreBatch_[BATCH_SIZE];
+        int batchPos_;
+#elif defined(DIAGON_HAVE_AVX2)
+        static constexpr int BATCH_SIZE = 8;  // AVX2: 8 floats
+        alignas(32) int docBatch_[BATCH_SIZE];
+        alignas(32) float scoreBatch_[BATCH_SIZE];
+        int batchPos_;
+#endif
+
         TopScoreDocCollector* parent_;
         int docBase_;
         Scorable* scorer_;

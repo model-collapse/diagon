@@ -45,8 +45,10 @@ public:
     /**
      * Constructor
      * @param fieldInfosBuilder Field metadata tracker (reference)
+     * @param expectedTerms Expected number of unique terms (for pre-sizing hash table)
      */
-    explicit FreqProxTermsWriter(FieldInfosBuilder& fieldInfosBuilder);
+    explicit FreqProxTermsWriter(FieldInfosBuilder& fieldInfosBuilder,
+                                 size_t expectedTerms = 10000);
 
     /**
      * Destructor
@@ -120,6 +122,10 @@ private:
 
     // Field metadata tracker (reference)
     FieldInfosBuilder& fieldInfosBuilder_;
+
+    // Reusable term frequency map (avoids allocating one per document)
+    // Cleared and reused for each document to reduce malloc overhead
+    std::unordered_map<std::string, int> termFreqsCache_;
 
     /**
      * Add term occurrence to posting list

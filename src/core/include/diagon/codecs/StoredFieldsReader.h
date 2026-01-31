@@ -59,7 +59,7 @@ public:
      * @param fieldInfos Field metadata for looking up field names
      */
     StoredFieldsReader(store::Directory* directory, const std::string& segmentName,
-                       const index::FieldInfos& fieldInfos);
+                       const ::diagon::index::FieldInfos& fieldInfos);
 
     /**
      * Destructor - closes input files
@@ -107,7 +107,7 @@ private:
     std::string segmentName_;
 
     // Field metadata
-    const index::FieldInfos& fieldInfos_;
+    const ::diagon::index::FieldInfos& fieldInfos_;
 
     // Input files
     std::unique_ptr<store::IndexInput> dataInput_;   // .fdt file

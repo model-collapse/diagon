@@ -6,7 +6,7 @@
 #include "diagon/codecs/LiveDocsFormat.h"
 #include "diagon/codecs/NormsFormat.h"
 #include "diagon/codecs/NumericDocValuesReader.h"
-#include "diagon/codecs/SimpleFieldsProducer.h"
+#include "diagon/codecs/PostingsFormat.h"
 #include "diagon/codecs/StoredFieldsReader.h"
 #include "diagon/index/FieldInfo.h"
 #include "diagon/index/IndexReader.h"
@@ -24,11 +24,11 @@ namespace index {
 /**
  * SegmentReader - LeafReader implementation for a single segment
  *
- * Phase 4 implementation:
- * - Uses SimpleFieldsProducer to read .post files
- * - No doc values, stored fields, or norms yet
- * - No deletions (numDocs == maxDoc)
- * - Eager loading (all data loaded on open)
+ * Phase 4.3 implementation:
+ * - Uses codec-specific FieldsProducer (e.g., Lucene104FieldsProducer)
+ * - Supports doc values, stored fields, and norms
+ * - Supports deletions via live docs
+ * - Lazy loading (fields producer created on first terms() call)
  *
  * Thread-safe for concurrent reads after construction.
  *
@@ -190,9 +190,9 @@ private:
     SegmentReader(store::Directory& dir, std::shared_ptr<SegmentInfo> si);
 
     /**
-     * Load fields producer for a field
+     * Load fields producer (lazy initialization)
      */
-    void loadFieldsProducer(const std::string& field) const;
+    void loadFieldsProducer() const;
 
     /**
      * Load doc values reader (lazy initialization)
@@ -220,10 +220,9 @@ private:
     // Segment metadata
     std::shared_ptr<SegmentInfo> segmentInfo_;
 
-    // Fields producers (one per field, lazy loaded)
-    // Phase 4: Eager loading, but using mutable for lazy pattern compatibility
-    mutable std::unordered_map<std::string, std::unique_ptr<codecs::SimpleFieldsProducer>>
-        fieldsProducers_;
+    // Fields producer (segment-wide, lazy loaded)
+    // Phase 4.3: Uses codec-specific producer (e.g., Lucene104FieldsProducer)
+    mutable std::unique_ptr<codecs::FieldsProducer> fieldsProducer_;
 
     // Cached Terms objects
     mutable std::unordered_map<std::string, std::unique_ptr<Terms>> termsCache_;

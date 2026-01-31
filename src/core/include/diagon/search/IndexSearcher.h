@@ -30,6 +30,35 @@ struct Integer {
 };
 
 /**
+ * IndexSearcher configuration
+ */
+struct IndexSearcherConfig {
+    /**
+     * Enable batch-at-a-time scoring (P1 optimization)
+     *
+     * When enabled, uses batch postings decoding and SIMD BM25 scoring
+     * to eliminate one-at-a-time iterator overhead.
+     *
+     * Phase 4 analysis showed:
+     * - One-at-a-time: 32.79% virtual call overhead
+     * - Batch-at-a-time: Expected +19% search improvement
+     *
+     * Default: false (conservative, keeps existing behavior)
+     */
+    bool enable_batch_scoring = false;
+
+    /**
+     * Batch size for SIMD processing
+     *
+     * - 8: AVX2 (8 floats × 32-bit = 256-bit)
+     * - 16: AVX512 (16 floats × 32-bit = 512-bit)
+     *
+     * Default: 8 (AVX2, widely available)
+     */
+    int batch_size = 8;
+};
+
+/**
  * IndexSearcher executes queries against an IndexReader.
  *
  * Phase 4 implementation:
@@ -39,12 +68,25 @@ struct Integer {
  * - No query rewriting
  * - No caching
  *
+ * Phase 5 (P1) - Batch-at-a-Time Scoring:
+ * - Optional batch processing mode (enable_batch_scoring)
+ * - Eliminates one-at-a-time iterator overhead
+ * - SIMD BM25 scoring with AVX2
+ * - Expected +19% improvement when enabled
+ *
  * Based on: org.apache.lucene.search.IndexSearcher
  *
  * Usage:
  * ```cpp
  * auto reader = DirectoryReader::open(*directory);
+ *
+ * // Default mode (one-at-a-time)
  * IndexSearcher searcher(*reader);
+ *
+ * // Batch mode (P1 optimization)
+ * IndexSearcherConfig config;
+ * config.enable_batch_scoring = true;
+ * IndexSearcher batchSearcher(*reader, config);
  *
  * // Search with collector
  * auto collector = TopScoreDocCollector::create(10);
@@ -58,7 +100,10 @@ struct Integer {
 class IndexSearcher {
 public:
     explicit IndexSearcher(index::IndexReader& reader)
-        : reader_(reader) {}
+        : reader_(reader), config_() {}
+
+    explicit IndexSearcher(index::IndexReader& reader, const IndexSearcherConfig& config)
+        : reader_(reader), config_(config) {}
 
     // ==================== Search Methods ====================
 
@@ -96,8 +141,14 @@ public:
 
     const index::IndexReader& getIndexReader() const { return reader_; }
 
+    /**
+     * Get configuration
+     */
+    const IndexSearcherConfig& getConfig() const { return config_; }
+
 private:
     index::IndexReader& reader_;
+    IndexSearcherConfig config_;
 };
 
 }  // namespace search

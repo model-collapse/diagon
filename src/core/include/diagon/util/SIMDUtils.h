@@ -7,7 +7,14 @@
 #include <cstdint>
 
 // Platform detection and SIMD intrinsics
-#if defined(__AVX2__)
+#if defined(__AVX512F__)
+    #include <immintrin.h>  // AVX512
+    #define DIAGON_HAVE_AVX512 1
+    #define DIAGON_HAVE_AVX2 1  // AVX512 implies AVX2
+    #define DIAGON_SIMD_WIDTH_BYTES 64
+    #define DIAGON_SIMD_WIDTH_I32 16
+    #define DIAGON_SIMD_WIDTH_F32 16
+#elif defined(__AVX2__)
     #include <immintrin.h>  // AVX2
     #define DIAGON_HAVE_AVX2 1
     #define DIAGON_SIMD_WIDTH_BYTES 32

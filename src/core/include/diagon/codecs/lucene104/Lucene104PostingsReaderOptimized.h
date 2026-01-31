@@ -7,6 +7,7 @@
 #include "diagon/index/PostingsEnum.h"
 #include "diagon/index/SegmentWriteState.h"
 #include "diagon/store/IndexInput.h"
+#include "diagon/util/StreamVByte.h"
 
 #include <cstdint>
 #include <memory>
@@ -110,42 +111,19 @@ private:
     }
 
     /**
-     * Inlined StreamVByte decode for 4 integers
-     * Eliminates function call overhead
+     * SIMD StreamVByte decode for 4 integers
+     * Uses AVX2/SSE/NEON when available, scalar fallback otherwise
      */
     inline void decodeStreamVByte4(uint32_t* output) {
-        // Read control byte
-        uint8_t control = readByteFromBatch();
-
-        // Decode lengths from control byte (2 bits per integer)
-        int len0 = (control & 0x03) + 1;
-        int len1 = ((control >> 2) & 0x03) + 1;
-        int len2 = ((control >> 4) & 0x03) + 1;
-        int len3 = ((control >> 6) & 0x03) + 1;
-
-        // Decode value 0
-        output[0] = 0;
-        for (int j = 0; j < len0; j++) {
-            output[0] |= static_cast<uint32_t>(readByteFromBatch()) << (j * 8);
+        // Ensure we have enough bytes in batch buffer
+        // Worst case: 1 control byte + 16 data bytes = 17 bytes
+        if (ioBatchPos_ + 17 > ioBatchLimit_) {
+            refillIOBatch();
         }
 
-        // Decode value 1
-        output[1] = 0;
-        for (int j = 0; j < len1; j++) {
-            output[1] |= static_cast<uint32_t>(readByteFromBatch()) << (j * 8);
-        }
-
-        // Decode value 2
-        output[2] = 0;
-        for (int j = 0; j < len2; j++) {
-            output[2] |= static_cast<uint32_t>(readByteFromBatch()) << (j * 8);
-        }
-
-        // Decode value 3
-        output[3] = 0;
-        for (int j = 0; j < len3; j++) {
-            output[3] |= static_cast<uint32_t>(readByteFromBatch()) << (j * 8);
-        }
+        // Use SIMD decode (AVX2/SSE/NEON)
+        int bytesConsumed = util::StreamVByte::decode4(&ioBatch_[ioBatchPos_], output);
+        ioBatchPos_ += bytesConsumed;
     }
 };
 

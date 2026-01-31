@@ -7,7 +7,9 @@
 #include "diagon/codecs/NormsFormat.h"
 #include "diagon/codecs/SegmentState.h"
 #include "diagon/codecs/SimpleFieldsConsumer.h"
+#include "diagon/codecs/lucene104/Lucene104FieldsConsumer.h"
 #include "diagon/index/DocValues.h"
+#include "diagon/index/FreqProxFields.h"
 #include "diagon/index/SegmentWriteState.h"
 
 #include <atomic>
@@ -398,27 +400,38 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
         SegmentWriteState state(directory_, segmentName, numDocsInRAM_, segmentInfo->fieldInfos(),
                                 "");
 
-        // Create codec consumer
-        codecs::SimpleFieldsConsumer consumer(state);
+        // Get codec by name and create fields consumer
+        auto& codec = codecs::Codec::forName(segmentInfo->codecName());
+        auto consumer = codec.postingsFormat().fieldsConsumer(state);
 
-        // Get all terms from terms writer
-        std::vector<std::string> terms = termsWriter_.getTerms();
-
-        // Build term → posting list map
-        std::unordered_map<std::string, std::vector<int>> termPostings;
-        for (const auto& term : terms) {
-            termPostings[term] = termsWriter_.getPostingList(term);
+        if (!consumer) {
+            throw std::runtime_error("Codec returned null FieldsConsumer");
         }
 
-        // Write posting lists
-        consumer.writeField("_all", termPostings);
+        // Create Fields wrapper around in-memory postings
+        FreqProxFields fields(termsWriter_);
+
+        // Use streaming API - codec iterates over fields/terms/postings
+        consumer->write(fields, nullptr);  // norms=nullptr for now
 
         // Close consumer
-        consumer.close();
+        consumer->close();
 
-        // Add files to SegmentInfo
-        for (const auto& file : consumer.getFiles()) {
-            segmentInfo->addFile(file);
+        // Add files to SegmentInfo (hack: cast to get files)
+        // TODO Phase 4.1: Make getFiles() part of FieldsConsumer interface
+        auto* lucene104Consumer = dynamic_cast<codecs::lucene104::Lucene104FieldsConsumer*>(consumer.get());
+        auto* simpleConsumer = dynamic_cast<codecs::SimpleFieldsConsumer*>(consumer.get());
+
+        if (lucene104Consumer) {
+            for (const auto& file : lucene104Consumer->getFiles()) {
+                segmentInfo->addFile(file);
+            }
+        } else if (simpleConsumer) {
+            for (const auto& file : simpleConsumer->getFiles()) {
+                segmentInfo->addFile(file);
+            }
+        } else {
+            throw std::runtime_error("Unknown FieldsConsumer type");
         }
 
         // Write stored fields if present
@@ -485,10 +498,9 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
             auto& codec = codecs::Codec::forName(codecName_);
             auto& normsFormat = codec.normsFormat();
 
-            // Create segment write state for norms (codecs::SegmentWriteState)
-            store::IOContext normsContext = store::IOContext::DEFAULT;
-            codecs::SegmentWriteState normsState(*directory_, segmentName, "", normsContext);
-            normsState.segmentInfo = segmentInfo.get();
+            // Create segment write state for norms
+            SegmentWriteState normsState(directory_, segmentName, numDocsInRAM_,
+                                         segmentInfo->fieldInfos(), "");
 
             auto normsConsumer = normsFormat.normsConsumer(normsState);
 

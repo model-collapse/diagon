@@ -94,6 +94,17 @@ public:
      * @return PostingsEnum for iterating doc IDs
      */
     virtual std::unique_ptr<PostingsEnum> postings() = 0;
+
+    /**
+     * Returns postings for current term with optional batch mode.
+     *
+     * @param useBatch If true, return batch-capable enum if available
+     * @return PostingsEnum for iterating doc IDs
+     */
+    virtual std::unique_ptr<PostingsEnum> postings(bool useBatch) {
+        // Default implementation: ignore useBatch flag
+        return postings();
+    }
 };
 
 }  // namespace index

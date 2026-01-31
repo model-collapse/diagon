@@ -3,19 +3,27 @@
 
 #pragma once
 
+#include "diagon/index/SegmentWriteState.h"
+
 #include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
 namespace diagon {
+
+// Forward declarations in correct namespace
+namespace index {
+class Fields;
+class NormsProducer;
+class Terms;
+}
+
 namespace codecs {
 
-// Forward declarations (to be implemented in future tasks)
+// Forward declarations
 class FieldsConsumer;
 class FieldsProducer;
-class SegmentWriteState;
-class SegmentReadState;
 
 /**
  * PostingsFormat encodes/decodes inverted index.
@@ -50,7 +58,7 @@ public:
      *
      * NOTE: Stub - returns nullptr until formats are implemented
      */
-    virtual std::unique_ptr<FieldsConsumer> fieldsConsumer(SegmentWriteState& state) = 0;
+    virtual std::unique_ptr<FieldsConsumer> fieldsConsumer(index::SegmentWriteState& state) = 0;
 
     /**
      * Create producer for reading postings
@@ -58,7 +66,7 @@ public:
      *
      * NOTE: Stub - returns nullptr until formats are implemented
      */
-    virtual std::unique_ptr<FieldsProducer> fieldsProducer(SegmentReadState& state) = 0;
+    virtual std::unique_ptr<FieldsProducer> fieldsProducer(index::SegmentReadState& state) = 0;
 
     // ==================== Factory & Registration ====================
 
@@ -82,28 +90,49 @@ private:
 /**
  * Write-side API for postings
  *
- * NOTE: Stub interface - to be implemented with actual postings encoding
+ * Uses streaming "pull" API: codec iterates over Fields/Terms/Postings
+ * provided by the indexer.
+ *
+ * Based on: org.apache.lucene.codecs.FieldsConsumer
  */
 class FieldsConsumer {
 public:
     virtual ~FieldsConsumer() = default;
 
     /**
+     * Write all fields, terms and postings using streaming API
+     *
+     * This is the "pull" API: codec iterates over the provided Fields
+     * and writes terms/postings to disk format.
+     *
+     * @param fields Fields to write (provides iterator over fields/terms)
+     * @param norms Norms producer (optional, can be nullptr)
+     */
+    virtual void write(index::Fields& fields, index::NormsProducer* norms) = 0;
+
+    /**
      * Close and flush
      */
     virtual void close() = 0;
-
-    // TODO: Add write() and merge() methods when Fields classes are implemented
 };
 
 /**
  * Read-side API for postings
  *
- * NOTE: Stub interface - to be implemented with actual postings decoding
+ * Provides access to Terms for each field in a segment.
+ * Implementations handle format-specific details (e.g., Lucene104, Simple).
  */
 class FieldsProducer {
 public:
     virtual ~FieldsProducer() = default;
+
+    /**
+     * Get Terms for a field
+     *
+     * @param field Field name
+     * @return Terms instance, or nullptr if field doesn't exist or has no postings
+     */
+    virtual std::unique_ptr<::diagon::index::Terms> terms(const std::string& field) = 0;
 
     /**
      * Check file integrity (checksums)
@@ -114,8 +143,6 @@ public:
      * Close
      */
     virtual void close() = 0;
-
-    // TODO: Add terms() and iterator methods when Terms/TermsEnum are implemented
 };
 
 }  // namespace codecs

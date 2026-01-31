@@ -4,7 +4,7 @@
 #pragma once
 
 #include "diagon/codecs/NormsFormat.h"
-#include "diagon/codecs/SegmentState.h"
+#include "diagon/index/SegmentWriteState.h"
 #include "diagon/index/DocValues.h"
 #include "diagon/store/IndexInput.h"
 
@@ -32,7 +32,7 @@ public:
      *
      * @param state Segment read state
      */
-    explicit Lucene104NormsReader(SegmentReadState& state);
+    explicit Lucene104NormsReader(index::SegmentReadState& state);
 
     /**
      * Destructor
@@ -139,7 +139,7 @@ private:
         int docID_;
     };
 
-    SegmentReadState& state_;
+    index::SegmentReadState& state_;
     std::unique_ptr<store::IndexInput> data_;  // .nvd file
     std::unique_ptr<store::IndexInput> meta_;  // .nvm file
     bool closed_{false};

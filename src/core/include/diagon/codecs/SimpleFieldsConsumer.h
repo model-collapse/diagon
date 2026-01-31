@@ -51,7 +51,7 @@ public:
      *
      * @param state Segment write state (directory, segment name, etc.)
      */
-    explicit SimpleFieldsConsumer(const index::SegmentWriteState& state);
+    explicit SimpleFieldsConsumer(const ::diagon::index::SegmentWriteState& state);
 
     /**
      * Destructor - closes output if not already closed
@@ -59,7 +59,17 @@ public:
     ~SimpleFieldsConsumer() override;
 
     /**
-     * Write a field's posting lists
+     * Write all fields, terms and postings using streaming API
+     *
+     * Implements proper Lucene "pull" API for compatibility.
+     *
+     * @param fields Fields to write (provides iterator)
+     * @param norms Norms producer (optional)
+     */
+    void write(index::Fields& fields, index::NormsProducer* norms) override;
+
+    /**
+     * Write a field's posting lists (legacy batch API)
      *
      * @param fieldName Field name
      * @param terms Map of term → posting list
@@ -80,7 +90,7 @@ public:
 
 private:
     // Segment write state
-    index::SegmentWriteState state_;
+    ::diagon::index::SegmentWriteState state_;
 
     // Output stream
     std::unique_ptr<store::IndexOutput> output_;

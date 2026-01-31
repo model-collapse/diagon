@@ -4,7 +4,7 @@
 #pragma once
 
 #include "diagon/codecs/NormsFormat.h"
-#include "diagon/codecs/SegmentState.h"
+#include "diagon/index/SegmentWriteState.h"
 #include "diagon/store/IndexOutput.h"
 
 #include <memory>
@@ -44,7 +44,7 @@ public:
      *
      * @param state Segment write state
      */
-    explicit Lucene104NormsWriter(SegmentWriteState& state);
+    explicit Lucene104NormsWriter(index::SegmentWriteState& state);
 
     /**
      * Destructor
@@ -83,7 +83,7 @@ private:
      */
     void writeNormsData(const index::FieldInfo& field, const std::vector<int8_t>& norms);
 
-    SegmentWriteState& state_;
+    index::SegmentWriteState& state_;
     std::unique_ptr<store::IndexOutput> data_;    // .nvd file
     std::unique_ptr<store::IndexOutput> meta_;    // .nvm file
     bool closed_{false};
@@ -96,8 +96,8 @@ class Lucene104NormsFormat : public NormsFormat {
 public:
     std::string getName() const override { return "Lucene104Norms"; }
 
-    std::unique_ptr<NormsConsumer> normsConsumer(SegmentWriteState& state) override;
-    std::unique_ptr<NormsProducer> normsProducer(SegmentReadState& state) override;
+    std::unique_ptr<NormsConsumer> normsConsumer(index::SegmentWriteState& state) override;
+    std::unique_ptr<NormsProducer> normsProducer(index::SegmentReadState& state) override;
 };
 
 }  // namespace lucene104

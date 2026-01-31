@@ -2,6 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
+#include "diagon/codecs/lucene104/Lucene104PostingsReaderOptimized.h"
+#include "diagon/codecs/lucene104/Lucene104PostingsEnumBatch.h"
 
 #include "diagon/store/ByteBuffersIndexInput.h"
 #include "diagon/util/Exceptions.h"
@@ -48,7 +50,27 @@ Lucene104PostingsReader::postings(const index::FieldInfo& fieldInfo, const TermS
     // Determine if frequencies are written
     bool writeFreqs = (fieldInfo.indexOptions >= index::IndexOptions::DOCS_AND_FREQS);
 
-    return std::make_unique<Lucene104PostingsEnum>(docIn_.get(), termState, writeFreqs);
+    // Use optimized version with SIMD StreamVByte decoding
+    return std::make_unique<Lucene104PostingsEnumOptimized>(docIn_.get(), termState, writeFreqs);
+}
+
+std::unique_ptr<index::PostingsEnum>
+Lucene104PostingsReader::postings(const index::FieldInfo& fieldInfo, const TermState& termState,
+                                  bool useBatch) {
+    if (!docIn_) {
+        throw std::runtime_error("No input set for PostingsReader");
+    }
+
+    // Determine if frequencies are written
+    bool writeFreqs = (fieldInfo.indexOptions >= index::IndexOptions::DOCS_AND_FREQS);
+
+    if (useBatch) {
+        // P1.1: Return native batch implementation
+        return std::make_unique<Lucene104PostingsEnumBatch>(docIn_.get(), termState, writeFreqs);
+    } else {
+        // Return regular optimized version
+        return std::make_unique<Lucene104PostingsEnumOptimized>(docIn_.get(), termState, writeFreqs);
+    }
 }
 
 void Lucene104PostingsReader::close() {

@@ -38,6 +38,7 @@ set(DIAGON_CORE_SOURCES
     src/index/IndexReader.cpp
     src/index/IndexWriter.cpp
     src/index/FreqProxTermsWriter.cpp
+    src/index/FreqProxFields.cpp
     src/index/DocumentsWriterPerThread.cpp
     src/index/DocumentsWriter.cpp
     src/index/SegmentInfo.cpp
@@ -61,9 +62,12 @@ set(DIAGON_CORE_SOURCES
     src/codecs/SimpleFieldsConsumer.cpp
     src/codecs/SimpleFieldsProducer.cpp
     src/codecs/lucene104/Lucene104Codec.cpp
+    src/codecs/lucene104/Lucene104FieldsConsumer.cpp
+    src/codecs/lucene104/Lucene104FieldsProducer.cpp
     src/codecs/lucene104/Lucene104PostingsWriter.cpp
     src/codecs/lucene104/Lucene104PostingsReader.cpp
     src/codecs/lucene104/Lucene104PostingsReaderOptimized.cpp
+    src/codecs/lucene104/Lucene104PostingsEnumBatch.cpp
     src/codecs/lucene104/Lucene104NormsWriter.cpp
     src/codecs/lucene104/Lucene104NormsReader.cpp
     src/codecs/blocktree/BlockTreeTermsWriter.cpp
@@ -152,6 +156,8 @@ set(DIAGON_CORE_HEADERS
     # Index
     include/diagon/index/CacheHelper.h
     include/diagon/index/FieldInfo.h
+    include/diagon/index/Fields.h
+    include/diagon/index/FreqProxFields.h
     include/diagon/index/IndexMapping.h
     include/diagon/index/IndexReader.h
     include/diagon/index/SegmentWriteState.h
@@ -200,9 +206,12 @@ set(DIAGON_CORE_HEADERS
     include/diagon/codecs/SimpleFieldsConsumer.h
     include/diagon/codecs/SimpleFieldsProducer.h
     include/diagon/codecs/lucene104/Lucene104Codec.h
+    include/diagon/codecs/lucene104/Lucene104FieldsConsumer.h
+    include/diagon/codecs/lucene104/Lucene104FieldsProducer.h
     include/diagon/codecs/lucene104/Lucene104PostingsWriter.h
     include/diagon/codecs/lucene104/Lucene104PostingsReader.h
     include/diagon/codecs/lucene104/Lucene104PostingsReaderOptimized.h
+    include/diagon/codecs/lucene104/Lucene104PostingsEnumBatch.h
     include/diagon/codecs/lucene104/Lucene104NormsWriter.h
     include/diagon/codecs/lucene104/Lucene104NormsReader.h
     include/diagon/codecs/blocktree/BlockTreeTermsWriter.h

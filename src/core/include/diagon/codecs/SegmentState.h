@@ -61,16 +61,15 @@ struct SegmentReadState {
     std::string segmentSuffix;
     store::IOContext& context;
     index::SegmentInfo* segmentInfo{nullptr};  // Optional
-
-    // TODO: Add when implemented:
-    // FieldInfos& fieldInfos;
+    const index::FieldInfos& fieldInfos;
 
     SegmentReadState(store::Directory& dir, const std::string& name, const std::string& suffix,
-                     store::IOContext& ctx)
+                     store::IOContext& ctx, const index::FieldInfos& fields)
         : directory(dir)
         , segmentName(name)
         , segmentSuffix(suffix)
-        , context(ctx) {}
+        , context(ctx)
+        , fieldInfos(fields) {}
 };
 
 }  // namespace codecs

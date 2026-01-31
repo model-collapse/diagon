@@ -51,6 +51,21 @@ public:
                                                   const TermState& termState);
 
     /**
+     * Get batch postings for a term (P1.1 optimization).
+     *
+     * Returns native batch implementation that can decode multiple documents
+     * at once, eliminating virtual call overhead.
+     *
+     * @param fieldInfo Field metadata
+     * @param termState Term state from writer (file pointers)
+     * @param useBatch If true, return batch enum; otherwise return regular enum
+     * @return PostingsEnum (may be batch-capable)
+     */
+    std::unique_ptr<index::PostingsEnum> postings(const index::FieldInfo& fieldInfo,
+                                                  const TermState& termState,
+                                                  bool useBatch);
+
+    /**
      * Close all input files.
      */
     void close();

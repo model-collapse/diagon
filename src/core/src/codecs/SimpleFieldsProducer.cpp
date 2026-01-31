@@ -29,7 +29,11 @@ SimpleFieldsProducer::SimpleFieldsProducer(Directory& dir, const std::string& se
     load(dir);
 }
 
-std::unique_ptr<Terms> SimpleFieldsProducer::terms() const {
+std::unique_ptr<Terms> SimpleFieldsProducer::terms(const std::string& field) {
+    // Check if field matches
+    if (field != fieldName_) {
+        return nullptr;  // This producer only handles one field
+    }
     return std::make_unique<SimpleTerms>(terms_);
 }
 
@@ -172,6 +176,20 @@ std::unique_ptr<PostingsEnum> SimpleTermsEnum::postings() {
     return std::make_unique<SimplePostingsEnum>(terms_[current_].postings);
 }
 
+std::unique_ptr<PostingsEnum> SimpleTermsEnum::postings(bool useBatch) {
+    if (!isValid()) {
+        return nullptr;
+    }
+
+    if (useBatch) {
+        // Return batch-capable implementation
+        return std::make_unique<SimpleBatchPostingsEnum>(terms_[current_].postings);
+    } else {
+        // Return regular implementation
+        return std::make_unique<SimplePostingsEnum>(terms_[current_].postings);
+    }
+}
+
 // ==================== SimplePostingsEnum ====================
 
 int SimplePostingsEnum::nextDoc() {
@@ -204,6 +222,58 @@ int SimplePostingsEnum::docID() const {
 }
 
 int SimplePostingsEnum::freq() const {
+    if (!isValid()) {
+        return 0;
+    }
+    return postings_[current_].freq;
+}
+
+// ==================== SimpleBatchPostingsEnum ====================
+
+int SimpleBatchPostingsEnum::nextBatch(index::PostingsBatch& batch) {
+    int count = 0;
+
+    // Fill batch with up to batch.capacity documents
+    while (count < batch.capacity && current_ + 1 < static_cast<int>(postings_.size())) {
+        current_++;
+        batch.docs[count] = postings_[current_].docID;
+        batch.freqs[count] = postings_[current_].freq;
+        count++;
+    }
+
+    batch.count = count;
+    return count;
+}
+
+int SimpleBatchPostingsEnum::nextDoc() {
+    current_++;
+    if (current_ >= static_cast<int>(postings_.size())) {
+        return NO_MORE_DOCS;
+    }
+    return postings_[current_].docID;
+}
+
+int SimpleBatchPostingsEnum::advance(int target) {
+    // Linear scan for simplicity
+    while (current_ + 1 < static_cast<int>(postings_.size())) {
+        current_++;
+        if (postings_[current_].docID >= target) {
+            return postings_[current_].docID;
+        }
+    }
+
+    current_ = static_cast<int>(postings_.size());
+    return NO_MORE_DOCS;
+}
+
+int SimpleBatchPostingsEnum::docID() const {
+    if (!isValid()) {
+        return -1;
+    }
+    return postings_[current_].docID;
+}
+
+int SimpleBatchPostingsEnum::freq() const {
     if (!isValid()) {
         return 0;
     }

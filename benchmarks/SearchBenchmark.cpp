@@ -51,6 +51,10 @@ std::string generateRandomText(int numWords, std::mt19937& rng) {
  * Create test index with specified number of documents
  */
 std::unique_ptr<FSDirectory> createTestIndex(int numDocs, const fs::path& indexPath) {
+    // Clean up any existing index data to avoid corruption
+    if (fs::exists(indexPath)) {
+        fs::remove_all(indexPath);
+    }
     fs::create_directories(indexPath);
     auto dir = FSDirectory::open(indexPath.string());
 
@@ -102,7 +106,7 @@ static void BM_TermQuerySearch(benchmark::State& state) {
     IndexSearcher searcher(*reader);
 
     // Create query
-    search::Term term("_all", "search");  // Common term
+    search::Term term("body", "search");  // Common term
     TermQuery query(term);
 
     for (auto _ : state) {
@@ -136,7 +140,7 @@ static void BM_SearchWithDifferentTopK(benchmark::State& state) {
     auto reader = DirectoryReader::open(*dir);
     IndexSearcher searcher(*reader);
 
-    search::Term term("_all", "search");
+    search::Term term("body", "search");
     TermQuery query(term);
 
     for (auto _ : state) {
@@ -172,7 +176,7 @@ static void BM_SearchRareVsCommonTerms(benchmark::State& state) {
     IndexSearcher searcher(*reader);
 
     // Rare term appears in ~1% of docs, common term in ~50%
-    search::Term term("_all", rareQuery ? "elasticsearch" : "the");
+    search::Term term("body", rareQuery ? "elasticsearch" : "the");
     TermQuery query(term);
 
     for (auto _ : state) {
@@ -204,7 +208,7 @@ static void BM_ReaderReuse(benchmark::State& state) {
         initialized = true;
     }
 
-    search::Term term("_all", "search");
+    search::Term term("body", "search");
     TermQuery query(term);
 
     if (reuseReader) {
@@ -252,7 +256,7 @@ static void BM_CountVsSearch(benchmark::State& state) {
     auto reader = DirectoryReader::open(*dir);
     IndexSearcher searcher(*reader);
 
-    search::Term term("_all", "search");
+    search::Term term("body", "search");
     TermQuery query(term);
 
     if (useCount) {
@@ -262,7 +266,7 @@ static void BM_CountVsSearch(benchmark::State& state) {
         }
     } else {
         for (auto _ : state) {
-            auto results = searcher.search(query, Integer::MAX_VALUE);
+            auto results = searcher.search(query, 1000000);  // Large number to get all results
             benchmark::DoNotOptimize(results);
         }
     }

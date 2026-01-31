@@ -3,6 +3,7 @@
 
 #include "diagon/codecs/blocktree/BlockTreeTermsReader.h"
 
+#include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
 #include "diagon/util/Exceptions.h"
 
 #include <algorithm>
@@ -212,9 +213,33 @@ int64_t SegmentTermsEnum::totalTermFreq() const {
 }
 
 std::unique_ptr<index::PostingsEnum> SegmentTermsEnum::postings() {
-    // TODO: Create PostingsEnum from postingsFP
-    // For Phase 2 MVP, integrate with Lucene104PostingsReader
-    throw std::runtime_error("postings() not yet implemented");
+    return postings(false);
+}
+
+std::unique_ptr<index::PostingsEnum> SegmentTermsEnum::postings(bool useBatch) {
+    if (!positioned_ || currentTermIndex_ < 0 ||
+        currentTermIndex_ >= static_cast<int>(currentBlock_.stats.size())) {
+        throw std::runtime_error("No current term (call next() or seek first)");
+    }
+
+    if (!postingsReader_ || !fieldInfo_) {
+        throw std::runtime_error("PostingsReader not set (internal error)");
+    }
+
+    // Get term state
+    const auto& stats = currentBlock_.stats[currentTermIndex_];
+
+    // Create TermState for postings reader
+    codecs::lucene104::TermState termState;
+    termState.docStartFP = stats.postingsFP;
+    termState.docFreq = stats.docFreq;
+    termState.totalTermFreq = stats.totalTermFreq;
+
+    // Cast postings reader back to correct type
+    auto* reader = static_cast<codecs::lucene104::Lucene104PostingsReader*>(postingsReader_);
+
+    // Get postings from reader
+    return reader->postings(*fieldInfo_, termState, useBatch);
 }
 
 }  // namespace blocktree

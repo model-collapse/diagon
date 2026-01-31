@@ -135,6 +135,21 @@ public:
             return idf_ * freq * (k1_ + 1.0f) / (freq + k);
         }
 
+        /**
+         * Get IDF value (for batch scoring)
+         */
+        float getIDF() const { return idf_; }
+
+        /**
+         * Get k1 parameter (for batch scoring)
+         */
+        float getK1() const { return k1_; }
+
+        /**
+         * Get b parameter (for batch scoring)
+         */
+        float getB() const { return b_; }
+
     private:
         float idf_;
         float k1_;

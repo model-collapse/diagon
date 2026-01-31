@@ -58,6 +58,14 @@ add_diagon_benchmark(MMapDirectoryBenchmark
 
 # ==================== Postings Format Benchmarks ====================
 
+add_diagon_benchmark(Lucene104BatchBenchmark
+    Lucene104BatchBenchmark.cpp
+)
+
+add_diagon_benchmark(BatchScoringBenchmark
+    BatchScoringBenchmark.cpp
+)
+
 add_diagon_benchmark(PostingsFormatBenchmark
     PostingsFormatBenchmark.cpp
 )
@@ -111,6 +119,28 @@ add_standalone_benchmark(BloomFilterBenchmark
 # Block-Max Quantized Index Benchmark (standalone, uses MSMarco dataset)
 add_standalone_benchmark(BlockMaxQuantizedIndexBenchmark
     BlockMaxQuantizedIndexBenchmark.cpp
+)
+
+# Lucene104 Integration Validation (Phase 4.1: BlockTreeTermsWriter)
+add_standalone_benchmark(Lucene104IntegrationValidation
+    Lucene104IntegrationValidation.cpp
+)
+
+# Tokenizer Benchmark (micro-benchmark for FastTokenizer)
+add_diagon_benchmark(TokenizerBenchmark
+    TokenizerBenchmark.cpp
+)
+
+# ==================== Lucene Comparison Benchmark ====================
+
+add_diagon_benchmark(LuceneComparisonBenchmark
+    LuceneComparisonBenchmark.cpp
+)
+
+# ==================== Scale Testing Benchmark ====================
+
+add_diagon_benchmark(ScaleComparisonBenchmark
+    ScaleComparisonBenchmark.cpp
 )
 
 # ==================== Combined Benchmark Target ====================

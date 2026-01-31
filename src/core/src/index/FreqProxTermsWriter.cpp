@@ -11,8 +11,13 @@ namespace index {
 
 // ==================== FreqProxTermsWriter ====================
 
-FreqProxTermsWriter::FreqProxTermsWriter(FieldInfosBuilder& fieldInfosBuilder)
-    : fieldInfosBuilder_(fieldInfosBuilder) {}
+FreqProxTermsWriter::FreqProxTermsWriter(FieldInfosBuilder& fieldInfosBuilder,
+                                         size_t expectedTerms)
+    : fieldInfosBuilder_(fieldInfosBuilder) {
+    // Pre-size term dictionary to avoid rehashing during indexing
+    // This significantly reduces malloc overhead
+    termToPosting_.reserve(expectedTerms);
+}
 
 void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) {
     // Iterate over all fields in document
@@ -41,14 +46,14 @@ void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) 
         // Tokenize field
         std::vector<std::string> tokens = field->tokenize();
 
-        // Count term frequencies
-        std::unordered_map<std::string, int> termFreqs;
+        // Count term frequencies using cached map (avoid allocation per document)
+        termFreqsCache_.clear();  // Reuse existing map
         for (const auto& token : tokens) {
-            termFreqs[token]++;
+            termFreqsCache_[token]++;
         }
 
         // Add each unique term to posting lists
-        for (const auto& [term, freq] : termFreqs) {
+        for (const auto& [term, freq] : termFreqsCache_) {
             addTermOccurrence(fieldName, term, docID, fieldType.indexOptions);
         }
     }
@@ -79,6 +84,10 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
 FreqProxTermsWriter::PostingData FreqProxTermsWriter::createPostingList(const std::string& term,
                                                                         int docID) {
     PostingData data;
+
+    // Pre-allocate space for typical posting list (avg ~10 docs per term)
+    // Avoids multiple vector reallocations during growth
+    data.postings.reserve(20);  // 10 docs × 2 ints per doc (docID, freq)
 
     // Store initial [docID, freq] pair
     data.postings.push_back(docID);

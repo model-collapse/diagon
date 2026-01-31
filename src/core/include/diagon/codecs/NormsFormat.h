@@ -5,6 +5,7 @@
 
 #include "diagon/index/DocValues.h"
 #include "diagon/index/FieldInfo.h"
+#include "diagon/index/SegmentWriteState.h"
 
 #include <functional>
 #include <memory>
@@ -17,8 +18,6 @@ namespace codecs {
 // Forward declarations
 class NormsConsumer;
 class NormsProducer;
-class SegmentWriteState;
-class SegmentReadState;
 
 /**
  * NormsFormat - Encodes per-document length normalization factors
@@ -59,7 +58,7 @@ public:
      * @param state Segment write state
      * @return Consumer instance
      */
-    virtual std::unique_ptr<NormsConsumer> normsConsumer(SegmentWriteState& state) = 0;
+    virtual std::unique_ptr<NormsConsumer> normsConsumer(index::SegmentWriteState& state) = 0;
 
     /**
      * Create producer for reading norms
@@ -67,7 +66,7 @@ public:
      * @param state Segment read state
      * @return Producer instance
      */
-    virtual std::unique_ptr<NormsProducer> normsProducer(SegmentReadState& state) = 0;
+    virtual std::unique_ptr<NormsProducer> normsProducer(index::SegmentReadState& state) = 0;
 
     // ==================== Factory ====================
 

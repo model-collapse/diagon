@@ -4,6 +4,7 @@
 #pragma once
 
 #include "diagon/codecs/PostingsFormat.h"
+#include "diagon/index/BatchPostingsEnum.h"
 #include "diagon/index/PostingsEnum.h"
 #include "diagon/index/Terms.h"
 #include "diagon/index/TermsEnum.h"
@@ -70,11 +71,12 @@ public:
                          const std::string& fieldName);
 
     /**
-     * Get terms for the field
+     * Get terms for a field (FieldsProducer interface)
      *
-     * @return Terms instance (never null)
+     * @param field Field name (must match the field this producer was created for)
+     * @return Terms instance, or nullptr if field doesn't match
      */
-    std::unique_ptr<index::Terms> terms() const;
+    std::unique_ptr<::diagon::index::Terms> terms(const std::string& field) override;
 
     /**
      * Get all term data (for testing/debugging)
@@ -119,12 +121,12 @@ private:
 /**
  * SimpleTerms - Terms implementation for SimpleFieldsProducer
  */
-class SimpleTerms : public index::Terms {
+class SimpleTerms : public ::diagon::index::Terms {
 public:
     explicit SimpleTerms(const std::vector<SimpleFieldsProducer::TermData>& terms)
         : terms_(terms) {}
 
-    std::unique_ptr<index::TermsEnum> iterator() const override;
+    std::unique_ptr<::diagon::index::TermsEnum> iterator() const override;
 
     int64_t size() const override { return static_cast<int64_t>(terms_.size()); }
 
@@ -135,7 +137,7 @@ private:
 /**
  * SimpleTermsEnum - TermsEnum implementation for SimpleFieldsProducer
  */
-class SimpleTermsEnum : public index::TermsEnum {
+class SimpleTermsEnum : public ::diagon::index::TermsEnum {
 public:
     explicit SimpleTermsEnum(const std::vector<SimpleFieldsProducer::TermData>& terms)
         : terms_(terms)
@@ -153,7 +155,9 @@ public:
 
     int64_t totalTermFreq() const override;
 
-    std::unique_ptr<index::PostingsEnum> postings() override;
+    std::unique_ptr<::diagon::index::PostingsEnum> postings() override;
+
+    std::unique_ptr<::diagon::index::PostingsEnum> postings(bool useBatch) override;
 
 private:
     const std::vector<SimpleFieldsProducer::TermData>& terms_;
@@ -168,7 +172,7 @@ private:
 /**
  * SimplePostingsEnum - PostingsEnum implementation for SimpleFieldsProducer
  */
-class SimplePostingsEnum : public index::PostingsEnum {
+class SimplePostingsEnum : public ::diagon::index::PostingsEnum {
 public:
     explicit SimplePostingsEnum(const std::vector<SimpleFieldsProducer::Posting>& postings)
         : postings_(postings)
@@ -191,6 +195,43 @@ private:
     /**
      * Check if current position is valid
      */
+    bool isValid() const { return current_ >= 0 && current_ < static_cast<int>(postings_.size()); }
+};
+
+/**
+ * SimpleBatchPostingsEnum - Batch-capable postings enum for in-memory postings
+ *
+ * Quick validation implementation: wraps std::vector<Posting> with batch interface
+ * to eliminate virtual call overhead in BatchTermScorer.
+ */
+class SimpleBatchPostingsEnum : public ::diagon::index::BatchPostingsEnum {
+public:
+    explicit SimpleBatchPostingsEnum(const std::vector<SimpleFieldsProducer::Posting>& postings)
+        : postings_(postings)
+        , current_(-1) {}
+
+    // ==================== BatchPostingsEnum ====================
+
+    int nextBatch(::diagon::index::PostingsBatch& batch) override;
+
+    // ==================== DocIdSetIterator ====================
+
+    int nextDoc() override;
+
+    int advance(int target) override;
+
+    int docID() const override;
+
+    int64_t cost() const override { return static_cast<int64_t>(postings_.size()); }
+
+    // ==================== PostingsEnum ====================
+
+    int freq() const override;
+
+private:
+    const std::vector<SimpleFieldsProducer::Posting>& postings_;
+    int current_;  // Current posting index (-1 = before first)
+
     bool isValid() const { return current_ >= 0 && current_ < static_cast<int>(postings_.size()); }
 };
 

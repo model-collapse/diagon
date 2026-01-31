@@ -6,6 +6,11 @@
 #include <algorithm>
 #include <cmath>
 
+// SIMD headers for batched collection
+#if defined(DIAGON_HAVE_AVX512) || defined(DIAGON_HAVE_AVX2)
+#    include <immintrin.h>
+#endif
+
 namespace diagon {
 namespace search {
 
@@ -85,7 +90,25 @@ TopScoreDocCollector::TopScoreLeafCollector::TopScoreLeafCollector(
     : parent_(parent)
     , docBase_(context.docBase)
     , scorer_(nullptr)
-    , after_(parent->hasAfter_ ? &parent->after_ : nullptr) {}
+    , after_(parent->hasAfter_ ? &parent->after_ : nullptr)
+#if defined(DIAGON_HAVE_AVX512) || defined(DIAGON_HAVE_AVX2)
+    , batchPos_(0)
+#endif
+{
+}
+
+TopScoreDocCollector::TopScoreLeafCollector::~TopScoreLeafCollector() {
+#if defined(DIAGON_HAVE_AVX512) || defined(DIAGON_HAVE_AVX2)
+    // Flush any remaining documents in batch
+    flushBatch();
+#endif
+}
+
+void TopScoreDocCollector::TopScoreLeafCollector::finishSegment() {
+#if defined(DIAGON_HAVE_AVX512) || defined(DIAGON_HAVE_AVX2)
+    flushBatch();
+#endif
+}
 
 void TopScoreDocCollector::TopScoreLeafCollector::collect(int doc) {
     if (!scorer_) {
@@ -95,32 +118,43 @@ void TopScoreDocCollector::TopScoreLeafCollector::collect(int doc) {
     float score = scorer_->score();
     parent_->totalHits_++;
 
-    // Skip NaN and infinite scores (invalid) - don't add to results but count in totalHits
-    // Note: -ffast-math is disabled for this file to allow proper NaN/inf checking
+    // Skip NaN and infinite scores (invalid)
     if (std::isnan(score) || std::isinf(score)) {
         return;
     }
 
-    // Global doc ID
     int globalDoc = docBase_ + doc;
 
-    // Check if this doc is after the pagination point
+    // Check pagination filter
     if (after_ != nullptr) {
-        // Skip docs that come before 'after'
-        // after_.doc is global, doc is local to segment
         if (globalDoc < after_->doc) {
             return;
         }
         if (globalDoc == after_->doc) {
-            return;  // Skip the 'after' doc itself
+            return;
         }
-        // If scores are equal, use doc ID for tie-breaking
         if (score == after_->score && globalDoc <= after_->doc) {
             return;
         }
     }
 
-    // Add to priority queue
+#if defined(DIAGON_HAVE_AVX512) || defined(DIAGON_HAVE_AVX2)
+    // Add to batch (AVX512: 16 floats, AVX2: 8 floats)
+    docBatch_[batchPos_] = globalDoc;
+    scoreBatch_[batchPos_] = score;
+    batchPos_++;
+
+    // Flush batch when full
+    if (batchPos_ >= BATCH_SIZE) {
+        flushBatch();
+    }
+#else
+    // Scalar fallback: process immediately
+    collectSingle(globalDoc, score);
+#endif
+}
+
+void TopScoreDocCollector::TopScoreLeafCollector::collectSingle(int globalDoc, float score) {
     ScoreDoc scoreDoc(globalDoc, score);
 
     if (static_cast<int>(parent_->pq_.size()) < parent_->numHits_) {
@@ -139,6 +173,79 @@ void TopScoreDocCollector::TopScoreLeafCollector::collect(int doc) {
         }
     }
 }
+
+#if defined(DIAGON_HAVE_AVX512)
+void TopScoreDocCollector::TopScoreLeafCollector::flushBatch() {
+    if (batchPos_ == 0) {
+        return;  // Nothing to flush
+    }
+
+    if (static_cast<int>(parent_->pq_.size()) < parent_->numHits_) {
+        // Queue not full yet, add all documents from batch
+        for (int i = 0; i < batchPos_; i++) {
+            collectSingle(docBatch_[i], scoreBatch_[i]);
+        }
+    } else {
+        // Queue is full, use AVX512 SIMD to filter (16 floats at a time)
+        float minScore = parent_->pq_.top().score;
+        __m512 minScore_vec = _mm512_set1_ps(minScore);
+
+        // Load batch scores (16 floats)
+        __m512 scores_vec = _mm512_loadu_ps(scoreBatch_);
+
+        // Compare: which scores beat minimum?
+        // AVX512 uses mask registers instead of movemask
+        __mmask16 mask = _mm512_cmp_ps_mask(scores_vec, minScore_vec, _CMP_GT_OQ);
+
+        // Process documents that beat minScore
+        for (int i = 0; i < batchPos_; i++) {
+            if (mask & (1 << i)) {
+                // This document beats minScore, add to queue
+                collectSingle(docBatch_[i], scoreBatch_[i]);
+            }
+        }
+    }
+
+    batchPos_ = 0;  // Reset batch
+}
+#elif defined(DIAGON_HAVE_AVX2)
+void TopScoreDocCollector::TopScoreLeafCollector::flushBatch() {
+    if (batchPos_ == 0) {
+        return;  // Nothing to flush
+    }
+
+    if (static_cast<int>(parent_->pq_.size()) < parent_->numHits_) {
+        // Queue not full yet, add all documents from batch
+        for (int i = 0; i < batchPos_; i++) {
+            collectSingle(docBatch_[i], scoreBatch_[i]);
+        }
+    } else {
+        // Queue is full, use AVX2 SIMD to filter (8 floats at a time)
+        float minScore = parent_->pq_.top().score;
+        __m256 minScore_vec = _mm256_set1_ps(minScore);
+
+        // Load batch scores (8 floats)
+        __m256 scores_vec = _mm256_loadu_ps(scoreBatch_);
+
+        // Compare: which scores beat minimum?
+        // mask[i] = 0xFFFFFFFF if scoreBatch_[i] > minScore, else 0
+        __m256 mask = _mm256_cmp_ps(scores_vec, minScore_vec, _CMP_GT_OQ);
+
+        // Extract mask as integer
+        int mask_int = _mm256_movemask_ps(mask);
+
+        // Process documents that beat minScore
+        for (int i = 0; i < batchPos_; i++) {
+            if (mask_int & (1 << i)) {
+                // This document beats minScore, add to queue
+                collectSingle(docBatch_[i], scoreBatch_[i]);
+            }
+        }
+    }
+
+    batchPos_ = 0;  // Reset batch
+}
+#endif
 
 }  // namespace search
 }  // namespace diagon

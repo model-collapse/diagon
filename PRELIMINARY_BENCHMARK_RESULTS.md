@@ -1,8 +1,18 @@
 # Preliminary Benchmark Results: Diagon vs Lucene
 
 **Date**: 2026-01-30
-**Status**: Initial baseline comparison
-**Phase**: Phase 2 (Baseline Comparison) - Partial
+**Status**: Superseded by BENCHMARK_RESULTS.md
+**Phase**: Phase 2 (Baseline Comparison) - Complete
+
+---
+
+⚠️ **UPDATE**: This document contains initial findings with an incorrect interpretation of the DEBUG warning. See **BENCHMARK_RESULTS.md** for the corrected, final results.
+
+**Key Correction**: The DEBUG warning refers to Google Benchmark library, NOT Diagon. Diagon IS fully optimized with `-O3 -march=native -DNDEBUG -flto`. The 18.3x speedup is accurate and represents true Release build performance.
+
+---
+
+## Original Preliminary Analysis (with corrections noted)
 
 ## Summary
 

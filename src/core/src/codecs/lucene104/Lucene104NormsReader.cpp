@@ -29,16 +29,19 @@ float Lucene104NormsReader::decodeNormValue(int8_t norm) {
 
 // ==================== Constructor/Destructor ====================
 
-Lucene104NormsReader::Lucene104NormsReader(SegmentReadState& state)
+Lucene104NormsReader::Lucene104NormsReader(index::SegmentReadState& state)
     : state_(state) {
     // Open norms data file (.nvd)
-    std::string baseName = state.segmentInfo ? state.segmentInfo->name() : state.segmentName;
+    std::string baseName = state.segmentName;
+    if (!state.segmentSuffix.empty()) {
+        baseName += "_" + state.segmentSuffix;
+    }
     std::string dataName = baseName + ".nvd";
     std::string metaName = baseName + ".nvm";
 
     try {
-        data_ = state.directory.openInput(dataName, state.context);
-        meta_ = state.directory.openInput(metaName, state.context);
+        data_ = state.directory->openInput(dataName, state.context);
+        meta_ = state.directory->openInput(metaName, state.context);
     } catch (const FileNotFoundException&) {
         // No norms files - this is OK if no fields have norms
         data_.reset();

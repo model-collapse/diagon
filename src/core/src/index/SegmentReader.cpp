@@ -67,15 +67,16 @@ Terms* SegmentReader::terms(const std::string& field) const {
     }
 
     // Load fields producer if not already loaded
-    loadFieldsProducer(field);
+    loadFieldsProducer();
 
     // Get Terms from producer
-    auto producerIt = fieldsProducers_.find(field);
-    if (producerIt != fieldsProducers_.end()) {
-        auto terms = producerIt->second->terms();
-        Terms* termsPtr = terms.get();
-        termsCache_[field] = std::move(terms);
-        return termsPtr;
+    if (fieldsProducer_) {
+        auto terms = fieldsProducer_->terms(field);
+        if (terms) {
+            Terms* termsPtr = terms.get();
+            termsCache_[field] = std::move(terms);
+            return termsPtr;
+        }
     }
 
     return nullptr;
@@ -191,17 +192,30 @@ const util::Bits* SegmentReader::getLiveDocs() const {
 
 // ==================== Internal Methods ====================
 
-void SegmentReader::loadFieldsProducer(const std::string& field) const {
+void SegmentReader::loadFieldsProducer() const {
     // Check if already loaded
-    if (fieldsProducers_.find(field) != fieldsProducers_.end()) {
+    if (fieldsProducer_) {
         return;
     }
 
-    // Phase 4: Create SimpleFieldsProducer
-    // Note: SimpleFieldsProducer reads <segment>.post file with a single field
-    auto producer = std::make_unique<SimpleFieldsProducer>(directory_, segmentInfo_->name(), field);
+    // Phase 4.3: Get codec and create appropriate FieldsProducer
+    try {
+        // Get codec name from segment info
+        std::string codecName = segmentInfo_->codecName();
+        auto& codec = codecs::Codec::forName(codecName);
+        auto& postingsFormat = codec.postingsFormat();
 
-    fieldsProducers_[field] = std::move(producer);
+        // Create segment read state (using index::SegmentReadState)
+        std::string segmentName = segmentInfo_->name();
+        SegmentReadState readState(&directory_, segmentName, segmentInfo_->maxDoc(),
+                                   segmentInfo_->fieldInfos(), "");
+
+        // Create fields producer using codec
+        fieldsProducer_ = postingsFormat.fieldsProducer(readState);
+    } catch (const std::exception& e) {
+        // Failed to load fields producer - leave as nullptr
+        // This can happen if postings files don't exist
+    }
 }
 
 void SegmentReader::loadDocValuesReader() const {
@@ -283,9 +297,8 @@ void SegmentReader::loadNormsProducer() const {
 
         // Create segment read state
         std::string segmentName = segmentInfo_->name();
-        store::IOContext readContext = store::IOContext::READ;
-        codecs::SegmentReadState readState(directory_, segmentName, "", readContext);
-        readState.segmentInfo = segmentInfo_.get();
+        SegmentReadState readState(&directory_, segmentName, segmentInfo_->maxDoc(),
+                                   segmentInfo_->fieldInfos(), "");
 
         // Create norms producer
         normsProducer_ = normsFormat.normsProducer(readState);
@@ -301,8 +314,11 @@ void SegmentReader::doClose() {
     // Mark as closed
     setClosed();
 
-    // Clear producers
-    fieldsProducers_.clear();
+    // Clear fields producer and cache
+    if (fieldsProducer_) {
+        fieldsProducer_->close();
+        fieldsProducer_.reset();
+    }
     termsCache_.clear();
 
     // Clear doc values
