@@ -273,6 +273,25 @@ conda install -c conda-forge icu=73 zstd lz4
 3. Fix the C++ issue (don't copy non-copyables, implement virtual functions, etc.)
 4. Rebuild from clean state
 
+### Error: `ZSTD target not found`
+
+**Cause:** System package creates `zstd::libzstd_shared` target, but CMake expects `zstd::libzstd`
+
+**Root Cause:**
+- System libzstd-dev package's CMake config creates `zstd::libzstd_shared`
+- Our CMakeLists.txt looks for `zstd::libzstd` or `zstd::zstd`
+- Target name mismatch causes fatal error
+
+**Fix:** (Already applied to cmake/Dependencies.cmake)
+```cmake
+# In cmake/Dependencies.cmake, after find_package(zstd)
+if(TARGET zstd::libzstd_shared AND NOT TARGET zstd::libzstd)
+    add_library(zstd::libzstd ALIAS zstd::libzstd_shared)
+endif()
+```
+
+**Status:** ✅ Fixed in current codebase (2026-01-31)
+
 ### Error: `multiple definition of ...`
 
 **Cause:** Same symbol defined in multiple .cpp files

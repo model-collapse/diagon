@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Tenets
+- **Be Self-discipline** Each efficiency observation should be based a correctly build artifact, following the build SOP. There is no trade-off in experiment/test, there is no 'guessed/predicted' finding based on incorrectly build artifact/ artifact with obvious bugs / approxiate without testing. Except being permitted, all the benchmarks should be conducted after a full build.
+- **Be Humble and Straight** The positioning of this product is already clearly defined and known by the user. It is forbbiden to 'bury' the lags/drawbacks/inalignment/concerns in a long passage of boast. In each report, just mention the real benchmark data, straight and objective comparison, insights for improvement. No others. 
+- **Be Honest** DO NOT emphasize the advantage signal based on prediction data. All the reported comparison should be annotated with "predicted" and "experimented". Don't try to disguise the unreliable data (even fake data) with confident narrative.
+- **Be Rational** Each step you take (decide) to optmize / fix should be 100% rational based on the former obsevation, deep dive before every proposal. It is discouraged to enumerate massive clueless possibilties and let me choose. Experiment, verify and narrow down the root cause scope as much as possible.  
+- **Insist Highest Standard** The design target to succeed lucene and click-house from all the apects. There is no "Although we lag behind XXX, but we can save sth. by our design". There is NO EXCUSE falling behind them. Each time the benchmark show we are slower, you should be ashamed. Keep efficiency first in mind.
+
 ## Repository Purpose
 
 This is a **design and implementation workspace** for **DIAGON** (**D**iverse **I**ndex **A**rchitecture for **G**ranular **O**LAP **a**nd **N**atural language search), a C++ search engine library combining:
@@ -31,6 +38,12 @@ DIAGON provides diverse indexing capabilities through specialized index architec
 └── CLAUDE.md                            # This file
 ```
 
+## Tagets
+- A state-of-the art c++ search engine index library with highest efficiency, compatiblity, reliability.
+- Fully optimized algorithm, RAM layout and code implementtion.
+- 3x ~ 10x search speed comparing with Lucene.
+- 2x analytics processing speed comparing with Clickhouse 
+
 ## Build Standard Operating Procedure (SOP)
 
 **CRITICAL**: Always follow this procedure to avoid compilation/linking errors.
@@ -59,11 +72,6 @@ make diagon_core -j8
 ldd src/core/libdiagon_core.so | grep icu
 # Must show: libicuuc.so and libicui18n.so
 
-# 5. Build benchmarks
-make SearchBenchmark -j8  # or make benchmarks -j8
-
-# 6. Run benchmark
-./benchmarks/SearchBenchmark
 ```
 
 ### Key Rules
@@ -95,6 +103,16 @@ make SearchBenchmark -j8  # or make benchmarks -j8
 | `ZSTD target not found` | System libs missing | Install: `sudo apt install libzstd-dev` |
 
 See `BUILD_SOP.md` for troubleshooting guide and detailed explanations.
+
+## Benmark
+Use following command to build benchmark.
+```bash
+# 5. Build benchmarks
+make SearchBenchmark -j8  # or make benchmarks -j8
+
+# 6. Run benchmark
+./benchmarks/SearchBenchmark
+```
 
 ## Design Methodology
 

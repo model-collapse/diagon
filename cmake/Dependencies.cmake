@@ -47,10 +47,18 @@ if(NOT TARGET zstd::libzstd AND NOT TARGET zstd::zstd)
         else()
             set(HAVE_ZSTD TRUE CACHE BOOL "ZSTD library found" FORCE)
             message(STATUS "Found ZSTD (config)")
+            # System package creates zstd::libzstd_shared, create alias to expected name
+            if(TARGET zstd::libzstd_shared AND NOT TARGET zstd::libzstd)
+                add_library(zstd::libzstd ALIAS zstd::libzstd_shared)
+            endif()
         endif()
     else()
         set(HAVE_ZSTD TRUE CACHE BOOL "ZSTD library found" FORCE)
         message(STATUS "Found ZSTD")
+        # System package creates zstd::libzstd_shared, create alias to expected name
+        if(TARGET zstd::libzstd_shared AND NOT TARGET zstd::libzstd)
+            add_library(zstd::libzstd ALIAS zstd::libzstd_shared)
+        endif()
     endif()
 endif()
 
