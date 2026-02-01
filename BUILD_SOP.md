@@ -29,7 +29,17 @@
 - CMake finds conda libraries first due to PATH
 - Mix of conda and system libs causes ABI incompatibilities
 
-**Solution:** Use system libraries consistently (disable conda during build)
+**Solution (Automatic):** CMake now implements intelligent fallback:
+- ✅ Detects conda environment automatically
+- ✅ Tries conda libraries first
+- ✅ Falls back to system if not found
+- ✅ Reports source for each library (conda/system)
+- ⚠️ Warns if libraries come from mixed sources
+
+**Manual Override:** If you want to force system-only, set PATH:
+```bash
+export PATH=/usr/bin:/bin:/usr/local/bin:$PATH
+```
 
 ### Problem 3: Stale CMake Cache
 
@@ -66,12 +76,19 @@ rm -rf build
 mkdir build
 cd build
 
-# Disable conda to avoid library conflicts
-# (Optional: only if conda is causing issues)
+# Optional: Force system libraries only (if conda causes issues)
 # export PATH=/usr/bin:/bin:/usr/local/bin:$PATH
+#
+# Note: CMake now automatically tries conda first, then falls back to system.
+# You only need to set PATH if you want to force system-only libraries.
 ```
 
 **Why:** Removes all cached state, old binaries, and stale configurations
+
+**Automatic Fallback:** CMake will detect your conda environment and intelligently:
+- Try conda libraries first (ICU, ZLIB, LZ4, ZSTD)
+- Fall back to system libraries if not available in conda
+- Report the source of each library during configuration
 
 ### Step 2: Configure CMake (Release Mode)
 
@@ -462,11 +479,17 @@ ldconfig -p | grep libzstd
 
 A successful build should:
 
-1. ✅ Compile without errors
+1. ✅ Compile without errors or warnings (warnings are treated as errors via `-Werror`)
 2. ✅ Link without undefined symbols
 3. ✅ `ldd libdiagon_core.so` shows ICU libraries
 4. ✅ Benchmark runs without crashes
 5. ✅ Results are reasonable (not all zeros, not crashes)
+
+**Note:** The build uses `-Werror` to treat all warnings as errors. This ensures:
+- Zero-warning policy for production code
+- Immediate feedback on code quality issues
+- Consistent builds across different environments
+- External libraries (cppjieba) are marked as SYSTEM to suppress their warnings
 
 ---
 

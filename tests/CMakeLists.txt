@@ -12,6 +12,13 @@ include(GoogleTest)
 function(add_diagon_test TEST_NAME)
     add_executable(${TEST_NAME} ${ARGN})
 
+    # Set explicit RPATH to prefer system libraries
+    set_target_properties(${TEST_NAME} PROPERTIES
+        BUILD_RPATH_USE_ORIGIN TRUE
+        INSTALL_RPATH_USE_LINK_PATH FALSE
+        BUILD_RPATH "\$ORIGIN/../src/core:/usr/lib/x86_64-linux-gnu"
+    )
+
     # Link against diagon_core which transitively provides all dependencies
     # Plus directly link compression libraries since compression code is header-only
     target_link_libraries(${TEST_NAME}

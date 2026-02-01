@@ -234,6 +234,13 @@ When implementation begins:
 - Follow ClickHouse style for column storage code
 - Use clang-format for consistency
 
+### Code Quality Standards
+- **Zero-warning policy**: Build uses `-Werror` to treat all warnings as errors
+- All code must compile cleanly without warnings
+- External dependencies are marked as SYSTEM headers to suppress their warnings
+- Member initialization order must match declaration order
+- Use explicit casts for format strings (`%p` requires `void*`)
+
 ### Testing Strategy
 - Unit tests per module
 - Integration tests for end-to-end scenarios

@@ -104,34 +104,55 @@ Diagon provides a **hybrid** architecture combining two complementary indexing a
 ### Prerequisites
 - **C++ Compiler**: GCC 11+, Clang 14+, or MSVC 2022+
 - **CMake**: 3.20 or higher
-- **Dependencies**: ZLIB, LZ4, ZSTD (auto-installed via vcpkg/conan)
+- **C++ Standard**: C++20
+- **System Libraries**: ZLIB, LZ4, ZSTD, ICU (libicu-dev)
 
-### Build
+### Build (Recommended)
 
-#### Option 1: Using vcpkg (Recommended for Development)
 ```bash
-# Install vcpkg
-git clone https://github.com/Microsoft/vcpkg.git
-cd vcpkg && ./bootstrap-vcpkg.sh
+# Install system dependencies (Ubuntu/Debian)
+sudo apt-get install -y build-essential cmake \
+    libicu-dev libz-dev liblz4-dev libzstd-dev
 
-# Configure and build
-cd /path/to/diagon
-cmake -B build -S . \
-    -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake \
-    -DCMAKE_BUILD_TYPE=Release
+# Clone and build
+git clone https://github.com/yourusername/diagon.git
+cd diagon
+rm -rf build && mkdir build && cd build
 
-cmake --build build -j$(nproc)
+# Configure (Release mode without LTO)
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_CXX_FLAGS="-O3 -march=native" \
+      -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF \
+      -DDIAGON_BUILD_BENCHMARKS=ON \
+      -DDIAGON_BUILD_TESTS=ON \
+      ..
+
+# Build core library
+make diagon_core -j$(nproc)
+
+# Verify ICU is linked correctly
+ldd src/core/libdiagon_core.so | grep icu
+
+# Build benchmarks (optional)
+make SearchBenchmark -j$(nproc)
 ```
 
-#### Option 2: Using System Packages
-```bash
-# Ubuntu/Debian
-sudo apt-get install zlib1g-dev libzstd-dev liblz4-dev libgtest-dev
+### Intelligent Conda Fallback
 
-# Build
-cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j$(nproc)
-```
+If you have a conda environment active, CMake will automatically:
+- Try conda libraries first (ICU, ZLIB, LZ4, ZSTD)
+- Fall back to system libraries if not found in conda
+- Report the source for each library (conda/system)
+- Warn if libraries come from mixed sources
+
+**No manual PATH manipulation needed!** The build system handles it automatically.
+
+### Zero-Warning Policy
+
+Diagon enforces a zero-warning build policy:
+- All warnings treated as errors via `-Werror` (GCC/Clang) or `/WX` (MSVC)
+- External libraries (cppjieba) marked as SYSTEM to suppress their warnings
+- Any new warning will block the build
 
 ### Run Tests
 ```bash
@@ -139,7 +160,13 @@ cd build
 ctest --output-on-failure
 ```
 
-See [BUILD.md](BUILD.md) for detailed build instructions.
+### Quick Benchmark Test
+```bash
+cd build
+./benchmarks/SearchBenchmark --benchmark_filter=BM_TermQuerySearch/1000 --benchmark_min_time=0.1s
+```
+
+See [BUILD_SOP.md](BUILD_SOP.md) for detailed build instructions, troubleshooting, and performance tips.
 
 ## Usage Example
 
@@ -363,21 +390,42 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 git clone https://github.com/yourusername/diagon.git
 cd diagon
 
-# Build with tests and sanitizers
-cmake -B build -S . \
-    -DCMAKE_BUILD_TYPE=Debug \
-    -DDIAGON_BUILD_TESTS=ON \
-    -DCMAKE_CXX_FLAGS="-fsanitize=address -fsanitize=undefined"
+# Option 1: Release build (for performance testing)
+rm -rf build && mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF \
+      -DDIAGON_BUILD_TESTS=ON \
+      -DDIAGON_BUILD_BENCHMARKS=ON \
+      ..
+make -j$(nproc)
 
-cmake --build build
-cd build && ctest
+# Option 2: Debug build with sanitizers (for development)
+rm -rf build && mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Debug \
+      -DDIAGON_BUILD_TESTS=ON \
+      -DCMAKE_CXX_FLAGS="-fsanitize=address -fsanitize=undefined" \
+      ..
+make -j$(nproc)
+
+# Run tests
+ctest --output-on-failure
 ```
 
-### Code Style
-- C++20 standard
-- Follow Lucene naming conventions (camelCase methods)
-- Use clang-format for formatting
-- Document public APIs with Doxygen comments
+### Code Quality Standards
+- **C++20 standard** - Modern C++ with concepts, ranges, modules
+- **Zero-warning policy** - `-Werror` treats all warnings as errors
+- **Lucene-style naming** - camelCase methods, PascalCase classes
+- **Member initialization order** - Must match declaration order
+- **Format strings** - Use explicit `void*` casts for `%p`
+- **clang-format** - Automated code formatting
+- **Doxygen comments** - Document all public APIs
+
+### Key Build Rules
+1. **Always start clean**: `rm -rf build` before configuring
+2. **Disable LTO**: Use `-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF`
+3. **Verify ICU**: Check `ldd libdiagon_core.so | grep icu` after build
+4. **Use Release mode** for benchmarks (Debug is 10-100× slower)
+5. **Check warnings**: Build must complete with zero warnings
 
 ## Task List
 
@@ -470,4 +518,4 @@ Diagon is built upon the foundational work of:
 
 **Status**: 🔄 Active Development - ~20-25% Complete (Core + Tests + Analysis)
 **Version**: 1.0.0-alpha
-**Last Updated**: 2026-01-27
+**Last Updated**: 2026-02-01

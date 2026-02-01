@@ -15,14 +15,14 @@ if(DIAGON_COMPILER_GNU_LIKE)
         -Wall
         -Wextra
         -Wpedantic
-        # -Werror                     # Treat warnings as errors (enable in CI)
-        -Wno-unused-parameter       # Allow unused parameters
-        -Wno-sign-compare           # Common in index code
+        -Werror                     # Treat warnings as errors
+        -Wno-unused-parameter       # Allow unused parameters (intentional)
+        -Wno-sign-compare           # Common in index code (size_t vs int)
     )
 elseif(DIAGON_COMPILER_MSVC)
     add_compile_options(
         /W4                         # Warning level 4
-        # /WX                       # Treat warnings as errors (enable in CI)
+        /WX                         # Treat warnings as errors
         /wd4100                     # Unused parameter (common)
         /wd4244                     # Conversion warnings
     )

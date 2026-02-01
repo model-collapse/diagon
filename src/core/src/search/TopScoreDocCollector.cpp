@@ -87,13 +87,15 @@ TopDocs TopScoreDocCollector::topDocs(int start, int howMany) {
 
 TopScoreDocCollector::TopScoreLeafCollector::TopScoreLeafCollector(
     TopScoreDocCollector* parent, const index::LeafReaderContext& context)
+#if defined(DIAGON_HAVE_AVX512) || defined(DIAGON_HAVE_AVX2)
+    : batchPos_(0)
+    , parent_(parent)
+#else
     : parent_(parent)
+#endif
     , docBase_(context.docBase)
     , scorer_(nullptr)
     , after_(parent->hasAfter_ ? &parent->after_ : nullptr)
-#if defined(DIAGON_HAVE_AVX512) || defined(DIAGON_HAVE_AVX2)
-    , batchPos_(0)
-#endif
 {
 }
 

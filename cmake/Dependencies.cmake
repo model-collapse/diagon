@@ -4,12 +4,23 @@ message(STATUS "Configuring dependencies...")
 
 # ==================== Dependency Search Paths ====================
 
+# Detect conda environment and set up intelligent fallback
+if(DEFINED ENV{CONDA_PREFIX})
+    set(CONDA_PREFIX "$ENV{CONDA_PREFIX}")
+    message(STATUS "Conda environment detected: ${CONDA_PREFIX}")
+    # Add conda paths to search, but allow fallback to system
+    list(APPEND CMAKE_PREFIX_PATH "${CONDA_PREFIX}")
+    set(USING_CONDA_FALLBACK TRUE)
+    message(STATUS "Using intelligent fallback: Conda first, then system libraries")
+else()
+    set(USING_CONDA_FALLBACK FALSE)
+    message(STATUS "No conda environment detected, using system packages only")
+endif()
+
 if(DIAGON_USE_VCPKG)
     message(STATUS "Using vcpkg for dependency management")
 elseif(DIAGON_USE_CONAN)
     message(STATUS "Using Conan for dependency management")
-else()
-    message(STATUS "Using system packages for dependencies")
 endif()
 
 # ==================== Required Dependencies ====================
@@ -18,7 +29,16 @@ endif()
 if(NOT TARGET ZLIB::ZLIB)
     find_package(ZLIB REQUIRED)
     if(ZLIB_FOUND)
-        message(STATUS "Found ZLIB: ${ZLIB_VERSION}")
+        # Check actual library location, not just link libraries
+        if(ZLIB_LIBRARY)
+            if(ZLIB_LIBRARY MATCHES "${CONDA_PREFIX}")
+                message(STATUS "Found ZLIB: ${ZLIB_VERSION} (conda)")
+            else()
+                message(STATUS "Found ZLIB: ${ZLIB_VERSION} (system)")
+            endif()
+        else()
+            message(STATUS "Found ZLIB: ${ZLIB_VERSION}")
+        endif()
     endif()
 endif()
 
@@ -39,7 +59,11 @@ if(NOT TARGET zstd::libzstd AND NOT TARGET zstd::zstd)
                     IMPORTED_LOCATION "${ZSTD_LIBRARY}"
                     INTERFACE_INCLUDE_DIRECTORIES "${ZSTD_INCLUDE_DIR}"
                 )
-                message(STATUS "Found ZSTD: ${ZSTD_LIBRARY}")
+                if(ZSTD_LIBRARY MATCHES "${CONDA_PREFIX}")
+                    message(STATUS "Found ZSTD: ${ZSTD_LIBRARY} (conda)")
+                else()
+                    message(STATUS "Found ZSTD: ${ZSTD_LIBRARY} (system)")
+                endif()
                 set(HAVE_ZSTD TRUE CACHE BOOL "ZSTD library found" FORCE)
             else()
                 message(FATAL_ERROR "ZSTD not found. Please install libzstd-dev")
@@ -77,7 +101,11 @@ if(NOT TARGET LZ4::LZ4)
                     IMPORTED_LOCATION "${LZ4_LIBRARY}"
                     INTERFACE_INCLUDE_DIRECTORIES "${LZ4_INCLUDE_DIR}"
                 )
-                message(STATUS "Found LZ4: ${LZ4_LIBRARY}")
+                if(LZ4_LIBRARY MATCHES "${CONDA_PREFIX}")
+                    message(STATUS "Found LZ4: ${LZ4_LIBRARY} (conda)")
+                else()
+                    message(STATUS "Found LZ4: ${LZ4_LIBRARY} (system)")
+                endif()
                 set(HAVE_LZ4 TRUE CACHE BOOL "LZ4 library found" FORCE)
             else()
                 message(FATAL_ERROR "LZ4 not found. Please install liblz4-dev")
@@ -112,14 +140,27 @@ if(NOT TARGET ICU::uc OR NOT TARGET ICU::i18n)
                 IMPORTED_LOCATION "${ICU_I18N_LIBRARY}"
                 INTERFACE_INCLUDE_DIRECTORIES "${ICU_INCLUDE_DIR}"
             )
-            message(STATUS "Found ICU: ${ICU_UC_LIBRARY}")
+            if(ICU_UC_LIBRARY MATCHES "${CONDA_PREFIX}")
+                message(STATUS "Found ICU: ${ICU_UC_LIBRARY} (conda)")
+            else()
+                message(STATUS "Found ICU: ${ICU_UC_LIBRARY} (system)")
+            endif()
             set(HAVE_ICU TRUE CACHE BOOL "ICU library found" FORCE)
         else()
             message(FATAL_ERROR "ICU not found. Please install libicu-dev")
         endif()
     else()
         set(HAVE_ICU TRUE CACHE BOOL "ICU library found" FORCE)
-        message(STATUS "Found ICU: ${ICU_VERSION}")
+        # Detect if ICU is from conda or system
+        get_target_property(ICU_IMPORTED_LOCATION ICU::uc IMPORTED_LOCATION)
+        if(NOT ICU_IMPORTED_LOCATION)
+            get_target_property(ICU_IMPORTED_LOCATION ICU::uc INTERFACE_LINK_LIBRARIES)
+        endif()
+        if(ICU_IMPORTED_LOCATION MATCHES "${CONDA_PREFIX}")
+            message(STATUS "Found ICU: ${ICU_VERSION} (conda)")
+        else()
+            message(STATUS "Found ICU: ${ICU_VERSION} (system)")
+        endif()
     endif()
 endif()
 
@@ -142,7 +183,8 @@ if(NOT cppjieba_POPULATED)
     # cppjieba is header-only, create interface library
     add_library(cppjieba INTERFACE)
     # Add include directories for cppjieba and its dependency limonp
-    target_include_directories(cppjieba INTERFACE
+    # Mark as SYSTEM to suppress warnings from external code
+    target_include_directories(cppjieba SYSTEM INTERFACE
         "${cppjieba_SOURCE_DIR}/include"
         "${cppjieba_SOURCE_DIR}/deps/limonp/include"
     )
@@ -182,3 +224,20 @@ if(DIAGON_BUILD_BENCHMARKS)
 endif()
 
 message(STATUS "Dependency configuration complete")
+
+# ==================== Dependency Source Summary ====================
+
+if(USING_CONDA_FALLBACK)
+    message(STATUS "")
+    message(STATUS "========================================")
+    message(STATUS "Dependency Source Summary (Conda Fallback Enabled)")
+    message(STATUS "========================================")
+    message(STATUS "Strategy: Try conda first, fall back to system if not found")
+    message(STATUS "Conda prefix: ${CONDA_PREFIX}")
+    message(STATUS "")
+    message(STATUS "NOTE: For consistent linking, all libraries should come from")
+    message(STATUS "      the same source (all conda or all system). Mixed sources")
+    message(STATUS "      may cause runtime conflicts.")
+    message(STATUS "========================================")
+    message(STATUS "")
+endif()

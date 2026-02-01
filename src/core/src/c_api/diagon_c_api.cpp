@@ -856,7 +856,7 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
         auto* reader_ptr = static_cast<std::shared_ptr<diagon::index::DirectoryReader>*>(reader);
         auto* dir_reader = reader_ptr->get();  // Get raw pointer from shared_ptr
 
-        fprintf(stderr, "[C API] Got DirectoryReader=%p from shared_ptr\n", dir_reader);
+        fprintf(stderr, "[C API] Got DirectoryReader=%p from shared_ptr\n", static_cast<void*>(dir_reader));
         fflush(stderr);
 
         if (!dir_reader) {
@@ -886,7 +886,6 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
 
         diagon::index::LeafReader* leaf_reader = nullptr;
         int segment_local_doc_id = -1;
-        int segment_doc_base = -1;
 
         fprintf(stderr, "[C API] Finding segment for global doc_id=%d\n", doc_id);
         fflush(stderr);
@@ -902,7 +901,6 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
             // Check if global doc_id falls within this segment's range
             if (doc_id >= docBase && doc_id < docBase + maxDoc) {
                 leaf_reader = ctx.reader;
-                segment_doc_base = docBase;
 
                 // Convert global ID to segment-local ID
                 segment_local_doc_id = doc_id - docBase;
@@ -925,7 +923,7 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
             return nullptr;
         }
 
-        fprintf(stderr, "[C API] Got leaf_reader=%p for segment\n", leaf_reader);
+        fprintf(stderr, "[C API] Got leaf_reader=%p for segment\n", static_cast<void*>(leaf_reader));
         fflush(stderr);
 
         // Get stored fields reader from the leaf reader
@@ -933,7 +931,7 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
         fflush(stderr);
         auto* stored_fields_reader = leaf_reader->storedFieldsReader();
 
-        fprintf(stderr, "[C API] Got stored_fields_reader=%p\n", stored_fields_reader);
+        fprintf(stderr, "[C API] Got stored_fields_reader=%p\n", static_cast<void*>(stored_fields_reader));
         fflush(stderr);
 
         if (!stored_fields_reader) {

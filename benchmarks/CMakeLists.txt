@@ -11,6 +11,13 @@ find_package(benchmark REQUIRED)
 function(add_diagon_benchmark BENCHMARK_NAME)
     add_executable(${BENCHMARK_NAME} ${ARGN})
 
+    # Set explicit RPATH to prefer system libraries
+    set_target_properties(${BENCHMARK_NAME} PROPERTIES
+        BUILD_RPATH_USE_ORIGIN TRUE
+        INSTALL_RPATH_USE_LINK_PATH FALSE
+        BUILD_RPATH "\$ORIGIN/../src/core:/usr/lib/x86_64-linux-gnu"
+    )
+
     target_link_libraries(${BENCHMARK_NAME}
         PRIVATE
             diagon_core
