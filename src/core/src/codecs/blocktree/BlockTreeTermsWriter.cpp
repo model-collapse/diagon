@@ -19,6 +19,7 @@ BlockTreeTermsWriter::BlockTreeTermsWriter(store::IndexOutput* timOut, store::In
     , fieldInfo_(fieldInfo)
     , config_(config)
     , numTerms_(0)
+    , termsStartFP_(timOut->getFilePointer())  // Capture starting FP for this field
     , finished_(false) {
     if (!timOut_ || !tipOut_) {
         throw std::invalid_argument("Output streams cannot be null");
@@ -132,10 +133,11 @@ void BlockTreeTermsWriter::writeFST() {
     auto fst = fstBuilder_.finish();
 
     // Write FST to .tip file
-    // For Phase 2 MVP, we'll use simple serialization
-    // Format: [magic][numTerms][FST data]
+    // Format: [magic][fieldName][startFP][numTerms][FST data]
 
     tipOut_->writeInt(0x54495031);  // "TIP1" magic
+    tipOut_->writeString(fieldInfo_.name);  // Field name
+    tipOut_->writeVLong(termsStartFP_);  // Starting file pointer for this field's terms
     tipOut_->writeVLong(numTerms_);
 
     // TODO: Implement FST serialization

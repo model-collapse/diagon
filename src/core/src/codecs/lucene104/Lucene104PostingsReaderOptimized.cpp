@@ -93,20 +93,16 @@ void Lucene104PostingsEnumOptimized::refillBuffer() {
     int docsToRead = std::min(remaining, spaceLeft);
 
     if (docsToRead > 0) {
-        // For VInt, we need to go back to regular IndexInput reads
-        // to avoid complexities with variable-length encoding in batch buffer
+        // Read VInt from batch buffer (not directly from file)
         for (int i = 0; i < docsToRead; ++i) {
-            docDeltaBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+            docDeltaBuffer_[bufferIdx + i] = static_cast<uint32_t>(readVIntFromBatch());
             if (writeFreqs_) {
-                freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+                freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(readVIntFromBatch());
             } else {
                 freqBuffer_[bufferIdx + i] = 1;
             }
         }
         bufferIdx += docsToRead;
-
-        // After VInt reads, refill I/O batch for next StreamVByte groups
-        refillIOBatch();
     }
 
     bufferLimit_ = bufferIdx;

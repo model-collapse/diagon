@@ -4,6 +4,7 @@
 #include "diagon/index/FreqProxTermsWriter.h"
 
 #include <algorithm>
+#include <set>
 #include <stdexcept>
 
 namespace diagon {
@@ -61,13 +62,16 @@ void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) 
 
 void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const std::string& term,
                                             int docID, IndexOptions indexOptions) {
+    // Create composite key: "field\0term" (using null separator to avoid conflicts)
+    std::string compositeKey = fieldName + '\0' + term;
+
     // Check if term already exists
-    auto it = termToPosting_.find(term);
+    auto it = termToPosting_.find(compositeKey);
 
     if (it == termToPosting_.end()) {
         // New term - create posting list
         PostingData data = createPostingList(term, docID);
-        termToPosting_[term] = std::move(data);
+        termToPosting_[compositeKey] = std::move(data);
     } else {
         // Existing term - append to posting list
         PostingData& data = it->second;
@@ -107,20 +111,60 @@ void FreqProxTermsWriter::appendToPostingList(PostingData& data, int docID) {
 }
 
 std::vector<int> FreqProxTermsWriter::getPostingList(const std::string& term) const {
-    auto it = termToPosting_.find(term);
+    // Legacy method - search all fields for this term
+    // This is inefficient but maintains backward compatibility for tests
+    for (const auto& [compositeKey, data] : termToPosting_) {
+        // Extract term from "field\0term" format
+        auto nullPos = compositeKey.find('\0');
+        if (nullPos != std::string::npos) {
+            std::string termPart = compositeKey.substr(nullPos + 1);
+            if (termPart == term) {
+                return data.postings;
+            }
+        }
+    }
+    return {};  // Term not found
+}
+
+std::vector<std::string> FreqProxTermsWriter::getTerms() const {
+    // Legacy method - return all terms from all fields
+    std::set<std::string> uniqueTerms;
+
+    for (const auto& [compositeKey, _] : termToPosting_) {
+        // Extract term from "field\0term" format
+        auto nullPos = compositeKey.find('\0');
+        if (nullPos != std::string::npos) {
+            uniqueTerms.insert(compositeKey.substr(nullPos + 1));
+        }
+    }
+
+    std::vector<std::string> terms(uniqueTerms.begin(), uniqueTerms.end());
+    return terms;  // Already sorted by set
+}
+
+std::vector<int> FreqProxTermsWriter::getPostingList(const std::string& field,
+                                                      const std::string& term) const {
+    // Create composite key
+    std::string compositeKey = field + '\0' + term;
+
+    auto it = termToPosting_.find(compositeKey);
     if (it == termToPosting_.end()) {
-        return {};  // Term not found
+        return {};  // Term not found in this field
     }
 
     return it->second.postings;
 }
 
-std::vector<std::string> FreqProxTermsWriter::getTerms() const {
+std::vector<std::string> FreqProxTermsWriter::getTermsForField(const std::string& field) const {
     std::vector<std::string> terms;
-    terms.reserve(termToPosting_.size());
+    std::string prefix = field + '\0';
 
-    for (const auto& [term, _] : termToPosting_) {
-        terms.push_back(term);
+    for (const auto& [compositeKey, _] : termToPosting_) {
+        // Check if key starts with "field\0"
+        if (compositeKey.compare(0, prefix.length(), prefix) == 0) {
+            // Extract term part after "field\0"
+            terms.push_back(compositeKey.substr(prefix.length()));
+        }
     }
 
     // Sort for consistent ordering

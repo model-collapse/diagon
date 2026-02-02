@@ -8,6 +8,7 @@
 #include "diagon/util/Exceptions.h"
 
 #include <atomic>
+#include <iostream>
 
 namespace diagon {
 namespace index {
@@ -76,7 +77,9 @@ Terms* SegmentReader::terms(const std::string& field) const {
             Terms* termsPtr = terms.get();
             termsCache_[field] = std::move(terms);
             return termsPtr;
+        } else {
         }
+    } else {
     }
 
     return nullptr;
@@ -198,15 +201,18 @@ void SegmentReader::loadFieldsProducer() const {
         return;
     }
 
+
     // Phase 4.3: Get codec and create appropriate FieldsProducer
     try {
         // Get codec name from segment info
         std::string codecName = segmentInfo_->codecName();
+
         auto& codec = codecs::Codec::forName(codecName);
         auto& postingsFormat = codec.postingsFormat();
 
         // Create segment read state (using index::SegmentReadState)
         std::string segmentName = segmentInfo_->name();
+
         SegmentReadState readState(&directory_, segmentName, segmentInfo_->maxDoc(),
                                    segmentInfo_->fieldInfos(), "");
 

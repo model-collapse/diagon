@@ -7,6 +7,7 @@
 #include "diagon/util/Exceptions.h"
 
 #include <algorithm>
+#include <iostream>
 #include <stdexcept>
 
 namespace diagon {
@@ -26,23 +27,46 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
     }
 
     // Read FST from .tip file
-    // Format: [magic][numTerms][FST data]
-    int magic = tipIn_->readInt();
-    if (magic != 0x54495031) {  // "TIP1"
-        throw IOException("Invalid .tip file magic");
+    // Format: [magic][fieldName][startFP][numTerms][FST data] (per field)
+    // Need to find the section for our field
+    bool foundField = false;
+    while (tipIn_->getFilePointer() < tipIn_->length()) {
+        int magic = tipIn_->readInt();
+        if (magic != 0x54495031) {  // "TIP1"
+            throw IOException("Invalid .tip file magic");
+        }
+
+        std::string fieldName = tipIn_->readString();
+        int64_t startFP = tipIn_->readVLong();  // Read starting file pointer
+        int64_t numTerms = tipIn_->readVLong();
+        int fstSize = tipIn_->readVInt();
+
+        if (fieldName == fieldInfo_.name) {
+            // Found our field
+            termsStartFP_ = startFP;
+            numTerms_ = numTerms;
+            foundField = true;
+
+            // Read FST (placeholder for Phase 2 MVP)
+            if (fstSize > 0) {
+                // TODO: Deserialize FST
+                throw std::runtime_error("FST deserialization not yet implemented");
+            }
+
+            // For MVP, create empty FST
+            fst_ = std::make_unique<util::FST>();
+            break;
+        } else {
+            // Skip this field's FST data
+            if (fstSize > 0) {
+                tipIn_->seek(tipIn_->getFilePointer() + fstSize);
+            }
+        }
     }
 
-    numTerms_ = tipIn_->readVLong();
-
-    // Read FST (placeholder for Phase 2 MVP)
-    int fstSize = tipIn_->readVInt();
-    if (fstSize > 0) {
-        // TODO: Deserialize FST
-        throw std::runtime_error("FST deserialization not yet implemented");
+    if (!foundField) {
+        throw IOException("Field not found in .tip file: " + fieldInfo_.name);
     }
-
-    // For MVP, create empty FST
-    fst_ = std::make_unique<util::FST>();
 }
 
 void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
@@ -53,6 +77,7 @@ void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
 
     // Read block header
     int prefixLen = timIn_->readVInt();
+
     if (prefixLen > 0) {
         block.prefixData.resize(prefixLen);
         timIn_->readBytes(block.prefixData.data(), prefixLen);
@@ -123,8 +148,8 @@ bool SegmentTermsEnum::next() {
             positioned_ = true;
             return false;
         }
-        // Load first block at FP=0
-        reader_->loadBlock(0, currentBlock_);
+        // Load first block at this field's starting file pointer
+        reader_->loadBlock(reader_->termsStartFP_, currentBlock_);
         currentTermIndex_ = 0;
         positioned_ = true;
         return !currentBlock_.terms.empty();
@@ -149,7 +174,7 @@ bool SegmentTermsEnum::seekExact(const util::BytesRef& text) {
     // TODO: Implement FST-based seek
 
     // Load first block (simplified for MVP)
-    reader_->loadBlock(0, currentBlock_);
+    reader_->loadBlock(reader_->termsStartFP_, currentBlock_);
 
     // Binary search within block
     auto it = std::lower_bound(
@@ -167,7 +192,7 @@ bool SegmentTermsEnum::seekExact(const util::BytesRef& text) {
 
 index::TermsEnum::SeekStatus SegmentTermsEnum::seekCeil(const util::BytesRef& text) {
     // Load first block (simplified for MVP)
-    reader_->loadBlock(0, currentBlock_);
+    reader_->loadBlock(reader_->termsStartFP_, currentBlock_);
 
     // Binary search for ceiling
     auto it = std::lower_bound(

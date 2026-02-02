@@ -90,6 +90,23 @@ public:
     std::vector<std::string> getTerms() const;
 
     /**
+     * Get posting list for field-specific term
+     *
+     * @param field Field name
+     * @param term Term text
+     * @return Vector of [docID, freq] pairs, empty if term not found
+     */
+    std::vector<int> getPostingList(const std::string& field, const std::string& term) const;
+
+    /**
+     * Get all terms for a specific field
+     *
+     * @param field Field name
+     * @return Sorted list of unique terms in field
+     */
+    std::vector<std::string> getTermsForField(const std::string& field) const;
+
+    /**
      * Reset for reuse across segments
      * Clears all data but keeps allocated memory
      */

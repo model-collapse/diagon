@@ -2,156 +2,139 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104FieldsProducer.h"
-
+#include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
 #include "diagon/codecs/blocktree/BlockTreeTermsReader.h"
-#include "diagon/index/FieldInfo.h"
-#include "diagon/index/SegmentWriteState.h"
-#include "diagon/store/IOContext.h"
-#include "diagon/util/Exceptions.h"
 
-#include <stdexcept>
+#include "diagon/codecs/SegmentState.h"
+#include "diagon/index/Terms.h"
+#include "diagon/store/IOContext.h"
+
+#include <iostream>
 
 namespace diagon {
 namespace codecs {
 namespace lucene104 {
 
-Lucene104FieldsProducer::Lucene104FieldsProducer(::diagon::index::SegmentReadState& state)
-    : state_(state) {
+// ==================== BlockTreeTerms Wrapper ====================
 
-    // Open .tim file (term dictionary)
-    std::string timFileName = state.segmentName;
-    if (!state.segmentSuffix.empty()) {
-        timFileName += "_" + state.segmentSuffix;
-    }
-    timFileName += ".tim";
+/**
+ * Terms wrapper around BlockTreeTermsReader.
+ * Wires up PostingsReader to TermsEnum.
+ */
+class BlockTreeTerms : public index::Terms {
+public:
+    BlockTreeTerms(std::shared_ptr<blocktree::BlockTreeTermsReader> reader,
+                   Lucene104PostingsReader* postingsReader,
+                   const index::FieldInfo* fieldInfo)
+        : reader_(reader)
+        , postingsReader_(postingsReader)
+        , fieldInfo_(fieldInfo) {}
 
-    try {
-        timIn_ = state.directory->openInput(timFileName, store::IOContext::READ);
-    } catch (const std::exception& e) {
-        throw IOException("Failed to open .tim file: " + timFileName + ": " + e.what());
-    }
-
-    // Open .tip file (FST index)
-    std::string tipFileName = state.segmentName;
-    if (!state.segmentSuffix.empty()) {
-        tipFileName += "_" + state.segmentSuffix;
-    }
-    tipFileName += ".tip";
-
-    try {
-        tipIn_ = state.directory->openInput(tipFileName, store::IOContext::READ);
-    } catch (const std::exception& e) {
-        throw IOException("Failed to open .tip file: " + tipFileName + ": " + e.what());
+    std::unique_ptr<index::TermsEnum> iterator() const override {
+        auto termsEnum = reader_->iterator();
+        
+        // Cast to SegmentTermsEnum to set PostingsReader
+        auto* segmentEnum = dynamic_cast<blocktree::SegmentTermsEnum*>(termsEnum.get());
+        if (segmentEnum && postingsReader_ && fieldInfo_) {
+            segmentEnum->setPostingsReader(postingsReader_, fieldInfo_);
+        }
+        
+        return termsEnum;
     }
 
-    // Create postings reader
+    int64_t size() const override {
+        return reader_->getNumTerms();
+    }
+
+    int getDocCount() const override {
+        // TODO: Track doc count in BlockTreeTermsReader
+        return static_cast<int>(reader_->getNumTerms());
+    }
+
+    int64_t getSumTotalTermFreq() const override {
+        return -1;  // Unknown
+    }
+
+    int64_t getSumDocFreq() const override {
+        return -1;  // Unknown
+    }
+
+private:
+    std::shared_ptr<blocktree::BlockTreeTermsReader> reader_;
+    Lucene104PostingsReader* postingsReader_;
+    const index::FieldInfo* fieldInfo_;
+};
+
+// ==================== Lucene104FieldsProducer Implementation ====================
+
+Lucene104FieldsProducer::Lucene104FieldsProducer(index::SegmentReadState& state)
+    : segmentName_(state.segmentName)
+    , fieldInfos_(state.fieldInfos) {
+
+
+    // Open .tim file (term blocks)
+    std::string timFile = segmentName_ + ".tim";
+    timInput_ = state.directory->openInput(timFile, store::IOContext::READ);
+
+    // Open .tip file (term index FST)
+    std::string tipFile = segmentName_ + ".tip";
+    tipInput_ = state.directory->openInput(tipFile, store::IOContext::READ);
+
+    // Create PostingsReader for reading actual postings
     postingsReader_ = std::make_unique<Lucene104PostingsReader>(state);
+
+    // Open .doc file and set input for PostingsReader
+    std::string docFile = segmentName_ + ".doc";
+    auto docInput = state.directory->openInput(docFile, store::IOContext::READ);
+    postingsReader_->setInput(std::move(docInput));
 }
 
 Lucene104FieldsProducer::~Lucene104FieldsProducer() {
-    if (!closed_) {
-        try {
-            close();
-        } catch (...) {
-            // Suppress exceptions in destructor
-        }
-    }
+    close();
 }
 
-blocktree::BlockTreeTermsReader* Lucene104FieldsProducer::getTermsReader(
-    const std::string& field) {
-    // Check if already cached
-    auto it = termsReaders_.find(field);
-    if (it != termsReaders_.end()) {
-        return it->second.get();
-    }
+std::unique_ptr<index::Terms> Lucene104FieldsProducer::terms(const std::string& field) {
 
-    // Get field info
-    const auto* fieldInfo = state_.fieldInfos.fieldInfo(field);
+    // Check if field exists in FieldInfos
+    const index::FieldInfo* fieldInfo = fieldInfos_.fieldInfo(field);
     if (!fieldInfo) {
-        return nullptr;  // Field doesn't exist
+        return nullptr;
     }
 
-    // Check if field has inverted index
-    if (fieldInfo->indexOptions == ::diagon::index::IndexOptions::NONE) {
-        return nullptr;  // Field not indexed
+    if (!fieldInfo->hasPostings()) {
+        return nullptr;
     }
 
-    // Create new terms reader
-    auto reader = std::make_unique<blocktree::BlockTreeTermsReader>(
-        timIn_.get(), tipIn_.get(), *fieldInfo);
+    // Check if we already have a reader for this field
+    auto it = fieldReaders_.find(field);
+    if (it != fieldReaders_.end()) {
+        return std::make_unique<BlockTreeTerms>(it->second, postingsReader_.get(), fieldInfo);
+    }
 
-    auto* ptr = reader.get();
-    termsReaders_[field] = std::move(reader);
+    // Create new BlockTreeTermsReader for this field
+    auto reader = std::make_shared<blocktree::BlockTreeTermsReader>(
+        timInput_.get(), tipInput_.get(), *fieldInfo);
 
-    return ptr;
+
+    // Cache the reader
+    fieldReaders_[field] = reader;
+
+    // Return Terms wrapper with PostingsReader wired up
+    return std::make_unique<BlockTreeTerms>(reader, postingsReader_.get(), fieldInfo);
 }
 
-std::unique_ptr<::diagon::index::Terms> Lucene104FieldsProducer::terms(const std::string& field) {
-    if (closed_) {
-        throw AlreadyClosedException("FieldsProducer already closed");
-    }
-
-    auto* termsReader = getTermsReader(field);
-    if (!termsReader) {
-        return nullptr;  // Field doesn't exist or not indexed
-    }
-
-    // Get field info
-    const auto* fieldInfo = state_.fieldInfos.fieldInfo(field);
-
-    return std::make_unique<Lucene104Terms>(termsReader, postingsReader_.get(), fieldInfo);
+void Lucene104FieldsProducer::checkIntegrity() {
+    // TODO: Implement checksum validation
 }
 
 void Lucene104FieldsProducer::close() {
-    if (closed_) {
-        return;
+    fieldReaders_.clear();
+    if (postingsReader_) {
+        postingsReader_->close();
+        postingsReader_.reset();
     }
-
-    try {
-        // Close input files
-        timIn_.reset();
-        tipIn_.reset();
-
-        // Close postings reader
-        if (postingsReader_) {
-            postingsReader_->close();
-            postingsReader_.reset();
-        }
-
-        // Clear terms readers
-        termsReaders_.clear();
-
-        closed_ = true;
-    } catch (const std::exception& e) {
-        throw IOException("Failed to close FieldsProducer: " + std::string(e.what()));
-    }
-}
-
-// ==================== Lucene104Terms ====================
-
-Lucene104Terms::Lucene104Terms(blocktree::BlockTreeTermsReader* termsReader,
-                               Lucene104PostingsReader* postingsReader,
-                               const ::diagon::index::FieldInfo* fieldInfo)
-    : termsReader_(termsReader)
-    , postingsReader_(postingsReader)
-    , fieldInfo_(fieldInfo) {}
-
-std::unique_ptr<::diagon::index::TermsEnum> Lucene104Terms::iterator() const {
-    // Get SegmentTermsEnum from BlockTreeTermsReader
-    auto termsEnum = termsReader_->iterator();
-
-    // Cast to SegmentTermsEnum to set postings reader
-    auto* segmentEnum = dynamic_cast<blocktree::SegmentTermsEnum*>(termsEnum.get());
-    if (segmentEnum) {
-        segmentEnum->setPostingsReader(postingsReader_, fieldInfo_);
-    }
-
-    return termsEnum;
-}
-
-int64_t Lucene104Terms::size() const {
-    return termsReader_->getNumTerms();
+    timInput_.reset();
+    tipInput_.reset();
 }
 
 }  // namespace lucene104

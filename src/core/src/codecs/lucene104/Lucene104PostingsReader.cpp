@@ -9,6 +9,8 @@
 #include "diagon/util/Exceptions.h"
 #include "diagon/util/StreamVByte.h"
 
+#include <iostream>
+
 namespace diagon {
 namespace codecs {
 namespace lucene104 {

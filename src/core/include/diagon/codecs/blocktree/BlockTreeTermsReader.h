@@ -83,6 +83,7 @@ private:
 
     std::unique_ptr<util::FST> fst_;
     int64_t numTerms_;
+    int64_t termsStartFP_;  // File pointer where this field's terms start
 
     /**
      * Load term block at given file pointer.

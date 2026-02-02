@@ -3,6 +3,7 @@
 
 #include "diagon/codecs/lucene104/Lucene104Codec.h"
 #include "diagon/codecs/lucene104/Lucene104FieldsConsumer.h"
+#include "diagon/codecs/lucene104/Lucene104FieldsProducer.h"
 #include "diagon/codecs/lucene104/Lucene104NormsWriter.h"
 
 namespace diagon {
@@ -16,8 +17,7 @@ std::unique_ptr<FieldsConsumer> Lucene104PostingsFormat::fieldsConsumer(index::S
 }
 
 std::unique_ptr<FieldsProducer> Lucene104PostingsFormat::fieldsProducer(index::SegmentReadState& state) {
-    // TODO: Implement FieldsProducer that uses Lucene104PostingsReader
-    return nullptr;
+    return std::make_unique<Lucene104FieldsProducer>(state);
 }
 
 // ==================== Lucene104Codec Implementation ====================

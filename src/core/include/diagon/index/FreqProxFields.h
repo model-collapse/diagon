@@ -17,6 +17,9 @@
 namespace diagon {
 namespace index {
 
+// Forward declaration
+class FieldInfos;
+
 /**
  * FreqProxFields - Fields implementation that wraps FreqProxTermsWriter
  *
@@ -34,8 +37,10 @@ public:
      * Constructor
      *
      * @param termsWriter In-memory terms writer to wrap
+     * @param fieldInfos Field metadata to determine which fields to expose
      */
-    explicit FreqProxFields(const FreqProxTermsWriter& termsWriter);
+    explicit FreqProxFields(const FreqProxTermsWriter& termsWriter,
+                           const FieldInfos& fieldInfos);
 
     // ==================== Fields Interface ====================
 
@@ -125,10 +130,12 @@ public:
     /**
      * Constructor
      *
+     * @param fieldName Field name for this terms enum
      * @param sortedTerms List of terms in sorted order
      * @param termsWriter Terms writer containing postings
      */
-    FreqProxTermsEnum(const std::vector<std::string>& sortedTerms,
+    FreqProxTermsEnum(const std::string& fieldName,
+                      const std::vector<std::string>& sortedTerms,
                       const FreqProxTermsWriter& termsWriter);
 
     // ==================== TermsEnum Interface ====================
@@ -150,6 +157,7 @@ public:
     std::unique_ptr<PostingsEnum> postings(bool useBatch) override;
 
 private:
+    std::string fieldName_;
     const std::vector<std::string>& sortedTerms_;
     const FreqProxTermsWriter& termsWriter_;
 

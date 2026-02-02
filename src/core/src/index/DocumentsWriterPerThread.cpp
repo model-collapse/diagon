@@ -408,8 +408,8 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
             throw std::runtime_error("Codec returned null FieldsConsumer");
         }
 
-        // Create Fields wrapper around in-memory postings
-        FreqProxFields fields(termsWriter_);
+        // Create Fields wrapper around in-memory postings (pass FieldInfos to expose actual fields)
+        FreqProxFields fields(termsWriter_, segmentInfo->fieldInfos());
 
         // Use streaming API - codec iterates over fields/terms/postings
         consumer->write(fields, nullptr);  // norms=nullptr for now

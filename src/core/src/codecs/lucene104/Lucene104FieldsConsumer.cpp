@@ -148,16 +148,26 @@ void Lucene104FieldsConsumer::close() {
             tipOut_.reset();
         }
 
-        // Close postings writer
+        // Close postings writer and write to disk
         if (postingsWriter_) {
+            // Get accumulated bytes from in-memory buffer
+            auto docBytes = postingsWriter_->getBytes();
+
+            // Close the writer (clears in-memory buffer)
             postingsWriter_->close();
 
-            // Collect files created by postings writer (.doc file)
+            // Build .doc filename
             std::string docFile = state_.segmentName;
             if (!state_.segmentSuffix.empty()) {
                 docFile += "_" + state_.segmentSuffix;
             }
             docFile += ".doc";
+
+            // Write bytes to actual .doc file
+            auto docOut = state_.directory->createOutput(docFile, store::IOContext::DEFAULT);
+            docOut->writeBytes(docBytes.data(), docBytes.size());
+            docOut->close();
+
             files_.push_back(docFile);
         }
 

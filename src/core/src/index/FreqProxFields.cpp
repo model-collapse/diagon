@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/FreqProxFields.h"
+#include "diagon/index/FieldInfo.h"
 
 #include <algorithm>
 #include <set>
@@ -12,11 +13,16 @@ namespace index {
 
 // ==================== FreqProxFields Implementation ====================
 
-FreqProxFields::FreqProxFields(const FreqProxTermsWriter& termsWriter)
+FreqProxFields::FreqProxFields(const FreqProxTermsWriter& termsWriter,
+                               const FieldInfos& fieldInfos)
     : termsWriter_(termsWriter) {
-    // Currently we only support a single "_all" field
-    // Phase 4: Support multiple fields
-    fields_.push_back("_all");
+    // Iterate over actual fields from FieldInfos
+    for (const auto& fieldInfo : fieldInfos) {
+        // Only include indexed fields
+        if (fieldInfo.indexOptions != IndexOptions::NONE) {
+            fields_.push_back(fieldInfo.name);
+        }
+    }
 }
 
 std::unique_ptr<Terms> FreqProxFields::terms(const std::string& field) {
@@ -47,14 +53,14 @@ FreqProxTerms::FreqProxTerms(const std::string& fieldName,
     , sumDocFreq_(0)
     , docCount_(0) {
 
-    // Get all terms from terms writer
-    sortedTerms_ = termsWriter_.getTerms();  // Already sorted
+    // Get terms for this specific field only
+    sortedTerms_ = termsWriter_.getTermsForField(fieldName);
 
     // Compute statistics
     std::set<int> uniqueDocs;
 
     for (const auto& term : sortedTerms_) {
-        std::vector<int> postings = termsWriter_.getPostingList(term);
+        std::vector<int> postings = termsWriter_.getPostingList(fieldName, term);
 
         // postings format: [docID, freq, docID, freq, ...]
         int64_t termTotalFreq = 0;
@@ -77,7 +83,7 @@ FreqProxTerms::FreqProxTerms(const std::string& fieldName,
 }
 
 std::unique_ptr<TermsEnum> FreqProxTerms::iterator() const {
-    return std::make_unique<FreqProxTermsEnum>(sortedTerms_, termsWriter_);
+    return std::make_unique<FreqProxTermsEnum>(fieldName_, sortedTerms_, termsWriter_);
 }
 
 int64_t FreqProxTerms::size() const {
@@ -98,9 +104,11 @@ int64_t FreqProxTerms::getSumDocFreq() const {
 
 // ==================== FreqProxTermsEnum Implementation ====================
 
-FreqProxTermsEnum::FreqProxTermsEnum(const std::vector<std::string>& sortedTerms,
+FreqProxTermsEnum::FreqProxTermsEnum(const std::string& fieldName,
+                                     const std::vector<std::string>& sortedTerms,
                                      const FreqProxTermsWriter& termsWriter)
-    : sortedTerms_(sortedTerms)
+    : fieldName_(fieldName)
+    , sortedTerms_(sortedTerms)
     , termsWriter_(termsWriter)
     , termOrd_(-1)  // Before first term
     , currentDocFreq_(0)
@@ -178,8 +186,8 @@ std::unique_ptr<PostingsEnum> FreqProxTermsEnum::postings(bool useBatch) {
 }
 
 void FreqProxTermsEnum::loadCurrentPostings() {
-    // Get posting list from terms writer
-    currentPostings_ = termsWriter_.getPostingList(currentTerm_);
+    // Get posting list from terms writer (field-specific)
+    currentPostings_ = termsWriter_.getPostingList(fieldName_, currentTerm_);
 
     // Compute statistics
     // postings format: [docID, freq, docID, freq, ...]

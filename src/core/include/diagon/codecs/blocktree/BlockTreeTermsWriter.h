@@ -135,6 +135,7 @@ private:
     util::BytesRef lastTerm_;
     std::vector<uint8_t> lastTermData_;  // Storage for lastTerm_
     int64_t numTerms_;
+    int64_t termsStartFP_;  // File pointer where this field's terms start
     bool finished_;
 
     util::FST::Builder fstBuilder_;

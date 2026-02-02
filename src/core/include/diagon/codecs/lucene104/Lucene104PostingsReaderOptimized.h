@@ -10,6 +10,7 @@
 #include "diagon/util/StreamVByte.h"
 
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <vector>
 
@@ -108,6 +109,35 @@ private:
             refillIOBatch();
         }
         return ioBatch_[ioBatchPos_++];
+    }
+
+    /**
+     * Read VInt from I/O batch buffer
+     */
+    inline int32_t readVIntFromBatch() {
+        uint8_t b = readByteFromBatch();
+        if ((b & 0x80) == 0) {
+            return b;
+        }
+        int32_t i = b & 0x7F;
+        b = readByteFromBatch();
+        i |= (b & 0x7F) << 7;
+        if ((b & 0x80) == 0) {
+            return i;
+        }
+        b = readByteFromBatch();
+        i |= (b & 0x7F) << 14;
+        if ((b & 0x80) == 0) {
+            return i;
+        }
+        b = readByteFromBatch();
+        i |= (b & 0x7F) << 21;
+        if ((b & 0x80) == 0) {
+            return i;
+        }
+        b = readByteFromBatch();
+        i |= (b & 0x0F) << 28;
+        return i;
     }
 
     /**
