@@ -11,6 +11,7 @@
 #include "diagon/util/BytesRef.h"
 #include "diagon/util/Exceptions.h"
 
+#include <iostream>
 #include <stdexcept>
 
 namespace diagon {
@@ -60,18 +61,32 @@ void Lucene104FieldsConsumer::write(index::Fields& fields, index::NormsProducer*
     // Iterate over all fields
     auto fieldIterator = fields.iterator();
 
+    std::cerr << "[Lucene104FieldsConsumer::write] Starting field iteration" << std::endl;
+
+    int fieldCount = 0;
     while (fieldIterator->hasNext()) {
         std::string fieldName = fieldIterator->next();
+        fieldCount++;
+
+        std::cerr << "[Lucene104FieldsConsumer::write] Processing field #" << fieldCount
+                  << ": '" << fieldName << "'" << std::endl;
 
         // Get terms for this field
         auto terms = fields.terms(fieldName);
         if (!terms) {
+            std::cerr << "[Lucene104FieldsConsumer::write]   No terms for field '" << fieldName << "', skipping" << std::endl;
             continue;  // Field has no terms
         }
 
+        std::cerr << "[Lucene104FieldsConsumer::write]   Got terms for field '" << fieldName << "', calling writeField()" << std::endl;
+
         // Write this field
         writeField(fieldName, *terms);
+
+        std::cerr << "[Lucene104FieldsConsumer::write]   Finished writeField() for '" << fieldName << "'" << std::endl;
     }
+
+    std::cerr << "[Lucene104FieldsConsumer::write] Finished iteration, processed " << fieldCount << " fields" << std::endl;
 }
 
 void Lucene104FieldsConsumer::writeField(const std::string& fieldName, index::Terms& terms) {
@@ -84,12 +99,26 @@ void Lucene104FieldsConsumer::writeField(const std::string& fieldName, index::Te
     // Set field on postings writer
     postingsWriter_->setField(*fieldInfo);
 
+    // DEBUG: Check file pointer before creating writer
+    int64_t fpBefore = timOut_->getFilePointer();
+    std::cerr << "[Lucene104FieldsConsumer] Before creating writer for '" << fieldName
+              << "': timOut FP=" << fpBefore << std::endl;
+
     // Create BlockTreeTermsWriter for this field
     blocktree::BlockTreeTermsWriter termDictWriter(timOut_.get(), tipOut_.get(), *fieldInfo);
+
+    // DEBUG: Check file pointer after creating writer
+    int64_t fpAfter = timOut_->getFilePointer();
+    std::cerr << "[Lucene104FieldsConsumer] After creating writer for '" << fieldName
+              << "': timOut FP=" << fpAfter << std::endl;
 
     // Iterate over all terms for this field
     auto termsEnum = terms.iterator();
 
+    std::cerr << "[Lucene104FieldsConsumer::writeField] Field '" << fieldName
+              << "' has " << terms.size() << " terms, starting iteration..." << std::endl;
+
+    int termCount = 0;
     while (termsEnum->next()) {
         auto termBytes = termsEnum->term();
         std::string term(reinterpret_cast<const char*>(termBytes.data()), termBytes.length());
@@ -126,7 +155,11 @@ void Lucene104FieldsConsumer::writeField(const std::string& fieldName, index::Te
             docFreq, totalTermFreq, termState.docStartFP);
 
         termDictWriter.addTerm(termBytesRef, termStats);
+        termCount++;
     }
+
+    std::cerr << "[Lucene104FieldsConsumer::writeField] Finished field '" << fieldName
+              << "', processed " << termCount << " terms" << std::endl;
 
     // Finish writing term dictionary for this field
     termDictWriter.finish();

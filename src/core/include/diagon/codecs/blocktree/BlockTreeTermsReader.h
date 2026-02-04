@@ -27,6 +27,25 @@ namespace blocktree {
 class BlockTreeTermsReader {
 public:
     /**
+     * Metadata for a single block.
+     */
+    struct BlockMetadata {
+        /** First term in block */
+        std::vector<uint8_t> firstTermData;
+        util::BytesRef firstTerm;
+
+        /** File pointer to block */
+        int64_t blockFP;
+
+        BlockMetadata() : blockFP(0) {}
+
+        BlockMetadata(const util::BytesRef& term, int64_t fp)
+            : firstTermData(term.data(), term.data() + term.length())
+            , firstTerm(firstTermData.data(), firstTermData.size())
+            , blockFP(fp) {}
+    };
+
+    /**
      * Term block loaded from disk.
      */
     struct TermBlock {
@@ -85,6 +104,9 @@ private:
     int64_t numTerms_;
     int64_t termsStartFP_;  // File pointer where this field's terms start
 
+    /** Block index: list of all blocks with their first terms */
+    std::vector<BlockMetadata> blockIndex_;
+
     /**
      * Load term block at given file pointer.
      *
@@ -92,6 +114,15 @@ private:
      * @param block Output: loaded block
      */
     void loadBlock(int64_t blockFP, TermBlock& block);
+
+    /**
+     * Find block that may contain the given term.
+     * Returns block index, or -1 if term is before all blocks.
+     *
+     * @param term Term to search for
+     * @return Block index in blockIndex_
+     */
+    int findBlockForTerm(const util::BytesRef& term) const;
 
     friend class SegmentTermsEnum;
 };
@@ -133,13 +164,26 @@ public:
 private:
     BlockTreeTermsReader* reader_;
     BlockTreeTermsReader::TermBlock currentBlock_;
-    int currentTermIndex_;
+    int currentBlockIndex_;  // Which block we're in (index into blockIndex_)
+    int currentTermIndex_;   // Which term within the block
     bool positioned_;
 
     // Postings reader (type-erased to avoid circular dependency)
     void* postingsReader_{nullptr};
     const index::FieldInfo* fieldInfo_{nullptr};
 
+    /**
+     * Load a specific block by its index in blockIndex_.
+     *
+     * @param blockIndex Index into reader_->blockIndex_
+     */
+    void loadBlockByIndex(int blockIndex);
+
+    /**
+     * Load the block that may contain the given term.
+     *
+     * @param term Term to search for
+     */
     void loadBlockForTerm(const util::BytesRef& term);
 };
 

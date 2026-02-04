@@ -155,6 +155,196 @@ add_diagon_benchmark(ScaleComparisonBenchmark
     ScaleComparisonBenchmark.cpp
 )
 
+# ==================== Diagon Profiler (CONJUGATE Performance Comparison) ====================
+
+# Diagon profiler for comparing against Lucene (requires nlohmann/json)
+add_executable(DiagonProfiler diagon_profiler.cpp)
+
+target_link_libraries(DiagonProfiler
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(DiagonProfiler PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(DiagonProfiler
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
+# Register as benchmark target
+add_custom_target(run_DiagonProfiler
+    COMMAND DiagonProfiler
+    DEPENDS DiagonProfiler
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Running Diagon profiler for Lucene comparison"
+)
+
+# Diagon profiler debug tool
+add_executable(DiagonProfilerDebug diagon_profiler_debug.cpp)
+
+target_link_libraries(DiagonProfilerDebug
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(DiagonProfilerDebug PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(DiagonProfilerDebug
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
+# Index diagnostics tool
+add_executable(IndexDiagnostics index_diagnostics.cpp)
+
+target_link_libraries(IndexDiagnostics
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(IndexDiagnostics PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(IndexDiagnostics
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
+# Profiler verification tool
+add_executable(ProfilerVerification profiler_verification.cpp)
+
+target_link_libraries(ProfilerVerification
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(ProfilerVerification PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(ProfilerVerification
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
+# Field inspector tool
+add_executable(FieldInspector field_inspector.cpp)
+
+target_link_libraries(FieldInspector
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(FieldInspector PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(FieldInspector
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
+# Search trace tool
+add_executable(SearchTrace search_trace.cpp)
+
+target_link_libraries(SearchTrace
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(SearchTrace PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(SearchTrace
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
+# Minimal field test tool
+add_executable(MinimalFieldTest minimal_field_test.cpp)
+
+target_link_libraries(MinimalFieldTest
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(MinimalFieldTest PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(MinimalFieldTest
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
+# Test get terms tool
+add_executable(TestGetTerms test_get_terms.cpp)
+
+target_link_libraries(TestGetTerms
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(TestGetTerms PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(TestGetTerms
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
+# Field isolation test
+add_executable(FieldIsolationTest field_isolation_test.cpp)
+
+target_link_libraries(FieldIsolationTest
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(FieldIsolationTest PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(FieldIsolationTest
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
+# Multi-block regression test
+add_executable(MultiBlockRegressionTest multiblock_regression_test.cpp)
+
+target_link_libraries(MultiBlockRegressionTest
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(MultiBlockRegressionTest PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(MultiBlockRegressionTest
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
 # ==================== Combined Benchmark Target ====================
 
 add_custom_target(run_all_benchmarks

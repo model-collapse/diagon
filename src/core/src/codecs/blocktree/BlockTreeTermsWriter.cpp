@@ -6,6 +6,7 @@
 #include "diagon/util/Exceptions.h"
 
 #include <algorithm>
+#include <iostream>
 #include <stdexcept>
 
 namespace diagon {
@@ -21,6 +22,10 @@ BlockTreeTermsWriter::BlockTreeTermsWriter(store::IndexOutput* timOut, store::In
     , numTerms_(0)
     , termsStartFP_(timOut->getFilePointer())  // Capture starting FP for this field
     , finished_(false) {
+    // DEBUG: Show what file pointer we captured
+    std::cerr << "[BlockTreeTermsWriter] Created for field '" << fieldInfo_.name
+              << "', termsStartFP=" << termsStartFP_ << std::endl;
+
     if (!timOut_ || !tipOut_) {
         throw std::invalid_argument("Output streams cannot be null");
     }
@@ -68,6 +73,12 @@ void BlockTreeTermsWriter::finish() {
         writeBlock();
     }
 
+    // DEBUG: Show where we ended up
+    int64_t endFP = timOut_->getFilePointer();
+    std::cerr << "[BlockTreeTermsWriter] Finishing field '" << fieldInfo_.name
+              << "', endFP=" << endFP << ", bytesWritten=" << (endFP - termsStartFP_)
+              << ", numTerms=" << numTerms_ << std::endl;
+
     // Write FST index to .tip file
     writeFST();
 
@@ -81,6 +92,15 @@ void BlockTreeTermsWriter::writeBlock() {
 
     // Record block file pointer
     int64_t blockFP = timOut_->getFilePointer();
+
+    // DEBUG: Show first term being written
+    if (!pendingTerms_.empty()) {
+        const auto& firstTerm = pendingTerms_[0].term;
+        std::string firstTermStr(reinterpret_cast<const char*>(firstTerm.data()), firstTerm.length());
+        std::cerr << "[BlockTreeTermsWriter::writeBlock] Writing block for field '" << fieldInfo_.name
+                  << "' at FP=" << blockFP << ", first term='" << firstTermStr
+                  << "', num terms=" << pendingTerms_.size() << std::endl;
+    }
 
     // Compute common prefix for all terms in block
     util::BytesRef prefix = pendingTerms_[0].term;
@@ -132,17 +152,35 @@ void BlockTreeTermsWriter::writeFST() {
     // Finish FST construction
     auto fst = fstBuilder_.finish();
 
-    // Write FST to .tip file
-    // Format: [magic][fieldName][startFP][numTerms][FST data]
+    // Write block index to .tip file
+    // Format: [magic][fieldName][startFP][numTerms][numBlocks][block entries...]
+    // Each block entry: [firstTerm][blockFP]
 
     tipOut_->writeInt(0x54495031);  // "TIP1" magic
     tipOut_->writeString(fieldInfo_.name);  // Field name
     tipOut_->writeVLong(termsStartFP_);  // Starting file pointer for this field's terms
     tipOut_->writeVLong(numTerms_);
 
-    // TODO: Implement FST serialization
-    // For now, just write a placeholder
-    tipOut_->writeVInt(0);  // FST size = 0 (placeholder)
+    // Write block index (simplified replacement for FST)
+    const auto& blockEntries = fstBuilder_.getEntries();
+    tipOut_->writeVInt(static_cast<int>(blockEntries.size()));  // Number of blocks
+
+    std::cerr << "[BlockTreeTermsWriter] Writing " << blockEntries.size()
+              << " blocks for field '" << fieldInfo_.name << "'" << std::endl;
+
+    for (const auto& entry : blockEntries) {
+        // Write first term of block
+        tipOut_->writeVInt(static_cast<int>(entry.term.length()));
+        tipOut_->writeBytes(entry.term.data(), entry.term.length());
+
+        // Write block file pointer
+        tipOut_->writeVLong(entry.output);
+
+        if (blockEntries.size() <= 10) {  // Debug for small indexes
+            std::string termStr(reinterpret_cast<const char*>(entry.term.data()), entry.term.length());
+            std::cerr << "  Block: firstTerm='" << termStr << "', FP=" << entry.output << std::endl;
+        }
+    }
 }
 
 int BlockTreeTermsWriter::sharedPrefixLength(const util::BytesRef& a,

@@ -5,6 +5,7 @@
 #include "diagon/index/FieldInfo.h"
 
 #include <algorithm>
+#include <iostream>
 #include <set>
 #include <stdexcept>
 
@@ -16,22 +17,34 @@ namespace index {
 FreqProxFields::FreqProxFields(const FreqProxTermsWriter& termsWriter,
                                const FieldInfos& fieldInfos)
     : termsWriter_(termsWriter) {
+    std::cerr << "[FreqProxFields] Constructing with " << fieldInfos.size() << " field infos" << std::endl;
+
     // Iterate over actual fields from FieldInfos
     for (const auto& fieldInfo : fieldInfos) {
+        std::cerr << "[FreqProxFields]   FieldInfo: name='" << fieldInfo.name
+                  << "', indexOptions=" << static_cast<int>(fieldInfo.indexOptions) << std::endl;
+
         // Only include indexed fields
         if (fieldInfo.indexOptions != IndexOptions::NONE) {
             fields_.push_back(fieldInfo.name);
+            std::cerr << "[FreqProxFields]     -> Added to fields_" << std::endl;
         }
     }
+
+    std::cerr << "[FreqProxFields] Total indexed fields: " << fields_.size() << std::endl;
 }
 
 std::unique_ptr<Terms> FreqProxFields::terms(const std::string& field) {
+    std::cerr << "[FreqProxFields::terms] Called for field '" << field << "'" << std::endl;
+
     // Check if field exists
     auto it = std::find(fields_.begin(), fields_.end(), field);
     if (it == fields_.end()) {
+        std::cerr << "[FreqProxFields::terms]   Field not found in fields_, returning nullptr" << std::endl;
         return nullptr;  // Field not found
     }
 
+    std::cerr << "[FreqProxFields::terms]   Field found, creating FreqProxTerms" << std::endl;
     return std::make_unique<FreqProxTerms>(field, termsWriter_);
 }
 
@@ -53,8 +66,13 @@ FreqProxTerms::FreqProxTerms(const std::string& fieldName,
     , sumDocFreq_(0)
     , docCount_(0) {
 
+    std::cerr << "[FreqProxTerms] Constructing for field '" << fieldName << "'" << std::endl;
+
     // Get terms for this specific field only
     sortedTerms_ = termsWriter_.getTermsForField(fieldName);
+
+    std::cerr << "[FreqProxTerms]   Retrieved " << sortedTerms_.size() << " terms" << std::endl;
+
 
     // Compute statistics
     std::set<int> uniqueDocs;

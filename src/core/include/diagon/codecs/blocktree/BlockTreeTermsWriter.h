@@ -48,7 +48,7 @@ public:
         /** Constructor */
         Config()
             : minItemsInBlock(25)
-            , maxItemsInBlock(48) {}
+            , maxItemsInBlock(48) {}  // Proper block size with multi-block support
     };
 
     /**

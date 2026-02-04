@@ -61,6 +61,16 @@ public:
     void close() override;
 
 private:
+    /**
+     * Holds a field reader and its cloned inputs.
+     * Each field needs independent IndexInput clones to avoid file pointer conflicts.
+     */
+    struct FieldReaderHolder {
+        std::shared_ptr<blocktree::BlockTreeTermsReader> reader;
+        std::unique_ptr<store::IndexInput> timInputClone;
+        std::unique_ptr<store::IndexInput> tipInputClone;
+    };
+
     std::string segmentName_;
     const index::FieldInfos& fieldInfos_;
 
@@ -71,9 +81,8 @@ private:
     // Postings reader for retrieving doc IDs and frequencies
     std::unique_ptr<class Lucene104PostingsReader> postingsReader_;
 
-    // Per-field term readers (lazy loaded, shared)
-    mutable std::unordered_map<std::string, std::shared_ptr<blocktree::BlockTreeTermsReader>>
-        fieldReaders_;
+    // Per-field term readers (lazy loaded, each with independent input clones)
+    mutable std::unordered_map<std::string, FieldReaderHolder> fieldReaders_;
 };
 
 }  // namespace lucene104

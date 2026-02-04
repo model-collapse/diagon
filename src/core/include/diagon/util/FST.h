@@ -111,6 +111,20 @@ public:
     class Builder {
     public:
         /**
+         * Entry in the FST (for serialization).
+         */
+        struct Entry {
+            std::vector<uint8_t> termData;
+            BytesRef term;
+            Output output;
+
+            Entry(const BytesRef& t, Output o)
+                : termData(t.data(), t.data() + t.length())
+                , term(termData.data(), termData.size())
+                , output(o) {}
+        };
+
+        /**
          * Create builder.
          */
         Builder();
@@ -142,11 +156,21 @@ public:
          */
         std::unique_ptr<FST> finish();
 
+        /**
+         * Get all entries for serialization.
+         *
+         * @return List of all input→output mappings
+         */
+        const std::vector<Entry>& getEntries() const { return entries_; }
+
     private:
         Node* root_;  // Use raw pointer, will be moved to FST
         BytesRef lastInput_;
         std::vector<uint8_t> lastInputData_;  // Storage for lastInput_
         bool finished_;
+
+        /** All entries for serialization */
+        std::vector<Entry> entries_;
 
         Node* addNode();
 

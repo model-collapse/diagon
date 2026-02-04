@@ -4,6 +4,7 @@
 #include "diagon/index/FreqProxTermsWriter.h"
 
 #include <algorithm>
+#include <iostream>
 #include <set>
 #include <stdexcept>
 
@@ -21,6 +22,7 @@ FreqProxTermsWriter::FreqProxTermsWriter(FieldInfosBuilder& fieldInfosBuilder,
 }
 
 void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) {
+
     // Iterate over all fields in document
     for (const auto& field : doc.getFields()) {
         const std::string& fieldName = field->name();
@@ -163,7 +165,8 @@ std::vector<std::string> FreqProxTermsWriter::getTermsForField(const std::string
         // Check if key starts with "field\0"
         if (compositeKey.compare(0, prefix.length(), prefix) == 0) {
             // Extract term part after "field\0"
-            terms.push_back(compositeKey.substr(prefix.length()));
+            std::string term = compositeKey.substr(prefix.length());
+            terms.push_back(term);
         }
     }
 

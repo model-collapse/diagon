@@ -150,6 +150,9 @@ void FST::Builder::add(const BytesRef& input, Output output) {
     current->isFinal = true;
     current->output = output;
 
+    // Record entry for serialization
+    entries_.emplace_back(input, output);
+
     // Save last input
     lastInputData_.assign(input.data(), input.data() + input.length());
     lastInput_ = BytesRef(lastInputData_.data(), lastInputData_.size());

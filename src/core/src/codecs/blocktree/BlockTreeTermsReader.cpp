@@ -29,6 +29,10 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
     // Read FST from .tip file
     // Format: [magic][fieldName][startFP][numTerms][FST data] (per field)
     // Need to find the section for our field
+
+    // CRITICAL: Seek to beginning! Multiple readers share the same IndexInput
+    tipIn_->seek(0);
+
     bool foundField = false;
     while (tipIn_->getFilePointer() < tipIn_->length()) {
         int magic = tipIn_->readInt();
@@ -39,7 +43,7 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
         std::string fieldName = tipIn_->readString();
         int64_t startFP = tipIn_->readVLong();  // Read starting file pointer
         int64_t numTerms = tipIn_->readVLong();
-        int fstSize = tipIn_->readVInt();
+        int numBlocks = tipIn_->readVInt();  // Number of blocks
 
         if (fieldName == fieldInfo_.name) {
             // Found our field
@@ -47,19 +51,42 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
             numTerms_ = numTerms;
             foundField = true;
 
-            // Read FST (placeholder for Phase 2 MVP)
-            if (fstSize > 0) {
-                // TODO: Deserialize FST
-                throw std::runtime_error("FST deserialization not yet implemented");
+            // Read block index
+            blockIndex_.reserve(numBlocks);
+            std::cerr << "[BlockTreeTermsReader] Reading " << numBlocks
+                      << " blocks for field '" << fieldInfo_.name << "'" << std::endl;
+
+            for (int i = 0; i < numBlocks; i++) {
+                // Read first term
+                int termLen = tipIn_->readVInt();
+                std::vector<uint8_t> termData(termLen);
+                tipIn_->readBytes(termData.data(), termLen);
+
+                // Read block file pointer
+                int64_t blockFP = tipIn_->readVLong();
+
+                blockIndex_.emplace_back(util::BytesRef(termData.data(), termLen), blockFP);
+
+                if (numBlocks <= 10 && i < 10) {  // Debug for small indexes
+                    std::string termStr(reinterpret_cast<const char*>(termData.data()), termLen);
+                    std::cerr << "  Block " << i << ": firstTerm='" << termStr
+                              << "', FP=" << blockFP << std::endl;
+                }
             }
 
-            // For MVP, create empty FST
+            // For backward compatibility, create empty FST
             fst_ = std::make_unique<util::FST>();
             break;
         } else {
-            // Skip this field's FST data
-            if (fstSize > 0) {
-                tipIn_->seek(tipIn_->getFilePointer() + fstSize);
+            // Skip this field's block index
+            std::cerr << "[BlockTreeTermsReader] Skipping field '" << fieldName
+                      << "' (looking for '" << fieldInfo_.name << "')" << std::endl;
+
+            // Skip all block entries
+            for (int i = 0; i < numBlocks; i++) {
+                int termLen = tipIn_->readVInt();
+                tipIn_->seek(tipIn_->getFilePointer() + termLen);  // Skip term bytes
+                tipIn_->readVLong();  // Skip block FP
             }
         }
     }
@@ -72,11 +99,21 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
 void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
     block.blockFP = blockFP;
 
+    // DEBUG: Show where we're seeking
+    std::cerr << "[BlockTreeTermsReader::loadBlock] Seeking to blockFP=" << blockFP
+              << " for field '" << fieldInfo_.name << "'" << std::endl;
+
     // Seek to block
     timIn_->seek(blockFP);
 
+    // DEBUG: Verify position after seek
+    int64_t actualPos = timIn_->getFilePointer();
+    std::cerr << "[BlockTreeTermsReader::loadBlock] After seek, actualPos=" << actualPos << std::endl;
+
     // Read block header
     int prefixLen = timIn_->readVInt();
+
+    std::cerr << "[BlockTreeTermsReader::loadBlock] Read prefixLen=" << prefixLen << std::endl;
 
     if (prefixLen > 0) {
         block.prefixData.resize(prefixLen);
@@ -134,22 +171,56 @@ std::unique_ptr<index::TermsEnum> BlockTreeTermsReader::iterator() {
     return std::make_unique<SegmentTermsEnum>(this);
 }
 
+int BlockTreeTermsReader::findBlockForTerm(const util::BytesRef& term) const {
+    if (blockIndex_.empty()) {
+        return -1;
+    }
+
+    // Binary search to find the rightmost block where firstTerm <= term
+    // This is the block that may contain the term
+    auto it = std::upper_bound(
+        blockIndex_.begin(), blockIndex_.end(), term,
+        [](const util::BytesRef& term, const BlockMetadata& block) {
+            return term < block.firstTerm;
+        });
+
+    // upper_bound returns first block where firstTerm > term
+    // So we want the block before it (which has firstTerm <= term)
+    if (it == blockIndex_.begin()) {
+        // Term is before all blocks
+        return -1;
+    }
+
+    return static_cast<int>(std::distance(blockIndex_.begin(), it) - 1);
+}
+
 // ==================== SegmentTermsEnum ====================
 
 SegmentTermsEnum::SegmentTermsEnum(BlockTreeTermsReader* reader)
     : reader_(reader)
+    , currentBlockIndex_(-1)
     , currentTermIndex_(-1)
     , positioned_(false) {}
+
+void SegmentTermsEnum::loadBlockByIndex(int blockIndex) {
+    if (blockIndex < 0 || blockIndex >= static_cast<int>(reader_->blockIndex_.size())) {
+        throw std::out_of_range("Invalid block index");
+    }
+
+    currentBlockIndex_ = blockIndex;
+    int64_t blockFP = reader_->blockIndex_[blockIndex].blockFP;
+    reader_->loadBlock(blockFP, currentBlock_);
+}
 
 bool SegmentTermsEnum::next() {
     if (!positioned_) {
         // First call - check if field is empty
-        if (reader_->getNumTerms() == 0) {
+        if (reader_->getNumTerms() == 0 || reader_->blockIndex_.empty()) {
             positioned_ = true;
             return false;
         }
-        // Load first block at this field's starting file pointer
-        reader_->loadBlock(reader_->termsStartFP_, currentBlock_);
+        // Load first block
+        loadBlockByIndex(0);
         currentTermIndex_ = 0;
         positioned_ = true;
         return !currentBlock_.terms.empty();
@@ -162,19 +233,29 @@ bool SegmentTermsEnum::next() {
         return true;
     }
 
-    // No more terms in current block
-    // For Phase 2 MVP, we don't support multi-block iteration yet
-    // (would need to track next block FP)
+    // No more terms in current block - try next block
+    if (currentBlockIndex_ + 1 < static_cast<int>(reader_->blockIndex_.size())) {
+        loadBlockByIndex(currentBlockIndex_ + 1);
+        currentTermIndex_ = 0;
+        return !currentBlock_.terms.empty();
+    }
+
+    // No more blocks
     return false;
 }
 
 bool SegmentTermsEnum::seekExact(const util::BytesRef& text) {
-    // Use FST to find block
-    // For Phase 2 MVP without working FST, do linear scan
-    // TODO: Implement FST-based seek
+    // Use block index to find which block may contain the term
+    int blockIndex = reader_->findBlockForTerm(text);
 
-    // Load first block (simplified for MVP)
-    reader_->loadBlock(reader_->termsStartFP_, currentBlock_);
+    if (blockIndex < 0) {
+        // Term is before all blocks
+        positioned_ = false;
+        return false;
+    }
+
+    // Load the block
+    loadBlockByIndex(blockIndex);
 
     // Binary search within block
     auto it = std::lower_bound(
@@ -187,12 +268,28 @@ bool SegmentTermsEnum::seekExact(const util::BytesRef& text) {
         return true;
     }
 
+    // Not found - may need to check next block if we're at the boundary
+    // But for exact match, if it's not in this block, it doesn't exist
     return false;
 }
 
 index::TermsEnum::SeekStatus SegmentTermsEnum::seekCeil(const util::BytesRef& text) {
-    // Load first block (simplified for MVP)
-    reader_->loadBlock(reader_->termsStartFP_, currentBlock_);
+    // Use block index to find which block may contain the term
+    int blockIndex = reader_->findBlockForTerm(text);
+
+    if (blockIndex < 0) {
+        // Term is before all blocks - return first term in first block
+        if (reader_->blockIndex_.empty()) {
+            return SeekStatus::END;
+        }
+        loadBlockByIndex(0);
+        currentTermIndex_ = 0;
+        positioned_ = true;
+        return SeekStatus::NOT_FOUND;
+    }
+
+    // Load the block
+    loadBlockByIndex(blockIndex);
 
     // Binary search for ceiling
     auto it = std::lower_bound(
@@ -200,6 +297,13 @@ index::TermsEnum::SeekStatus SegmentTermsEnum::seekCeil(const util::BytesRef& te
         [](const util::BytesRef& a, const util::BytesRef& b) { return a < b; });
 
     if (it == currentBlock_.terms.end()) {
+        // Term is after all terms in this block - try next block
+        if (currentBlockIndex_ + 1 < static_cast<int>(reader_->blockIndex_.size())) {
+            loadBlockByIndex(currentBlockIndex_ + 1);
+            currentTermIndex_ = 0;
+            positioned_ = true;
+            return SeekStatus::NOT_FOUND;
+        }
         return SeekStatus::END;
     }
 

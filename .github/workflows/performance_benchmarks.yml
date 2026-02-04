@@ -1,0 +1,222 @@
+name: Performance Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run daily at 2 AM UTC for trending analysis
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for comparisons
+
+      - name: Set up build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libicu-dev \
+            libzstd-dev \
+            liblz4-dev \
+            zlib1g-dev \
+            cpufrequtils
+
+      - name: Configure CPU for stable benchmarking
+        run: |
+          # Set performance governor for consistent results
+          sudo cpupower frequency-set --governor performance || true
+          # Disable CPU frequency scaling
+          echo "performance" | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor || true
+
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_FLAGS="-O3 -march=native" \
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF \
+            -DDIAGON_BUILD_BENCHMARKS=ON \
+            -DDIAGON_BUILD_TESTS=ON
+
+      - name: Build Diagon
+        run: |
+          cmake --build build -j$(nproc)
+
+      - name: Run regression tests
+        run: |
+          cd build/benchmarks
+          ./FieldIsolationTest
+          ./MultiBlockRegressionTest
+
+      - name: Run performance benchmarks
+        id: benchmarks
+        run: |
+          cd build/benchmarks
+
+          # Run profiler benchmark
+          echo "Running DiagonProfiler..."
+          ./DiagonProfiler > profiler_results.txt 2>&1
+
+          # Extract key metrics
+          P99=$(grep "P99:" profiler_results.txt | awk '{print $2}')
+          DOCS=$(grep "Indexed.*documents" profiler_results.txt | awk '{print $2}')
+          INDEX_TIME=$(grep "Indexing complete in" profiler_results.txt | awk '{print $4}')
+          HITS=$(grep "Warmup query returned" profiler_results.txt | awk '{print $4}')
+
+          echo "p99=$P99" >> $GITHUB_OUTPUT
+          echo "docs=$DOCS" >> $GITHUB_OUTPUT
+          echo "index_time=$INDEX_TIME" >> $GITHUB_OUTPUT
+          echo "hits=$HITS" >> $GITHUB_OUTPUT
+
+          # Save full results as artifact
+          cp profiler_results.txt $GITHUB_WORKSPACE/
+
+      - name: Download baseline results
+        id: baseline
+        uses: actions/cache@v3
+        with:
+          path: baseline_results.json
+          key: perf-baseline-${{ github.base_ref || 'main' }}
+          restore-keys: |
+            perf-baseline-main
+
+      - name: Compare with baseline
+        id: comparison
+        run: |
+          CURRENT_P99="${{ steps.benchmarks.outputs.p99 }}"
+          BASELINE_P99="0.142"  # Initial baseline
+
+          if [ -f baseline_results.json ]; then
+            BASELINE_P99=$(jq -r '.p99' baseline_results.json || echo "0.142")
+          fi
+
+          # Calculate regression (percent change)
+          CURRENT_NUM=$(echo $CURRENT_P99 | sed 's/ ms$//')
+          BASELINE_NUM=$(echo $BASELINE_P99 | sed 's/ ms$//')
+
+          REGRESSION=$(echo "scale=2; (($CURRENT_NUM - $BASELINE_NUM) / $BASELINE_NUM) * 100" | bc)
+
+          echo "regression=$REGRESSION" >> $GITHUB_OUTPUT
+          echo "baseline_p99=$BASELINE_P99" >> $GITHUB_OUTPUT
+
+          # Check for significant regression (>10%)
+          if (( $(echo "$REGRESSION > 10" | bc -l) )); then
+            echo "status=⚠️ REGRESSION DETECTED" >> $GITHUB_OUTPUT
+            echo "regression_detected=true" >> $GITHUB_OUTPUT
+          elif (( $(echo "$REGRESSION < -10" | bc -l) )); then
+            echo "status=✅ PERFORMANCE IMPROVEMENT" >> $GITHUB_OUTPUT
+            echo "regression_detected=false" >> $GITHUB_OUTPUT
+          else
+            echo "status=✅ PERFORMANCE STABLE" >> $GITHUB_OUTPUT
+            echo "regression_detected=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update baseline (main branch only)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          cat > baseline_results.json <<EOF
+          {
+            "p99": "${{ steps.benchmarks.outputs.p99 }}",
+            "docs": "${{ steps.benchmarks.outputs.docs }}",
+            "index_time": "${{ steps.benchmarks.outputs.index_time }}",
+            "hits": "${{ steps.benchmarks.outputs.hits }}",
+            "commit": "${{ github.sha }}",
+            "date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: |
+            profiler_results.txt
+            baseline_results.json
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ steps.comparison.outputs.status }}';
+            const currentP99 = '${{ steps.benchmarks.outputs.p99 }}';
+            const baselineP99 = '${{ steps.comparison.outputs.baseline_p99 }}';
+            const regression = '${{ steps.comparison.outputs.regression }}';
+            const hits = '${{ steps.benchmarks.outputs.hits }}';
+            const docs = '${{ steps.benchmarks.outputs.docs }}';
+            const indexTime = '${{ steps.benchmarks.outputs.index_time }}';
+
+            const comment = `## ${status}
+
+            ### Performance Benchmark Results
+
+            | Metric | Current | Baseline | Change |
+            |--------|---------|----------|--------|
+            | Search P99 | ${currentP99} | ${baselineP99} | ${regression > 0 ? '+' : ''}${regression}% |
+            | Query Hits | ${hits} docs | - | - |
+            | Indexing | ${indexTime} ms (${docs} docs) | - | - |
+
+            ### Details
+            - Workload: 10K documents, multi-term Boolean query
+            - Test: \`+message:error +message:warning\`
+            - Block size: 48 terms per block
+
+            ${regression > 10 ? '⚠️ **Performance regression detected!** Please investigate before merging.' : ''}
+            ${regression < -10 ? '🎉 **Performance improvement detected!** Great work!' : ''}
+
+            <details>
+            <summary>View full benchmark output</summary>
+
+            [Download full results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            </details>
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Fail on regression
+        if: steps.comparison.outputs.regression_detected == 'true'
+        run: |
+          echo "::error::Performance regression detected: ${{ steps.comparison.outputs.regression }}% slower"
+          echo "Current P99: ${{ steps.benchmarks.outputs.p99 }}"
+          echo "Baseline P99: ${{ steps.comparison.outputs.baseline_p99 }}"
+          exit 1
+
+      - name: Save performance history (main only)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          mkdir -p performance_history
+          DATE=$(date +%Y-%m-%d)
+          cat > performance_history/${DATE}_${GITHUB_SHA:0:7}.json <<EOF
+          {
+            "date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "p99": "${{ steps.benchmarks.outputs.p99 }}",
+            "docs": "${{ steps.benchmarks.outputs.docs }}",
+            "index_time": "${{ steps.benchmarks.outputs.index_time }}",
+            "hits": "${{ steps.benchmarks.outputs.hits }}"
+          }
+          EOF
+
+          # Commit history (if repo has write access)
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add performance_history/
+          git commit -m "📊 Add performance results for ${GITHUB_SHA:0:7}" || true
+          git push origin main || echo "Note: Could not push performance history"
