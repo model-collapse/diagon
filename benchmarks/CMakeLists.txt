@@ -345,6 +345,24 @@ target_include_directories(MultiBlockRegressionTest
         ${CMAKE_SOURCE_DIR}/src/core/include
 )
 
+# Production-scale scalability test
+add_executable(ScalabilityTest scalability_test.cpp)
+
+target_link_libraries(ScalabilityTest
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(ScalabilityTest PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(ScalabilityTest
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
 # ==================== Combined Benchmark Target ====================
 
 add_custom_target(run_all_benchmarks
