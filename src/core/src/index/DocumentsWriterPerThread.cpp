@@ -314,12 +314,13 @@ std::vector<int64_t> DocumentsWriterPerThread::computeNorms(const std::string& f
     // Initialize norm values (field length per document)
     std::vector<int64_t> fieldLengths(numDocs, 0);
 
-    // Get all terms from terms writer
-    std::vector<std::string> terms = termsWriter_.getTerms();
+    // Get terms for THIS field only (O(n) instead of O(n²))
+    std::vector<std::string> terms = termsWriter_.getTermsForField(fieldName);
 
     // Sum frequencies for each document
     for (const auto& term : terms) {
-        std::vector<int> postings = termsWriter_.getPostingList(term);
+        // Use field-specific O(1) lookup instead of O(n) linear scan
+        std::vector<int> postings = termsWriter_.getPostingList(fieldName, term);
 
         // Posting list format: [docID, freq, docID, freq, ...]
         for (size_t i = 0; i < postings.size(); i += 2) {

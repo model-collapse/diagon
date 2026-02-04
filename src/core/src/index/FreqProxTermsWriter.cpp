@@ -74,6 +74,7 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
         // New term - create posting list
         PostingData data = createPostingList(term, docID);
         termToPosting_[compositeKey] = std::move(data);
+        invalidateBytesUsedCache();  // Cache now stale
     } else {
         // Existing term - append to posting list
         PostingData& data = it->second;
@@ -84,6 +85,7 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
         }
 
         appendToPostingList(data, docID);
+        invalidateBytesUsedCache();  // Cache now stale
     }
 }
 
@@ -177,7 +179,12 @@ std::vector<std::string> FreqProxTermsWriter::getTermsForField(const std::string
 }
 
 int64_t FreqProxTermsWriter::bytesUsed() const {
-    // ByteBlockPool memory
+    // Return cached value if still valid (optimization for frequent calls)
+    if (!bytesUsedDirty_) {
+        return cachedBytesUsed_;
+    }
+
+    // Recalculate memory usage when cache is dirty
     int64_t bytes = termBytePool_.bytesUsed();
 
     // Posting list vectors (approximate)
@@ -189,17 +196,23 @@ int64_t FreqProxTermsWriter::bytesUsed() const {
     // Map overhead (approximate)
     bytes += termToPosting_.size() * 64;  // Rough estimate
 
+    // Cache the result
+    cachedBytesUsed_ = bytes;
+    bytesUsedDirty_ = false;
+
     return bytes;
 }
 
 void FreqProxTermsWriter::reset() {
     termBytePool_.reset();
     termToPosting_.clear();
+    invalidateBytesUsedCache();  // Cache now stale
 }
 
 void FreqProxTermsWriter::clear() {
     termBytePool_.clear();
     termToPosting_.clear();
+    invalidateBytesUsedCache();  // Cache now stale
 }
 
 }  // namespace index

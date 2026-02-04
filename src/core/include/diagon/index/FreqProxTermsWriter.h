@@ -144,6 +144,17 @@ private:
     // Cleared and reused for each document to reduce malloc overhead
     std::unordered_map<std::string, int> termFreqsCache_;
 
+    // Cached memory usage tracking (optimization for bytesUsed())
+    mutable int64_t cachedBytesUsed_ = 0;
+    mutable bool bytesUsedDirty_ = true;
+
+    /**
+     * Invalidate bytesUsed cache when posting lists are modified
+     */
+    void invalidateBytesUsedCache() {
+        bytesUsedDirty_ = true;
+    }
+
     /**
      * Add term occurrence to posting list
      *

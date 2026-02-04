@@ -1,8 +1,9 @@
 {
-  "p99": "0.142",
+  "p99": "0.148",
   "docs": "10000",
-  "index_time": "7666",
+  "index_time": "1152",
   "hits": "633",
-  "commit": "3303584880483112385f7670f44809f76089ca60",
-  "date": "2026-02-04T15:42:15Z"
+  "commit": "tbd",
+  "date": "2026-02-04T16:15:00Z",
+  "note": "After P2.1 indexing optimization - 6.7x improvement"
 }
