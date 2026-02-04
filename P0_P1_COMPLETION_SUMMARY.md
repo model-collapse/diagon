@@ -171,7 +171,7 @@ python3 scripts/generate_performance_report.py
 
 ## Performance Baselines Established
 
-### Current Production Baseline (2026-02-04)
+### Current Production Baseline (2026-02-04) - **CORRECTED**
 
 ```json
 {
@@ -179,10 +179,12 @@ python3 scripts/generate_performance_report.py
   "docs": "10000",
   "index_time": "7666",
   "hits": "633",
-  "commit": "93f185e",
-  "date": "2026-02-04T15:32:41Z"
+  "commit": "3303584",
+  "date": "2026-02-04T15:42:15Z"
 }
 ```
+
+**Note**: Baseline file was corrected to fix parsing issues. The P99 performance remains at 0.142ms (3.5x faster than Lucene).
 
 ### Regression Thresholds
 

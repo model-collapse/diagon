@@ -1,8 +1,8 @@
 {
-  "p99": "0.172",
-  "docs": "Indexed",
-  "index_time": "in",
-  "hits": "returned",
-  "commit": "93f185e8f5e5b4134a7fa7838b17ba0c294e45f7",
-  "date": "2026-02-04T15:32:41Z"
+  "p99": "0.142",
+  "docs": "10000",
+  "index_time": "7666",
+  "hits": "633",
+  "commit": "3303584880483112385f7670f44809f76089ca60",
+  "date": "2026-02-04T15:42:15Z"
 }
