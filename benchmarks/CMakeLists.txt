@@ -361,6 +361,26 @@ endif()
 target_include_directories(ScalabilityTest
     PRIVATE
         ${CMAKE_SOURCE_DIR}/src/core/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Reuters-21578 benchmark
+add_executable(ReutersBenchmark reuters_benchmark.cpp)
+
+target_link_libraries(ReutersBenchmark
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(ReutersBenchmark PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(ReutersBenchmark
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 # ==================== Combined Benchmark Target ====================
