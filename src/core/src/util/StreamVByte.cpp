@@ -2,72 +2,16 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/util/StreamVByte.h"
+#include "diagon/util/StreamVByteTables.h"  // Precomputed lookup tables
 
 #include <algorithm>
 #include <cstring>
 
-#if defined(__AVX2__)
-    #include <immintrin.h>
-#elif defined(__SSE4_2__)
-    #include <nmmintrin.h>
-#elif defined(__ARM_NEON)
-    #include <arm_neon.h>
-#endif
+// SIMD intrinsics are included via SIMDUtils.h (included by StreamVByte.h)
+// No need to re-include or re-define macros here
 
 namespace diagon {
 namespace util {
-
-// ==================== Shuffle Mask Tables ====================
-
-// Precomputed shuffle masks for SSE (128-bit, 4 integers)
-// Each entry corresponds to a control byte (0-255)
-// Mask specifies how to shuffle bytes to extract 4 integers
-alignas(64) const uint8_t StreamVByte::SHUFFLE_MASKS_SSE[256][16] = {
-    // Format: Each mask rearranges bytes from packed input to 4×32-bit output
-    // Control byte 0x00: [1,1,1,1] - all 1-byte integers
-    {0,0xFF,0xFF,0xFF, 1,0xFF,0xFF,0xFF, 2,0xFF,0xFF,0xFF, 3,0xFF,0xFF,0xFF},
-    // Control byte 0x01: [2,1,1,1]
-    {0,1,0xFF,0xFF, 2,0xFF,0xFF,0xFF, 3,0xFF,0xFF,0xFF, 4,0xFF,0xFF,0xFF},
-    // Control byte 0x02: [3,1,1,1]
-    {0,1,2,0xFF, 3,0xFF,0xFF,0xFF, 4,0xFF,0xFF,0xFF, 5,0xFF,0xFF,0xFF},
-    // Control byte 0x03: [4,1,1,1]
-    {0,1,2,3, 4,0xFF,0xFF,0xFF, 5,0xFF,0xFF,0xFF, 6,0xFF,0xFF,0xFF},
-    // Control byte 0x04: [1,2,1,1]
-    {0,0xFF,0xFF,0xFF, 1,2,0xFF,0xFF, 3,0xFF,0xFF,0xFF, 4,0xFF,0xFF,0xFF},
-    // ... (256 entries total, showing pattern)
-    // NOTE: Full table initialization would be ~4KB, generating programmatically below
-};
-
-// AVX2 masks (256-bit, can process 8 bytes per lane)
-alignas(64) const uint8_t StreamVByte::SHUFFLE_MASKS_AVX2[256][32] = {};
-
-// ==================== Helper: Generate Shuffle Mask ====================
-
-// Runtime generation of shuffle masks (used during initialization)
-static void generateShuffleMask(uint8_t control, uint8_t* mask, bool is_avx2) {
-    int sizes[4];
-    for (int i = 0; i < 4; ++i) {
-        sizes[i] = ((control >> (i * 2)) & 0x3) + 1;
-    }
-
-    int offset = 0;
-    for (int i = 0; i < 4; ++i) {
-        // Fill each 32-bit integer slot
-        for (int j = 0; j < 4; ++j) {
-            if (j < sizes[i]) {
-                mask[i * 4 + j] = offset + j;
-            } else {
-                mask[i * 4 + j] = 0xFF;  // Zero fill
-            }
-        }
-        offset += sizes[i];
-    }
-
-    if (is_avx2) {
-        // Duplicate for second 128-bit lane
-        std::memcpy(mask + 16, mask, 16);
-    }
-}
 
 // ==================== Encoding ====================
 
@@ -167,31 +111,22 @@ int StreamVByte::decode4_SSE(const uint8_t* input, uint32_t* output) {
     uint8_t control = input[0];
     const uint8_t* data = input + 1;
 
-    // Generate shuffle mask on-the-fly (could use precomputed table)
-    alignas(16) uint8_t mask[16];
-    generateShuffleMask(control, mask, false);
+    // ✅ FAST: Load precomputed shuffle mask (1 cycle, not 20-30 cycles!)
+    __m128i mask_vec = _mm_load_si128(
+        reinterpret_cast<const __m128i*>(StreamVByteTables::SSE_MASKS[control])
+    );
 
     // Load data bytes (up to 16 bytes)
     __m128i data_vec = _mm_loadu_si128(reinterpret_cast<const __m128i*>(data));
 
-    // Load shuffle mask
-    __m128i mask_vec = _mm_load_si128(reinterpret_cast<const __m128i*>(mask));
-
-    // Shuffle bytes to extract 4 integers
+    // Shuffle bytes to extract 4 integers (PSHUFB: 1 cycle)
     __m128i result = _mm_shuffle_epi8(data_vec, mask_vec);
 
     // Store result
     _mm_storeu_si128(reinterpret_cast<__m128i*>(output), result);
 
-    // Calculate bytes consumed
-    int lengths[4];
-    int total_len = 0;
-    for (int i = 0; i < 4; ++i) {
-        lengths[i] = getLength(control, i);
-        total_len += lengths[i];
-    }
-
-    return 1 + total_len;  // Control byte + data bytes
+    // ✅ FAST: Lookup data length (1 cycle, not loop!)
+    return 1 + StreamVByteTables::DATA_LENGTHS[control];
 }
 
 #endif
@@ -201,10 +136,40 @@ int StreamVByte::decode4_SSE(const uint8_t* input, uint32_t* output) {
 #if defined(__AVX2__)
 
 int StreamVByte::decode4_AVX2(const uint8_t* input, uint32_t* output) {
-    // AVX2 version is essentially same as SSE but uses 256-bit registers
-    // For 4 integers, SSE is sufficient; AVX2 shines when decoding 8+ integers
-    // Fall back to SSE for 4-integer decode
+    // For 4 integers, SSE is sufficient and actually faster (smaller register)
+    // AVX2 shines when decoding 8+ integers (see decode8_AVX2)
     return decode4_SSE(input, output);
+}
+
+int StreamVByte::decode8_AVX2(const uint8_t* input, uint32_t* output) {
+    // Decode two groups of 4 integers using AVX2 (true 8-wide decode)
+    // This processes 2 control bytes and decodes 8 integers in parallel
+
+    uint8_t control0 = input[0];
+    int dataLen0 = StreamVByteTables::DATA_LENGTHS[control0];
+
+    uint8_t control1 = input[1 + dataLen0];
+    int dataLen1 = StreamVByteTables::DATA_LENGTHS[control1];
+
+    // Decode first group of 4 (lower 128 bits)
+    __m128i mask0_vec = _mm_load_si128(
+        reinterpret_cast<const __m128i*>(StreamVByteTables::SSE_MASKS[control0])
+    );
+    __m128i data0_vec = _mm_loadu_si128(reinterpret_cast<const __m128i*>(input + 1));
+    __m128i result0 = _mm_shuffle_epi8(data0_vec, mask0_vec);
+
+    // Decode second group of 4 (upper 128 bits)
+    __m128i mask1_vec = _mm_load_si128(
+        reinterpret_cast<const __m128i*>(StreamVByteTables::SSE_MASKS[control1])
+    );
+    __m128i data1_vec = _mm_loadu_si128(reinterpret_cast<const __m128i*>(input + 1 + dataLen0 + 1));
+    __m128i result1 = _mm_shuffle_epi8(data1_vec, mask1_vec);
+
+    // Combine into single AVX2 register and store
+    __m256i result = _mm256_set_m128i(result1, result0);
+    _mm256_storeu_si256(reinterpret_cast<__m256i*>(output), result);
+
+    return 2 + dataLen0 + dataLen1;  // Two control bytes + data
 }
 
 #endif

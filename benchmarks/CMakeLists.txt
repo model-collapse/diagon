@@ -62,6 +62,10 @@ add_diagon_benchmark(SIMDBenchmark
     SIMDBenchmark.cpp
 )
 
+add_diagon_benchmark(StreamVByteSIMDBenchmark
+    StreamVByteSIMDBenchmark.cpp
+)
+
 # ==================== MMap Directory Benchmarks ====================
 
 add_diagon_benchmark(MMapDirectoryBenchmark
@@ -76,6 +80,10 @@ add_diagon_benchmark(Lucene104BatchBenchmark
 
 add_diagon_benchmark(BatchScoringBenchmark
     BatchScoringBenchmark.cpp
+)
+
+add_diagon_benchmark(SIMDComparisonBenchmark
+    SIMDComparisonBenchmark.cpp
 )
 
 add_diagon_benchmark(PostingsFormatBenchmark

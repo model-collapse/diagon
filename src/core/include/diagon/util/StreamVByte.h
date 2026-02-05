@@ -109,6 +109,9 @@ private:
     static int decode4_NEON(const uint8_t* input, uint32_t* output);
     static int decode4_scalar(const uint8_t* input, uint32_t* output);
 
+    // AVX2 8-wide decode (true 8-integer decode, not 2×4)
+    static int decode8_AVX2(const uint8_t* input, uint32_t* output);
+
     // Helper: Extract length from control byte
     static inline int getLength(uint8_t control, int index) {
         return ((control >> (index * 2)) & 0x3) + 1;
@@ -123,11 +126,6 @@ private:
             ((len3 - 1) << 6)
         );
     }
-
-    // Shuffle masks for SIMD decode (indexed by control byte)
-    // These are precomputed lookup tables for fast decoding
-    static const uint8_t SHUFFLE_MASKS_AVX2[256][32];
-    static const uint8_t SHUFFLE_MASKS_SSE[256][16];
 };
 
 }  // namespace util
