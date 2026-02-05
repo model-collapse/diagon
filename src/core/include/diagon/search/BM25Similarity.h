@@ -112,26 +112,44 @@ public:
         SimScorer(float idf, float k1, float b)
             : idf_(idf)
             , k1_(k1)
-            , b_(b) {}
+            , b_(b)
+            , inv_avgFieldLength_(1.0f / 50.0f)  // Precompute reciprocal (opt #2)
+        {}
 
         /**
-         * Score a document
+         * Score a document (optimized version)
          * @param freq Term frequency
          * @param norm Document norm (encoded length)
+         *
+         * Optimizations applied:
+         * - Inlined decodeNorm() to eliminate function call overhead
+         * - Precomputed 1/avgFieldLength for multiplication instead of division
+         * - Removed freq==0 branch (branchless: 0*anything=0 anyway)
+         * - Added branch hints for rare norm values
          */
-        float score(float freq, long norm) const {
-            if (freq == 0.0f)
-                return 0.0f;
+        __attribute__((always_inline))
+        inline float score(float freq, long norm) const {
+            // Optimization #3: Remove freq==0 branch
+            // If freq==0, the result will be 0 anyway (0 * idf_ = 0)
+            // No need for explicit check - let it compute naturally
 
-            // Decode norm to field length
-            float fieldLength = decodeNorm(norm);
+            // Optimization #1: Inline decodeNorm with branch hints
+            // Decode norm to field length inline (avoid function call)
+            float fieldLength;
+            if (__builtin_expect(norm == 0 || norm == 127, 0)) {
+                // Rare case: branch hint tells CPU this is unlikely
+                fieldLength = 1.0f;
+            } else {
+                // Common case: normal decoding
+                float normFloat = static_cast<float>(norm);
+                float invNorm = 127.0f / normFloat;
+                fieldLength = invNorm * invNorm;
+            }
 
-            // Use a reasonable default average field length
-            // Phase 5 will compute this from collection statistics
-            float avgFieldLength = 50.0f;  // Typical document has ~50 terms
-
-            // BM25 formula with length normalization
-            float k = k1_ * (1.0f - b_ + b_ * fieldLength / avgFieldLength);
+            // Optimization #2: Use precomputed reciprocal (multiplication is 5× faster than division)
+            // Before: b_ * fieldLength / avgFieldLength
+            // After:  b_ * fieldLength * inv_avgFieldLength_
+            float k = k1_ * (1.0f - b_ + b_ * fieldLength * inv_avgFieldLength_);
             return idf_ * freq * (k1_ + 1.0f) / (freq + k);
         }
 
@@ -154,23 +172,9 @@ public:
         float idf_;
         float k1_;
         float b_;
+        float inv_avgFieldLength_;  // Precomputed 1/avgFieldLength for fast multiplication
 
-        float decodeNorm(long norm) const {
-            // Decode norm to field length
-            // Encoding: norm = 127 / sqrt(length)
-            // Decoding: length = (127 / norm)^2
-
-            if (norm == 0) {
-                return 1.0f;  // Default for deleted/missing docs
-            }
-            if (norm == 127) {
-                return 1.0f;  // Single term document
-            }
-
-            float normFloat = static_cast<float>(norm);
-            float length = 127.0f / normFloat;
-            return length * length;  // Return length (not sqrt(length))
-        }
+        // Note: decodeNorm() removed - now inlined in score() for better performance
     };
 
     /**

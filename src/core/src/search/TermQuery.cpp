@@ -103,7 +103,8 @@ public:
                    std::unique_ptr<index::PostingsEnum> postings,
                    const BM25Similarity::SimScorer& simScorer,
                    index::NumericDocValues* norms,
-                   int batch_size)
+                   int batch_size,
+                   BatchBuffers& buffers)  // Phase 3: Use external buffers
         : weight_(weight)
         , postings_(std::move(postings))
         , simScorer_(simScorer)
@@ -111,15 +112,15 @@ public:
         , batch_size_(batch_size)
         , batch_(batch_size)
         , batch_pos_(0)
+        , buffers_(buffers)  // Phase 3: Store reference (must match declaration order)
         , doc_(-1)
         , freq_(0)
         , score_(0.0f) {
 
-        // Pre-allocate buffers for batch processing
-        norms_batch_.resize(batch_size);
-        scores_batch_.resize(batch_size);
+        // Phase 3: Ensure external buffers have capacity (cheap if already sized)
+        buffers_.ensureCapacity(batch_size);
 
-        // Try to cast to batch interfaces
+        // Cache batch interface checks (Phase 3 optimization: move from hot path)
         batch_postings_ = dynamic_cast<index::BatchPostingsEnum*>(postings_.get());
         batch_norms_ = dynamic_cast<index::BatchNumericDocValues*>(norms_);
     }
@@ -140,7 +141,7 @@ public:
         // Return next document from batch
         doc_ = batch_.docs[batch_pos_];
         freq_ = batch_.freqs[batch_pos_];
-        score_ = scores_batch_[batch_pos_];
+        score_ = buffers_.scores[batch_pos_];  // Phase 3: Use external buffer
         batch_pos_++;
 
         return doc_;
@@ -174,53 +175,75 @@ private:
      * Fetch and score next batch of documents
      *
      * Returns false if no more documents available.
+     *
+     * Phase 3.3: Optimized with pointer arithmetic and inline hint
      */
-    bool fetchNextBatch() {
+    __attribute__((always_inline)) bool fetchNextBatch() {
         // Try batch decoding if available
         if (batch_postings_) {
             batch_.count = batch_postings_->nextBatch(batch_);
         } else {
             // Fallback: collect batch from one-at-a-time interface
-            batch_.count = 0;
+            // Phase 3.3: Use pointer arithmetic for faster access
+            int* doc_ptr = batch_.docs;
+            int* freq_ptr = batch_.freqs;
+            int count = 0;
+
             for (int i = 0; i < batch_size_; i++) {
                 int doc = postings_->nextDoc();
                 if (doc == NO_MORE_DOCS) {
                     break;
                 }
-                batch_.docs[i] = doc;
-                batch_.freqs[i] = postings_->freq();
-                batch_.count++;
+                *doc_ptr++ = doc;
+                *freq_ptr++ = postings_->freq();
+                count++;
             }
+            batch_.count = count;
         }
 
         if (batch_.count == 0) {
             return false;  // Exhausted
         }
 
-        // Batch lookup norms
+        // Batch lookup norms (Phase 3: Use external buffer)
         if (batch_norms_) {
             // Fast path: batch interface available
-            batch_norms_->getBatch(batch_.docs, norms_batch_.data(), batch_.count);
+            batch_norms_->getBatch(batch_.docs, buffers_.norms.data(), batch_.count);
         } else {
-            // Fallback: one-at-a-time norm lookup
+            // Fallback: one-at-a-time norm lookup with prefetching
+            // Phase 3.3: Use pointer arithmetic
+            // Phase 4: Add prefetching to reduce memory latency (P3 Task #38)
+            long* norm_ptr = buffers_.norms.data();
+            const int* doc_ptr = batch_.docs;
+
+            constexpr int PREFETCH_DISTANCE = 8;  // Prefetch 8 docs ahead
+
             for (int i = 0; i < batch_.count; i++) {
+                // Prefetch norm data for future documents
+                // This hides memory latency by fetching data before it's needed
+                if (i + PREFETCH_DISTANCE < batch_.count && norms_) {
+                    // Prefetch to L1 cache (hint: 3 = high temporal locality)
+                    // Prefetch the doc ID array location for the future document
+                    __builtin_prefetch(&doc_ptr[PREFETCH_DISTANCE], 0, 3);
+                }
+
                 long norm = 1L;
-                if (norms_ && norms_->advanceExact(batch_.docs[i])) {
+                if (norms_ && norms_->advanceExact(*doc_ptr++)) {
                     norm = norms_->longValue();
                 }
-                norms_batch_[i] = norm;
+                *norm_ptr++ = norm;
             }
         }
 
-        // SIMD batch scoring
+        // SIMD batch scoring (Phase 3: Use external buffer)
         BatchBM25Scorer::scoreBatch(
             batch_.freqs,
-            norms_batch_.data(),
+            buffers_.norms.data(),
             simScorer_.getIDF(),
             simScorer_.getK1(),
             simScorer_.getB(),
             50.0f,  // avgLength (TODO: get from stats)
-            scores_batch_.data(),
+            buffers_.scores.data(),
             batch_.count
         );
 
@@ -237,10 +260,9 @@ private:
     int batch_size_;
     index::PostingsBatch batch_;
     int batch_pos_;
-    std::vector<long> norms_batch_;
-    std::vector<float> scores_batch_;
+    BatchBuffers& buffers_;  // Phase 3: External pre-allocated buffers
 
-    // Batch interface pointers (may be null)
+    // Batch interface pointers (cached at construction, Phase 3 optimization)
     index::BatchPostingsEnum* batch_postings_ = nullptr;
     index::BatchNumericDocValues* batch_norms_ = nullptr;
 
@@ -326,9 +348,10 @@ public:
         auto* norms = context.reader->getNormValues(query_.getTerm().field());
 
         if (useBatch) {
-            // Create batch scorer (P1 optimization)
+            // Create batch scorer (P1 optimization, Phase 3: reuse buffers)
             return std::make_unique<BatchTermScorer>(
-                *this, std::move(postings), simScorer_, norms, config.batch_size);
+                *this, std::move(postings), simScorer_, norms, config.batch_size,
+                searcher_.getBatchBuffers());
         } else {
             // Create regular scorer (default)
             return std::make_unique<TermScorer>(
