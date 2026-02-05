@@ -70,6 +70,10 @@ set(DIAGON_CORE_SOURCES
     src/codecs/lucene104/Lucene104PostingsEnumBatch.cpp
     src/codecs/lucene104/Lucene104NormsWriter.cpp
     src/codecs/lucene104/Lucene104NormsReader.cpp
+
+    # Lucene105 (Batch-native postings format - P3 Task #35)
+    src/codecs/lucene105/Lucene105PostingsWriter.cpp
+    #src/codecs/lucene105/Lucene105PostingsReader.cpp
     src/codecs/blocktree/BlockTreeTermsWriter.cpp
     src/codecs/blocktree/BlockTreeTermsReader.cpp
 
@@ -214,6 +218,10 @@ set(DIAGON_CORE_HEADERS
     include/diagon/codecs/lucene104/Lucene104PostingsEnumBatch.h
     include/diagon/codecs/lucene104/Lucene104NormsWriter.h
     include/diagon/codecs/lucene104/Lucene104NormsReader.h
+
+    # Lucene105 (Batch-native postings format - P3 Task #35)
+    include/diagon/codecs/lucene105/Lucene105PostingsWriter.h
+    include/diagon/codecs/lucene105/Lucene105PostingsReader.h
     include/diagon/codecs/blocktree/BlockTreeTermsWriter.h
     include/diagon/codecs/blocktree/BlockTreeTermsReader.h
 
