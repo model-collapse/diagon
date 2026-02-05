@@ -7,20 +7,24 @@
 #include "diagon/util/Exceptions.h"
 #include "diagon/util/StreamVByte.h"
 
+#include <algorithm>
 #include <stdexcept>
 
 namespace diagon {
 namespace codecs {
 namespace lucene104 {
 
-// File extension for doc postings
+// File extensions
 static const std::string DOC_EXTENSION = "doc";
+static const std::string SKIP_EXTENSION = "skp";
 
 Lucene104PostingsWriter::Lucene104PostingsWriter(index::SegmentWriteState& state)
     : docOut_(nullptr)
+    , skipOut_(nullptr)
     , indexOptions_(index::IndexOptions::DOCS)
     , writeFreqs_(false)
     , docStartFP_(0)
+    , skipStartFP_(-1)
     , lastDocID_(0)
     , docCount_(0)
     , totalTermFreq_(0)
@@ -28,7 +32,13 @@ Lucene104PostingsWriter::Lucene104PostingsWriter(index::SegmentWriteState& state
     , segmentSuffix_(state.segmentSuffix)
     , docDeltaBuffer_{}  // Zero-initialize
     , freqBuffer_{}      // Zero-initialize
-    , bufferPos_(0) {
+    , bufferPos_(0)
+    , blockMaxFreq_(0)
+    , blockMaxNorm_(0)
+    , docsSinceLastSkip_(0)
+    , lastSkipDocFP_(0)
+    , lastSkipDoc_(0) {
+
     // Create .doc output file
     std::string docFileName = segmentName_;
     if (!segmentSuffix_.empty()) {
@@ -36,14 +46,22 @@ Lucene104PostingsWriter::Lucene104PostingsWriter(index::SegmentWriteState& state
     }
     docFileName += "." + DOC_EXTENSION;
 
-    // For Phase 2 MVP, use in-memory buffer
-    // TODO Phase 2.1: Use actual file via state.directory->createOutput()
+    // Create .skp output file (for skip entries with impacts)
+    std::string skipFileName = segmentName_;
+    if (!segmentSuffix_.empty()) {
+        skipFileName += "_" + segmentSuffix_;
+    }
+    skipFileName += "." + SKIP_EXTENSION;
+
+    // For now, use in-memory buffers
+    // TODO: Use actual file via state.directory->createOutput()
     docOut_ = std::make_unique<store::ByteBuffersIndexOutput>(docFileName);
+    skipOut_ = std::make_unique<store::ByteBuffersIndexOutput>(skipFileName);
 }
 
 Lucene104PostingsWriter::~Lucene104PostingsWriter() {
     // Ensure close() was called
-    if (docOut_) {
+    if (docOut_ || skipOut_) {
         try {
             close();
         } catch (...) {
@@ -66,13 +84,24 @@ void Lucene104PostingsWriter::setField(const index::FieldInfo& fieldInfo) {
 void Lucene104PostingsWriter::startTerm() {
     // Record file pointer at start of this term's postings
     docStartFP_ = docOut_->getFilePointer();
+    skipStartFP_ = -1;  // Will be set when first skip entry is written
     lastDocID_ = 0;
     docCount_ = 0;
     totalTermFreq_ = 0;
     bufferPos_ = 0;  // Reset StreamVByte buffer
+
+    // Reset block-level tracking for impacts
+    blockMaxFreq_ = 0;
+    blockMaxNorm_ = 0;
+    docsSinceLastSkip_ = 0;
+    lastSkipDocFP_ = docStartFP_;
+    lastSkipDoc_ = 0;
+
+    // Clear skip entries from previous term
+    skipEntries_.clear();
 }
 
-void Lucene104PostingsWriter::startDoc(int docID, int freq) {
+void Lucene104PostingsWriter::startDoc(int docID, int freq, int8_t norm) {
     if (docID < 0) {
         throw std::invalid_argument("docID must be >= 0");
     }
@@ -85,6 +114,14 @@ void Lucene104PostingsWriter::startDoc(int docID, int freq) {
     if (freq <= 0) {
         throw std::invalid_argument("freq must be > 0");
     }
+
+    // Track max frequency and norm for current block (for Block-Max WAND)
+    blockMaxFreq_ = std::max(blockMaxFreq_, freq);
+    blockMaxNorm_ = std::max(blockMaxNorm_, norm);
+    docsSinceLastSkip_++;
+
+    // Check if we need to create a skip entry
+    maybeFlushSkipEntry();
 
     // Buffer doc delta and frequency for StreamVByte encoding
     int docDelta = docID - lastDocID_;
@@ -121,11 +158,27 @@ TermState Lucene104PostingsWriter::finishTerm() {
         bufferPos_ = 0;
     }
 
+    // Flush final skip entry if there are remaining docs
+    if (docsSinceLastSkip_ > 0 && !skipEntries_.empty()) {
+        // Only create final skip entry if we have a previous one
+        // (no point in single skip entry for small postings lists)
+        SkipEntry entry;
+        entry.doc = lastDocID_;
+        entry.docFP = docOut_->getFilePointer();
+        entry.maxFreq = blockMaxFreq_;
+        entry.maxNorm = blockMaxNorm_;
+        skipEntries_.push_back(entry);
+    }
+
+    // Write skip data to .skp file
+    writeSkipData();
+
     TermState state;
     state.docStartFP = docStartFP_;
+    state.skipStartFP = skipStartFP_;
     state.docFreq = docCount_;
     state.totalTermFreq = totalTermFreq_;
-    state.skipOffset = -1;  // No skip list in Phase 2 MVP
+    state.skipEntryCount = static_cast<int>(skipEntries_.size());
 
     return state;
 }
@@ -150,10 +203,68 @@ void Lucene104PostingsWriter::flushBuffer() {
     bufferPos_ = 0;  // Reset buffer
 }
 
+void Lucene104PostingsWriter::maybeFlushSkipEntry() {
+    // Create skip entry every SKIP_INTERVAL docs
+    if (docsSinceLastSkip_ >= SKIP_INTERVAL) {
+        SkipEntry entry;
+        entry.doc = lastDocID_;  // Doc at start of NEXT block
+        entry.docFP = docOut_->getFilePointer();
+        entry.maxFreq = blockMaxFreq_;
+        entry.maxNorm = blockMaxNorm_;
+
+        skipEntries_.push_back(entry);
+
+        // Reset for next block
+        blockMaxFreq_ = 0;
+        blockMaxNorm_ = 0;
+        docsSinceLastSkip_ = 0;
+        lastSkipDocFP_ = entry.docFP;
+    }
+}
+
+void Lucene104PostingsWriter::writeSkipData() {
+    if (skipEntries_.empty()) {
+        // No skip data for small postings lists
+        skipStartFP_ = -1;
+        return;
+    }
+
+    // Record file pointer to start of skip data for this term
+    skipStartFP_ = skipOut_->getFilePointer();
+
+    // Write number of skip entries
+    skipOut_->writeVInt(static_cast<int32_t>(skipEntries_.size()));
+
+    // Write skip entries with delta encoding
+    int32_t lastDoc = 0;
+    int64_t lastDocFP = docStartFP_;
+
+    for (const auto& entry : skipEntries_) {
+        // Delta encode doc ID
+        int32_t docDelta = entry.doc - lastDoc;
+        skipOut_->writeVInt(docDelta);
+
+        // Delta encode file pointer
+        int64_t docFPDelta = entry.docFP - lastDocFP;
+        skipOut_->writeVLong(docFPDelta);
+
+        // Write impact metadata
+        skipOut_->writeVInt(entry.maxFreq);
+        skipOut_->writeByte(static_cast<uint8_t>(entry.maxNorm));
+
+        lastDoc = entry.doc;
+        lastDocFP = entry.docFP;
+    }
+}
+
 void Lucene104PostingsWriter::close() {
     if (docOut_) {
         docOut_->close();
         docOut_.reset();
+    }
+    if (skipOut_) {
+        skipOut_->close();
+        skipOut_.reset();
     }
 }
 

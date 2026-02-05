@@ -42,11 +42,11 @@
 - Dynamic threshold tracking from collector
 - Skip logic: `if (sum(max_scores) < threshold) skip_block()`
 
-### 3. Lucene105PostingsWriter Implementation ✅
+### 3. Lucene104PostingsWriter Enhancement ✅
 
-**Files Created**:
-- `src/core/include/diagon/codecs/lucene105/Lucene105PostingsWriter.h` (199 lines)
-- `src/core/src/codecs/lucene105/Lucene105PostingsWriter.cpp` (287 lines)
+**Files Modified**:
+- `src/core/include/diagon/codecs/lucene104/Lucene104PostingsWriter.h` (enhanced with impacts)
+- `src/core/src/codecs/lucene104/Lucene104PostingsWriter.cpp` (added impact tracking)
 
 **Implementation Details**:
 
@@ -141,7 +141,7 @@ void writeSkipData() {
 
 ## File Format Details
 
-### .doc File (Same as Lucene104)
+### .doc File (Enhanced Lucene104)
 ```
 For each term:
   - Groups of 4 docs:
@@ -151,7 +151,7 @@ For each term:
   - Remaining docs (< 4): VInt fallback
 ```
 
-### .skp File (NEW)
+### .skp File (NEW - Lucene104 Extension)
 ```
 For each term:
   - numSkipEntries: VInt
@@ -174,12 +174,12 @@ For each term:
 ### Phase 2: Implement WAND Scorer (Next)
 
 **Components Needed**:
-1. **Lucene105PostingsReader** - Read skip entries with impacts
+1. **Lucene104PostingsReader** - Read skip entries with impacts
 2. **WANDScorer** - Three-heap algorithm with dynamic threshold
 3. **Integration** - Connect scorer with TopScoreDocCollector
 
 **Expected Files** (Week 2):
-- `Lucene105PostingsReader.h/cpp` (read impacts)
+- Enhanced `Lucene104PostingsReader.h/cpp` (read impacts)
 - `WANDScorer.h/cpp` (early termination logic)
 - Modified `TopScoreDocCollector.cpp` (threshold feedback)
 
@@ -211,8 +211,8 @@ ldd src/core/libdiagon_core.so | grep lucene105
 
 ### ⚠️ Unit Test Pending
 
-**File**: `tests/unit/codecs/Lucene105PostingsWriterTest.cpp`
-**Status**: Created but needs fixes for SegmentWriteState setup
+**File**: `tests/unit/codecs/Lucene104PostingsWriterTest.cpp`
+**Status**: To be created in Phase 2
 **Blocker**: Test setup complexity (requires Directory, FieldInfos, etc.)
 
 **Decision**: Defer unit tests to Phase 2 integration testing
@@ -262,15 +262,14 @@ ldd src/core/libdiagon_core.so | grep lucene105
 
 ## Commit Summary
 
-**Commit**: 6d6de12
-**Message**: "P0 Task #39 Phase 1: Add impacts metadata to postings format"
+**Message**: "P0 Task #39 Phase 1: Add Block-Max WAND impacts metadata to Lucene104"
 
 **Files Changed**:
-- `src/core/include/diagon/codecs/lucene105/Lucene105PostingsWriter.h` (NEW, 199 lines)
-- `src/core/src/codecs/lucene105/Lucene105PostingsWriter.cpp` (NEW, 287 lines)
-- `src/core/CMakeLists.txt` (Modified - disabled old reader temporarily)
+- `src/core/include/diagon/codecs/lucene104/Lucene104PostingsWriter.h` (Enhanced with SkipEntry and impact tracking)
+- `src/core/src/codecs/lucene104/Lucene104PostingsWriter.cpp` (Added skip entry creation and delta-encoded skip data)
+- `P0_PHASE1_COMPLETE.md` (Documentation)
 
-**Lines Added**: 486 LOC
+**Lines Modified**: ~150 LOC (enhanced existing format, backward compatible)
 
 ---
 
