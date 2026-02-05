@@ -162,6 +162,12 @@ void TopScoreDocCollector::TopScoreLeafCollector::collectSingle(int globalDoc, f
     if (static_cast<int>(parent_->pq_.size()) < parent_->numHits_) {
         // Queue not full yet, just add
         parent_->pq_.push(scoreDoc);
+
+        // Check if queue just became full - update threshold for first time
+        if (static_cast<int>(parent_->pq_.size()) == parent_->numHits_ && scorer_) {
+            float minScore = parent_->pq_.top().score;
+            scorer_->setMinCompetitiveScore(minScore);
+        }
     } else {
         // Queue is full, check if this doc beats the worst doc
         const ScoreDoc& top = parent_->pq_.top();
@@ -172,6 +178,12 @@ void TopScoreDocCollector::TopScoreLeafCollector::collectSingle(int globalDoc, f
         if (betterThanTop) {
             parent_->pq_.pop();
             parent_->pq_.push(scoreDoc);
+
+            // Threshold changed - notify scorer (P0 Task #39: WAND feedback)
+            if (scorer_) {
+                float newMinScore = parent_->pq_.top().score;
+                scorer_->setMinCompetitiveScore(newMinScore);
+            }
         }
     }
 }

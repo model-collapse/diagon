@@ -76,6 +76,19 @@ public:
      * @return Current document ID
      */
     virtual int docID() = 0;
+
+    /**
+     * Set minimum competitive score for early termination (P0 Task #39)
+     *
+     * Called by collector when the threshold changes (e.g., heap fills up).
+     * Scorers like WANDScorer use this to skip documents that cannot possibly
+     * beat this score.
+     *
+     * @param minScore New minimum competitive score
+     */
+    virtual void setMinCompetitiveScore(float minScore) {
+        // Default: no-op (not all scorers support this)
+    }
 };
 
 /**

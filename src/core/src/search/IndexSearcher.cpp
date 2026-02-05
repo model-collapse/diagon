@@ -27,6 +27,11 @@ public:
 
     int docID() override { return scorer_->docID(); }
 
+    void setMinCompetitiveScore(float minScore) override {
+        // Forward to underlying scorer (P0 Task #39: WAND threshold feedback)
+        scorer_->setMinCompetitiveScore(minScore);
+    }
+
 private:
     Scorer* scorer_;
 };

@@ -7,6 +7,8 @@
 #include "diagon/index/LeafReaderContext.h"
 #include "diagon/search/IndexSearcher.h"
 #include "diagon/search/Scorer.h"
+#include "diagon/search/WANDScorer.h"
+#include "diagon/search/BM25Similarity.h"
 
 #include <algorithm>
 #include <sstream>
@@ -398,9 +400,23 @@ public:
                 reqScorer = std::make_unique<DisjunctionScorer>(
                     *this, std::move(combined), 1 + query_.getMinimumNumberShouldMatch());
             } else {
-                // Pure disjunction
-                reqScorer = std::make_unique<DisjunctionScorer>(
-                    *this, std::move(shouldScorers), query_.getMinimumNumberShouldMatch());
+                // Pure disjunction - check if we should use WAND
+                const auto& config = searcher_.getConfig();
+                bool useWAND = config.enable_block_max_wand &&
+                               shouldScorers.size() >= 2 &&  // At least 2 terms
+                               scoreMode_ == ScoreMode::COMPLETE;  // Need scoring
+
+                if (useWAND) {
+                    // Use Block-Max WAND for early termination
+                    // TODO: Get BM25Similarity from somewhere
+                    BM25Similarity similarity;  // Default parameters
+                    reqScorer = std::make_unique<WANDScorer>(
+                        shouldScorers, similarity, query_.getMinimumNumberShouldMatch());
+                } else {
+                    // Use standard disjunction
+                    reqScorer = std::make_unique<DisjunctionScorer>(
+                        *this, std::move(shouldScorers), query_.getMinimumNumberShouldMatch());
+                }
             }
         }
 
