@@ -66,7 +66,6 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
                 std::vector<uint8_t> fstData(fstSize);
                 tipIn_->readBytes(fstData.data(), fstSize);
                 fst_ = util::FST::deserialize(fstData);
-                std::cerr << "[BlockTreeTermsReader] TIP2: FST " << fstSize << " bytes" << std::endl;
 
                 // Extract block metadata from FST for compatibility with iteration code
                 auto fstEntries = fst_->getAllEntries();
@@ -77,8 +76,6 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
                         blockFP
                     );
                 }
-                std::cerr << "[BlockTreeTermsReader] Extracted " << blockIndex_.size()
-                          << " block entries from FST" << std::endl;
 
             } else {
                 throw IOException("Invalid .tip magic: " + std::to_string(magic));
@@ -110,21 +107,11 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
 void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
     block.blockFP = blockFP;
 
-    // DEBUG: Show where we're seeking
-    std::cerr << "[BlockTreeTermsReader::loadBlock] Seeking to blockFP=" << blockFP
-              << " for field '" << fieldInfo_.name << "'" << std::endl;
-
     // Seek to block
     timIn_->seek(blockFP);
 
-    // DEBUG: Verify position after seek
-    int64_t actualPos = timIn_->getFilePointer();
-    std::cerr << "[BlockTreeTermsReader::loadBlock] After seek, actualPos=" << actualPos << std::endl;
-
     // Read block header
     int prefixLen = timIn_->readVInt();
-
-    std::cerr << "[BlockTreeTermsReader::loadBlock] Read prefixLen=" << prefixLen << std::endl;
 
     if (prefixLen > 0) {
         block.prefixData.resize(prefixLen);

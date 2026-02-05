@@ -108,20 +108,14 @@ std::unique_ptr<index::Terms> Lucene104FieldsProducer::terms(const std::string& 
     // Check if we already have a reader for this field
     auto it = fieldReaders_.find(field);
     if (it != fieldReaders_.end()) {
-        std::cerr << "[Lucene104FieldsProducer] Returning cached reader for field '" << field << "'" << std::endl;
         return std::make_unique<BlockTreeTerms>(it->second.reader, postingsReader_.get(), fieldInfo);
     }
-
-    std::cerr << "[Lucene104FieldsProducer] Creating NEW reader for field '" << field << "'" << std::endl;
 
     // Clone inputs so each field reader has independent file pointers
     // CRITICAL: Multiple BlockTreeTermsReader instances cannot share the same IndexInput
     // because they would interfere with each other's file pointer positions
     auto timInputClone = timInput_->clone();
     auto tipInputClone = tipInput_->clone();
-
-    std::cerr << "[Lucene104FieldsProducer] Cloned inputs: timInput=" << timInputClone.get()
-              << ", tipInput=" << tipInputClone.get() << std::endl;
 
     // Create new BlockTreeTermsReader for this field with cloned inputs
     auto reader = std::make_shared<blocktree::BlockTreeTermsReader>(
