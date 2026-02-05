@@ -86,6 +86,7 @@ set(DIAGON_CORE_SOURCES
     src/search/MatchAllDocsQuery.cpp
     src/search/IndexSearcher.cpp
     src/search/BM25ScorerSIMD.cpp
+    src/search/WANDScorer.cpp
 
     # Sparse (Sparse vector support)
     src/sparse/SparseVector.cpp

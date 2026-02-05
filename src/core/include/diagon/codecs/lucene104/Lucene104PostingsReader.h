@@ -66,6 +66,18 @@ public:
                                                   bool useBatch);
 
     /**
+     * Get impacts-aware postings for Block-Max WAND (Phase 2).
+     *
+     * Returns PostingsEnum with skip entry support for early termination.
+     *
+     * @param fieldInfo Field metadata
+     * @param termState Term state from writer (file pointers)
+     * @return Impacts-aware PostingsEnum
+     */
+    std::unique_ptr<index::PostingsEnum> impactsPostings(const index::FieldInfo& fieldInfo,
+                                                         const TermState& termState);
+
+    /**
      * Close all input files.
      */
     void close();
@@ -78,13 +90,122 @@ public:
      */
     void setInput(std::unique_ptr<store::IndexInput> input) { docIn_ = std::move(input); }
 
+    /**
+     * Set skip input stream for testing (Phase 2).
+     *
+     * @param input IndexInput to read skip data from
+     */
+    void setSkipInput(std::unique_ptr<store::IndexInput> input) { skipIn_ = std::move(input); }
+
+    /**
+     * Read skip entries for a term from .skp file.
+     *
+     * @param termState Term state with skip file pointer
+     * @return Vector of skip entries (empty if no skip data)
+     */
+    std::vector<SkipEntry> readSkipEntries(const TermState& termState);
+
 private:
-    // Input file for doc IDs and frequencies
-    std::unique_ptr<store::IndexInput> docIn_;
+    // Input files
+    std::unique_ptr<store::IndexInput> docIn_;   // Doc IDs and frequencies
+    std::unique_ptr<store::IndexInput> skipIn_;  // Skip entries with impacts
 
     // Segment info
     std::string segmentName_;
     std::string segmentSuffix_;
+};
+
+/**
+ * Impacts-aware PostingsEnum for Block-Max WAND.
+ *
+ * Extends PostingsEnum with impact information (max_freq, max_norm per block)
+ * and advanceShallow() for efficient skip list traversal.
+ *
+ * Phase 2b: Block-Max WAND support
+ */
+class Lucene104PostingsEnumWithImpacts : public index::PostingsEnum {
+public:
+    /**
+     * Constructor
+     * @param docIn Input for reading doc IDs
+     * @param termState Term state with file pointers
+     * @param writeFreqs Whether frequencies are encoded
+     * @param skipEntries Skip entries with impacts (from .skp file)
+     */
+    Lucene104PostingsEnumWithImpacts(store::IndexInput* docIn, const TermState& termState,
+                                     bool writeFreqs,
+                                     const std::vector<SkipEntry>& skipEntries);
+
+    // ==================== DocIdSetIterator ====================
+
+    int docID() const override { return currentDoc_; }
+
+    int nextDoc() override;
+
+    int advance(int target) override;
+
+    int64_t cost() const override { return docFreq_; }
+
+    // ==================== PostingsEnum ====================
+
+    int freq() const override { return currentFreq_; }
+
+    // ==================== Impacts Support ====================
+
+    /**
+     * Shallow advance to target without fully decoding.
+     * Updates skip list position for accurate max score queries.
+     *
+     * @param target Target doc ID
+     */
+    void advanceShallow(int target);
+
+    /**
+     * Get maximum score achievable up to upTo doc ID.
+     * Uses skip entry impacts (max_freq, max_norm) for upper bound.
+     *
+     * @param upTo Upper bound doc ID (inclusive)
+     * @param k1 BM25 k1 parameter
+     * @param b BM25 b parameter
+     * @param avgFieldLength Average field length for BM25
+     * @return Maximum possible score in range [currentDoc, upTo]
+     */
+    float getMaxScore(int upTo, float k1, float b, float avgFieldLength) const;
+
+private:
+    store::IndexInput* docIn_;  // Not owned
+    int docFreq_;
+    int64_t totalTermFreq_;
+    bool writeFreqs_;
+
+    // Current state
+    int currentDoc_;
+    int currentFreq_;
+    int docsRead_;
+
+    // Skip entries with impacts
+    std::vector<SkipEntry> skipEntries_;
+    int currentSkipIndex_;  // Current position in skip list
+    int shallowTarget_;     // Last target passed to advanceShallow()
+
+    // StreamVByte buffering
+    static constexpr int BUFFER_SIZE = 32;
+    static constexpr int STREAMVBYTE_GROUP_SIZE = 4;
+    uint32_t docDeltaBuffer_[BUFFER_SIZE];
+    uint32_t freqBuffer_[BUFFER_SIZE];
+    int bufferPos_;
+    int bufferLimit_;
+
+    /**
+     * Refill buffer by reading multiple StreamVByte groups (up to 32 docs).
+     */
+    void refillBuffer();
+
+    /**
+     * Use skip list to jump to target, avoiding full decode.
+     * Returns file pointer to start reading from.
+     */
+    int64_t skipToTarget(int target);
 };
 
 /**
