@@ -216,7 +216,7 @@ private:
             long* norm_ptr = buffers_.norms.data();
             const int* doc_ptr = batch_.docs;
 
-            constexpr int PREFETCH_DISTANCE = 8;  // Prefetch 8 docs ahead
+            constexpr int PREFETCH_DISTANCE = 12;  // Optimal: covers L3/RAM latency (~330 cycles)
 
             for (int i = 0; i < batch_.count; i++) {
                 // Prefetch norm data for future documents
