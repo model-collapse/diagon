@@ -23,8 +23,6 @@ BlockTreeTermsWriter::BlockTreeTermsWriter(store::IndexOutput* timOut, store::In
     , termsStartFP_(timOut->getFilePointer())  // Capture starting FP for this field
     , finished_(false) {
     // DEBUG: Show what file pointer we captured
-    std::cerr << "[BlockTreeTermsWriter] Created for field '" << fieldInfo_.name
-              << "', termsStartFP=" << termsStartFP_ << std::endl;
 
     if (!timOut_ || !tipOut_) {
         throw std::invalid_argument("Output streams cannot be null");
@@ -73,12 +71,6 @@ void BlockTreeTermsWriter::finish() {
         writeBlock();
     }
 
-    // DEBUG: Show where we ended up
-    int64_t endFP = timOut_->getFilePointer();
-    std::cerr << "[BlockTreeTermsWriter] Finishing field '" << fieldInfo_.name
-              << "', endFP=" << endFP << ", bytesWritten=" << (endFP - termsStartFP_)
-              << ", numTerms=" << numTerms_ << std::endl;
-
     // Write FST index to .tip file
     writeFST();
 
@@ -97,9 +89,6 @@ void BlockTreeTermsWriter::writeBlock() {
     if (!pendingTerms_.empty()) {
         const auto& firstTerm = pendingTerms_[0].term;
         std::string firstTermStr(reinterpret_cast<const char*>(firstTerm.data()), firstTerm.length());
-        std::cerr << "[BlockTreeTermsWriter::writeBlock] Writing block for field '" << fieldInfo_.name
-                  << "' at FP=" << blockFP << ", first term='" << firstTermStr
-                  << "', num terms=" << pendingTerms_.size() << std::endl;
     }
 
     // Compute common prefix for all terms in block
@@ -165,8 +154,6 @@ void BlockTreeTermsWriter::writeFST() {
     tipOut_->writeVInt(static_cast<int>(fstData.size()));
     tipOut_->writeBytes(fstData.data(), fstData.size());
 
-    std::cerr << "[BlockTreeTermsWriter] Wrote FST for field '" << fieldInfo_.name
-              << "': " << fstData.size() << " bytes, " << numTerms_ << " terms" << std::endl;
 }
 
 int BlockTreeTermsWriter::sharedPrefixLength(const util::BytesRef& a,

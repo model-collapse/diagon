@@ -26,9 +26,6 @@ BlockMaxQuantizedIndex::BlockMaxQuantizedIndex(const Config& config)
     : config_(config) {
     if (config_.use_custom_quantization) {
         // Load custom quantization from files
-        std::cerr << "Using custom quantization:" << std::endl;
-        std::cerr << "  LUT file: " << config_.lut_file << std::endl;
-        std::cerr << "  Map file: " << config_.map_file << std::endl;
         loadCustomQuantization();
     } else {
         // Initialize default uniform quantization values
@@ -63,7 +60,6 @@ void BlockMaxQuantizedIndex::loadCustomQuantization() {
     }
 
     size_t actual_bins = quant_lut_.size();
-    std::cerr << "Loaded custom quantization LUT with " << actual_bins << " bins" << std::endl;
 
     // Update num_quantization_bins to match LUT (const_cast needed)
     const_cast<size_t&>(config_.num_quantization_bins) = actual_bins;
@@ -98,7 +94,6 @@ void BlockMaxQuantizedIndex::loadCustomQuantization() {
         }
     }
 
-    std::cerr << "Loaded custom quantization mapping (256 -> " << actual_bins << " bins)" << std::endl;
 
     // Initialize quant_values_ for compatibility (use LUT values)
     quant_values_ = quant_lut_;
@@ -131,20 +126,10 @@ float BlockMaxQuantizedIndex::dequantizeScore(uint8_t bin) const {
 }
 
 void BlockMaxQuantizedIndex::build(const std::vector<SparseDoc>& documents) {
-    auto build_start = std::chrono::high_resolution_clock::now();
-
     num_documents_ = documents.size();
     num_windows_ = (num_documents_ + config_.window_size - 1) / config_.window_size;
     num_window_groups_ = (num_windows_ + config_.window_group_size - 1) / config_.window_group_size;
 
-    std::cerr << "Building quantized index"
-              << (config_.enable_on_demand_allocation ? " with on-demand allocation" : "")
-              << std::endl;
-    std::cerr << "Total docs: " << num_documents_
-              << ", Window size: " << config_.window_size
-              << ", Num windows: " << num_windows_
-              << ", Window group size: " << config_.window_group_size
-              << ", Num window groups: " << num_window_groups_ << std::endl;
 
     // Find max term ID
     num_terms_ = 0;
@@ -160,9 +145,6 @@ void BlockMaxQuantizedIndex::build(const std::vector<SparseDoc>& documents) {
 
     if (config_.enable_on_demand_allocation) {
         // ========== PASS 1: Determine max group_id for each term+block ==========
-        std::cerr << "Pass 1: Determining group usage for on-demand allocation..." << std::endl;
-        auto pass1_start = std::chrono::high_resolution_clock::now();
-
         // max_group_id[term][block] = highest group_id that has documents
         std::vector<std::vector<int>> max_group_id(num_terms_);
         for (size_t term = 0; term < num_terms_; ++term) {
@@ -189,12 +171,7 @@ void BlockMaxQuantizedIndex::build(const std::vector<SparseDoc>& documents) {
             }
         }
 
-        auto pass1_end = std::chrono::high_resolution_clock::now();
-        double pass1_time_ms = std::chrono::duration<double, std::milli>(pass1_end - pass1_start).count();
-        std::cerr << "Pass 1 complete in " << pass1_time_ms << " ms" << std::endl;
-
         // ========== PASS 2: Allocate only needed groups ==========
-        size_t total_possible_groups = num_terms_ * config_.num_quantization_bins * num_window_groups_;
         size_t allocated_groups = 0;
         size_t empty_term_blocks = 0;
 
@@ -224,12 +201,8 @@ void BlockMaxQuantizedIndex::build(const std::vector<SparseDoc>& documents) {
             }
         }
 
-        size_t skipped_groups = total_possible_groups - allocated_groups;
-        double saved_percentage = 100.0 * skipped_groups / total_possible_groups;
-        std::cerr << "Allocated " << allocated_groups << " groups, "
-                  << "skipped " << skipped_groups << " empty groups ("
-                  << std::fixed << std::setprecision(1) << saved_percentage << "% saved)" << std::endl;
-        std::cerr << "Empty term+blocks: " << empty_term_blocks << std::endl;
+        // On-demand allocation complete
+        (void)allocated_groups;  // Prevent unused variable warning
 
     } else {
         // Traditional allocation: allocate all groups for all term+block combinations
@@ -288,9 +261,6 @@ void BlockMaxQuantizedIndex::build(const std::vector<SparseDoc>& documents) {
     // Store forward index for reranking
     forward_index_ = documents;
 
-    auto build_end = std::chrono::high_resolution_clock::now();
-    double build_time_ms = std::chrono::duration<double, std::milli>(build_end - build_start).count();
-    std::cerr << "Index build complete in " << build_time_ms << " ms" << std::endl;
 }
 
 std::vector<doc_id_t> BlockMaxQuantizedIndex::query(const SparseDoc& query,

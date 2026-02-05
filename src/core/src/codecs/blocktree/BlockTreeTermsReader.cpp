@@ -50,7 +50,6 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
             if (magic == 0x54495031) {  // "TIP1" - old format with block list
                 int numBlocks = tipIn_->readVInt();
                 blockIndex_.reserve(numBlocks);
-                std::cerr << "[BlockTreeTermsReader] TIP1: " << numBlocks << " blocks" << std::endl;
 
                 for (int i = 0; i < numBlocks; i++) {
                     int termLen = tipIn_->readVInt();
@@ -83,8 +82,6 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
             break;
         } else {
             // Skip field data
-            std::cerr << "[BlockTreeTermsReader] Skipping field '" << fieldName << "'" << std::endl;
-
             if (magic == 0x54495031) {
                 int numBlocks = tipIn_->readVInt();
                 for (int i = 0; i < numBlocks; i++) {
