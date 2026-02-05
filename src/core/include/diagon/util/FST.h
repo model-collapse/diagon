@@ -217,6 +217,14 @@ public:
      */
     static std::unique_ptr<FST> deserialize(const std::vector<uint8_t>& data);
 
+    /**
+     * Get all entries in the FST (for extracting block metadata).
+     * Returns list of (term, output) pairs in sorted order.
+     *
+     * @return Vector of (term bytes, output value) pairs
+     */
+    std::vector<std::pair<std::vector<uint8_t>, Output>> getAllEntries() const;
+
     std::unique_ptr<Node> root_;
 
     friend class Builder;

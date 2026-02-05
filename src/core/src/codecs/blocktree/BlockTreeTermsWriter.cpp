@@ -153,34 +153,20 @@ void BlockTreeTermsWriter::writeFST() {
     auto fst = fstBuilder_.finish();
 
     // Write block index to .tip file
-    // Format: [magic][fieldName][startFP][numTerms][numBlocks][block entries...]
-    // Each block entry: [firstTerm][blockFP]
+    // Format: [magic][fieldName][startFP][numTerms][fstSize][fstData]
 
-    tipOut_->writeInt(0x54495031);  // "TIP1" magic
+    tipOut_->writeInt(0x54495032);  // "TIP2" magic (version 2 with FST)
     tipOut_->writeString(fieldInfo_.name);  // Field name
     tipOut_->writeVLong(termsStartFP_);  // Starting file pointer for this field's terms
     tipOut_->writeVLong(numTerms_);
 
-    // Write block index (simplified replacement for FST)
-    const auto& blockEntries = fstBuilder_.getEntries();
-    tipOut_->writeVInt(static_cast<int>(blockEntries.size()));  // Number of blocks
+    // Serialize FST
+    auto fstData = fst->serialize();
+    tipOut_->writeVInt(static_cast<int>(fstData.size()));
+    tipOut_->writeBytes(fstData.data(), fstData.size());
 
-    std::cerr << "[BlockTreeTermsWriter] Writing " << blockEntries.size()
-              << " blocks for field '" << fieldInfo_.name << "'" << std::endl;
-
-    for (const auto& entry : blockEntries) {
-        // Write first term of block
-        tipOut_->writeVInt(static_cast<int>(entry.term.length()));
-        tipOut_->writeBytes(entry.term.data(), entry.term.length());
-
-        // Write block file pointer
-        tipOut_->writeVLong(entry.output);
-
-        if (blockEntries.size() <= 10) {  // Debug for small indexes
-            std::string termStr(reinterpret_cast<const char*>(entry.term.data()), entry.term.length());
-            std::cerr << "  Block: firstTerm='" << termStr << "', FP=" << entry.output << std::endl;
-        }
-    }
+    std::cerr << "[BlockTreeTermsWriter] Wrote FST for field '" << fieldInfo_.name
+              << "': " << fstData.size() << " bytes, " << numTerms_ << " terms" << std::endl;
 }
 
 int BlockTreeTermsWriter::sharedPrefixLength(const util::BytesRef& a,

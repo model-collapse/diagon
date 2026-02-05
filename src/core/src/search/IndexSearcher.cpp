@@ -77,6 +77,9 @@ void IndexSearcher::search(const Query& query, Collector* collector) {
         while ((doc = scorer->nextDoc()) != DocIdSetIterator::NO_MORE_DOCS) {
             leafCollector->collect(doc);
         }
+
+        // Finish segment to flush any batched results (SIMD)
+        leafCollector->finishSegment();
     }
 }
 

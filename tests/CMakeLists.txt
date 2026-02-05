@@ -60,6 +60,7 @@ add_diagon_test(BytesRefTest unit/util/BytesRefTest.cpp)
 add_diagon_test(BitSetTest unit/util/BitSetTest.cpp)
 add_diagon_test(NumericUtilsTest unit/util/NumericUtilsTest.cpp)
 add_diagon_test(FSTTest unit/util/FSTTest.cpp)
+add_diagon_test(FSTSerializationTest unit/util/FSTSerializationTest.cpp)
 add_diagon_test(BlockPoolTest unit/util/BlockPoolTest.cpp)
 add_diagon_test(BloomFilterTest unit/util/BloomFilterTest.cpp)
 
@@ -115,6 +116,7 @@ add_diagon_test(StreamVBytePostingsDebugTest unit/codecs/StreamVBytePostingsDebu
 add_diagon_test(StreamVBytePostingsRoundTripTest unit/codecs/StreamVBytePostingsRoundTripTest.cpp)
 add_diagon_test(PostingsWriterReaderRoundTripTest unit/codecs/PostingsWriterReaderRoundTripTest.cpp)
 add_diagon_test(BlockTreeTest unit/codecs/BlockTreeTest.cpp)
+add_diagon_test(BlockTreeFSTTest unit/codecs/BlockTreeFSTTest.cpp)
 add_diagon_test(NormsTest unit/codecs/NormsTest.cpp)
 
 # Column tests
@@ -136,6 +138,7 @@ add_diagon_test(GranularityTest unit/granularity/GranularityTest.cpp)
 
 # Search tests
 add_diagon_test(SearchTest unit/search/SearchTest.cpp)
+add_diagon_test(QueryCorrectnessTest unit/search/QueryCorrectnessTest.cpp)
 add_diagon_test(TopScoreDocCollectorTest unit/search/TopScoreDocCollectorTest.cpp)
 add_diagon_test(BM25NormsIntegrationTest unit/search/BM25NormsIntegrationTest.cpp)
 add_diagon_test(NumericRangeQueryTest unit/search/NumericRangeQueryTest.cpp)

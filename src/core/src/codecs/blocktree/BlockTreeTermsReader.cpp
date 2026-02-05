@@ -36,14 +36,10 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
     bool foundField = false;
     while (tipIn_->getFilePointer() < tipIn_->length()) {
         int magic = tipIn_->readInt();
-        if (magic != 0x54495031) {  // "TIP1"
-            throw IOException("Invalid .tip file magic");
-        }
 
         std::string fieldName = tipIn_->readString();
-        int64_t startFP = tipIn_->readVLong();  // Read starting file pointer
+        int64_t startFP = tipIn_->readVLong();
         int64_t numTerms = tipIn_->readVLong();
-        int numBlocks = tipIn_->readVInt();  // Number of blocks
 
         if (fieldName == fieldInfo_.name) {
             // Found our field
@@ -51,42 +47,57 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
             numTerms_ = numTerms;
             foundField = true;
 
-            // Read block index
-            blockIndex_.reserve(numBlocks);
-            std::cerr << "[BlockTreeTermsReader] Reading " << numBlocks
-                      << " blocks for field '" << fieldInfo_.name << "'" << std::endl;
+            if (magic == 0x54495031) {  // "TIP1" - old format with block list
+                int numBlocks = tipIn_->readVInt();
+                blockIndex_.reserve(numBlocks);
+                std::cerr << "[BlockTreeTermsReader] TIP1: " << numBlocks << " blocks" << std::endl;
 
-            for (int i = 0; i < numBlocks; i++) {
-                // Read first term
-                int termLen = tipIn_->readVInt();
-                std::vector<uint8_t> termData(termLen);
-                tipIn_->readBytes(termData.data(), termLen);
-
-                // Read block file pointer
-                int64_t blockFP = tipIn_->readVLong();
-
-                blockIndex_.emplace_back(util::BytesRef(termData.data(), termLen), blockFP);
-
-                if (numBlocks <= 10 && i < 10) {  // Debug for small indexes
-                    std::string termStr(reinterpret_cast<const char*>(termData.data()), termLen);
-                    std::cerr << "  Block " << i << ": firstTerm='" << termStr
-                              << "', FP=" << blockFP << std::endl;
+                for (int i = 0; i < numBlocks; i++) {
+                    int termLen = tipIn_->readVInt();
+                    std::vector<uint8_t> termData(termLen);
+                    tipIn_->readBytes(termData.data(), termLen);
+                    int64_t blockFP = tipIn_->readVLong();
+                    blockIndex_.emplace_back(util::BytesRef(termData.data(), termLen), blockFP);
                 }
-            }
+                fst_ = std::make_unique<util::FST>();
 
-            // For backward compatibility, create empty FST
-            fst_ = std::make_unique<util::FST>();
+            } else if (magic == 0x54495032) {  // "TIP2" - new format with FST
+                int fstSize = tipIn_->readVInt();
+                std::vector<uint8_t> fstData(fstSize);
+                tipIn_->readBytes(fstData.data(), fstSize);
+                fst_ = util::FST::deserialize(fstData);
+                std::cerr << "[BlockTreeTermsReader] TIP2: FST " << fstSize << " bytes" << std::endl;
+
+                // Extract block metadata from FST for compatibility with iteration code
+                auto fstEntries = fst_->getAllEntries();
+                blockIndex_.reserve(fstEntries.size());
+                for (const auto& [termBytes, blockFP] : fstEntries) {
+                    blockIndex_.emplace_back(
+                        util::BytesRef(termBytes.data(), termBytes.size()),
+                        blockFP
+                    );
+                }
+                std::cerr << "[BlockTreeTermsReader] Extracted " << blockIndex_.size()
+                          << " block entries from FST" << std::endl;
+
+            } else {
+                throw IOException("Invalid .tip magic: " + std::to_string(magic));
+            }
             break;
         } else {
-            // Skip this field's block index
-            std::cerr << "[BlockTreeTermsReader] Skipping field '" << fieldName
-                      << "' (looking for '" << fieldInfo_.name << "')" << std::endl;
+            // Skip field data
+            std::cerr << "[BlockTreeTermsReader] Skipping field '" << fieldName << "'" << std::endl;
 
-            // Skip all block entries
-            for (int i = 0; i < numBlocks; i++) {
-                int termLen = tipIn_->readVInt();
-                tipIn_->seek(tipIn_->getFilePointer() + termLen);  // Skip term bytes
-                tipIn_->readVLong();  // Skip block FP
+            if (magic == 0x54495031) {
+                int numBlocks = tipIn_->readVInt();
+                for (int i = 0; i < numBlocks; i++) {
+                    int termLen = tipIn_->readVInt();
+                    tipIn_->seek(tipIn_->getFilePointer() + termLen);
+                    tipIn_->readVLong();
+                }
+            } else if (magic == 0x54495032) {
+                int fstSize = tipIn_->readVInt();
+                tipIn_->seek(tipIn_->getFilePointer() + fstSize);
             }
         }
     }

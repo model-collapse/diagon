@@ -101,6 +101,14 @@ public:
      * @param doc Document ID (relative to current segment)
      */
     virtual void collect(int doc) = 0;
+
+    /**
+     * Called after finishing collecting from a segment.
+     * Allows collectors to flush any batched/buffered data.
+     *
+     * Default implementation does nothing.
+     */
+    virtual void finishSegment() {}
 };
 
 }  // namespace search
