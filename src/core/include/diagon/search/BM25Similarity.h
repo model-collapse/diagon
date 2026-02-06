@@ -48,13 +48,16 @@ struct TermStatistics {
 /**
  * BM25 similarity scoring
  *
- * BM25 formula:
- * score = IDF * (freq * (k1 + 1)) / (freq + k1 * (1 - b + b * fieldLength / avgFieldLength))
+ * BM25 formula (Lucene 8.x+ simplified):
+ * score = IDF * freq / (freq + k1 * (1 - b + b * fieldLength / avgFieldLength))
  *
  * where:
  * - IDF = ln(1 + (N - df + 0.5) / (df + 0.5))
  * - k1 = term frequency saturation parameter (default 1.2)
  * - b = length normalization parameter (default 0.75)
+ *
+ * Note: The classic BM25 formula includes (k1 + 1) in the numerator,
+ * but Lucene 8+ removed this constant multiplier since it doesn't affect ranking.
  *
  * Based on: org.apache.lucene.search.similarities.BM25Similarity
  */
@@ -99,9 +102,9 @@ public:
         // For Phase 4, we'll use a simplified approach
         float avgFieldLength = fieldLength;  // Simplified
 
-        // BM25 formula
+        // BM25 formula (Lucene 8+ simplified)
         float k = k1_ * (1.0f - b_ + b_ * fieldLength / avgFieldLength);
-        return freq * (k1_ + 1.0f) / (freq + k);
+        return freq / (freq + k);
     }
 
     /**
@@ -109,11 +112,11 @@ public:
      */
     class SimScorer {
     public:
-        SimScorer(float idf, float k1, float b)
+        SimScorer(float idf, float k1, float b, float avgFieldLength)
             : idf_(idf)
             , k1_(k1)
             , b_(b)
-            , inv_avgFieldLength_(1.0f / 50.0f)  // Precompute reciprocal (opt #2)
+            , inv_avgFieldLength_(1.0f / avgFieldLength)  // Precompute reciprocal (opt #2)
         {}
 
         /**
@@ -150,7 +153,8 @@ public:
             // Before: b_ * fieldLength / avgFieldLength
             // After:  b_ * fieldLength * inv_avgFieldLength_
             float k = k1_ * (1.0f - b_ + b_ * fieldLength * inv_avgFieldLength_);
-            return idf_ * freq * (k1_ + 1.0f) / (freq + k);
+            // BM25 formula (Lucene 8+ simplified without (k1+1) term)
+            return idf_ * freq / (freq + k);
         }
 
         /**
@@ -168,6 +172,11 @@ public:
          */
         float getB() const { return b_; }
 
+        /**
+         * Get avgFieldLength (for WAND scorer initialization)
+         */
+        float getAvgFieldLength() const { return 1.0f / inv_avgFieldLength_; }
+
     private:
         float idf_;
         float k1_;
@@ -183,7 +192,23 @@ public:
     SimScorer scorer(float boost, const CollectionStatistics& collectionStats,
                      const TermStatistics& termStats) const {
         float idfValue = idf(termStats.docFreq, collectionStats.docCount);
-        return SimScorer(idfValue * boost, k1_, b_);
+
+        // Compute actual average field length from index statistics
+        // avgFieldLength = total term occurrences / documents with field
+        float avgFieldLength = 50.0f;  // Default fallback
+        if (collectionStats.docCount > 0 && collectionStats.sumTotalTermFreq > 0) {
+            avgFieldLength = static_cast<float>(collectionStats.sumTotalTermFreq) /
+                           static_cast<float>(collectionStats.docCount);
+        }
+
+        static bool logged = false;
+        if (!logged) {
+            fprintf(stderr, "[DEBUG BM25Similarity::scorer] Computed avgFieldLength=%.2f (sumTotalTermFreq=%ld, docCount=%ld)\n",
+                    avgFieldLength, collectionStats.sumTotalTermFreq, collectionStats.docCount);
+            logged = true;
+        }
+
+        return SimScorer(idfValue * boost, k1_, b_, avgFieldLength);
     }
 
 private:

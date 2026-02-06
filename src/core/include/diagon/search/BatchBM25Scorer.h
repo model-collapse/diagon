@@ -90,7 +90,7 @@ public:
      * @param scores Output scores [8]
      */
 #if defined(DIAGON_HAVE_AVX2)
-    static void scoreBatchAVX2(const int* freqs, const long* norms,
+    __attribute__((always_inline)) static void scoreBatchAVX2(const int* freqs, const long* norms,
                                float idf, float k1, float b, float avgLength,
                                float* scores) {
         // Load 8 frequencies
@@ -117,15 +117,11 @@ public:
         __m256 k_factor = _mm256_add_ps(one_minus_b, b_term);
         __m256 k = _mm256_mul_ps(k1_vec, k_factor);
 
-        // Compute numerator: freq * (k1 + 1)
-        __m256 k1_plus_1 = _mm256_add_ps(k1_vec, one_vec);
-        __m256 numerator = _mm256_mul_ps(freq_vec, k1_plus_1);
-
         // Compute denominator: freq + k
         __m256 denominator = _mm256_add_ps(freq_vec, k);
 
-        // Compute raw score: idf * numerator / denominator
-        __m256 score_vec = _mm256_mul_ps(idf_vec, _mm256_div_ps(numerator, denominator));
+        // Compute BM25 score (Lucene 8+ simplified): idf * freq / (freq + k)
+        __m256 score_vec = _mm256_mul_ps(idf_vec, _mm256_div_ps(freq_vec, denominator));
 
         // Zero out scores where freq == 0
         score_vec = _mm256_andnot_ps(freq_zero_mask, score_vec);
@@ -135,13 +131,113 @@ public:
     }
 #endif
 
+    // ==================== AVX512 Implementation ====================
+
+#if defined(DIAGON_HAVE_AVX512)
     /**
-     * Scalar fallback for non-AVX2 systems
+     * Decode Lucene norms to field lengths (AVX512 - 16 documents)
+     *
+     * Encoding: norm = 127 / sqrt(length)
+     * Decoding: length = (127 / norm)²
+     *
+     * @param norms Input norms [16] (int64)
+     * @return Decoded lengths [16] (float32)
      */
-    static void scoreBatchScalar(const int* freqs, const long* norms,
+    static __m512 decodeNormsBatchAVX512(const long* norms) {
+        // Load 16 norms as int64 → convert to float
+        // Convert to int32 first (norms are small values)
+        __m256i norms_lo_i32 = _mm256_set_epi32(
+            static_cast<int>(norms[7]), static_cast<int>(norms[6]),
+            static_cast<int>(norms[5]), static_cast<int>(norms[4]),
+            static_cast<int>(norms[3]), static_cast<int>(norms[2]),
+            static_cast<int>(norms[1]), static_cast<int>(norms[0]));
+
+        __m256i norms_hi_i32 = _mm256_set_epi32(
+            static_cast<int>(norms[15]), static_cast<int>(norms[14]),
+            static_cast<int>(norms[13]), static_cast<int>(norms[12]),
+            static_cast<int>(norms[11]), static_cast<int>(norms[10]),
+            static_cast<int>(norms[9]), static_cast<int>(norms[8]));
+
+        // Convert to float
+        __m256 norms_lo_f32 = _mm256_cvtepi32_ps(norms_lo_i32);
+        __m256 norms_hi_f32 = _mm256_cvtepi32_ps(norms_hi_i32);
+
+        // Combine into 512-bit vector
+        __m512 norm_vec = _mm512_castps256_ps512(norms_lo_f32);
+        norm_vec = _mm512_insertf32x8(norm_vec, norms_hi_f32, 1);
+
+        // Handle zero/default norms (mask-based)
+        __mmask16 zero_mask = _mm512_cmp_ps_mask(norm_vec, _mm512_setzero_ps(), _CMP_EQ_OQ);
+        __m512 safe_norm = _mm512_mask_blend_ps(zero_mask, norm_vec, _mm512_set1_ps(127.0f));
+
+        // length = (127 / norm)²
+        __m512 ratio = _mm512_div_ps(_mm512_set1_ps(127.0f), safe_norm);
+        __m512 length = _mm512_mul_ps(ratio, ratio);
+
+        return length;
+    }
+
+    /**
+     * Compute BM25 scores for 16 documents (AVX512)
+     *
+     * @param freqs Term frequencies [16]
+     * @param norms Document norms [16]
+     * @param idf IDF value (constant per term)
+     * @param k1 Term frequency saturation (default 1.2)
+     * @param b Length normalization (default 0.75)
+     * @param avgLength Average document length (default 50.0)
+     * @param scores Output scores [16]
+     */
+    __attribute__((always_inline)) static void scoreBatchAVX512(const int* freqs, const long* norms,
                                  float idf, float k1, float b, float avgLength,
                                  float* scores) {
-        for (int i = 0; i < 8; i++) {
+        // Load 16 frequencies
+        __m512 freq_vec = _mm512_cvtepi32_ps(_mm512_loadu_si512((__m512i*)freqs));
+
+        // Decode 16 norms to lengths
+        __m512 length_vec = decodeNormsBatchAVX512(norms);
+
+        // Broadcast constants
+        __m512 idf_vec = _mm512_set1_ps(idf);
+        __m512 k1_vec = _mm512_set1_ps(k1);
+        __m512 b_vec = _mm512_set1_ps(b);
+        __m512 avgLen_vec = _mm512_set1_ps(avgLength);
+        __m512 one_vec = _mm512_set1_ps(1.0f);
+        __m512 zero_vec = _mm512_setzero_ps();
+
+        // Handle zero frequencies with mask (AVX512 feature)
+        __mmask16 freq_nonzero_mask = _mm512_cmp_ps_mask(freq_vec, zero_vec, _CMP_NEQ_OQ);
+
+        // Compute k = k1 * (1 - b + b * length / avgLength)
+        __m512 length_ratio = _mm512_div_ps(length_vec, avgLen_vec);
+        __m512 b_term = _mm512_mul_ps(b_vec, length_ratio);
+        __m512 one_minus_b = _mm512_sub_ps(one_vec, b_vec);
+        __m512 k_factor = _mm512_add_ps(one_minus_b, b_term);
+        __m512 k = _mm512_mul_ps(k1_vec, k_factor);
+
+        // Compute denominator: freq + k
+        __m512 denominator = _mm512_add_ps(freq_vec, k);
+
+        // Compute BM25 score (Lucene 8+ simplified): idf * freq / (freq + k)
+        __m512 score_vec = _mm512_mul_ps(idf_vec, _mm512_div_ps(freq_vec, denominator));
+
+        // Zero out scores where freq == 0 (using mask)
+        score_vec = _mm512_maskz_mov_ps(freq_nonzero_mask, score_vec);
+
+        // Store results
+        _mm512_storeu_ps(scores, score_vec);
+    }
+#endif  // DIAGON_HAVE_AVX512
+
+    /**
+     * Scalar fallback for non-SIMD systems or partial batches
+     *
+     * @param count Number of documents to score (variable)
+     */
+    __attribute__((always_inline)) static void scoreBatchScalar(const int* freqs, const long* norms,
+                                 float idf, float k1, float b, float avgLength,
+                                 float* scores, int count) {
+        for (int i = 0; i < count; i++) {
             if (freqs[i] == 0) {
                 scores[i] = 0.0f;
                 continue;
@@ -157,30 +253,43 @@ public:
                 length = ratio * ratio;
             }
 
-            // BM25 formula
+            // BM25 formula (Lucene 8+ simplified)
             float k = k1 * (1.0f - b + b * length / avgLength);
-            float numerator = freqs[i] * (k1 + 1.0f);
             float denominator = freqs[i] + k;
-            scores[i] = idf * numerator / denominator;
+            scores[i] = idf * freqs[i] / denominator;
         }
     }
 
     /**
-     * Dispatch to best available implementation
+     * Dispatch to best available implementation based on batch size
+     *
+     * Automatically selects:
+     * - AVX512 for count=16 (if available)
+     * - AVX2 for count=8 (if available)
+     * - Scalar for other counts or as fallback
+     *
+     * Phase 3.5: Inline hint for hot path optimization
      */
-    static void scoreBatch(const int* freqs, const long* norms,
+    __attribute__((always_inline)) static void scoreBatch(const int* freqs, const long* norms,
                           float idf, float k1, float b, float avgLength,
                           float* scores, int count) {
-        if (count == 8) {
-#if defined(DIAGON_HAVE_AVX2)
+#if defined(DIAGON_HAVE_AVX512)
+        if (count == 16) {
+            scoreBatchAVX512(freqs, norms, idf, k1, b, avgLength, scores);
+        } else if (count == 8) {
             scoreBatchAVX2(freqs, norms, idf, k1, b, avgLength, scores);
-#else
-            scoreBatchScalar(freqs, norms, idf, k1, b, avgLength, scores);
-#endif
         } else {
-            // Partial batch, use scalar
-            scoreBatchScalar(freqs, norms, idf, k1, b, avgLength, scores);
+            scoreBatchScalar(freqs, norms, idf, k1, b, avgLength, scores, count);
         }
+#elif defined(DIAGON_HAVE_AVX2)
+        if (count == 8) {
+            scoreBatchAVX2(freqs, norms, idf, k1, b, avgLength, scores);
+        } else {
+            scoreBatchScalar(freqs, norms, idf, k1, b, avgLength, scores, count);
+        }
+#else
+        scoreBatchScalar(freqs, norms, idf, k1, b, avgLength, scores, count);
+#endif
     }
 };
 

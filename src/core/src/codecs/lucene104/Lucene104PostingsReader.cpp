@@ -55,7 +55,8 @@ Lucene104PostingsReader::postings(const index::FieldInfo& fieldInfo, const TermS
     bool writeFreqs = (fieldInfo.indexOptions >= index::IndexOptions::DOCS_AND_FREQS);
 
     // Use optimized version with SIMD StreamVByte decoding
-    return std::make_unique<Lucene104PostingsEnumOptimized>(docIn_.get(), termState, writeFreqs);
+    // Clone IndexInput for thread-safe independent reading
+    return std::make_unique<Lucene104PostingsEnumOptimized>(docIn_->clone(), termState, writeFreqs);
 }
 
 std::unique_ptr<index::PostingsEnum>
@@ -70,10 +71,10 @@ Lucene104PostingsReader::postings(const index::FieldInfo& fieldInfo, const TermS
 
     if (useBatch) {
         // P1.1: Return native batch implementation
-        return std::make_unique<Lucene104PostingsEnumBatch>(docIn_.get(), termState, writeFreqs);
+        return std::make_unique<Lucene104PostingsEnumBatch>(docIn_->clone(), termState, writeFreqs);
     } else {
         // Return regular optimized version
-        return std::make_unique<Lucene104PostingsEnumOptimized>(docIn_.get(), termState, writeFreqs);
+        return std::make_unique<Lucene104PostingsEnumOptimized>(docIn_->clone(), termState, writeFreqs);
     }
 }
 
@@ -91,7 +92,8 @@ Lucene104PostingsReader::impactsPostings(const index::FieldInfo& fieldInfo,
     std::vector<SkipEntry> skipEntries = readSkipEntries(termState);
 
     // Return impacts-aware enum
-    return std::make_unique<Lucene104PostingsEnumWithImpacts>(docIn_.get(), termState, writeFreqs,
+    // Clone IndexInput for thread-safe independent reading
+    return std::make_unique<Lucene104PostingsEnumWithImpacts>(docIn_->clone(), termState, writeFreqs,
                                                                skipEntries);
 }
 
@@ -108,7 +110,17 @@ std::vector<SkipEntry> Lucene104PostingsReader::readSkipEntries(const TermState&
     std::vector<SkipEntry> entries;
 
     // Check if skip data exists
+    static int debugCount = 0;
+    if (debugCount++ < 10) {
+        fprintf(stderr, "[DEBUG readSkipEntries] skipStartFP=%lld, skipIn_=%p, docFreq=%d\n",
+                static_cast<long long>(termState.skipStartFP), (void*)skipIn_.get(), termState.docFreq);
+    }
+
     if (termState.skipStartFP == -1 || !skipIn_) {
+        if (debugCount <= 10) {
+            fprintf(stderr, "[DEBUG readSkipEntries] Returning empty (skipStartFP=%lld, skipIn_=%p)\n",
+                    static_cast<long long>(termState.skipStartFP), (void*)skipIn_.get());
+        }
         return entries;  // No skip data (small postings list)
     }
 
@@ -118,6 +130,11 @@ std::vector<SkipEntry> Lucene104PostingsReader::readSkipEntries(const TermState&
     // Read number of skip entries
     int32_t numEntries = skipIn_->readVInt();
     entries.reserve(numEntries);
+
+    if (debugCount <= 10) {
+        fprintf(stderr, "[DEBUG readSkipEntries] Reading %d skip entries from FP %lld\n",
+                numEntries, static_cast<long long>(termState.skipStartFP));
+    }
 
     // Read skip entries with delta decoding
     int32_t lastDoc = 0;
@@ -140,8 +157,17 @@ std::vector<SkipEntry> Lucene104PostingsReader::readSkipEntries(const TermState&
 
         entries.push_back(entry);
 
+        if (debugCount <= 10 && i < 3) {
+            fprintf(stderr, "[DEBUG readSkipEntries] Entry %d: doc=%d, docFP=%lld, maxFreq=%d, maxNorm=%d\n",
+                    i, entry.doc, static_cast<long long>(entry.docFP), entry.maxFreq, entry.maxNorm);
+        }
+
         lastDoc = entry.doc;
         lastDocFP = entry.docFP;
+    }
+
+    if (debugCount <= 10) {
+        fprintf(stderr, "[DEBUG readSkipEntries] Successfully read %zu skip entries\n", entries.size());
     }
 
     return entries;
@@ -150,9 +176,9 @@ std::vector<SkipEntry> Lucene104PostingsReader::readSkipEntries(const TermState&
 // ==================== Lucene104PostingsEnumWithImpacts ====================
 
 Lucene104PostingsEnumWithImpacts::Lucene104PostingsEnumWithImpacts(
-    store::IndexInput* docIn, const TermState& termState, bool writeFreqs,
+    std::unique_ptr<store::IndexInput> docIn, const TermState& termState, bool writeFreqs,
     const std::vector<SkipEntry>& skipEntries)
-    : docIn_(docIn)
+    : docIn_(std::move(docIn))
     , docFreq_(termState.docFreq)
     , totalTermFreq_(termState.totalTermFreq)
     , writeFreqs_(writeFreqs)
@@ -259,9 +285,9 @@ float Lucene104PostingsEnumWithImpacts::getMaxScore(int upTo, float k1, float b,
         int maxFreq = entry.maxFreq;
         int maxNorm = entry.maxNorm;  // Larger norm = shorter doc = higher score
 
-        // Simplified BM25 upper bound (assuming IDF=1 for now)
+        // Simplified BM25 upper bound (Lucene 8+ formula, assuming IDF=1)
         // TODO: Pass actual IDF from scorer
-        float score = static_cast<float>(maxFreq * (k1 + 1)) /
+        float score = static_cast<float>(maxFreq) /
                       (maxFreq + k1 * (1 - b + b * (1.0f / (maxNorm + 1))));
 
         maxScore = std::max(maxScore, score);
@@ -359,11 +385,84 @@ void Lucene104PostingsEnumWithImpacts::refillBuffer() {
     bufferLimit_ = bufferIdx;
 }
 
+int Lucene104PostingsEnumWithImpacts::getMaxFreq(int upTo) const {
+    // Find the skip entry that covers the range [currentDoc_, upTo]
+    // Return the maximum frequency from skip metadata
+    if (skipEntries_.empty()) {
+        // No skip data - return conservative maximum
+        static int emptyCount = 0;
+        if (emptyCount++ < 5) {
+            fprintf(stderr, "[DEBUG getMaxFreq] No skip entries, returning max\n");
+        }
+        return std::numeric_limits<int>::max();
+    }
+
+    int maxFreq = 0;
+    bool foundEntry = false;
+
+    for (const auto& entry : skipEntries_) {
+        if (entry.doc > upTo) {
+            break;
+        }
+        if (entry.doc >= currentDoc_) {
+            maxFreq = std::max(maxFreq, entry.maxFreq);
+            foundEntry = true;
+        }
+    }
+
+    // If no skip entries overlap [currentDoc, upTo], use first skip entry as conservative estimate
+    // This handles the case where we're querying early document ranges before first skip entry
+    if (!foundEntry && !skipEntries_.empty()) {
+        // First skip entry represents max frequency for at least part of the postings list
+        // Use it as upper bound for earlier ranges
+        maxFreq = skipEntries_[0].maxFreq;
+        foundEntry = true;
+    }
+
+    static int callCount = 0;
+    if (callCount++ < 10) {
+        fprintf(stderr, "[DEBUG getMaxFreq] upTo=%d, currentDoc=%d, skipEntries=%zu, maxFreq=%d (foundEntry=%d)\n",
+                upTo, currentDoc_, skipEntries_.size(), maxFreq, foundEntry);
+    }
+
+    return maxFreq > 0 ? maxFreq : std::numeric_limits<int>::max();
+}
+
+int Lucene104PostingsEnumWithImpacts::getMaxNorm(int upTo) const {
+    // Find the skip entry that covers the range [currentDoc_, upTo]
+    // Return the maximum norm (shortest document = highest norm value)
+    if (skipEntries_.empty()) {
+        // No skip data - return shortest possible doc (127 = length 1.0)
+        return 127;
+    }
+
+    int maxNorm = 0;
+    bool foundEntry = false;
+
+    for (const auto& entry : skipEntries_) {
+        if (entry.doc > upTo) {
+            break;
+        }
+        if (entry.doc >= currentDoc_) {
+            maxNorm = std::max(maxNorm, static_cast<int>(entry.maxNorm));
+            foundEntry = true;
+        }
+    }
+
+    // If no skip entries overlap [currentDoc, upTo], use first skip entry as conservative estimate
+    if (!foundEntry && !skipEntries_.empty()) {
+        maxNorm = static_cast<int>(skipEntries_[0].maxNorm);
+        foundEntry = true;
+    }
+
+    return maxNorm > 0 ? maxNorm : 127;
+}
+
 // ==================== Lucene104PostingsEnum ====================
 
-Lucene104PostingsEnum::Lucene104PostingsEnum(store::IndexInput* docIn, const TermState& termState,
+Lucene104PostingsEnum::Lucene104PostingsEnum(std::unique_ptr<store::IndexInput> docIn, const TermState& termState,
                                              bool writeFreqs)
-    : docIn_(docIn)
+    : docIn_(std::move(docIn))
     , docFreq_(termState.docFreq)
     , totalTermFreq_(termState.totalTermFreq)
     , writeFreqs_(writeFreqs)
