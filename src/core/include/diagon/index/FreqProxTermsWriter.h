@@ -6,6 +6,7 @@
 #include "diagon/document/Document.h"
 #include "diagon/index/FieldInfo.h"
 #include "diagon/util/ByteBlockPool.h"
+#include "diagon/util/IntBlockPool.h"
 
 #include <memory>
 #include <string>
@@ -107,6 +108,15 @@ public:
     std::vector<std::string> getTermsForField(const std::string& field) const;
 
     /**
+     * Get field lengths for norm computation
+     *
+     * @return Map of (fieldName, docID) -> fieldLength
+     */
+    const std::unordered_map<std::string, std::unordered_map<int, int>>& getFieldLengths() const {
+        return fieldLengths_;
+    }
+
+    /**
      * Reset for reuse across segments
      * Clears all data but keeps allocated memory
      */
@@ -122,8 +132,8 @@ private:
     /**
      * Posting list data stored in termToPosting_ map
      *
-     * Note: For Phase 2 simplicity, posting lists are stored as vectors.
-     * Phase 3 will use ByteBlockPool/IntBlockPool with linked continuation blocks.
+     * Uses aggressive pre-allocation to minimize vector reallocation overhead.
+     * Typical posting list has ~10-50 postings, so we pre-allocate 100 ints (50 postings).
      */
     struct PostingData {
         int lastDocID;              // Last docID added (for duplicate detection)
@@ -144,6 +154,9 @@ private:
     // Cleared and reused for each document to reduce malloc overhead
     std::unordered_map<std::string, int> termFreqsCache_;
 
+    // Field lengths for norm computation: fieldName -> (docID -> fieldLength)
+    std::unordered_map<std::string, std::unordered_map<int, int>> fieldLengths_;
+
     // Cached memory usage tracking (optimization for bytesUsed())
     mutable int64_t cachedBytesUsed_ = 0;
     mutable bool bytesUsedDirty_ = true;
@@ -161,27 +174,30 @@ private:
      * @param fieldName Field name
      * @param term Term text
      * @param docID Document ID
+     * @param freq Term frequency in document
      * @param indexOptions Index options for field
      */
     void addTermOccurrence(const std::string& fieldName, const std::string& term, int docID,
-                           IndexOptions indexOptions);
+                           int freq, IndexOptions indexOptions);
 
     /**
      * Create new posting list for term
      *
      * @param term Term text
      * @param docID Document ID
+     * @param freq Term frequency in document
      * @return Posting data
      */
-    PostingData createPostingList(const std::string& term, int docID);
+    PostingData createPostingList(const std::string& term, int docID, int freq);
 
     /**
      * Append docID/freq to existing posting list
      *
      * @param data Posting data to update
      * @param docID Document ID
+     * @param freq Term frequency in document
      */
-    void appendToPostingList(PostingData& data, int docID);
+    void appendToPostingList(PostingData& data, int docID, int freq);
 };
 
 }  // namespace index

@@ -49,21 +49,24 @@ void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) 
         // Tokenize field
         std::vector<std::string> tokens = field->tokenize();
 
+        // Track field length for norm computation
+        fieldLengths_[fieldName][docID] = static_cast<int>(tokens.size());
+
         // Count term frequencies using cached map (avoid allocation per document)
         termFreqsCache_.clear();  // Reuse existing map
         for (const auto& token : tokens) {
             termFreqsCache_[token]++;
         }
 
-        // Add each unique term to posting lists
+        // Add each unique term to posting lists with actual frequency
         for (const auto& [term, freq] : termFreqsCache_) {
-            addTermOccurrence(fieldName, term, docID, fieldType.indexOptions);
+            addTermOccurrence(fieldName, term, docID, freq, fieldType.indexOptions);
         }
     }
 }
 
 void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const std::string& term,
-                                            int docID, IndexOptions indexOptions) {
+                                            int docID, int freq, IndexOptions indexOptions) {
     // Create composite key: "field\0term" (using null separator to avoid conflicts)
     std::string compositeKey = fieldName + '\0' + term;
 
@@ -71,8 +74,8 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
     auto it = termToPosting_.find(compositeKey);
 
     if (it == termToPosting_.end()) {
-        // New term - create posting list
-        PostingData data = createPostingList(term, docID);
+        // New term - create posting list with actual frequency
+        PostingData data = createPostingList(term, docID, freq);
         termToPosting_[compositeKey] = std::move(data);
         invalidateBytesUsedCache();  // Cache now stale
     } else {
@@ -84,32 +87,34 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
             return;
         }
 
-        appendToPostingList(data, docID);
+        appendToPostingList(data, docID, freq);
         invalidateBytesUsedCache();  // Cache now stale
     }
 }
 
 FreqProxTermsWriter::PostingData FreqProxTermsWriter::createPostingList(const std::string& term,
-                                                                        int docID) {
+                                                                        int docID, int freq) {
     PostingData data;
 
-    // Pre-allocate space for typical posting list (avg ~10 docs per term)
-    // Avoids multiple vector reallocations during growth
-    data.postings.reserve(20);  // 10 docs × 2 ints per doc (docID, freq)
+    // Aggressive pre-allocation: typical term has 10-50 postings in Reuters
+    // Pre-allocate 100 ints (50 postings = 50 docs) to avoid most reallocations
+    // For terms with > 50 postings, vector will still grow but far less frequently
+    data.postings.reserve(100);
 
     // Store initial [docID, freq] pair
     data.postings.push_back(docID);
-    data.postings.push_back(1);  // freq = 1
+    data.postings.push_back(freq);
 
     data.lastDocID = docID;
 
     return data;
 }
 
-void FreqProxTermsWriter::appendToPostingList(PostingData& data, int docID) {
+void FreqProxTermsWriter::appendToPostingList(PostingData& data, int docID, int freq) {
     // Append [docID, freq] pair
+    // Most lists won't exceed 100 ints due to aggressive pre-allocation
     data.postings.push_back(docID);
-    data.postings.push_back(1);  // freq = 1
+    data.postings.push_back(freq);
 
     data.lastDocID = docID;
 }
@@ -187,7 +192,7 @@ int64_t FreqProxTermsWriter::bytesUsed() const {
     // Recalculate memory usage when cache is dirty
     int64_t bytes = termBytePool_.bytesUsed();
 
-    // Posting list vectors (approximate)
+    // Posting list vectors (with aggressive pre-allocation, we allocate more than we use)
     for (const auto& [term, data] : termToPosting_) {
         bytes += term.capacity();                         // Term string
         bytes += data.postings.capacity() * sizeof(int);  // Posting vector
@@ -206,12 +211,14 @@ int64_t FreqProxTermsWriter::bytesUsed() const {
 void FreqProxTermsWriter::reset() {
     termBytePool_.reset();
     termToPosting_.clear();
+    fieldLengths_.clear();
     invalidateBytesUsedCache();  // Cache now stale
 }
 
 void FreqProxTermsWriter::clear() {
     termBytePool_.clear();
     termToPosting_.clear();
+    fieldLengths_.clear();
     invalidateBytesUsedCache();  // Cache now stale
 }
 
