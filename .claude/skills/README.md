@@ -1,6 +1,36 @@
 # Diagon Claude Code Skills
 
-This directory contains reusable skills for working with the Diagon codebase.
+## ⚠️ Important: Actual Skills Location
+
+**Skills are located in the GLOBAL directory**: `~/.claude/skills/`
+
+**NOT in this project-local directory**: `/home/ubuntu/diagon/.claude/skills/`
+
+This directory contains **documentation only**. The actual skills are registered globally.
+
+## Skill Format (IMPORTANT)
+
+Skills use **SKILL.md format** (markdown with YAML frontmatter):
+
+```
+~/.claude/skills/skill_name/
+└── SKILL.md  ← YAML frontmatter + markdown instructions
+```
+
+Example SKILL.md:
+```markdown
+---
+name: skill_name
+description: Brief description
+allowed-tools: Bash, Read, Write
+user-invocable: true
+argument-hint: [arg1] [arg2=default]
+---
+
+# Skill instructions...
+```
+
+This directory contains reusable skill documentation for working with the Diagon codebase.
 
 ## Available Skills
 
