@@ -76,8 +76,13 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
     if (it == termToPosting_.end()) {
         // New term - create posting list with actual frequency
         PostingData data = createPostingList(term, docID, freq);
+
+        // Track memory incrementally: composite key + posting data
+        bytesUsed_ += compositeKey.capacity();  // String storage
+        bytesUsed_ += data.postings.capacity() * sizeof(int);  // Vector capacity
+        bytesUsed_ += 64;  // Hash map node overhead (approximate)
+
         termToPosting_[compositeKey] = std::move(data);
-        invalidateBytesUsedCache();  // Cache now stale
     } else {
         // Existing term - append to posting list
         PostingData& data = it->second;
@@ -87,8 +92,14 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
             return;
         }
 
+        size_t oldCapacity = data.postings.capacity();
         appendToPostingList(data, docID, freq);
-        invalidateBytesUsedCache();  // Cache now stale
+        size_t newCapacity = data.postings.capacity();
+
+        // Track delta only if vector grew (reallocation occurred)
+        if (newCapacity > oldCapacity) {
+            bytesUsed_ += (newCapacity - oldCapacity) * sizeof(int);
+        }
     }
 }
 
@@ -184,42 +195,23 @@ std::vector<std::string> FreqProxTermsWriter::getTermsForField(const std::string
 }
 
 int64_t FreqProxTermsWriter::bytesUsed() const {
-    // Return cached value if still valid (optimization for frequent calls)
-    if (!bytesUsedDirty_) {
-        return cachedBytesUsed_;
-    }
-
-    // Recalculate memory usage when cache is dirty
-    int64_t bytes = termBytePool_.bytesUsed();
-
-    // Posting list vectors (with aggressive pre-allocation, we allocate more than we use)
-    for (const auto& [term, data] : termToPosting_) {
-        bytes += term.capacity();                         // Term string
-        bytes += data.postings.capacity() * sizeof(int);  // Posting vector
-    }
-
-    // Map overhead (approximate)
-    bytes += termToPosting_.size() * 64;  // Rough estimate
-
-    // Cache the result
-    cachedBytesUsed_ = bytes;
-    bytesUsedDirty_ = false;
-
-    return bytes;
+    // Return incrementally tracked memory usage - O(1) instead of O(n)!
+    // No need to scan all posting lists anymore
+    return bytesUsed_ + termBytePool_.bytesUsed();
 }
 
 void FreqProxTermsWriter::reset() {
     termBytePool_.reset();
     termToPosting_.clear();
     fieldLengths_.clear();
-    invalidateBytesUsedCache();  // Cache now stale
+    bytesUsed_ = 0;  // Reset memory counter
 }
 
 void FreqProxTermsWriter::clear() {
     termBytePool_.clear();
     termToPosting_.clear();
     fieldLengths_.clear();
-    invalidateBytesUsedCache();  // Cache now stale
+    bytesUsed_ = 0;  // Reset memory counter
 }
 
 }  // namespace index

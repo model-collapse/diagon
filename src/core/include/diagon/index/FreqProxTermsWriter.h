@@ -157,16 +157,9 @@ private:
     // Field lengths for norm computation: fieldName -> (docID -> fieldLength)
     std::unordered_map<std::string, std::unordered_map<int, int>> fieldLengths_;
 
-    // Cached memory usage tracking (optimization for bytesUsed())
-    mutable int64_t cachedBytesUsed_ = 0;
-    mutable bool bytesUsedDirty_ = true;
-
-    /**
-     * Invalidate bytesUsed cache when posting lists are modified
-     */
-    void invalidateBytesUsedCache() {
-        bytesUsedDirty_ = true;
-    }
+    // Incremental memory usage tracking (like Lucene's approach)
+    // Track memory as we add terms, not by scanning all posting lists
+    int64_t bytesUsed_ = 0;
 
     /**
      * Add term occurrence to posting list
