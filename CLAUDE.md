@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Tenets
-- **Be Self-discipline** Each efficiency observation should be based a correctly build artifact, following the build SOP. There is no trade-off in experiment/test, there is no 'guessed/predicted' finding based on incorrectly build artifact/ artifact with obvious bugs / approxiate without testing. Except being permitted, all the benchmarks should be conducted after a full build.
+- **Be Self-disciplined** Each efficiency observation should be based on a correctly built artifact, following the build SOP. There is no trade-off in experiment/test, there is no 'guessed/predicted' finding based on incorrectly built artifact/artifact with obvious bugs/approximate without testing. **Always use `/build_diagon target=benchmarks` before benchmarking.** All benchmarks should be conducted after a full clean build using the build skills.
 - **Be Humble and Straight** The positioning of this product is already clearly defined and known by the user. It is forbbiden to 'bury' the lags/drawbacks/inalignment/concerns in a long passage of boast. In each report, just mention the real benchmark data, straight and objective comparison, insights for improvement. No others. 
 - **Be Honest** DO NOT emphasize the advantage signal based on prediction data. All the reported comparison should be annotated with "predicted" and "experimented". Don't try to disguise the unreliable data (even fake data) with confident narrative.
 - **Be Rational** Each step you take (decide) to optmize / fix should be 100% rational based on the former obsevation, deep dive before every proposal. It is discouraged to enumerate massive clueless possibilties and let me choose. Experiment, verify and narrow down the root cause scope as much as possible.  
@@ -38,20 +38,68 @@ DIAGON provides diverse indexing capabilities through specialized index architec
 └── CLAUDE.md                            # This file
 ```
 
-## Tagets
-- A state-of-the art c++ search engine index library with highest efficiency, compatiblity, reliability.
-- Fully optimized algorithm, RAM layout and code implementtion.
-- 3x ~ 10x search speed comparing with Lucene.
-- 2x analytics processing speed comparing with Clickhouse 
+## Targets
+- A state-of-the-art C++ search engine index library with highest efficiency, compatibility, reliability
+- Fully optimized algorithm, RAM layout and code implementation
+- **3-10x search speed compared with Lucene** (verified via `/benchmark_reuters_lucene`)
+- **3.5-6x speedup for multi-term OR queries** (WAND advantage, verified via `/benchmark_lucene_multiterm`)
+- 2x analytics processing speed compared with ClickHouse
+
+### Performance Targets
+
+**General Queries:**
+- Single-term: <1ms P99 latency
+- Boolean AND (2-term): <2ms P99 latency
+- Boolean OR (2-term): <3ms P99 latency
+
+**Multi-Term Queries:**
+- 2-term AND: <2ms, OR: <3ms
+- 5-term AND: <5ms, OR: <8ms
+- 10-term AND: <10ms, OR: <15ms
+
+**Indexing:**
+- Throughput: ≥5,000 docs/sec (Reuters-21578)
+- Index size: 250-700 bytes/doc
+
+**Competitive Targets:**
+- 3-10x faster than Lucene (general queries)
+- 3.5-6x faster than Lucene (multi-term OR queries with WAND) 
 
 ## Build Standard Operating Procedure (SOP)
 
-**CRITICAL**: Always follow this procedure to avoid compilation/linking errors.
+**CRITICAL**: Always use the build skills to ensure consistent, error-free builds.
 
-**Full Documentation**: See `BUILD_SOP.md` for complete details.
+**Full Documentation**: See `BUILD_SOP.md` and `.claude/skills/README.md` for complete details.
 
-### Quick Build Procedure
+### Build Methods
 
+**Primary Method: Use Build Skills (Required)**
+```
+/build_diagon                          # Build core library only
+/build_diagon target=benchmarks        # Build core + benchmarks (for benchmarking)
+/build_diagon target=tests             # Build core + tests
+/build_diagon target=all               # Build everything
+/build_diagon target=benchmarks jobs=16  # Use 16 parallel jobs
+
+# Alternative name (identical functionality):
+/build_lucene                          # Same as /build_diagon
+```
+
+**Why use skills:**
+- ✅ Follows BUILD_SOP.md exactly
+- ✅ Automatic ICU linking verification
+- ✅ Handles clean builds correctly
+- ✅ Prevents common build errors
+- ✅ Consistent across all environments
+
+**Alternative: Helper Script** (if skills unavailable)
+```bash
+./scripts/build_lucene.sh              # Build core library
+./scripts/build_lucene.sh benchmarks   # Build core + benchmarks
+./scripts/build_lucene.sh all true 16  # Build all, clean, 16 jobs
+```
+
+**Manual Build** (only for troubleshooting)
 ```bash
 # 1. ALWAYS start clean
 cd /home/ubuntu/diagon
@@ -73,6 +121,8 @@ ldd src/core/libdiagon_core.so | grep icu
 # Must show: libicuuc.so and libicui18n.so
 
 ```
+
+See `.claude/skills/README.md` for complete skill documentation.
 
 ### Key Rules
 
@@ -104,14 +154,127 @@ ldd src/core/libdiagon_core.so | grep icu
 
 See `BUILD_SOP.md` for troubleshooting guide and detailed explanations.
 
-## Benmark
-Use following command to build benchmark.
-```bash
-# 5. Build benchmarks
-make SearchBenchmark -j8  # or make benchmarks -j8
+## Benchmarking
 
-# 6. Run benchmark
-./benchmarks/SearchBenchmark
+**CRITICAL**: Always use benchmark skills for consistent, reproducible results.
+
+**Full Documentation**: See `.claude/skills/BENCHMARK_DIAGON_GUIDE.md`, `.claude/skills/BENCHMARK_REUTERS_GUIDE.md`, and `.claude/skills/BENCHMARK_MULTITERM_GUIDE.md`.
+
+### Available Benchmark Skills
+
+#### General Performance Benchmarks
+
+**1. Pure Diagon Performance** (daily tracking, regression detection)
+```
+/benchmark_diagon                      # Standard benchmark
+/benchmark_diagon benchmark=wand       # WAND optimization test
+/benchmark_diagon benchmark=both       # All benchmarks
+/benchmark_diagon compare_baseline=false  # No baseline comparison
+```
+
+**2. Diagon vs Lucene Comparison** (milestone validation)
+```
+/benchmark_reuters_lucene              # Standard comparison
+/benchmark_reuters_lucene benchmark=wand  # WAND comparison
+/benchmark_reuters_lucene benchmark=both  # Full comparison
+```
+
+#### Multi-Term Query Benchmarks
+
+**3. Multi-Term Query Performance** (query optimization)
+```
+/benchmark_diagon_multiterm            # Test all multi-term queries
+/benchmark_diagon_multiterm query_type=or  # OR queries (WAND focus)
+/benchmark_diagon_multiterm term_counts=large  # 6-10 term queries
+```
+
+**4. Multi-Term Competitive Analysis** (competitive validation)
+```
+/benchmark_lucene_multiterm            # Compare with Lucene
+/benchmark_lucene_multiterm query_type=or  # OR advantage (3.5-6x target)
+/benchmark_lucene_multiterm target_speedup=5.0  # Raise target
+```
+
+### Benchmark Workflow
+
+**Daily Development:**
+```bash
+# 1. Build with benchmarks
+/build_diagon target=benchmarks
+
+# 2. Run pure Diagon benchmark (trend tracking)
+/benchmark_diagon
+
+# 3. Check for regressions
+# Review report in benchmark_results/
+```
+
+**After Query Optimization:**
+```bash
+# 1. Build
+/build_diagon target=benchmarks
+
+# 2. Test multi-term queries
+/benchmark_diagon_multiterm
+
+# 3. Validate improvement
+# Compare with baseline in report
+```
+
+**Pre-Release Validation:**
+```bash
+# 1. Build
+/build_diagon target=benchmarks
+
+# 2. Run comprehensive benchmarks
+/benchmark_diagon benchmark=both
+/benchmark_reuters_lucene benchmark=both
+/benchmark_diagon_multiterm
+/benchmark_lucene_multiterm
+
+# 3. Verify all targets met
+# Review all reports in benchmark_results/
+```
+
+### Benchmark Reports
+
+All benchmarks generate comprehensive reports following `.claude/BENCHMARK_REPORT_TEMPLATE_V2.md`:
+
+**Report Location:**
+```
+benchmark_results/diagon_[YYYYMMDD_HHMMSS].md          # Pure Diagon
+benchmark_results/reuters_lucene_[YYYYMMDD_HHMMSS].md  # vs Lucene
+benchmark_results/multiterm_[YYYYMMDD_HHMMSS].md       # Multi-term Diagon
+benchmark_results/lucene_multiterm_[YYYYMMDD_HHMMSS].md # Multi-term comparison
+```
+
+**Report Sections:**
+1. Executive Summary
+2. Test Environment
+3. Indexing Performance
+4. Query Performance (with multi-term analysis for specialized benchmarks)
+5. Performance Analysis
+6. Detailed Comparison
+7. Issues and Concerns
+8. Recommendations
+9. Raw Data
+10. Reproducibility
+
+**Why use benchmark skills:**
+- ✅ Automatic build verification
+- ✅ Consistent test procedure
+- ✅ Baseline tracking and regression detection
+- ✅ Comprehensive report generation
+- ✅ Reproducible results
+- ✅ Professional formatting
+
+### Manual Benchmarking (Discouraged)
+
+Only use manual commands for debugging specific issues:
+```bash
+cd /home/ubuntu/diagon/build/benchmarks
+./ReutersBenchmark
+./ReutersWANDBenchmark
 ```
 
 ## Design Methodology
@@ -261,7 +424,83 @@ When implementation begins:
 | Type Partitioning | ✓ | ✗ | ✓ |
 | FST Term Dict | ✓ | ✓ | ✗ |
 
+## Claude Code Skills
+
+This project provides production-ready Claude Code skills for build and benchmark operations.
+
+### Available Skills (6 Total)
+
+**Build Skills:**
+- `/build_diagon` - Primary build skill (recommended)
+- `/build_lucene` - Alternative name (identical functionality)
+
+**General Benchmark Skills:**
+- `/benchmark_diagon` - Pure Diagon performance (trend tracking, regression detection)
+- `/benchmark_reuters_lucene` - Diagon vs Lucene comparison (milestone validation)
+
+**Multi-Term Benchmark Skills:**
+- `/benchmark_diagon_multiterm` - Multi-term query performance (query optimization)
+- `/benchmark_lucene_multiterm` - Multi-term competitive analysis (3-6x speedup target)
+
+### Skill Documentation
+
+**Quick Reference:**
+- `.claude/skills/README.md` - All skills overview
+- `.claude/skills/SKILLS_OVERVIEW.md` - Comprehensive guide with workflows
+
+**Build Documentation:**
+- `.claude/skills/BUILD_SKILL_SETUP.md` - Build skills setup
+- `BUILD_SOP.md` - Build standard operating procedure
+
+**Benchmark Documentation:**
+- `.claude/skills/BENCHMARK_DIAGON_GUIDE.md` - Pure Diagon benchmarks
+- `.claude/skills/BENCHMARK_REUTERS_GUIDE.md` - Lucene comparison benchmarks
+- `.claude/skills/BENCHMARK_MULTITERM_GUIDE.md` - Multi-term query benchmarks
+- `.claude/BENCHMARK_REPORT_TEMPLATE_V2.md` - Comprehensive report template
+
+### When to Use Each Skill
+
+| Skill | When to Use | Frequency |
+|-------|-------------|-----------|
+| `/build_diagon` | Before any benchmarking or testing | Always |
+| `/benchmark_diagon` | Daily performance tracking | Daily/per-commit |
+| `/benchmark_reuters_lucene` | Validate against Lucene | Weekly/per-milestone |
+| `/benchmark_diagon_multiterm` | After query optimization | After query changes |
+| `/benchmark_lucene_multiterm` | Competitive validation | Before releases |
+
 ## Common Tasks
+
+### Building
+
+```bash
+# Standard build (always use this)
+/build_diagon target=benchmarks
+
+# Quick core-only build
+/build_diagon
+
+# Full build with tests
+/build_diagon target=all
+```
+
+### Benchmarking
+
+```bash
+# Daily check
+/benchmark_diagon
+
+# Weekly Lucene comparison
+/benchmark_reuters_lucene
+
+# After query optimization
+/benchmark_diagon_multiterm
+
+# Pre-release validation
+/benchmark_diagon benchmark=both
+/benchmark_reuters_lucene benchmark=both
+/benchmark_diagon_multiterm
+/benchmark_lucene_multiterm
+```
 
 ### Studying Reference Code
 
@@ -320,3 +559,76 @@ When extending the design:
 3. **Hybrid carefully**: When combining Lucene + ClickHouse concepts, document why
 4. **Performance first**: Both source systems are highly optimized, learn from them
 5. **Test against source**: DIAGON should match or exceed source system performance
+
+## Skills-Based Development Workflow
+
+This project uses Claude Code skills for all build and benchmark operations. **Always use skills instead of manual commands.**
+
+### Standard Development Cycle
+
+1. **Make code changes**
+   ```bash
+   vim src/core/search/BooleanQuery.cpp
+   ```
+
+2. **Build using skill**
+   ```
+   /build_diagon target=benchmarks
+   ```
+
+3. **Benchmark using skill**
+   ```
+   /benchmark_diagon                    # Daily tracking
+   # OR
+   /benchmark_diagon_multiterm          # After query changes
+   ```
+
+4. **Review report**
+   ```bash
+   cat benchmark_results/diagon_*.md | grep "Overall Result"
+   ```
+
+5. **Commit if no regressions**
+   ```bash
+   git add .
+   git commit -m "Optimize BooleanQuery"
+   ```
+
+### Pre-Release Checklist
+
+- [ ] `/build_diagon target=all` - Full clean build
+- [ ] `/benchmark_diagon benchmark=both` - Pure Diagon performance
+- [ ] `/benchmark_reuters_lucene benchmark=both` - vs Lucene general
+- [ ] `/benchmark_diagon_multiterm` - Multi-term performance
+- [ ] `/benchmark_lucene_multiterm` - Multi-term competitive
+- [ ] Review all reports for regressions
+- [ ] Verify all performance targets met
+- [ ] Document performance improvements in release notes
+
+### Why Skills?
+
+**Consistency:**
+- Same procedure every time
+- No forgotten steps
+- No manual errors
+
+**Quality:**
+- Automatic ICU verification
+- Clean builds by default
+- Comprehensive reporting
+
+**Efficiency:**
+- One command instead of many
+- Baseline tracking automatic
+- Regression detection built-in
+
+**Documentation:**
+- Professional reports
+- Reproducible procedures
+- Historical tracking
+
+---
+
+**Last Updated:** 2026-02-09
+**Skills:** 6 production-ready skills available
+**Status:** ✅ All workflows use skills for build and benchmark operations

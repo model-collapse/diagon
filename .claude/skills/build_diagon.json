@@ -1,0 +1,32 @@
+{
+  "name": "build_diagon",
+  "description": "Build the Diagon search engine following the standard operating procedure (SOP)",
+  "version": "1.0.0",
+  "arguments": [
+    {
+      "name": "target",
+      "description": "Build target: core (library only), benchmarks, tests, or all (default: core)",
+      "type": "string",
+      "default": "core"
+    },
+    {
+      "name": "clean",
+      "description": "Clean build directory before building (default: true)",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "name": "verify",
+      "description": "Verify ICU linking after build (default: true)",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "name": "jobs",
+      "description": "Number of parallel build jobs (default: 8)",
+      "type": "number",
+      "default": 8
+    }
+  ],
+  "prompt": "You are executing the Diagon build skill following the BUILD_SOP.md standard operating procedure.\n\n## Your Task\n\nBuild the Diagon search engine with these parameters:\n- Target: {{target}}\n- Clean build: {{clean}}\n- Verify ICU: {{verify}}\n- Parallel jobs: {{jobs}}\n\n## About Diagon\n\nDiagon is a high-performance C++ search engine combining:\n- Apache Lucene-inspired inverted index architecture\n- ClickHouse-inspired columnar storage for OLAP\n- Target: 3-10x faster than Lucene\n\n## Build Procedure\n\nFollow these steps exactly:\n\n### Step 1: Clean Environment (if clean=true)\n```bash\ncd /home/ubuntu/diagon\nrm -rf build\nmkdir build\ncd build\n```\n\n### Step 2: Configure CMake\n```bash\ncmake -DCMAKE_BUILD_TYPE=Release \\\n      -DCMAKE_CXX_FLAGS=\"-O3 -march=native\" \\\n      -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF \\\n      -DDIAGON_BUILD_BENCHMARKS=ON \\\n      -DDIAGON_BUILD_TESTS=ON \\\n      ..\n```\n\n**CRITICAL:** Always use `-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF` to disable LTO.\n\n### Step 3: Build Core Library\n```bash\nmake diagon_core -j{{jobs}}\n```\n\n### Step 4: Verify ICU Linking (if verify=true)\n```bash\nldd src/core/libdiagon_core.so | grep icu\n```\nExpected: Should show `libicuuc.so` and `libicui18n.so`\n\nIf ICU is not linked, STOP and report the error.\n\n### Step 5: Build Target (if not 'core')\n\nFor target='benchmarks':\n```bash\nmake benchmarks -j{{jobs}}\n```\n\nFor target='tests':\n```bash\nmake -j{{jobs}}  # Build all including tests\n```\n\nFor target='all':\n```bash\nmake -j{{jobs}}  # Build everything\n```\n\n### Step 6: Report Results\n\nProvide a summary:\n- Build status (success/failure)\n- ICU verification result\n- Build time (if available)\n- Location of built artifacts\n- Next steps:\n  - For 'core': Suggest building benchmarks\n  - For 'benchmarks': Show how to run benchmarks\n  - For 'tests': Show how to run tests\n  - For 'all': Show both benchmark and test commands\n\n## Important Reminders\n\n1. **Always disable LTO**: `-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF`\n2. **Always verify ICU**: Check `ldd` output shows ICU libraries\n3. **Build core first**: Catches compilation errors early\n4. **Start clean**: Remove stale cache with `rm -rf build`\n5. **Never use Debug mode for benchmarks**: 10-100x slower\n\n## Error Handling\n\nIf you encounter errors:\n1. `undefined reference to icu_73::...` → ICU version mismatch (see BUILD_SOP.md)\n2. `use of deleted function` → C++ compilation error (fix code)\n3. `ZSTD target not found` → Should be auto-fixed in CMake\n4. Build failures → Check compiler output, report exact error\n\nFor all errors, consult BUILD_SOP.md troubleshooting section.\n\n## Success Criteria\n\nA successful build must:\n- ✅ Compile without errors or warnings (zero-warning policy with -Werror)\n- ✅ Link without undefined symbols\n- ✅ Show ICU libraries in `ldd` output\n- ✅ Create expected artifacts (libraries, executables)\n\n## Performance Context\n\nReminder from CLAUDE.md tenets:\n- Target: 3-10x faster than Apache Lucene\n- Zero tolerance for performance regressions\n- All benchmarks must be on correctly built Release artifacts\n\nNow execute the build following these steps."
+}
