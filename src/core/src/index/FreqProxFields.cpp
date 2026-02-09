@@ -58,36 +58,15 @@ FreqProxTerms::FreqProxTerms(const std::string& fieldName,
     , sumDocFreq_(0)
     , docCount_(0) {
 
-
     // Get terms for this specific field only
     sortedTerms_ = termsWriter_.getTermsForField(fieldName);
 
-
-
-    // Compute statistics
-    std::set<int> uniqueDocs;
-
-    for (const auto& term : sortedTerms_) {
-        std::vector<int> postings = termsWriter_.getPostingList(fieldName, term);
-
-        // postings format: [docID, freq, docID, freq, ...]
-        int64_t termTotalFreq = 0;
-        int docFreq = 0;
-
-        for (size_t i = 0; i < postings.size(); i += 2) {
-            int docID = postings[i];
-            int freq = (i + 1 < postings.size()) ? postings[i + 1] : 1;
-
-            uniqueDocs.insert(docID);
-            termTotalFreq += freq;
-            docFreq++;
-        }
-
-        sumTotalTermFreq_ += termTotalFreq;
-        sumDocFreq_ += docFreq;
-    }
-
-    docCount_ = static_cast<int>(uniqueDocs.size());
+    // Use pre-computed statistics (eliminates flush overhead!)
+    // Statistics are computed incrementally during indexing, not by scanning posting lists
+    auto stats = termsWriter_.getFieldStats(fieldName);
+    sumTotalTermFreq_ = stats.sumTotalTermFreq;
+    sumDocFreq_ = stats.sumDocFreq;
+    docCount_ = stats.docCount;
 }
 
 std::unique_ptr<TermsEnum> FreqProxTerms::iterator() const {

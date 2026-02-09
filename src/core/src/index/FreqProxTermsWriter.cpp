@@ -50,7 +50,12 @@ void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) 
         std::vector<std::string> tokens = field->tokenize();
 
         // Track field length for norm computation
-        fieldLengths_[fieldName][docID] = static_cast<int>(tokens.size());
+        auto& fieldLengthMap = fieldLengths_[fieldName];
+        if (fieldLengthMap.find(docID) == fieldLengthMap.end()) {
+            // First time seeing this document for this field
+            fieldStats_[fieldName].docCount++;
+        }
+        fieldLengthMap[docID] = static_cast<int>(tokens.size());
 
         // Count term frequencies using cached map (avoid allocation per document)
         termFreqsCache_.clear();  // Reuse existing map
@@ -73,6 +78,9 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
     // Check if term already exists
     auto it = termToPosting_.find(key);
 
+    // Get or create field stats
+    FieldStats& stats = fieldStats_[fieldName];
+
     if (it == termToPosting_.end()) {
         // New term - create posting list with actual frequency
         PostingData data = createPostingList(term, docID, freq);
@@ -81,6 +89,10 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
         bytesUsed_ += fieldName.capacity() + term.capacity();  // String storage
         bytesUsed_ += data.postings.capacity() * sizeof(int);  // Vector capacity
         bytesUsed_ += 64;  // Hash map node overhead (approximate)
+
+        // Update field statistics incrementally (new term)
+        stats.sumTotalTermFreq += freq;     // Add term frequency
+        stats.sumDocFreq += 1;              // One document has this term
 
         termToPosting_[std::move(key)] = std::move(data);
     } else {
@@ -100,6 +112,10 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
         if (newCapacity > oldCapacity) {
             bytesUsed_ += (newCapacity - oldCapacity) * sizeof(int);
         }
+
+        // Update field statistics incrementally (existing term, new document)
+        stats.sumTotalTermFreq += freq;     // Add term frequency
+        stats.sumDocFreq += 1;              // Another document has this term
     }
 }
 
@@ -184,6 +200,15 @@ std::vector<std::string> FreqProxTermsWriter::getTermsForField(const std::string
     return terms;
 }
 
+FreqProxTermsWriter::FieldStats FreqProxTermsWriter::getFieldStats(const std::string& fieldName) const {
+    auto it = fieldStats_.find(fieldName);
+    if (it != fieldStats_.end()) {
+        return it->second;
+    }
+    // Return default-initialized stats if field not found
+    return FieldStats{};
+}
+
 int64_t FreqProxTermsWriter::bytesUsed() const {
     // Return incrementally tracked memory usage - O(1) instead of O(n)!
     // No need to scan all posting lists anymore
@@ -194,6 +219,7 @@ void FreqProxTermsWriter::reset() {
     termBytePool_.reset();
     termToPosting_.clear();
     fieldLengths_.clear();
+    fieldStats_.clear();
     bytesUsed_ = 0;  // Reset memory counter
 }
 
@@ -201,6 +227,7 @@ void FreqProxTermsWriter::clear() {
     termBytePool_.clear();
     termToPosting_.clear();
     fieldLengths_.clear();
+    fieldStats_.clear();
     bytesUsed_ = 0;  // Reset memory counter
 }
 

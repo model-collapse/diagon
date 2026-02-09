@@ -108,6 +108,24 @@ public:
     std::vector<std::string> getTermsForField(const std::string& field) const;
 
     /**
+     * Field statistics for Terms implementation
+     * Computed incrementally during indexing to avoid scanning posting lists during flush
+     */
+    struct FieldStats {
+        int64_t sumTotalTermFreq = 0;  // Sum of all term frequencies in field
+        int64_t sumDocFreq = 0;         // Sum of document frequencies (docs per term)
+        int docCount = 0;               // Number of unique documents with this field
+    };
+
+    /**
+     * Get field statistics (pre-computed during indexing)
+     *
+     * @param fieldName Field name
+     * @return Field statistics, or default-initialized if field not found
+     */
+    FieldStats getFieldStats(const std::string& fieldName) const;
+
+    /**
      * Get field lengths for norm computation
      *
      * @return Map of (fieldName, docID) -> fieldLength
@@ -172,6 +190,10 @@ private:
     // Incremental memory usage tracking (like Lucene's approach)
     // Track memory as we add terms, not by scanning all posting lists
     int64_t bytesUsed_ = 0;
+
+    // Incremental field statistics (computed during indexing, not during flush)
+    // Eliminates need to scan all posting lists during FreqProxTerms construction
+    std::unordered_map<std::string, FieldStats> fieldStats_;
 
     /**
      * Add term occurrence to posting list
