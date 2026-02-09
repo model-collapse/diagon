@@ -72,8 +72,19 @@ void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) 
 
 void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const std::string& term,
                                             int docID, int freq, IndexOptions indexOptions) {
-    // Use pair as key - avoids string concatenation overhead (~12% CPU savings)
-    auto key = std::make_pair(fieldName, term);
+    // Get or assign field ID (reduces hash overhead: hash int vs hash string)
+    auto fieldIdIt = fieldNameToId_.find(fieldName);
+    int fieldId;
+    if (fieldIdIt == fieldNameToId_.end()) {
+        // New field - assign ID
+        fieldId = nextFieldId_++;
+        fieldNameToId_[fieldName] = fieldId;
+    } else {
+        fieldId = fieldIdIt->second;
+    }
+
+    // Use (fieldID, term) as key - faster hashing than (fieldName, term)
+    auto key = std::make_pair(fieldId, term);
 
     // Check if term already exists
     auto it = termToPosting_.find(key);
@@ -153,7 +164,7 @@ std::vector<int> FreqProxTermsWriter::getPostingList(const std::string& term) co
     // Legacy method - search all fields for this term
     // This is inefficient but maintains backward compatibility for tests
     for (const auto& [key, data] : termToPosting_) {
-        // Check if term matches (key.second is the term)
+        // key is (fieldID, term) pair - check if term matches
         if (key.second == term) {
             return data.postings;
         }
@@ -176,8 +187,14 @@ std::vector<std::string> FreqProxTermsWriter::getTerms() const {
 
 std::vector<int> FreqProxTermsWriter::getPostingList(const std::string& field,
                                                       const std::string& term) const {
-    // Use pair as key - no string concatenation needed
-    auto key = std::make_pair(field, term);
+    // Get field ID
+    auto fieldIdIt = fieldNameToId_.find(field);
+    if (fieldIdIt == fieldNameToId_.end()) {
+        return {};  // Field not found
+    }
+
+    // Use (fieldID, term) as key - faster hashing
+    auto key = std::make_pair(fieldIdIt->second, term);
 
     auto it = termToPosting_.find(key);
     if (it == termToPosting_.end()) {
@@ -219,6 +236,8 @@ void FreqProxTermsWriter::reset() {
     fieldLengths_.clear();
     fieldStats_.clear();
     fieldToSortedTerms_.clear();
+    fieldNameToId_.clear();
+    nextFieldId_ = 0;
     bytesUsed_ = 0;  // Reset memory counter
 }
 
@@ -228,6 +247,8 @@ void FreqProxTermsWriter::clear() {
     fieldLengths_.clear();
     fieldStats_.clear();
     fieldToSortedTerms_.clear();
+    fieldNameToId_.clear();
+    nextFieldId_ = 0;
     bytesUsed_ = 0;  // Reset memory counter
 }
 

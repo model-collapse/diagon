@@ -159,24 +159,31 @@ private:
         std::vector<int> postings;  // [docID, freq, docID, freq, ...]
     };
 
-    // Custom hash function for pair<string, string>
-    struct PairHash {
-        size_t operator()(const std::pair<std::string, std::string>& p) const {
-            // Combine hashes of field and term
-            size_t h1 = std::hash<std::string>{}(p.first);
+    // Custom hash function for pair<int, string>
+    // Uses field ID (integer) instead of field name string for faster hashing
+    struct FieldTermHash {
+        size_t operator()(const std::pair<int, std::string>& p) const {
+            // Hash field ID (integer) + term (string)
+            // Integer hashing is ~10x faster than string hashing
+            size_t h1 = std::hash<int>{}(p.first);
             size_t h2 = std::hash<std::string>{}(p.second);
             // Better hash combining than XOR (from Boost)
             return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
         }
     };
 
+    // Field name to field ID mapping (assigned incrementally)
+    // Reduces hash computation overhead: hash(int, string) vs hash(string, string)
+    std::unordered_map<std::string, int> fieldNameToId_;
+    int nextFieldId_ = 0;
+
     // Term byte storage
     util::ByteBlockPool termBytePool_;
 
     // Term → posting list mapping
-    // Key: (fieldName, term) pair - avoids string concatenation overhead
-    // Custom hash eliminates ~12% CPU from composite key creation
-    std::unordered_map<std::pair<std::string, std::string>, PostingData, PairHash> termToPosting_;
+    // Key: (fieldID, term) pair - uses integer field ID instead of string for faster hashing
+    // Integer hashing is ~10x faster than string hashing
+    std::unordered_map<std::pair<int, std::string>, PostingData, FieldTermHash> termToPosting_;
 
     // Field metadata tracker (reference)
     FieldInfosBuilder& fieldInfosBuilder_;
