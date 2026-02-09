@@ -4,10 +4,81 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Tenets
 - **Be Self-disciplined** Each efficiency observation should be based on a correctly built artifact, following the build SOP. There is no trade-off in experiment/test, there is no 'guessed/predicted' finding based on incorrectly built artifact/artifact with obvious bugs/approximate without testing. **Always use `/build_diagon target=benchmarks` before benchmarking.** All benchmarks should be conducted after a full clean build using the build skills.
-- **Be Humble and Straight** The positioning of this product is already clearly defined and known by the user. It is forbbiden to 'bury' the lags/drawbacks/inalignment/concerns in a long passage of boast. In each report, just mention the real benchmark data, straight and objective comparison, insights for improvement. No others. 
+- **Be Humble and Straight** The positioning of this product is already clearly defined and known by the user. It is forbbiden to 'bury' the lags/drawbacks/inalignment/concerns in a long passage of boast. In each report, just mention the real benchmark data, straight and objective comparison, insights for improvement. No others.
 - **Be Honest** DO NOT emphasize the advantage signal based on prediction data. All the reported comparison should be annotated with "predicted" and "experimented". Don't try to disguise the unreliable data (even fake data) with confident narrative.
-- **Be Rational** Each step you take (decide) to optmize / fix should be 100% rational based on the former obsevation, deep dive before every proposal. It is discouraged to enumerate massive clueless possibilties and let me choose. Experiment, verify and narrow down the root cause scope as much as possible.  
+- **Be Rational** Each step you take (decide) to optmize / fix should be 100% rational based on the former obsevation, deep dive before every proposal. It is discouraged to enumerate massive clueless possibilties and let me choose. Experiment, verify and narrow down the root cause scope as much as possible.
 - **Insist Highest Standard** The design target to succeed lucene and click-house from all the apects. There is no "Although we lag behind XXX, but we can save sth. by our design". There is NO EXCUSE falling behind them. Each time the benchmark show we are slower, you should be ashamed. Keep efficiency first in mind.
+
+## MANDATORY: Skills-First Policy
+
+**CRITICAL RULE**: This project has production-ready Claude Code skills that MUST be used instead of writing custom code.
+
+### Build Operations - ALWAYS Use Skills
+
+When building is needed:
+- ✅ **REQUIRED**: Use `/build_diagon` skill
+- ❌ **FORBIDDEN**: Manual cmake/make commands
+- ❌ **FORBIDDEN**: Writing custom build scripts
+
+**Example (correct)**:
+```
+/build_diagon target=benchmarks
+```
+
+**If spawning agent**: Agent MUST use the Skill tool with `/build_diagon`
+
+### Benchmark Operations - ALWAYS Use Skills
+
+When benchmarking is needed:
+- ✅ **REQUIRED**: Use one of the 4 benchmark skills
+- ❌ **FORBIDDEN**: Writing custom benchmark code (*.cpp, *.java)
+- ❌ **FORBIDDEN**: Direct execution of benchmark binaries
+- ❌ **FORBIDDEN**: Creating new benchmark implementations
+
+**Available benchmark skills**:
+1. `/benchmark_diagon` - Pure Diagon performance
+2. `/benchmark_reuters_lucene` - vs Lucene comparison
+3. `/benchmark_diagon_multiterm` - Multi-term query focus
+4. `/benchmark_lucene_multiterm` - Multi-term competitive analysis
+
+**Example (correct)**:
+```
+/benchmark_lucene_multiterm
+```
+
+**If spawning agent**: Agent MUST use the Skill tool:
+```python
+Skill(skill="benchmark_lucene_multiterm")
+# NOT: Create new benchmark code
+# NOT: Write custom C++ benchmark
+```
+
+### When Skills Don't Exist
+
+**Only if no skill exists** for your specific need:
+1. Ask user if a new skill should be created
+2. If user approves, create the skill following `.claude/skills/` patterns
+3. Do NOT write one-off custom code as workaround
+
+### Enforcement
+
+**For Claude (me)**:
+- Before ANY build: Check if I used `/build_diagon` skill
+- Before ANY benchmark: Check if I used appropriate benchmark skill
+- If I find myself writing cmake/make/benchmark code: STOP and use skill instead
+
+**For Agents**:
+- When spawning general-purpose agent for benchmarking: Explicitly instruct to use Skill tool
+- Verify agent used skills by checking for skill invocation in output
+- If agent writes custom code: Recognize this as deviation from project policy
+
+### Why This Rule Exists
+
+**Consistency**: Skills ensure same procedure every time
+**Quality**: Skills follow BUILD_SOP.md and report templates
+**Efficiency**: Skills are tested and optimized
+**Documentation**: Skills generate professional reports
+**NO EXCEPTIONS**: This is a hard requirement, not a suggestion
 
 ## Repository Purpose
 
