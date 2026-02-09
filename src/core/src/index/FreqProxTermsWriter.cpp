@@ -94,6 +94,9 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
         stats.sumTotalTermFreq += freq;     // Add term frequency
         stats.sumDocFreq += 1;              // One document has this term
 
+        // Add term to sorted index (O(log n) insert, eliminates O(n log n) sort during flush)
+        fieldToSortedTerms_[fieldName].insert(term);
+
         termToPosting_[std::move(key)] = std::move(data);
     } else {
         // Existing term - append to posting list
@@ -185,19 +188,14 @@ std::vector<int> FreqProxTermsWriter::getPostingList(const std::string& field,
 }
 
 std::vector<std::string> FreqProxTermsWriter::getTermsForField(const std::string& field) const {
-    std::vector<std::string> terms;
-
-    for (const auto& [key, _] : termToPosting_) {
-        // key.first is the field, key.second is the term
-        if (key.first == field) {
-            terms.push_back(key.second);
-        }
+    // Use pre-sorted index (eliminates O(n log n) sorting during flush)
+    auto it = fieldToSortedTerms_.find(field);
+    if (it == fieldToSortedTerms_.end()) {
+        return {};  // Field not found
     }
 
-    // Sort for consistent ordering
-    std::sort(terms.begin(), terms.end());
-
-    return terms;
+    // Convert set to vector (already sorted)
+    return std::vector<std::string>(it->second.begin(), it->second.end());
 }
 
 FreqProxTermsWriter::FieldStats FreqProxTermsWriter::getFieldStats(const std::string& fieldName) const {
@@ -220,6 +218,7 @@ void FreqProxTermsWriter::reset() {
     termToPosting_.clear();
     fieldLengths_.clear();
     fieldStats_.clear();
+    fieldToSortedTerms_.clear();
     bytesUsed_ = 0;  // Reset memory counter
 }
 
@@ -228,6 +227,7 @@ void FreqProxTermsWriter::clear() {
     termToPosting_.clear();
     fieldLengths_.clear();
     fieldStats_.clear();
+    fieldToSortedTerms_.clear();
     bytesUsed_ = 0;  // Reset memory counter
 }
 

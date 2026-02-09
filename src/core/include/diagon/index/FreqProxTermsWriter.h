@@ -9,6 +9,7 @@
 #include "diagon/util/IntBlockPool.h"
 
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -194,6 +195,11 @@ private:
     // Incremental field statistics (computed during indexing, not during flush)
     // Eliminates need to scan all posting lists during FreqProxTerms construction
     std::unordered_map<std::string, FieldStats> fieldStats_;
+
+    // Pre-sorted term index per field (maintained incrementally during indexing)
+    // Eliminates O(n log n) sorting during flush - getTermsForField() is now O(k)
+    // Trade-off: O(log n) insert per unique term vs O(n log n) sort on every flush
+    std::unordered_map<std::string, std::set<std::string>> fieldToSortedTerms_;
 
     /**
      * Add term occurrence to posting list
