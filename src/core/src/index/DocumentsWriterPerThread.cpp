@@ -10,6 +10,7 @@
 #include "diagon/codecs/lucene104/Lucene104FieldsConsumer.h"
 #include "diagon/index/DocValues.h"
 #include "diagon/index/FreqProxFields.h"
+#include "diagon/index/InMemoryNormsProducer.h"
 #include "diagon/index/SegmentWriteState.h"
 
 #include <atomic>
@@ -111,14 +112,14 @@ std::atomic<int> DocumentsWriterPerThread::nextSegmentNumber_{0};
 
 DocumentsWriterPerThread::DocumentsWriterPerThread()
     : config_(Config{})
-    , termsWriter_(fieldInfosBuilder_)
+    , termsWriter_(fieldInfosBuilder_, 50000)  // Pre-size for typical corpus (30k-50k terms)
     , codecName_("Lucene104") {}
 
 DocumentsWriterPerThread::DocumentsWriterPerThread(const Config& config,
                                                    store::Directory* directory,
                                                    const std::string& codecName)
     : config_(config)
-    , termsWriter_(fieldInfosBuilder_)
+    , termsWriter_(fieldInfosBuilder_, 50000)  // Pre-size for typical corpus
     , directory_(directory)
     , codecName_(codecName) {}
 
@@ -412,8 +413,19 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
         // Create Fields wrapper around in-memory postings (pass FieldInfos to expose actual fields)
         FreqProxFields fields(termsWriter_, segmentInfo->fieldInfos());
 
+        // Create norms producer from field lengths computed during indexing
+        auto normsProducer = std::make_unique<InMemoryNormsProducer>();
+        const auto& fieldLengths = termsWriter_.getFieldLengths();
+
+        // Populate norms from field lengths
+        for (const auto& [fieldName, docLengths] : fieldLengths) {
+            for (const auto& [docID, fieldLength] : docLengths) {
+                normsProducer->setNormFromLength(fieldName, docID, fieldLength);
+            }
+        }
+
         // Use streaming API - codec iterates over fields/terms/postings
-        consumer->write(fields, nullptr);  // norms=nullptr for now
+        consumer->write(fields, normsProducer.get());
 
         // Close consumer
         consumer->close();

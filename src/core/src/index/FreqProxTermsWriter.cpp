@@ -16,9 +16,22 @@ namespace index {
 FreqProxTermsWriter::FreqProxTermsWriter(FieldInfosBuilder& fieldInfosBuilder,
                                          size_t expectedTerms)
     : fieldInfosBuilder_(fieldInfosBuilder) {
-    // Pre-size term dictionary to avoid rehashing during indexing
-    // This significantly reduces malloc overhead
+    // Aggressive pre-sizing to minimize rehashing and malloc overhead
+    // Rehashing is expensive: allocate new buckets + move all entries
+
+    // Pre-size term dictionary (main data structure)
     termToPosting_.reserve(expectedTerms);
+
+    // Pre-size field-related containers (typical: 5-20 fields per schema)
+    // Reserve extra capacity (1.3x) to avoid rehashing as fields are added
+    constexpr size_t EXPECTED_FIELDS = 20;
+    fieldStats_.reserve(EXPECTED_FIELDS);
+    fieldToSortedTerms_.reserve(EXPECTED_FIELDS);
+    fieldNameToId_.reserve(EXPECTED_FIELDS);
+
+    // Pre-size per-document term frequency cache (typical: 50-100 unique terms per doc)
+    // This is reused across documents, so one-time allocation
+    termFreqsCache_.reserve(128);
 }
 
 void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) {
