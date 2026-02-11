@@ -67,6 +67,7 @@ add_diagon_test(FSTIterationTest unit/util/FSTIterationTest.cpp)
 add_diagon_test(FSTArcEncodingTest unit/util/FSTArcEncodingTest.cpp)
 add_diagon_test(FSTSerializationVerificationTest unit/util/FSTSerializationVerificationTest.cpp)
 add_diagon_test(LuceneFSTComparisonTest unit/util/LuceneFSTComparisonTest.cpp)
+add_diagon_test(FSTPerformanceGuard unit/util/FSTPerformanceGuard.cpp)
 add_diagon_test(BlockPoolTest unit/util/BlockPoolTest.cpp)
 add_diagon_test(BloomFilterTest unit/util/BloomFilterTest.cpp)
 
