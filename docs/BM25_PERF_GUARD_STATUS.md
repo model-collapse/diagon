@@ -197,13 +197,31 @@ To make BM25PerformanceGuard use real Reuters data:
 
 ---
 
+## Profiling Analysis
+
+See `docs/BM25_PERF_GUARD_PROFILING.md` for detailed profiling analysis of the SingleTerm_P50_Baseline test.
+
+**Key Findings**:
+- Query execution takes 460 µs (99.97% of total time)
+- Synthetic data has "market" in 99% of docs vs 5.3% in Reuters
+- 4.9x larger posting list explains ~5x of the slowdown
+- Residual 2x slowdown indicates implementation efficiency gap
+- **Conclusion**: Test "failures" are expected with synthetic data
+
+**Root Causes**:
+1. **Primary (5x)**: Synthetic data term distribution != real text
+2. **Secondary (2x)**: Implementation efficiency (postings decoding, BM25 scoring, heap ops)
+
+**Recommendation**: Run `/benchmark_diagon` on real Reuters to measure actual performance gap.
+
 ## Conclusion
 
 The BM25 Performance Guard infrastructure is **complete and working**. The tests successfully validate:
 - No crashes or segfaults
 - Basic query functionality works
 - Performance can be measured and tracked
+- Regression detection (compare Diagon vs Diagon over time)
 
-For production-quality performance comparison with Lucene, use the existing `/benchmark_diagon` and `/profile_diagon` skills which work with real Reuters data.
+**Important**: These tests use **synthetic data** and are NOT accurate for Lucene comparison. For production-quality performance comparison with Lucene, use the existing `/benchmark_diagon` and `/profile_diagon` skills which work with real Reuters data.
 
 The performance guard tests serve as **regression detection** - if future changes cause performance to degrade significantly, these tests will catch it.
