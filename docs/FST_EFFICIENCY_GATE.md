@@ -19,7 +19,30 @@ The FST Efficiency Gate is an automated system that:
 
 ## Quick Start
 
-### Run Benchmark and Check for Regressions
+### Option 1: CMake Task (Recommended)
+
+```bash
+cd /home/ubuntu/diagon/build
+
+# Check for regressions (runs benchmark + comparison)
+make check_fst_regression
+```
+
+**Exit codes**:
+- `0`: No significant regression (PASS)
+- `1`: Regression > 10% detected (FAIL)
+
+**First-time setup** (if no baseline exists):
+```bash
+# Establish baseline
+make update_fst_baseline
+
+# Commit baseline (required)
+git add benchmark_results/fst_baseline.json
+git commit -m "Establish FST baseline on [platform/date]"
+```
+
+### Option 2: Manual Execution
 
 ```bash
 cd /home/ubuntu/diagon/build/benchmarks
@@ -202,6 +225,114 @@ git commit -m "Update FST baseline: [reason for change]
 
 ---
 
+## CMake Tasks
+
+### check_fst_regression
+
+**Purpose**: Run FST benchmark and automatically check for performance regressions.
+
+**Usage**:
+```bash
+cd /home/ubuntu/diagon/build
+make check_fst_regression
+```
+
+**What it does**:
+1. Runs `FSTEfficiencyGate` benchmark (3 repetitions, aggregated results)
+2. Outputs results to `build/benchmarks/fst_current.json`
+3. Runs `check_fst_regression.py` comparing current vs baseline
+4. Reports regressions, warnings, and improvements
+5. Exits with code 0 (pass) or 1 (fail)
+
+**When to use**:
+- Before committing FST changes
+- In pre-merge CI/CD pipeline
+- After suspected performance regressions
+- Regular performance monitoring
+
+**Example output** (passing):
+```
+Running FST Efficiency Gate...
+Running 56 benchmarks...
+[Benchmark results...]
+
+Checking for regressions against baseline...
+✅ PASS: No significant regressions detected
+  Improvements:    2
+  Acceptable:     54
+  Warnings:        0
+  Critical:        0
+```
+
+**Example output** (warning):
+```
+⚠️  WARNING: Performance regressions detected (10-20% slower)
+  ⚠️  BM_FST_Lookup_ExactMatch: 159.8 ns → 181.5 ns (+13.6%)
+   Action: Review and consider optimization
+   Status: PASS (within 20% threshold)
+```
+
+**Example output** (critical failure):
+```
+❌ FAIL: Critical regressions detected (>20% slower)
+  ❌ BM_FST_Construction_10K: 2.55 ms → 3.32 ms (+30.2%)
+   Action: Investigate and fix before merging
+make: *** [check_fst_regression] Error 1
+```
+
+---
+
+### update_fst_baseline
+
+**Purpose**: Establish or update the FST performance baseline.
+
+**Usage**:
+```bash
+cd /home/ubuntu/diagon/build
+make update_fst_baseline
+```
+
+**What it does**:
+1. Runs `FSTEfficiencyGate` benchmark (5 repetitions for stable baseline)
+2. Saves results to `benchmark_results/fst_baseline.json`
+3. Prints reminder to commit the new baseline
+
+**When to use**:
+- **First-time setup**: No baseline exists yet
+- **After verified improvements**: Performance optimizations merged
+- **After architectural changes**: New FST implementation
+- **After environment changes**: New compiler, platform, or dependencies
+
+**⚠️ IMPORTANT**: Always commit baseline with explanation:
+```bash
+git add benchmark_results/fst_baseline.json
+git commit -m "Update FST baseline: [reason]
+
+[Detailed explanation of why baseline changed]
+[Performance improvements or environment changes]"
+```
+
+**DO NOT update baseline to make CI pass** - defeats the purpose of regression detection!
+
+**Example workflow** (after optimization):
+```bash
+# 1. Verify improvement
+make check_fst_regression
+# Output: ✅ BM_FST_Lookup_ExactMatch: 159.8 ns → 145.2 ns (-9.1% improvement)
+
+# 2. Update baseline (if improvement is real)
+make update_fst_baseline
+
+# 3. Commit with explanation
+git add benchmark_results/fst_baseline.json
+git commit -m "Update FST baseline: Optimized arc traversal
+
+Improved lookup performance by 9.1% through better cache locality
+in arc traversal. See PR #123 for details."
+```
+
+---
+
 ## CI/CD Integration
 
 ### GitHub Actions Workflow
@@ -239,22 +370,11 @@ jobs:
                 build
           cmake --build build -j$(nproc)
 
-      - name: Run FST Efficiency Gate
-        run: |
-          cd build/benchmarks
-          ./FSTEfficiencyGate \
-              --benchmark_out=current_fst.json \
-              --benchmark_out_format=json \
-              --benchmark_repetitions=3 \
-              --benchmark_report_aggregates_only=true
-
-      - name: Check for Regressions
+      - name: Check for FST Regressions
         id: regression_check
         run: |
-          python3 scripts/check_fst_regression.py \
-              build/benchmarks/current_fst.json \
-              benchmark_results/fst_baseline.json \
-              2>&1 | tee regression_report.txt
+          cd build
+          make check_fst_regression 2>&1 | tee ../regression_report.txt
         continue-on-error: true
 
       - name: Comment on PR
@@ -284,7 +404,7 @@ jobs:
         with:
           name: fst-benchmark-results
           path: |
-            build/benchmarks/current_fst.json
+            build/benchmarks/fst_current.json
             regression_report.txt
 ```
 

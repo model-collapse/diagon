@@ -163,9 +163,12 @@ def check_regressions(current_file: str, baseline_file: str) -> bool:
         print("❌ Error: No common benchmarks found between baseline and current")
         return False
 
-    # Analyze regressions
+    # Analyze regressions (skip stddev/cv as they're statistical variance, not performance)
     analyses: List[RegressionAnalysis] = []
     for name in sorted(common_names):
+        # Skip statistical variance measurements (stddev, cv) - they're not actual performance metrics
+        if '_stddev' in name or '_cv' in name:
+            continue
         analysis = analyze_regression(baseline_results[name], current_results[name])
         analyses.append(analysis)
 

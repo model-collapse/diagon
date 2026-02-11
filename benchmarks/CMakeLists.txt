@@ -735,3 +735,42 @@ target_link_libraries(CheckLongTokens
 # FST Efficiency Gate (Performance Regression Detection)
 add_diagon_benchmark(FSTEfficiencyGate FSTEfficiencyGate.cpp)
 
+# FST Regression Detection Task
+add_custom_target(check_fst_regression
+    COMMAND ${CMAKE_COMMAND} -E echo "Running FST Efficiency Gate..."
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/FSTEfficiencyGate
+        --benchmark_out=${CMAKE_CURRENT_BINARY_DIR}/fst_current.json
+        --benchmark_out_format=json
+        --benchmark_repetitions=3
+        --benchmark_report_aggregates_only=true
+    COMMAND ${CMAKE_COMMAND} -E echo ""
+    COMMAND ${CMAKE_COMMAND} -E echo "Checking for regressions against baseline..."
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_fst_regression.py
+        ${CMAKE_CURRENT_BINARY_DIR}/fst_current.json
+        ${CMAKE_SOURCE_DIR}/benchmark_results/fst_baseline.json
+    DEPENDS FSTEfficiencyGate
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Running FST performance regression detection"
+    VERBATIM
+)
+
+# FST Baseline Update Task (use after verified improvements)
+add_custom_target(update_fst_baseline
+    COMMAND ${CMAKE_COMMAND} -E echo "Establishing new FST performance baseline..."
+    COMMAND ${CMAKE_COMMAND} -E echo "Running benchmark with 5 repetitions for stable baseline..."
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/FSTEfficiencyGate
+        --benchmark_out=${CMAKE_SOURCE_DIR}/benchmark_results/fst_baseline.json
+        --benchmark_out_format=json
+        --benchmark_repetitions=5
+        --benchmark_report_aggregates_only=true
+    COMMAND ${CMAKE_COMMAND} -E echo ""
+    COMMAND ${CMAKE_COMMAND} -E echo "✅ Baseline updated: benchmark_results/fst_baseline.json"
+    COMMAND ${CMAKE_COMMAND} -E echo "⚠️  IMPORTANT: Commit this baseline with explanation:"
+    COMMAND ${CMAKE_COMMAND} -E echo "   git add benchmark_results/fst_baseline.json"
+    COMMAND ${CMAKE_COMMAND} -E echo "   git commit -m \"Update FST baseline: [reason]\""
+    DEPENDS FSTEfficiencyGate
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Establishing new FST performance baseline"
+    VERBATIM
+)
+
