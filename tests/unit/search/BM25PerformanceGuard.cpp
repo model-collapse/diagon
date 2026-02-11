@@ -2,30 +2,30 @@
 // Licensed under the Apache License, Version 2.0
 
 /**
- * BM25 Performance Guard Tests - SMOKE TESTS WITH SYNTHETIC DATA
+ * BM25 Performance Guard Tests - REAL REUTERS DATA
  *
- * NOTE: These tests use SYNTHETIC data for quick smoke testing, not real Reuters data.
- * For accurate performance comparison with Lucene baseline, use:
- *   - /benchmark_diagon skill (real Reuters benchmark)
- *   - /profile_diagon skill (detailed profiling)
+ * These tests use the REAL Reuters-21578 dataset for accurate performance comparison
+ * against Lucene baseline.
  *
  * Baseline: Lucene 11.0.0-SNAPSHOT on Reuters-21578 (19,043 documents, 64,664 unique terms)
  * Date Established: 2026-02-11
  * Reference: docs/LUCENE_BM25_PERFORMANCE_BASELINE.md
  *
- * Current Results (Synthetic 5K docs, 100 iterations):
- * - Single-term P50: 464 µs (vs Lucene 47 µs on Reuters)
- * - OR-5 P50: 3,073 µs (vs Lucene 110 µs on Reuters)
- * - AND-2 P50: 597 µs (vs Lucene 43 µs on Reuters)
+ * Lucene Baseline Performance:
+ * - Indexing: 12,024 docs/sec
+ * - Single-term P50: 46.8 µs (term: "market", 1,007 hits)
+ * - OR-5 P50: 109.6 µs (oil, trade, market, price, dollar)
+ * - AND-2 P50: 43.1 µs (oil AND price)
  *
- * Performance difference is expected because:
- * - Synthetic random data vs real Reuters text
- * - Small index (5K docs) vs full Reuters (19K docs)
- * - Cold cache on fresh index
- * - Different term distributions and posting list patterns
+ * Diagon Targets (with 15-20% margin):
+ * - Single-term P50: ≤ 65 µs
+ * - OR-5 P50: ≤ 126 µs
+ * - AND-2 P50: ≤ 51 µs
  *
- * Purpose: Smoke test to ensure no crashes and basic functionality works
- * For real performance validation, use Reuters benchmark tools
+ * Critical Thresholds (never exceed 2x Lucene):
+ * - Single-term: < 100 µs
+ * - OR-5: < 220 µs
+ * - AND-2: < 90 µs
  */
 
 #include <gtest/gtest.h>
@@ -40,11 +40,12 @@
 #include "diagon/search/BM25Similarity.h"
 #include "diagon/store/MMapDirectory.h"
 
+#include "../../../benchmarks/dataset/ReutersDatasetAdapter.h"
+
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <vector>
-#include <random>
 
 using namespace diagon;
 using namespace diagon::document;
@@ -55,60 +56,17 @@ using namespace diagon::store;
 namespace {
 
 // Test index path
-constexpr const char* TEST_INDEX_PATH = "/tmp/diagon_bm25_perf_guard_index";
+constexpr const char* TEST_INDEX_PATH = "/tmp/diagon_bm25_perf_guard_reuters_index";
+
+// Reuters dataset path
+constexpr const char* REUTERS_DATASET_PATH = "/home/ubuntu/opensearch_warmroom/lucene/lucene/benchmark/work/reuters-out";
 
 // Measurement parameters (reduced for faster test execution)
 constexpr int WARMUP_ITERATIONS = 20;
 constexpr int MEASUREMENT_ITERATIONS = 100;
 
 /**
- * Generate synthetic Reuters-like documents for testing
- * (Real Reuters data requires separate download)
- */
-std::vector<std::unique_ptr<Document>> generateTestDocuments(int count) {
-    std::vector<std::unique_ptr<Document>> docs;
-    docs.reserve(count);
-
-    // Common Reuters terms
-    std::vector<std::string> terms = {
-        "market", "trade", "oil", "price", "dollar", "stock", "company",
-        "export", "import", "economy", "financial", "investor", "trading",
-        "petroleum", "barrel", "cocoa", "coffee", "copper", "zinc"
-    };
-
-    std::mt19937 rng(42); // Deterministic
-    std::uniform_int_distribution<int> term_dist(0, terms.size() - 1);
-    std::uniform_int_distribution<int> len_dist(50, 200);
-
-    for (int i = 0; i < count; i++) {
-        auto doc = std::make_unique<Document>();
-
-        // Generate title (5 terms)
-        std::string title;
-        for (int j = 0; j < 5; j++) {
-            if (j > 0) title += " ";
-            title += terms[term_dist(rng)];
-        }
-
-        // Generate body (50-200 terms)
-        std::string body;
-        int body_len = len_dist(rng);
-        for (int j = 0; j < body_len; j++) {
-            if (j > 0) body += " ";
-            body += terms[term_dist(rng)];
-        }
-
-        doc->add(std::make_unique<TextField>("title", title, false));
-        doc->add(std::make_unique<TextField>("body", body, false));
-
-        docs.push_back(std::move(doc));
-    }
-
-    return docs;
-}
-
-/**
- * Create test index with synthetic documents
+ * Create test index with real Reuters-21578 data
  */
 void createTestIndex() {
     // Clean index directory
@@ -122,14 +80,23 @@ void createTestIndex() {
 
     index::IndexWriter writer(*directory, config);
 
-    // Generate and index documents (reduced for faster test execution)
-    auto docs = generateTestDocuments(5000); // Enough for performance testing
-    for (const auto& doc : docs) {
-        writer.addDocument(*doc);
+    // Index real Reuters documents
+    diagon::benchmarks::ReutersDatasetAdapter adapter(REUTERS_DATASET_PATH);
+    document::Document doc;
+
+    int docCount = 0;
+    while (adapter.nextDocument(doc)) {
+        writer.addDocument(doc);
+        docCount++;
+
+        // Clear doc for next iteration
+        doc = document::Document();
     }
 
     writer.commit();
     writer.close();
+
+    std::cout << "Indexed " << docCount << " Reuters documents\n";
 }
 
 /**
@@ -182,6 +149,12 @@ struct LatencyStats {
 class BM25PerformanceGuardTest : public ::testing::Test {
 protected:
     static void SetUpTestSuite() {
+        // Check if Reuters dataset exists
+        if (!std::filesystem::exists(REUTERS_DATASET_PATH)) {
+            GTEST_SKIP() << "Reuters dataset not found at: " << REUTERS_DATASET_PATH
+                         << "\nPlease run: cd /home/ubuntu/opensearch_warmroom/lucene/lucene/benchmark && ./gradlew getReuters";
+        }
+
         createTestIndex();
     }
 
