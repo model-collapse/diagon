@@ -56,6 +56,18 @@ add_diagon_benchmark(SearchBenchmark
     SearchBenchmark.cpp
 )
 
+add_diagon_benchmark(WANDBenchmark
+    WANDBenchmark.cpp
+)
+
+add_diagon_benchmark(ReutersWANDBenchmark
+    ReutersWANDBenchmark.cpp
+)
+
+add_diagon_benchmark(LuceneMultiTermComparison
+    LuceneMultiTermComparison.cpp
+)
+
 # ==================== SIMD Benchmarks ====================
 
 add_diagon_benchmark(SIMDBenchmark
@@ -89,6 +101,31 @@ add_diagon_benchmark(SIMDComparisonBenchmark
 add_diagon_benchmark(PostingsFormatBenchmark
     PostingsFormatBenchmark.cpp
 )
+
+# ==================== Reuters Reindexer Tool ====================
+
+add_executable(ReutersReindexer ReutersReindexer.cpp)
+target_link_libraries(ReutersReindexer diagon_core)
+
+# ==================== Tokenizer Comparison Tool ====================
+
+add_executable(TokenizerComparison TokenizerComparison.cpp)
+target_link_libraries(TokenizerComparison diagon_core)
+
+# ==================== StandardTokenizer Test ====================
+
+add_executable(StandardTokenizerTest StandardTokenizerTest.cpp)
+target_link_libraries(StandardTokenizerTest diagon_core)
+
+# ==================== Quick BM25 Test ====================
+
+add_executable(QuickBM25Test QuickBM25Test.cpp)
+target_link_libraries(QuickBM25Test diagon_core)
+
+# ==================== BM25 Diagnostic Test ====================
+
+add_executable(BM25DiagnosticTest BM25DiagnosticTest.cpp)
+target_link_libraries(BM25DiagnosticTest diagon_core)
 
 add_diagon_benchmark(PostingsOptimizationBenchmark
     PostingsOptimizationBenchmark.cpp
@@ -163,32 +200,32 @@ add_diagon_benchmark(ScaleComparisonBenchmark
     ScaleComparisonBenchmark.cpp
 )
 
-# ==================== Diagon Profiler (CONJUGATE Performance Comparison) ====================
+# ==================== Diagon Profiler V1 (CONJUGATE Performance Comparison) ====================
 
-# Diagon profiler for comparing against Lucene (requires nlohmann/json)
-add_executable(DiagonProfiler diagon_profiler.cpp)
+# Diagon profiler V1 for comparing against Lucene (requires nlohmann/json)
+add_executable(DiagonProfilerV1 diagon_profiler.cpp)
 
-target_link_libraries(DiagonProfiler
+target_link_libraries(DiagonProfilerV1
     PRIVATE
         diagon_core
 )
 
 # Link ICU directly
 if(TARGET ICU::uc AND TARGET ICU::i18n)
-    target_link_libraries(DiagonProfiler PRIVATE ICU::uc ICU::i18n)
+    target_link_libraries(DiagonProfilerV1 PRIVATE ICU::uc ICU::i18n)
 endif()
 
-target_include_directories(DiagonProfiler
+target_include_directories(DiagonProfilerV1
     PRIVATE
         ${CMAKE_SOURCE_DIR}/src/core/include
 )
 
 # Register as benchmark target
-add_custom_target(run_DiagonProfiler
-    COMMAND DiagonProfiler
-    DEPENDS DiagonProfiler
+add_custom_target(run_DiagonProfilerV1
+    COMMAND DiagonProfilerV1
+    DEPENDS DiagonProfilerV1
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    COMMENT "Running Diagon profiler for Lucene comparison"
+    COMMENT "Running Diagon profiler V1 for Lucene comparison"
 )
 
 # Diagon profiler debug tool
@@ -391,6 +428,136 @@ target_include_directories(ReutersBenchmark
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# Diagon Profiler (matching Lucene profiler for comparison)
+add_executable(DiagonProfiler DiagonProfiler.cpp)
+
+target_link_libraries(DiagonProfiler
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(DiagonProfiler PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(DiagonProfiler
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Detailed Query Profiler (phase-by-phase breakdown)
+add_executable(DetailedQueryProfiler DetailedQueryProfiler.cpp)
+
+target_link_libraries(DetailedQueryProfiler
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(DetailedQueryProfiler PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(DetailedQueryProfiler
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Compare Top-10 results with Lucene
+add_executable(CompareTop10 CompareTop10.cpp)
+
+target_link_libraries(CompareTop10
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(CompareTop10 PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(CompareTop10
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
+# Check term statistics
+add_executable(CheckTermStats CheckTermStats.cpp)
+
+target_link_libraries(CheckTermStats
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(CheckTermStats PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(CheckTermStats
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
+# WAND Instrumented Profiler
+add_executable(WANDInstrumentedProfiler WANDInstrumentedProfiler.cpp)
+
+target_link_libraries(WANDInstrumentedProfiler
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(WANDInstrumentedProfiler PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(WANDInstrumentedProfiler
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
+# Debug WAND tool
+add_executable(debug_wand debug_wand.cpp)
+
+# Score breakdown diagnostic tool
+add_executable(score_breakdown score_breakdown.cpp)
+
+target_link_libraries(score_breakdown
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(score_breakdown PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(score_breakdown
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(debug_wand
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(debug_wand PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(debug_wand
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
 # ==================== Combined Benchmark Target ====================
 
 add_custom_target(run_all_benchmarks
@@ -398,4 +565,173 @@ add_custom_target(run_all_benchmarks
     COMMENT "Running all benchmarks"
 )
 
+# ==================== Results Comparison Tools ====================
+
+# ReutersResultsComparison - not a benchmark, just outputs results
+add_executable(ReutersResultsComparison ReutersResultsComparison.cpp)
+
+set_target_properties(ReutersResultsComparison PROPERTIES
+    BUILD_RPATH_USE_ORIGIN TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    BUILD_RPATH "\$ORIGIN/../src/core:/usr/lib/x86_64-linux-gnu"
+)
+
+target_link_libraries(ReutersResultsComparison
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(ReutersResultsComparison PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(ReutersResultsComparison
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
+# DiagonIndexDiagnostics - inspect index statistics
+add_executable(DiagonIndexDiagnostics DiagonIndexDiagnostics.cpp)
+
+set_target_properties(DiagonIndexDiagnostics PROPERTIES
+    BUILD_RPATH_USE_ORIGIN TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    BUILD_RPATH "\$ORIGIN/../src/core:/usr/lib/x86_64-linux-gnu"
+)
+
+target_link_libraries(DiagonIndexDiagnostics
+    PRIVATE
+        diagon_core
+)
+
+# Link ICU directly
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(DiagonIndexDiagnostics PRIVATE ICU::uc ICU::i18n)
+endif()
+
+target_include_directories(DiagonIndexDiagnostics
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
 message(STATUS "Diagon Benchmarks configured")
+
+add_executable(PostingsDecodingProfiler PostingsDecodingProfiler.cpp)
+target_link_libraries(PostingsDecodingProfiler
+    PRIVATE
+        diagon_core
+)
+
+add_executable(FSTTraversalProfiler FSTTraversalProfiler.cpp)
+target_link_libraries(FSTTraversalProfiler
+    PRIVATE
+        diagon_core
+)
+
+add_executable(FSTProfileBenchmark FSTProfileBenchmark.cpp)
+target_link_libraries(FSTProfileBenchmark
+    PRIVATE
+        diagon_core
+)
+
+add_executable(BM25ProfileBenchmark BM25ProfileBenchmark.cpp)
+target_link_libraries(BM25ProfileBenchmark
+    PRIVATE
+        diagon_core
+)
+
+add_executable(BM25DetailedProfiler BM25DetailedProfiler.cpp)
+target_link_libraries(BM25DetailedProfiler
+    PRIVATE
+        diagon_core
+)
+
+add_executable(SearchInternalProfiler SearchInternalProfiler.cpp)
+target_link_libraries(SearchInternalProfiler
+    PRIVATE
+        diagon_core
+)
+target_compile_definitions(SearchInternalProfiler PRIVATE DIAGON_PROFILE_SEARCH)
+
+add_executable(ManualSearchProfiler ManualSearchProfiler.cpp)
+target_link_libraries(ManualSearchProfiler
+    PRIVATE
+        diagon_core
+)
+
+add_executable(WANDEffectivenessProfiler WANDEffectivenessProfiler.cpp)
+target_link_libraries(WANDEffectivenessProfiler
+    PRIVATE
+        diagon_core
+)
+
+add_executable(WANDDebugStats WANDDebugStats.cpp)
+target_link_libraries(WANDDebugStats
+    PRIVATE
+        diagon_core
+)
+
+add_executable(TestIndexBug TestIndexBug.cpp)
+target_link_libraries(TestIndexBug
+    PRIVATE
+        diagon_core
+)
+
+add_executable(InspectIndexFields InspectIndexFields.cpp)
+target_link_libraries(InspectIndexFields
+    PRIVATE
+        diagon_core
+)
+
+add_executable(InspectIndexFiles InspectIndexFiles.cpp)
+target_link_libraries(InspectIndexFiles
+    PRIVATE
+        diagon_core
+)
+
+add_executable(DebugTestIndex DebugTestIndex.cpp)
+target_link_libraries(DebugTestIndex
+    PRIVATE
+        diagon_core
+)
+
+add_executable(ProfileOR5 ProfileOR5.cpp)
+target_link_libraries(ProfileOR5
+    PRIVATE
+        diagon_core
+)
+
+add_executable(ProfileOR5Short ProfileOR5Short.cpp)
+target_link_libraries(ProfileOR5Short
+    PRIVATE
+        diagon_core
+)
+
+add_executable(ProfileIndexOpening ProfileIndexOpening.cpp)
+target_link_libraries(ProfileIndexOpening
+    PRIVATE
+        diagon_core
+)
+
+add_executable(AnalyzeHitCountDifference AnalyzeHitCountDifference.cpp)
+target_link_libraries(AnalyzeHitCountDifference
+    PRIVATE
+        diagon_core
+)
+
+add_executable(TestWANDHitCounting TestWANDHitCounting.cpp)
+target_link_libraries(TestWANDHitCounting
+    PRIVATE
+        diagon_core
+)
+
+add_executable(CheckLongTokens CheckLongTokens.cpp)
+target_link_libraries(CheckLongTokens
+    PRIVATE
+        diagon_core
+)
+
+# FST Efficiency Gate (Performance Regression Detection)
+add_diagon_benchmark(FSTEfficiencyGate FSTEfficiencyGate.cpp)
+
