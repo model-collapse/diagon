@@ -8,19 +8,32 @@
 
 ## Executive Summary
 
-| Component | Lucene Baseline | Diagon Target | Diagon Current | Status |
-|-----------|-----------------|---------------|----------------|--------|
-| **OR-5 P50** | 109.6 µs | ≤ 126 µs | TBD | 🔄 Pending |
-| **OR-5 P99** | 211.1 µs | ≤ 250 µs | TBD | 🔄 Pending |
-| **Single-term P50** | 46.8 µs | ≤ 65 µs | TBD | 🔄 Pending |
-| **AND-2 P50** | 43.1 µs | ≤ 51 µs | TBD | 🔄 Pending |
+| Component | Lucene Baseline<br/>(Reuters) | Diagon Target | Diagon Smoke Test<br/>(Synthetic) | Status |
+|-----------|-----------------|---------------|-------------------|--------|
+| **OR-5 P50** | 109.6 µs | ≤ 126 µs | 3,073 µs | ⚠️ Needs Real Data |
+| **OR-5 P99** | 211.1 µs | ≤ 250 µs | 19,111 µs | ⚠️ Needs Real Data |
+| **Single-term P50** | 46.8 µs | ≤ 65 µs | 464 µs | ⚠️ Needs Real Data |
+| **AND-2 P50** | 43.1 µs | ≤ 51 µs | 597 µs | ⚠️ Needs Real Data |
 | **Indexing** | 12,024 docs/sec | ≥ 10,000 docs/sec | TBD | 🔄 Pending |
 
+**Status Update (2026-02-11)**:
+- ✅ BM25PerformanceGuard test created, compiles, and runs successfully
+- ✅ Segfault fixed (directory lifecycle issue resolved)
+- ✅ Using MMapDirectory for better I/O performance
+- ⚠️ Current results use synthetic data, not comparable to Lucene Reuters baseline
+- 📊 Smoke test results: Single-term=464µs, OR-5=3,073µs, AND-2=597µs
+- 🔍 Performance difference expected: synthetic random data vs real text has different characteristics
+
+**Key Findings**:
+- **Smoke tests work**: No crashes, basic functionality validated
+- **Synthetic data != Reuters**: Random terms have different FST/posting patterns than real text
+- **For accurate comparison**: Need to benchmark on real Reuters dataset
+
 **Next Actions**:
-1. Build Diagon with BM25PerformanceGuard tests
-2. Run tests on Reuters-21578 dataset (or synthetic equivalent)
-3. Measure current Diagon performance
-4. Update this document with results
+1. ~~Build Diagon with BM25PerformanceGuard tests~~ ✅ Complete
+2. ~~Debug segfault in index reading~~ ✅ Fixed (directory lifecycle)
+3. Measure Diagon performance on **real Reuters data** with `/benchmark_diagon` skill
+4. Update this document with apples-to-apples comparison results
 5. Identify bottlenecks if performance below target
 6. Optimize until Diagon matches or exceeds Lucene
 
