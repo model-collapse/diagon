@@ -10,11 +10,13 @@ set(DIAGON_CORE_SOURCES
     src/util/BitSet.cpp
     src/util/NumericUtils.cpp
     src/util/FST.cpp
+    src/util/PackedFST.cpp
     src/util/ByteBlockPool.cpp
     src/util/IntBlockPool.cpp
     src/util/StreamVByte.cpp
     src/util/BloomFilter.cpp
     src/util/CityHash.cpp
+    src/util/SearchProfiler.cpp
     src/util/packed/DirectWriter.cpp
     src/util/packed/DirectMonotonicWriter.cpp
 
@@ -39,6 +41,7 @@ set(DIAGON_CORE_SOURCES
     src/index/IndexWriter.cpp
     src/index/FreqProxTermsWriter.cpp
     src/index/FreqProxFields.cpp
+    src/index/InMemoryNormsProducer.cpp
     src/index/DocumentsWriterPerThread.cpp
     src/index/DocumentsWriter.cpp
     src/index/SegmentInfo.cpp
@@ -87,6 +90,7 @@ set(DIAGON_CORE_SOURCES
     src/search/IndexSearcher.cpp
     src/search/BM25ScorerSIMD.cpp
     src/search/WANDScorer.cpp
+    src/search/MaxScoreBulkScorer.cpp
 
     # Sparse (Sparse vector support)
     src/sparse/SparseVector.cpp
@@ -263,10 +267,13 @@ set(DIAGON_CORE_HEADERS
     include/diagon/search/TopDocs.h
     include/diagon/search/Collector.h
     include/diagon/search/TopScoreDocCollector.h
+    include/diagon/search/TotalHitCountCollector.h
     include/diagon/search/TermQuery.h
     include/diagon/search/NumericRangeQuery.h
     include/diagon/search/DoubleRangeQuery.h
     include/diagon/search/MatchAllDocsQuery.h
+    include/diagon/search/BulkScorer.h
+    include/diagon/search/MaxScoreBulkScorer.h
     include/diagon/search/BM25Similarity.h
 
     # Sparse
@@ -318,6 +325,9 @@ set(DIAGON_CORE_HEADERS
 # ==================== Library Target ====================
 
 add_library(diagon_core SHARED ${DIAGON_CORE_SOURCES} ${DIAGON_CORE_HEADERS})
+
+# Enable search profiling for SearchInternalProfiler (can be disabled for production)
+target_compile_definitions(diagon_core PRIVATE DIAGON_PROFILE_SEARCH)
 
 # TopScoreDocCollector needs proper NaN/infinity handling, disable -ffast-math for it
 if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")

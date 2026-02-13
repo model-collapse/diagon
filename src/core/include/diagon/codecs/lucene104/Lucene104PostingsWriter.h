@@ -135,6 +135,18 @@ public:
      */
     std::vector<uint8_t> getBytes() const;
 
+    /**
+     * Get accumulated skip bytes from in-memory buffer.
+     * @return Vector of skip data bytes
+     */
+    std::vector<uint8_t> getSkipBytes() const;
+
+    /**
+     * Get skip file name.
+     * @return Skip file name
+     */
+    std::string getSkipFileName() const { return skipFileName_; }
+
 private:
     // Output files
     std::unique_ptr<store::IndexOutput> docOut_;  // Doc IDs and frequencies
@@ -152,8 +164,11 @@ private:
     int64_t totalTermFreq_;
 
     // Segment info
+    store::Directory* directory_;  // Directory for writing files
     std::string segmentName_;
     std::string segmentSuffix_;
+    std::string docFileName_;   // Full .doc file name
+    std::string skipFileName_;  // Full .skp file name
 
     // StreamVByte buffering
     static constexpr int BUFFER_SIZE = 4;  // StreamVByte processes 4 integers at a time
@@ -162,7 +177,8 @@ private:
     int bufferPos_;
 
     // Block-Max WAND support
-    static constexpr int SKIP_INTERVAL = 128;  // Create skip entry every 128 docs
+    // Lowered from 256 to 64 to create more skip entries for tighter max score bounds
+    static constexpr int SKIP_INTERVAL = 64;  // Create skip entry every 64 docs (denser than Lucene)
 
     // Block-level impact tracking (for next skip entry)
     int32_t blockMaxFreq_;       // Max frequency in current block

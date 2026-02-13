@@ -66,7 +66,7 @@ public:
      * @param fields Fields to write (provides iterator)
      * @param norms Norms producer (optional)
      */
-    void write(index::Fields& fields, index::NormsProducer* norms) override;
+    void write(index::Fields& fields, codecs::NormsProducer* norms) override;
 
     /**
      * Write a field's posting lists (legacy batch API)

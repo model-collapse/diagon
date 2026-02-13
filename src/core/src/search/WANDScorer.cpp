@@ -3,8 +3,11 @@
 
 #include "diagon/search/WANDScorer.h"
 #include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
+#include "diagon/util/ScalingUtils.h"
+#include "diagon/util/SearchProfiler.h"
 
 #include <algorithm>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
 
@@ -15,15 +18,26 @@ WANDScorer::WANDScorer(std::vector<std::unique_ptr<Scorer>>& scorers,
                        const BM25Similarity& similarity, int minShouldMatch)
     : similarity_(similarity)
     , minShouldMatch_(minShouldMatch)
-    , minCompetitiveScore_(0.0f)
+    , scalingFactor_(0)        // Will be computed below
+    , minCompetitiveScore_(0)  // Scaled integer, starts at 0
+    , leadCost_(0)
     , lead_(nullptr)
     , doc_(-1)
     , leadScore_(0.0f)
     , freq_(0)
-    , tailMaxScore_(0.0f)
+    , tailMaxScore_(0)         // Scaled integer
     , tailSize_(0)
     , cost_(0)
-    , upTo_(-1) {
+    , upTo_(-1)
+    , docsScored_(0)           // Instrumentation
+    , tailPromotions_(0)
+    , maxScoreUpdates_(0)
+    , matchingDocs_(0)
+    , blockBoundaryHits_(0)    // Phase 2 instrumentation
+    , blockBoundaryMisses_(0)  // Phase 2 instrumentation
+    , blocksSkipped_(0)        // Phase 3 instrumentation
+    , moveToNextBlockCalls_(0) // Phase 3 instrumentation
+    , debugPrint_(false) {
 
     if (minShouldMatch >= static_cast<int>(scorers.size())) {
         throw std::invalid_argument("minShouldMatch should be < number of scorers");
@@ -31,6 +45,13 @@ WANDScorer::WANDScorer(std::vector<std::unique_ptr<Scorer>>& scorers,
 
     // Take ownership of scorers
     allScorers_ = std::move(scorers);
+
+    // Compute scaling factor from first scorer's max score
+    // This determines the precision of integer comparisons
+    if (!allScorers_.empty()) {
+        float maxPossibleScore = allScorers_[0]->getMaxScore(index::PostingsEnum::NO_MORE_DOCS);
+        scalingFactor_ = util::ScalingUtils::scalingFactor(maxPossibleScore);
+    }
 
     // Create wrappers for each scorer
     wrappers_.reserve(allScorers_.size());
@@ -51,18 +72,36 @@ WANDScorer::WANDScorer(std::vector<std::unique_ptr<Scorer>>& scorers,
         cost_ += scorerCost;
     }
 
+    // Initialize leadCost_ (will be updated during iteration)
+    leadCost_ = cost_;
+
     // Reserve space for heaps
     head_.reserve(allScorers_.size());
     tail_.reserve(allScorers_.size());
 }
 
-WANDScorer::~WANDScorer() = default;
+WANDScorer::~WANDScorer() {
+    if (debugPrint_) {
+        std::cerr << "[WAND Stats] "
+                  << "Docs scored: " << docsScored_
+                  << ", Matching: " << matchingDocs_
+                  << ", Tail promotions: " << tailPromotions_
+                  << ", Max score updates: " << maxScoreUpdates_
+                  << ", moveToNextBlock calls: " << moveToNextBlockCalls_
+                  << ", Blocks skipped: " << blocksSkipped_
+                  << std::endl;
+    }
+}
 
 int WANDScorer::nextDoc() {
+
     return advance(doc_ + 1);
 }
 
-int WANDScorer::advance(int target) {
+int WANDScorer::advanceApproximation(int target) {
+
+    // Phase 1: Return next candidate without checking if it matches
+
     // Move lead scorers back to tail
     pushBackLeads(target);
 
@@ -80,40 +119,97 @@ int WANDScorer::advance(int target) {
         return doc_ = index::PostingsEnum::NO_MORE_DOCS;
     }
 
-    // Set doc to head top
+    // Set doc to head top (candidate)
     doc_ = headTop->doc;
+    return doc_;
+}
+
+bool WANDScorer::doMatches() {
+
+    // Phase 2: Check if current candidate satisfies constraints
 
     // Move scorers on doc from head to lead
     moveToNextCandidate();
 
-    // Check if this doc matches constraints
-    while (!matches()) {
-        // Can't possibly match
-        if (leadScore_ + tailMaxScore_ < minCompetitiveScore_ ||
-            freq_ + tailSize_ < minShouldMatch_) {
-            // Move to next doc
-            headTop = advanceHead(doc_ + 1);
-            if (headTop == nullptr) {
-                return doc_ = index::PostingsEnum::NO_MORE_DOCS;
+    // Try to satisfy constraints by advancing tail scorers
+    while (true) {
+        // Check if document cannot meet minShouldMatch constraint (truly doesn't match)
+        if (freq_ + tailSize_ < minShouldMatch_) {
+            return false;  // Can never meet minShouldMatch, not a match
+        }
+
+        // Check if we meet minShouldMatch
+        if (matches()) {
+            // This document matches the query!
+            matchingDocs_++;  // Count for totalHits (ALL matches)
+
+            // Compute max possible score to check competitiveness
+            int64_t headMaxScore = 0;
+            for (ScorerWrapper* wrapper : head_) {
+                headMaxScore += wrapper->scaledMaxScore;
             }
-            doc_ = headTop->doc;
-            moveToNextCandidate();
-        } else {
-            // Advance a tail scorer
+            int64_t scaledLeadScore = util::ScalingUtils::scaleMaxScore(leadScore_, scalingFactor_);
+            int64_t maxPossible = scaledLeadScore + headMaxScore + tailMaxScore_;
+
+            // Now check if it's competitive for top-K
+            if (maxPossible < minCompetitiveScore_) {
+                // Document matches but isn't competitive, skip it
+                return false;
+            }
+
+            // Document matches AND is competitive
+            return true;
+        }
+
+        // We don't meet minShouldMatch yet
+        // Try advancing a tail scorer to get more term matches
+        if (tailSize_ > 0) {
             advanceTail();
+        } else {
+            // No more tail scorers to try, but we don't meet minShouldMatch
+            return false;
         }
     }
+}
 
-    return doc_;
+int WANDScorer::advance(int target) {
+
+    // Two-phase iteration: repeatedly call approximation then matches until we find a match
+    while (true) {
+        // Phase 1: Get next candidate
+        int candidate = advanceApproximation(target);
+
+        if (candidate == index::PostingsEnum::NO_MORE_DOCS) {
+            return candidate;
+        }
+
+        // Instrumentation: Count every candidate we examine
+        docsScored_++;
+
+        // Phase 2: Check if candidate matches
+        bool isMatch = doMatches();
+
+        // Count ALL matching documents for totalHits, even if not competitive
+        // This is done inside doMatches() when matches() returns true
+
+        if (isMatch) {
+            return candidate;
+        }
+
+        // Candidate didn't match, try next doc
+        target = candidate + 1;
+    }
 }
 
 float WANDScorer::score() const {
+
     // Score is already computed in leadScore_
     return leadScore_;
 }
 
 void WANDScorer::setMinCompetitiveScore(float minScore) {
-    minCompetitiveScore_ = minScore;
+    // Phase 1: Scale min score to integer (round DOWN to be conservative)
+    minCompetitiveScore_ = util::ScalingUtils::scaleMinScore(minScore, scalingFactor_);
 }
 
 void WANDScorer::addLead(ScorerWrapper* wrapper) {
@@ -216,41 +312,125 @@ void WANDScorer::moveToNextCandidate() {
 }
 
 bool WANDScorer::matches() {
-    // Check minShouldMatch constraint
+    // Only check minShouldMatch constraint
+    // The collector will filter by score for top-K
     if (freq_ < minShouldMatch_) {
-        return false;
-    }
-
-    // Check score constraint
-    if (leadScore_ < minCompetitiveScore_) {
         return false;
     }
 
     return true;
 }
 
-void WANDScorer::updateMaxScores(int target) {
-    upTo_ = index::PostingsEnum::NO_MORE_DOCS;
+void WANDScorer::moveToNextBlock(int target) {
 
-    // Find minimum block boundary from head scorers
-    for (ScorerWrapper* wrapper : head_) {
-        if (wrapper->doc <= upTo_ && wrapper->cost <= 1000000) {  // Cost threshold
-            // TODO: Call advanceShallow() on impacts enum
-            // For now, use conservative estimate
-            wrapper->maxScore = 100.0f;  // Placeholder
+    moveToNextBlockCalls_++;  // Instrumentation
+
+    // Phase 3: Skip blocks that cannot produce competitive scores
+    //
+    // Based on Lucene WANDScorer.java lines 400-430:
+    // "We need to find the next block where the sum of max scores
+    // could potentially produce a competitive hit."
+    //
+    // Algorithm:
+    // 1. Compute max scores for current window [target, upTo_]
+    // 2. Check: sum(head maxScores) + sum(tail maxScores) >= minCompetitiveScore?
+    // 3. If YES: found competitive block, return
+    // 4. If NO: skip this block (advance upTo_), repeat from step 1
+    //
+    // This reduces documents scored by skipping entire non-competitive blocks.
+
+    while (upTo_ < index::PostingsEnum::NO_MORE_DOCS) {
+        // Update max scores for all scorers in range [target, upTo_]
+        // (This is a subset of what updateMaxScores() does)
+
+        // Compute head max scores
+        int64_t headMaxScore = 0;
+        for (ScorerWrapper* wrapper : head_) {
+            wrapper->scorer->advanceShallow(target);
+            float maxScore = wrapper->scorer->getMaxScore(upTo_);
+            int64_t scaledMaxScore = util::ScalingUtils::scaleMaxScore(maxScore, scalingFactor_);
+            headMaxScore += scaledMaxScore;
         }
+
+        // Compute tail max scores
+        int64_t tailMaxScore = 0;
+        for (int i = 0; i < tailSize_; ++i) {
+            tail_[i]->scorer->advanceShallow(target);
+            float maxScore = tail_[i]->scorer->getMaxScore(upTo_);
+            int64_t scaledMaxScore = util::ScalingUtils::scaleMaxScore(maxScore, scalingFactor_);
+            tailMaxScore += scaledMaxScore;
+        }
+
+        // Check if this block can produce competitive scores
+        int64_t totalMaxScore = headMaxScore + tailMaxScore;
+        if (totalMaxScore >= minCompetitiveScore_) {
+            // Found a potentially competitive block
+            return;
+        }
+
+        // This block cannot produce competitive scores, skip it
+        blocksSkipped_++;  // Instrumentation
+
+        // Advance to next block (128 docs ahead, or NO_MORE_DOCS)
+        if (upTo_ >= index::PostingsEnum::NO_MORE_DOCS - 128) {
+            upTo_ = index::PostingsEnum::NO_MORE_DOCS;
+            return;
+        }
+
+        target = upTo_ + 1;  // Start search from next doc
+        upTo_ = target + 128;  // Next window
+    }
+}
+
+void WANDScorer::updateMaxScores(int target) {
+
+    // Instrumentation: Count max score updates
+    maxScoreUpdates_++;
+
+    // Phase 1: Fixed 128-doc window
+    upTo_ = (target < index::PostingsEnum::NO_MORE_DOCS - 128) ? target + 128
+                                                                : index::PostingsEnum::NO_MORE_DOCS;
+
+    // Phase 3: Skip non-competitive blocks
+    // This may advance upTo_ to find a block where sum(maxScores) >= minCompetitiveScore
+    if (minCompetitiveScore_ > 0) {
+        moveToNextBlock(target);
+    }
+
+    // Update max scores for head scorers
+    for (ScorerWrapper* wrapper : head_) {
+        // Call advanceShallow to prepare for getMaxScore
+        wrapper->scorer->advanceShallow(target);
+        // Get maximum possible score in range [target, upTo_]
+        float maxScore = wrapper->scorer->getMaxScore(upTo_);
+        // Phase 1: Scale to integer (round UP to avoid missing matches)
+        wrapper->scaledMaxScore = util::ScalingUtils::scaleMaxScore(maxScore, scalingFactor_);
     }
 
     // Update tail max scores
-    tailMaxScore_ = 0.0f;
+    tailMaxScore_ = 0;  // Scaled integer
     for (int i = 0; i < tailSize_; ++i) {
-        // TODO: Update max score from impacts
-        tail_[i]->maxScore = 100.0f;  // Placeholder
-        tailMaxScore_ += tail_[i]->maxScore;
+        // Call advanceShallow to prepare for getMaxScore
+        tail_[i]->scorer->advanceShallow(target);
+        // Get maximum possible score in range [target, upTo_]
+        float maxScore = tail_[i]->scorer->getMaxScore(upTo_);
+        // Phase 1: Scale to integer (round UP to avoid missing matches)
+        tail_[i]->scaledMaxScore = util::ScalingUtils::scaleMaxScore(maxScore, scalingFactor_);
+        tailMaxScore_ += tail_[i]->scaledMaxScore;  // Integer addition
     }
 
-    // Remove tail scorers that can match on their own
+    // Promote tail scorers when their combined max scores could produce a competitive match
+    //
+    // Lucene's logic (line 481): "We need to make sure that entries in 'tail' alone cannot match
+    // a competitive hit."
+    //
+    // If tailMaxScore >= minCompetitiveScore, then tail scorers alone could match without
+    // any head scorers, so we must advance them to check for actual matches.
+    //
+    // This is sum-based promotion: if SUM(tail max scores) >= threshold, promote highest scorer.
+    // Phase 1: Integer comparison (exact, no precision errors)
     while (tailSize_ > 0 && tailMaxScore_ >= minCompetitiveScore_) {
+        tailPromotions_++;  // Instrumentation: Count tail promotions
         ScorerWrapper* wrapper = popTail();
         wrapper->doc = wrapper->scorer->advance(target);
         head_.push_back(wrapper);
@@ -266,7 +446,7 @@ WANDScorer::ScorerWrapper* WANDScorer::insertTailWithOverFlow(ScorerWrapper* wra
     if (tailSize_ < static_cast<int>(allScorers_.size()) - 1) {
         tail_.push_back(wrapper);
         tailSize_++;
-        tailMaxScore_ += wrapper->maxScore;
+        tailMaxScore_ += wrapper->scaledMaxScore;  // Phase 1: Use scaled integer
 
         // Heapify upward
         upHeapMaxScore(tailSize_ - 1);
@@ -275,14 +455,15 @@ WANDScorer::ScorerWrapper* WANDScorer::insertTailWithOverFlow(ScorerWrapper* wra
     }
 
     // Tail is full, check if this wrapper has higher max score than min
-    if (wrapper->maxScore <= tail_[0]->maxScore) {
+    // Phase 1: Use scaled integers
+    if (wrapper->scaledMaxScore <= tail_[0]->scaledMaxScore) {
         return wrapper;  // This wrapper should be evicted
     }
 
     // Evict min max score from tail
     ScorerWrapper* evicted = tail_[0];
     tail_[0] = wrapper;
-    tailMaxScore_ = tailMaxScore_ - evicted->maxScore + wrapper->maxScore;
+    tailMaxScore_ = tailMaxScore_ - evicted->scaledMaxScore + wrapper->scaledMaxScore;  // Integer arithmetic
     downHeapMaxScore(0);
 
     return evicted;
@@ -294,7 +475,7 @@ WANDScorer::ScorerWrapper* WANDScorer::popTail() {
     }
 
     ScorerWrapper* top = tail_[0];
-    tailMaxScore_ -= top->maxScore;
+    tailMaxScore_ -= top->scaledMaxScore;  // Phase 1: Use scaled integer
     tailSize_--;
 
     if (tailSize_ > 0) {
@@ -310,11 +491,11 @@ WANDScorer::ScorerWrapper* WANDScorer::popTail() {
 
 void WANDScorer::upHeapMaxScore(int index) {
     ScorerWrapper* wrapper = tail_[index];
-    float maxScore = wrapper->maxScore;
+    int64_t scaledMaxScore = wrapper->scaledMaxScore;  // Phase 1: Use scaled integer
 
     while (index > 0) {
         int parent = (index - 1) / 2;
-        if (tail_[parent]->maxScore >= maxScore) {
+        if (tail_[parent]->scaledMaxScore >= scaledMaxScore) {  // Phase 1: Use scaled integer
             break;
         }
         tail_[index] = tail_[parent];
@@ -330,18 +511,19 @@ void WANDScorer::downHeapMaxScore(int index) {
     }
 
     ScorerWrapper* wrapper = tail_[index];
-    float maxScore = wrapper->maxScore;
+    int64_t scaledMaxScore = wrapper->scaledMaxScore;  // Phase 1: Use scaled integer
 
     int half = tailSize_ / 2;
     while (index < half) {
         int child = 2 * index + 1;
 
         // Choose larger child
-        if (child + 1 < tailSize_ && tail_[child + 1]->maxScore > tail_[child]->maxScore) {
+        // Phase 1: Use scaled integers
+        if (child + 1 < tailSize_ && tail_[child + 1]->scaledMaxScore > tail_[child]->scaledMaxScore) {
             child++;
         }
 
-        if (maxScore >= tail_[child]->maxScore) {
+        if (scaledMaxScore >= tail_[child]->scaledMaxScore) {
             break;
         }
 

@@ -5,6 +5,7 @@
 
 #include "diagon/document/IndexableField.h"
 #include "diagon/util/FastTokenizer.h"
+#include "diagon/util/StandardTokenizer.h"
 
 #include <memory>
 #include <string>
@@ -69,13 +70,17 @@ public:
     }
 
     /**
-     * Fast whitespace tokenization using zero-copy string_view
-     * Splits on space, tab, newline, carriage return
+     * Tokenize field value using Lucene-compatible StandardTokenizer
      *
-     * Optimization: Uses FastTokenizer (3-4x faster than std::istringstream)
-     * - No string copying during parsing
-     * - Pre-allocated result vector
-     * - Single pass algorithm
+     * Uses ICU-based Unicode word boundaries (UAX#29) to match Lucene StandardAnalyzer:
+     * - Lowercases all tokens
+     * - Splits on hyphens and punctuation
+     * - Preserves numbers with decimals
+     * - Filters out punctuation-only tokens
+     *
+     * Previous: FastTokenizer (whitespace-only, 3x faster but incompatible)
+     * Current: StandardTokenizer (Lucene-compatible, ~500-800 MB/s)
+     * Trade-off: Correctness over raw speed
      */
     std::vector<std::string> tokenize() const override {
         std::vector<std::string> tokens;
@@ -89,13 +94,18 @@ public:
             return tokens;
         }
 
-        // Tokenized - use fast tokenizer (zero-copy parsing)
+        // Tokenized - use StandardTokenizer (Lucene-compatible)
         auto val = stringValue();
         if (!val) {
             return tokens;
         }
 
-        return util::FastTokenizer::tokenize(*val);
+        // Use StandardTokenizer for Lucene compatibility
+        return util::StandardTokenizer::tokenize(*val);
+
+        // Note: FastTokenizer still available for whitespace-only tokenization
+        // if needed for performance-critical scenarios where Lucene compatibility
+        // is not required: util::FastTokenizer::tokenize(*val)
     }
 };
 

@@ -28,6 +28,7 @@ Lucene104PostingsWriter::Lucene104PostingsWriter(index::SegmentWriteState& state
     , lastDocID_(0)
     , docCount_(0)
     , totalTermFreq_(0)
+    , directory_(state.directory)
     , segmentName_(state.segmentName)
     , segmentSuffix_(state.segmentSuffix)
     , docDeltaBuffer_{}  // Zero-initialize
@@ -39,24 +40,23 @@ Lucene104PostingsWriter::Lucene104PostingsWriter(index::SegmentWriteState& state
     , lastSkipDocFP_(0)
     , lastSkipDoc_(0) {
 
-    // Create .doc output file
-    std::string docFileName = segmentName_;
+    // Create .doc output file name
+    docFileName_ = segmentName_;
     if (!segmentSuffix_.empty()) {
-        docFileName += "_" + segmentSuffix_;
+        docFileName_ += "_" + segmentSuffix_;
     }
-    docFileName += "." + DOC_EXTENSION;
+    docFileName_ += "." + DOC_EXTENSION;
 
-    // Create .skp output file (for skip entries with impacts)
-    std::string skipFileName = segmentName_;
+    // Create .skp output file name (for skip entries with impacts)
+    skipFileName_ = segmentName_;
     if (!segmentSuffix_.empty()) {
-        skipFileName += "_" + segmentSuffix_;
+        skipFileName_ += "_" + segmentSuffix_;
     }
-    skipFileName += "." + SKIP_EXTENSION;
+    skipFileName_ += "." + SKIP_EXTENSION;
 
-    // For now, use in-memory buffers
-    // TODO: Use actual file via state.directory->createOutput()
-    docOut_ = std::make_unique<store::ByteBuffersIndexOutput>(docFileName);
-    skipOut_ = std::make_unique<store::ByteBuffersIndexOutput>(skipFileName);
+    // Use in-memory buffers - FieldsConsumer will write to actual files
+    docOut_ = std::make_unique<store::ByteBuffersIndexOutput>(docFileName_);
+    skipOut_ = std::make_unique<store::ByteBuffersIndexOutput>(skipFileName_);
 }
 
 Lucene104PostingsWriter::~Lucene104PostingsWriter() {
@@ -125,6 +125,7 @@ void Lucene104PostingsWriter::startDoc(int docID, int freq, int8_t norm) {
 
     // Buffer doc delta and frequency for StreamVByte encoding
     int docDelta = docID - lastDocID_;
+
     docDeltaBuffer_[bufferPos_] = static_cast<uint32_t>(docDelta);
     freqBuffer_[bufferPos_] = static_cast<uint32_t>(freq);
     bufferPos_++;
@@ -258,6 +259,7 @@ void Lucene104PostingsWriter::writeSkipData() {
 }
 
 void Lucene104PostingsWriter::close() {
+    // Close in-memory buffers (FieldsConsumer will write to actual files)
     if (docOut_) {
         docOut_->close();
         docOut_.reset();
@@ -275,6 +277,15 @@ int64_t Lucene104PostingsWriter::getFilePointer() const {
 std::vector<uint8_t> Lucene104PostingsWriter::getBytes() const {
     // Cast to ByteBuffersIndexOutput to access toArrayCopy()
     auto* bufOut = dynamic_cast<store::ByteBuffersIndexOutput*>(docOut_.get());
+    if (bufOut) {
+        return bufOut->toArrayCopy();
+    }
+    return std::vector<uint8_t>();
+}
+
+std::vector<uint8_t> Lucene104PostingsWriter::getSkipBytes() const {
+    // Cast to ByteBuffersIndexOutput to access toArrayCopy()
+    auto* bufOut = dynamic_cast<store::ByteBuffersIndexOutput*>(skipOut_.get());
     if (bufOut) {
         return bufOut->toArrayCopy();
     }

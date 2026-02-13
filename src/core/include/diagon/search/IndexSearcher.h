@@ -222,13 +222,27 @@ public:
     // ==================== Search Methods ====================
 
     /**
-     * Search and return top hits.
+     * Search and return top hits with default totalHitsThreshold (1000).
      *
      * @param query Query to execute
      * @param numHits Number of top hits to return
      * @return TopDocs with results
      */
     TopDocs search(const Query& query, int numHits);
+
+    /**
+     * Search and return top hits with explicit totalHitsThreshold.
+     *
+     * When totalHits exceeds the threshold, WAND early termination is activated
+     * and totalHits becomes approximate (GREATER_THAN_OR_EQUAL_TO).
+     * Use INT_MAX for exact counting.
+     *
+     * @param query Query to execute
+     * @param numHits Number of top hits to return
+     * @param totalHitsThreshold Threshold for approximate counting
+     * @return TopDocs with results
+     */
+    TopDocs search(const Query& query, int numHits, int totalHitsThreshold);
 
     /**
      * Search with custom collector.

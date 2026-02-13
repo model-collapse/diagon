@@ -103,6 +103,31 @@ public:
      */
     void readBytes(uint8_t* buffer, size_t length) override;
 
+    // ==================== Fast Direct-Access Methods ====================
+
+    /**
+     * @brief Non-virtual readVInt operating directly on mapped memory.
+     *
+     * Avoids per-byte virtual dispatch by reading from the raw mmap pointer.
+     * Falls back to base class for cross-chunk reads (extremely rare).
+     */
+    int32_t readVInt() override;
+
+    /**
+     * @brief Non-virtual readVLong operating directly on mapped memory.
+     */
+    int64_t readVLong() override;
+
+    /**
+     * @brief Non-virtual readInt operating directly on mapped memory.
+     */
+    int32_t readInt() override;
+
+    /**
+     * @brief Non-virtual readLong operating directly on mapped memory.
+     */
+    int64_t readLong() override;
+
     // ==================== Positioning ====================
 
     /**
@@ -218,6 +243,38 @@ protected:
     bool is_slice_;                       ///< Whether this is a slice
     int64_t slice_offset_;                ///< Slice start offset (if is_slice_)
     int64_t slice_length_;                ///< Slice length (if is_slice_)
+
+    // ==================== Fast Path Helpers ====================
+
+    /**
+     * @brief Returns raw pointer into current chunk + remaining bytes.
+     *
+     * Used by readVInt/readVLong to avoid per-byte virtual dispatch.
+     * Returns nullptr if position is invalid or spans chunk boundary
+     * with fewer bytes remaining than needed.
+     *
+     * @param needed Minimum bytes needed in contiguous memory
+     * @param[out] ptr Raw pointer to current position
+     * @param[out] remaining Bytes remaining in current chunk
+     * @return true if ptr is valid and remaining >= needed
+     */
+    inline bool getDirectPointer(size_t needed, const uint8_t*& ptr, size_t& remaining) const {
+        int64_t absolute_pos = is_slice_ ? (slice_offset_ + pos_) : pos_;
+        int64_t max_pos = is_slice_ ? slice_length_ : file_length_;
+        if (pos_ + static_cast<int64_t>(needed) > max_pos) return false;
+
+        int chunk_idx = static_cast<int>(absolute_pos >> chunk_power_);
+        size_t chunk_offset = static_cast<size_t>(absolute_pos & chunk_mask_);
+
+        if (chunk_idx >= static_cast<int>(num_chunks_)) return false;
+
+        auto& chunk = chunks_[chunk_idx];
+        remaining = chunk.length - chunk_offset;
+        if (remaining < needed) return false;
+
+        ptr = chunk.data + chunk_offset;
+        return true;
+    }
 };
 
 }  // namespace diagon::store

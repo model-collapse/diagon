@@ -102,15 +102,24 @@ public:
      */
     static int encodedSizeArray(const uint32_t* values, int count);
 
+#if defined(__AVX2__)
+    /**
+     * AVX2-optimized decode for 8 integers (public for use in optimized readers)
+     * Decodes 2 groups of 4 integers in parallel using AVX2
+     *
+     * @param input Buffer to read from (2 control bytes + data)
+     * @param output Array to write 8 decoded values
+     * @return Number of bytes consumed from input
+     */
+    static int decode8_AVX2(const uint8_t* input, uint32_t* output);
+#endif
+
 private:
     // Platform-specific decode implementations
     static int decode4_AVX2(const uint8_t* input, uint32_t* output);
     static int decode4_SSE(const uint8_t* input, uint32_t* output);
     static int decode4_NEON(const uint8_t* input, uint32_t* output);
     static int decode4_scalar(const uint8_t* input, uint32_t* output);
-
-    // AVX2 8-wide decode (true 8-integer decode, not 2×4)
-    static int decode8_AVX2(const uint8_t* input, uint32_t* output);
 
     // Helper: Extract length from control byte
     static inline int getLength(uint8_t control, int index) {

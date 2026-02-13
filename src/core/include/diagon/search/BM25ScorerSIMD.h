@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "diagon/index/DocValues.h"
 #include "diagon/index/PostingsEnum.h"
 #include "diagon/search/BM25Similarity.h"
 #include "diagon/search/Scorer.h"
@@ -47,9 +48,11 @@ public:
      * @param idf IDF component (precomputed)
      * @param k1 BM25 k1 parameter (default 1.2)
      * @param b BM25 b parameter (default 0.75)
+     * @param avgFieldLength Average field length (for max score computation)
+     * @param norms Document norms for length normalization (non-owning)
      */
     BM25ScorerSIMD(const Weight& weight, std::unique_ptr<index::PostingsEnum> postings, float idf,
-                   float k1 = 1.2f, float b = 0.75f);
+                   float k1, float b, float avgFieldLength, index::NumericDocValues* norms);
 
     // Scorer interface
     int nextDoc() override;
@@ -62,6 +65,10 @@ public:
 
     // Scorer interface
     const Weight& getWeight() const override;
+
+    // Score upper bounds (P1: WAND optimization)
+    float getMaxScore(int upTo) const override;
+    int advanceShallow(int target) override;
 
 #if defined(DIAGON_HAVE_AVX2) || defined(DIAGON_HAVE_NEON)
     /**
@@ -88,6 +95,7 @@ public:
 private:
     const Weight& weight_;
     std::unique_ptr<index::PostingsEnum> postings_;
+    index::NumericDocValues* norms_;  // Non-owning pointer to norms
     int doc_;
     float currentScore_;
 
@@ -96,6 +104,7 @@ private:
     float k1_;
     float b_;
     float k1_plus_1_;  // Precomputed k1 + 1
+    float avgFieldLength_;  // Average field length (for getMaxScore)
 
     /**
      * Scalar BM25 scoring (fallback and single-doc case)

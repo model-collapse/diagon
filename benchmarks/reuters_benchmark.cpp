@@ -12,9 +12,11 @@
 #include "diagon/search/BooleanQuery.h"
 #include "diagon/document/Document.h"
 #include "diagon/store/FSDirectory.h"
-#include "dataset/ReutersDatasetAdapter.h"
+#include "diagon/store/MMapDirectory.h"
+#include "dataset/SimpleReutersAdapter.h"
 
 #include <iostream>
+#include <fstream>
 #include <chrono>
 #include <vector>
 #include <algorithm>
@@ -23,15 +25,22 @@
 using namespace diagon;
 using namespace std::chrono;
 
+struct QueryMetrics {
+    std::string name;
+    int hits;
+    int64_t p50_us;
+    int64_t p90_us;
+    int64_t p99_us;
+};
+
 struct BenchmarkResult {
     int docsIndexed;
     int64_t indexTimeMs;
     double throughput;  // docs/sec
     int64_t indexSizeBytes;
 
-    // Query results
-    std::vector<std::pair<std::string, int64_t>> queryLatencies;  // query name, P99 latency in us
-    std::vector<std::pair<std::string, int>> queryHits;            // query name, hit count
+    // Query results with full percentile breakdown
+    std::vector<QueryMetrics> queryResults;
 };
 
 void printResults(const BenchmarkResult& result) {
@@ -48,12 +57,19 @@ void printResults(const BenchmarkResult& result) {
     std::cout << "  Storage: " << (result.indexSizeBytes / result.docsIndexed)
               << " bytes/doc\n\n";
 
-    std::cout << "Search Performance (P99 latency):\n";
-    for (size_t i = 0; i < result.queryLatencies.size(); i++) {
-        std::cout << "  " << std::setw(20) << std::left << result.queryLatencies[i].first << ": "
-                  << std::setw(8) << std::right << std::fixed << std::setprecision(3)
-                  << (result.queryLatencies[i].second / 1000.0) << " ms";
-        std::cout << "  (" << result.queryHits[i].second << " hits)\n";
+    std::cout << "Search Performance (P50 / P90 / P99 latency):\n";
+    std::cout << std::setw(50) << std::left << "  Query"
+              << std::setw(12) << std::right << "P50 (ms)"
+              << std::setw(12) << "P90 (ms)"
+              << std::setw(12) << "P99 (ms)"
+              << std::setw(10) << "Hits" << "\n";
+    std::cout << "  " << std::string(92, '-') << "\n";
+    for (const auto& qm : result.queryResults) {
+        std::cout << "  " << std::setw(48) << std::left << qm.name
+                  << std::setw(12) << std::right << std::fixed << std::setprecision(3) << (qm.p50_us / 1000.0)
+                  << std::setw(12) << (qm.p90_us / 1000.0)
+                  << std::setw(12) << (qm.p99_us / 1000.0)
+                  << std::setw(10) << qm.hits << "\n";
     }
 
     std::cout << "\n=========================================\n";
@@ -109,8 +125,8 @@ int main(int argc, char* argv[]) {
 
         auto writer = std::make_unique<index::IndexWriter>(*dir, config);
 
-        // Read Reuters dataset
-        benchmarks::ReutersDatasetAdapter adapter(reutersPath);
+        // Read Reuters dataset (simple: 1 file = 1 document, matches Lucene)
+        benchmarks::SimpleReutersAdapter adapter(reutersPath);
 
         int docCount = 0;
         document::Document doc;
@@ -156,7 +172,9 @@ int main(int argc, char* argv[]) {
     std::cout << "========================================\n";
 
     try {
-        auto dir = store::FSDirectory::open(indexPath);
+        // Use MMapDirectory for zero-copy memory-mapped I/O (2-3x faster random reads)
+        // Reuters dataset (12MB) fits entirely in memory, ideal for mmap
+        auto dir = store::MMapDirectory::open(indexPath);
         auto reader = index::DirectoryReader::open(*dir);
         auto searcher = std::make_unique<search::IndexSearcher>(*reader);
 
@@ -176,7 +194,7 @@ int main(int argc, char* argv[]) {
             {"Single term: 'trade'", []() {
                 return std::make_unique<search::TermQuery>(search::Term("body", "trade"));
             }},
-            {"Boolean: 'oil AND price'", []() {
+            {"Boolean AND: 'oil AND price'", []() {
                 search::BooleanQuery::Builder builder;
                 builder.add(std::make_shared<search::TermQuery>(search::Term("body", "oil")),
                            search::Occur::MUST);
@@ -184,12 +202,63 @@ int main(int argc, char* argv[]) {
                            search::Occur::MUST);
                 return builder.build();
             }},
-            {"Boolean: 'trade OR export'", []() {
+            {"Boolean OR 2-term: 'trade OR export'", []() {
                 search::BooleanQuery::Builder builder;
                 builder.add(std::make_shared<search::TermQuery>(search::Term("body", "trade")),
                            search::Occur::SHOULD);
                 builder.add(std::make_shared<search::TermQuery>(search::Term("body", "export")),
                            search::Occur::SHOULD);
+                return builder.build();
+            }},
+            {"Boolean OR 5-term: 'oil OR trade OR market OR price OR dollar'", []() {
+                search::BooleanQuery::Builder builder;
+                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "oil")),
+                           search::Occur::SHOULD);
+                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "trade")),
+                           search::Occur::SHOULD);
+                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "market")),
+                           search::Occur::SHOULD);
+                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "price")),
+                           search::Occur::SHOULD);
+                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "dollar")),
+                           search::Occur::SHOULD);
+                return builder.build();
+            }},
+            {"Boolean OR 10-term", []() {
+                search::BooleanQuery::Builder builder;
+                for (const auto& t : {"oil", "trade", "market", "price", "dollar",
+                                       "export", "bank", "government", "company", "president"}) {
+                    builder.add(std::make_shared<search::TermQuery>(search::Term("body", t)),
+                               search::Occur::SHOULD);
+                }
+                return builder.build();
+            }},
+            {"Boolean OR 20-term", []() {
+                search::BooleanQuery::Builder builder;
+                for (const auto& t : {"market", "company", "stock", "trade", "price",
+                                       "bank", "dollar", "oil", "export", "government",
+                                       "share", "billion", "profit", "exchange", "interest",
+                                       "economic", "report", "industry", "investment", "revenue"}) {
+                    builder.add(std::make_shared<search::TermQuery>(search::Term("body", t)),
+                               search::Occur::SHOULD);
+                }
+                return builder.build();
+            }},
+            {"Boolean OR 50-term", []() {
+                search::BooleanQuery::Builder builder;
+                for (const auto& t : {"market", "company", "stock", "trade", "price",
+                                       "bank", "dollar", "oil", "export", "government",
+                                       "share", "billion", "profit", "exchange", "interest",
+                                       "economic", "report", "industry", "investment", "revenue",
+                                       "million", "percent", "year", "said", "would",
+                                       "new", "also", "last", "first", "group",
+                                       "accord", "tax", "rate", "growth", "debt",
+                                       "loss", "quarter", "month", "net", "income",
+                                       "sales", "earnings", "bond", "foreign", "loan",
+                                       "budget", "deficit", "surplus", "inflation", "central"}) {
+                    builder.add(std::make_shared<search::TermQuery>(search::Term("body", t)),
+                               search::Occur::SHOULD);
+                }
                 return builder.build();
             }}
         };
@@ -225,14 +294,17 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            // Calculate P99
+            // Calculate P50/P90/P99
             std::sort(latencies.begin(), latencies.end());
+            int64_t p50 = latencies[static_cast<size_t>(latencies.size() * 0.50)];
+            int64_t p90 = latencies[static_cast<size_t>(latencies.size() * 0.90)];
             int64_t p99 = latencies[static_cast<size_t>(latencies.size() * 0.99)];
 
-            result.queryLatencies.push_back({testQuery.name, p99});
-            result.queryHits.push_back({testQuery.name, hits});
+            result.queryResults.push_back({testQuery.name, hits, p50, p90, p99});
 
-            std::cout << "  P99: " << std::fixed << std::setprecision(3) << (p99 / 1000.0) << " ms"
+            std::cout << "  P50: " << std::fixed << std::setprecision(3) << (p50 / 1000.0)
+                     << " ms  P90: " << (p90 / 1000.0)
+                     << " ms  P99: " << (p99 / 1000.0) << " ms"
                      << "  (" << hits << " hits)\n";
         }
 
@@ -253,10 +325,12 @@ int main(int argc, char* argv[]) {
         outFile << "Indexing time (ms): " << result.indexTimeMs << "\n";
         outFile << "Throughput (docs/sec): " << result.throughput << "\n";
         outFile << "Index size (bytes): " << result.indexSizeBytes << "\n";
-        for (size_t i = 0; i < result.queryLatencies.size(); i++) {
-            outFile << "Query: " << result.queryLatencies[i].first
-                   << " | P99 (us): " << result.queryLatencies[i].second
-                   << " | Hits: " << result.queryHits[i].second << "\n";
+        for (const auto& qm : result.queryResults) {
+            outFile << "Query: " << qm.name
+                   << " | P50 (us): " << qm.p50_us
+                   << " | P90 (us): " << qm.p90_us
+                   << " | P99 (us): " << qm.p99_us
+                   << " | Hits: " << qm.hits << "\n";
         }
         outFile.close();
         std::cout << "\n✓ Results saved to reuters_benchmark_results.txt\n";

@@ -139,11 +139,23 @@ Single-term         | 0.1-0.5 ms      | Low (already fast)
 "oil OR trade OR market OR price OR dollar OR economy OR bank OR stock OR government OR company"
 ```
 
+**20-term OR** (scaling validation):
+```
+"market OR company OR stock OR trade OR price OR bank OR dollar OR oil OR export OR government OR share OR billion OR profit OR exchange OR interest OR economic OR report OR industry OR investment OR revenue"
+```
+
+**50-term OR** (extreme scaling):
+```
+[20 terms above] + million, percent, year, said, would, new, also, last, first, group, accord, tax, rate, growth, debt, loss, quarter, month, net, income, sales, earnings, bond, foreign, loan, budget, deficit, surplus, inflation, central
+```
+
 **Expected Performance:**
 - 2-term: <3ms (P99)
 - 3-term: <5ms (P99)
 - 5-term: <8ms (P99)
 - 10-term: <15ms (P99)
+- 20-term: <20ms (P99)
+- 50-term: <30ms (P99)
 
 **WAND Advantage:**
 - Without WAND: OR queries scale linearly or worse with term count
@@ -254,6 +266,8 @@ Single-term         | 0.1-0.5 ms      | Low (already fast)
 3-term:  <5ms   (5,000 μs)
 5-term:  <8ms   (8,000 μs)
 10-term: <15ms  (15,000 μs)
+20-term: <20ms  (20,000 μs)
+50-term: <30ms  (30,000 μs)
 ```
 
 #### Mixed Boolean (P99 latency)
@@ -278,6 +292,8 @@ Complex: <10ms  (10,000 μs)
 3-term:  ≥4.0x faster
 5-term:  ≥5.0x faster
 10-term: ≥6.0x faster
+20-term: ≥6.0x faster
+50-term: ≥6.0x faster
 ```
 
 #### Mixed Boolean Queries
@@ -285,6 +301,10 @@ Complex: <10ms  (10,000 μs)
 Simple:  ≥3.0x faster
 Complex: ≥4.0x faster
 ```
+
+### MANDATORY: Percentile Reporting
+
+**All multi-term benchmark reports MUST include P50, P90, and P99 percentiles** for every query. When comparing Diagon vs Lucene, compare **each percentile separately** (P50 vs P50, P90 vs P90, P99 vs P99).
 
 ### Scalability Targets
 
@@ -300,6 +320,8 @@ Term Count | AND Latency | OR Latency (no WAND) | OR Latency (WAND)
 2          | 2ms         | 5ms                 | 3ms
 5          | 5ms         | 25ms                | 8ms  (3.1x better)
 10         | 10ms        | 100ms               | 15ms (6.7x better)
+20         | -           | 200ms               | 20ms (10x better)
+50         | -           | 500ms               | 30ms (16.7x better)
 
 Growth rate: Linear | Super-linear | Sub-linear (ideal)
 ```
@@ -595,10 +617,11 @@ grep -A10 "WAND" benchmark_results/multiterm_*.md
 - `mixed` - After query planner changes
 
 **Term Counts:**
-- `all` - Default, full coverage
+- `all` - Default, full coverage (2, 3, 5, 10, 20, 50 terms)
 - `small` - Quick smoke test (2-3 terms)
 - `medium` - Typical workload (4-5 terms)
 - `large` - Stress test (6-10 terms)
+- `extreme` - Scaling validation (20-50 terms)
 
 **Iterations:**
 - `100` - Default, good balance
@@ -616,7 +639,7 @@ grep -A10 "WAND" benchmark_results/multiterm_*.md
 
 ---
 
-**Last Updated:** 2026-02-09
+**Last Updated:** 2026-02-13
 **Skills:** `benchmark_diagon_multiterm`, `benchmark_lucene_multiterm`
 **Dataset:** Reuters-21578 (21,578 documents)
 **Focus:** Multi-term Boolean query performance and optimization

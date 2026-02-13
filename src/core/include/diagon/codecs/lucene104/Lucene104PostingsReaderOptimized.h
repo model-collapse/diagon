@@ -38,7 +38,7 @@ public:
      * @param termState Term state with file pointers
      * @param writeFreqs Whether frequencies are encoded
      */
-    Lucene104PostingsEnumOptimized(store::IndexInput* docIn, const TermState& termState,
+    Lucene104PostingsEnumOptimized(std::unique_ptr<store::IndexInput> docIn, const TermState& termState,
                                    bool writeFreqs);
 
     // ==================== DocIdSetIterator ====================
@@ -56,7 +56,7 @@ public:
     int freq() const override { return currentFreq_; }
 
 private:
-    store::IndexInput* docIn_;  // Not owned
+    std::unique_ptr<store::IndexInput> docIn_;  // Owned clone
     int docFreq_;
     int64_t totalTermFreq_;
     bool writeFreqs_;
@@ -90,14 +90,26 @@ private:
      * Refill I/O batch buffer
      */
     inline void refillIOBatch() {
+        // CRITICAL FIX: Preserve remaining bytes before refilling
+        int remainingBytes = ioBatchLimit_ - ioBatchPos_;
+
+        // Move remaining bytes to start of buffer
+        if (remainingBytes > 0 && ioBatchPos_ > 0) {
+            std::memmove(ioBatch_, ioBatch_ + ioBatchPos_, remainingBytes);
+        }
+
+        // Read more data to fill the rest of the buffer
         int64_t remaining = docIn_->length() - docIn_->getFilePointer();
-        int toRead = static_cast<int>(std::min(static_cast<int64_t>(IO_BATCH_SIZE), remaining));
+        int spaceAvailable = IO_BATCH_SIZE - remainingBytes;
+        int toRead = static_cast<int>(std::min(static_cast<int64_t>(spaceAvailable), remaining));
+
         if (toRead > 0) {
-            docIn_->readBytes(ioBatch_, toRead);
+            docIn_->readBytes(ioBatch_ + remainingBytes, toRead);
             ioBatchPos_ = 0;
-            ioBatchLimit_ = toRead;
+            ioBatchLimit_ = remainingBytes + toRead;
         } else {
-            ioBatchLimit_ = 0;
+            ioBatchPos_ = 0;
+            ioBatchLimit_ = remainingBytes;
         }
     }
 
@@ -155,6 +167,24 @@ private:
         int bytesConsumed = util::StreamVByte::decode4(&ioBatch_[ioBatchPos_], output);
         ioBatchPos_ += bytesConsumed;
     }
+
+#if defined(__AVX2__)
+    /**
+     * AVX2-optimized bulk decode for 8 integers
+     * 2x throughput compared to decode4
+     */
+    inline void decodeStreamVByte8_AVX2(uint32_t* output) {
+        // Ensure we have enough bytes for 2 groups
+        // Worst case: 2 control bytes + 32 data bytes = 34 bytes
+        if (ioBatchPos_ + 34 > ioBatchLimit_) {
+            refillIOBatch();
+        }
+
+        // Use AVX2 8-wide decode (true 8-integer parallel decode)
+        int bytesConsumed = util::StreamVByte::decode8_AVX2(&ioBatch_[ioBatchPos_], output);
+        ioBatchPos_ += bytesConsumed;
+    }
+#endif
 };
 
 }  // namespace lucene104

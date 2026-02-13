@@ -64,12 +64,16 @@ public:
         /** Postings file pointer */
         int64_t postingsFP = 0;
 
+        /** Skip file pointer (Block-Max WAND support) */
+        int64_t skipStartFP = -1;
+
         /** Constructor */
         TermStats() = default;
-        TermStats(int df, int64_t ttf, int64_t fp)
+        TermStats(int df, int64_t ttf, int64_t fp, int64_t skip = -1)
             : docFreq(df)
             , totalTermFreq(ttf)
-            , postingsFP(fp) {}
+            , postingsFP(fp)
+            , skipStartFP(skip) {}
     };
 
     /**
@@ -96,6 +100,19 @@ public:
      * Finish writing all terms and write FST index.
      */
     void finish();
+
+    /**
+     * Get field-level statistics (valid after finish())
+     */
+    int64_t getNumTerms() const { return numTerms_; }
+    int64_t getSumTotalTermFreq() const { return sumTotalTermFreq_; }
+    int64_t getSumDocFreq() const { return sumDocFreq_; }
+    int getDocCount() const { return docCount_; }
+
+    /**
+     * Set document count (must be called before finish())
+     */
+    void setDocCount(int docCount) { docCount_ = docCount; }
 
 private:
     /**
@@ -137,6 +154,11 @@ private:
     int64_t numTerms_;
     int64_t termsStartFP_;  // File pointer where this field's terms start
     bool finished_;
+
+    // Field-level statistics
+    int64_t sumTotalTermFreq_;  // Sum of all term frequencies in field
+    int64_t sumDocFreq_;        // Sum of all document frequencies in field
+    int docCount_;              // Number of documents with this field
 
     util::FST::Builder fstBuilder_;
 

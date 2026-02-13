@@ -70,7 +70,7 @@ public:
      * @param fields Fields to write (provides iterator)
      * @param norms Norms producer (optional)
      */
-    void write(::diagon::index::Fields& fields, ::diagon::index::NormsProducer* norms) override;
+    void write(::diagon::index::Fields& fields, ::diagon::codecs::NormsProducer* norms) override;
 
     /**
      * Close and flush
@@ -83,6 +83,16 @@ public:
     const std::vector<std::string>& getFiles() const { return files_; }
 
 private:
+    /**
+     * Field-level metadata stored per field
+     */
+    struct FieldMetadata {
+        int64_t numTerms;
+        int64_t sumTotalTermFreq;
+        int64_t sumDocFreq;
+        int docCount;
+    };
+
     ::diagon::index::SegmentWriteState& state_;
     std::unique_ptr<Lucene104PostingsWriter> postingsWriter_;
 
@@ -93,13 +103,17 @@ private:
     std::vector<std::string> files_;
     bool closed_{false};
 
+    // Field metadata map (fieldName -> stats)
+    std::map<std::string, FieldMetadata> fieldMetadata_;
+
     /**
      * Write a single field
      *
      * @param fieldName Field name
      * @param terms Terms for this field
+     * @param norms Norms producer (optional, for Block-Max WAND impacts)
      */
-    void writeField(const std::string& fieldName, ::diagon::index::Terms& terms);
+    void writeField(const std::string& fieldName, ::diagon::index::Terms& terms, ::diagon::codecs::NormsProducer* norms);
 };
 
 }  // namespace lucene104

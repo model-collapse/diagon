@@ -46,7 +46,8 @@ LeafReaderContext createContext(int docBase) {
 TEST(TopScoreDocCollectorTest, CreateCollector) {
     auto collector = TopScoreDocCollector::create(10);
     EXPECT_NE(nullptr, collector);
-    EXPECT_EQ(ScoreMode::COMPLETE, collector->scoreMode());
+    // Default threshold=1000 enables TOP_SCORES for WAND early termination
+    EXPECT_EQ(ScoreMode::TOP_SCORES, collector->scoreMode());
 }
 
 TEST(TopScoreDocCollectorTest, InvalidNumHits) {

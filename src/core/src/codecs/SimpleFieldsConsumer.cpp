@@ -60,7 +60,7 @@ void SimpleFieldsConsumer::writeHeader() {
     output_->writeInt(0);
 }
 
-void SimpleFieldsConsumer::write(index::Fields& fields, index::NormsProducer* norms) {
+void SimpleFieldsConsumer::write(index::Fields& fields, codecs::NormsProducer* norms) {
     ensureOpen();
 
     // Note: norms parameter not used yet

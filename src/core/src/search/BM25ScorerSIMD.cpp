@@ -3,6 +3,7 @@
 
 #include "diagon/search/BM25ScorerSIMD.h"
 #include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
+#include "diagon/util/SearchProfiler.h"
 
 #include <limits>
 
@@ -41,17 +42,13 @@ BM25ScorerSIMD::BM25ScorerSIMD(const Weight& weight, std::unique_ptr<index::Post
 }
 
 int BM25ScorerSIMD::nextDoc() {
+
     doc_ = postings_->nextDoc();
     if (doc_ != index::PostingsEnum::NO_MORE_DOCS) {
         int freq = postings_->freq();
         long norm = 1L;  // Default norm if not available
         if (norms_ && norms_->advanceExact(doc_)) {
             norm = norms_->longValue();
-        }
-        static int debugCount = 0;
-        if (debugCount++ < 5) {
-            fprintf(stderr, "[DEBUG BM25Scorer::nextDoc] doc=%d, freq=%d, norm=%ld, norms_=%p\n",
-                    doc_, freq, norm, (void*)norms_);
         }
         currentScore_ = scoreScalar(freq, norm);
     }
@@ -63,10 +60,12 @@ int BM25ScorerSIMD::docID() const {
 }
 
 float BM25ScorerSIMD::score() const {
+
     return currentScore_;
 }
 
 int BM25ScorerSIMD::advance(int target) {
+
     doc_ = postings_->advance(target);
     if (doc_ != index::PostingsEnum::NO_MORE_DOCS) {
         int freq = postings_->freq();
@@ -88,6 +87,7 @@ const Weight& BM25ScorerSIMD::getWeight() const {
 }
 
 float BM25ScorerSIMD::scoreScalar(int freq, long norm) const {
+
     if (freq == 0)
         return 0.0f;
 
@@ -108,12 +108,6 @@ float BM25ScorerSIMD::scoreScalar(int freq, long norm) const {
     float k = k1_ * (1.0f - b_ + b_ * fieldLength / avgFieldLength_);
     float freqFloat = static_cast<float>(freq);
     float score = idf_ * freqFloat / (freqFloat + k);
-
-    static int debugCount = 0;
-    if (debugCount++ < 5) {
-        fprintf(stderr, "[DEBUG scoreScalar] freq=%d, norm=%ld, fieldLength=%.2f, avgFieldLength=%.2f, k=%.3f, score=%.5f\n",
-                freq, norm, fieldLength, avgFieldLength_, k, score);
-    }
 
     return score;
 }
@@ -305,17 +299,10 @@ float BM25ScorerSIMD::getMaxScore(int upTo) const {
     // Try to get impacts-aware postings
     auto* impactsPostings = dynamic_cast<codecs::lucene104::Lucene104PostingsEnumWithImpacts*>(postings_.get());
 
-    static int callNum = 0;
-    callNum++;
-
     if (!impactsPostings) {
         // No impacts support - compute global max score as fallback
         // This is what Lucene does: score(Float.MAX_VALUE, 1L)
         // It's the theoretical maximum score for this term
-        if (callNum <= 3) {
-            fprintf(stderr, "[DEBUG BM25 call %d] No impacts (dynamic_cast failed), using global max score fallback\n", callNum);
-        }
-
         // Compute BM25 score with maximum frequency and shortest document
         // BM25 (Lucene 8+) = IDF * (freq / (freq + k1 * (1 - b + b * fieldLength / avgFieldLength)))
         // With very large freq and fieldLength=1 (shortest possible):
@@ -325,34 +312,15 @@ float BM25ScorerSIMD::getMaxScore(int upTo) const {
         constexpr long SHORTEST_DOC_NORM = 127;  // Shortest document (fieldLength=1)
 
         float maxScore = scoreScalar(static_cast<int>(MAX_FREQ), SHORTEST_DOC_NORM);
-        if (callNum <= 3) {
-            fprintf(stderr, "[DEBUG BM25 call %d]   Computed global maxScore=%.3f\n", callNum, maxScore);
-        }
         return maxScore;
-    }
-
-    if (callNum <= 3) {
-        fprintf(stderr, "[DEBUG BM25 call %d] Has impacts (dynamic_cast succeeded), using impacts\n", callNum);
     }
 
     // Get maximum frequency and norm from impacts metadata
     int maxFreq = impactsPostings->getMaxFreq(upTo);
     int maxNorm = impactsPostings->getMaxNorm(upTo);
 
-    static bool logged_success = false;
-    if (!logged_success) {
-        fprintf(stderr, "[DEBUG] BM25ScorerSIMD::getMaxScore: dynamic_cast SUCCEEDED\n");
-        fprintf(stderr, "[DEBUG]   upTo=%d, maxFreq=%d, maxNorm=%d\n", upTo, maxFreq, maxNorm);
-        logged_success = true;
-    }
-
     // Handle edge case: if no impacts available, return conservative bound
     if (maxFreq == 0 || maxFreq == std::numeric_limits<int>::max()) {
-        static bool logged_invalid = false;
-        if (!logged_invalid) {
-            fprintf(stderr, "[DEBUG] BM25ScorerSIMD::getMaxScore: Invalid impacts (maxFreq=%d)\n", maxFreq);
-            logged_invalid = true;
-        }
         return std::numeric_limits<float>::max();
     }
 
@@ -371,13 +339,6 @@ float BM25ScorerSIMD::getMaxScore(int upTo) const {
                         k1_ * (1.0f - b_ + b_ * minFieldLength / avgFieldLength_);
 
     float maxScore = idf_ * (numerator / denominator);
-
-    static bool logged_score = false;
-    if (!logged_score) {
-        fprintf(stderr, "[DEBUG]   Computed maxScore=%.3f (idf=%.3f, numerator=%.3f, denominator=%.3f)\n",
-                maxScore, idf_, numerator, denominator);
-        logged_score = true;
-    }
 
     return maxScore;
 }

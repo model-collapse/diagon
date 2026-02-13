@@ -2,17 +2,24 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104PostingsReaderOptimized.h"
+#include "diagon/util/SearchProfiler.h"
 
 #include "diagon/util/Exceptions.h"
+
+#if defined(__AVX2__)
+#include <immintrin.h>
+#elif defined(__SSE4_2__)
+#include <nmmintrin.h>
+#endif
 
 namespace diagon {
 namespace codecs {
 namespace lucene104 {
 
-Lucene104PostingsEnumOptimized::Lucene104PostingsEnumOptimized(store::IndexInput* docIn,
+Lucene104PostingsEnumOptimized::Lucene104PostingsEnumOptimized(std::unique_ptr<store::IndexInput> docIn,
                                                                const TermState& termState,
                                                                bool writeFreqs)
-    : docIn_(docIn)
+    : docIn_(std::move(docIn))
     , docFreq_(termState.docFreq)
     , totalTermFreq_(termState.totalTermFreq)
     , writeFreqs_(writeFreqs)
@@ -26,6 +33,7 @@ Lucene104PostingsEnumOptimized::Lucene104PostingsEnumOptimized(store::IndexInput
     , ioBatch_{}  // Zero-initialize
     , ioBatchPos_(0)
     , ioBatchLimit_(0) {
+
     // Seek to start of this term's postings
     docIn_->seek(termState.docStartFP);
 
@@ -34,6 +42,7 @@ Lucene104PostingsEnumOptimized::Lucene104PostingsEnumOptimized(store::IndexInput
 }
 
 int Lucene104PostingsEnumOptimized::nextDoc() {
+
     if (docsRead_ >= docFreq_) {
         currentDoc_ = NO_MORE_DOCS;
         return NO_MORE_DOCS;
@@ -54,7 +63,7 @@ int Lucene104PostingsEnumOptimized::nextDoc() {
         currentDoc_ += docDelta;
     }
 
-    // Get frequency from buffer (branchless using multiplication)
+    // Get frequency from buffer
     currentFreq_ = writeFreqs_ ? static_cast<int32_t>(freqBuffer_[bufferPos_]) : 1;
 
     bufferPos_++;
@@ -63,52 +72,81 @@ int Lucene104PostingsEnumOptimized::nextDoc() {
 }
 
 void Lucene104PostingsEnumOptimized::refillBuffer() {
+
     bufferPos_ = 0;
     int remaining = docFreq_ - docsRead_;
     int bufferIdx = 0;
 
-    // Fill buffer with as many complete StreamVByte groups (4 docs each) as possible
-    // Process in batches for better cache locality
+#if defined(__AVX2__)
+    // AVX2 fast path: Decode 8 docs at a time (2x throughput)
+    constexpr int AVX2_GROUP_SIZE = 8;
+    while (remaining >= AVX2_GROUP_SIZE && bufferIdx + AVX2_GROUP_SIZE <= BUFFER_SIZE) {
+        // Prefetch next data for better cache performance
+        __builtin_prefetch(&ioBatch_[ioBatchPos_ + 64], 0, 3);
+
+        // Decode 8 doc deltas using AVX2 (stores deltas, not absolute docIDs)
+        decodeStreamVByte8_AVX2(&docDeltaBuffer_[bufferIdx]);
+
+        // Decode 8 frequencies using AVX2
+        if (writeFreqs_) {
+            decodeStreamVByte8_AVX2(&freqBuffer_[bufferIdx]);
+        } else {
+            // Set default frequencies using SIMD (faster than 8 scalar stores)
+            __m256i ones = _mm256_set1_epi32(1);
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(&freqBuffer_[bufferIdx]), ones);
+        }
+
+        bufferIdx += AVX2_GROUP_SIZE;
+        remaining -= AVX2_GROUP_SIZE;
+    }
+#endif
+
+    // SSE/Scalar path: Decode 4 docs at a time
     while (remaining >= STREAMVBYTE_GROUP_SIZE && bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
-        // Inline StreamVByte decode for doc deltas
+        // Decode doc deltas (stores deltas, not absolute docIDs)
         decodeStreamVByte4(&docDeltaBuffer_[bufferIdx]);
 
-        // Inline StreamVByte decode for frequencies
+        // Decode frequencies
         if (writeFreqs_) {
             decodeStreamVByte4(&freqBuffer_[bufferIdx]);
         } else {
-            // Set default frequencies
+#if defined(__SSE4_2__) || defined(__AVX2__)
+            // Set default frequencies using SIMD
+            __m128i ones = _mm_set1_epi32(1);
+            _mm_storeu_si128(reinterpret_cast<__m128i*>(&freqBuffer_[bufferIdx]), ones);
+#else
             freqBuffer_[bufferIdx] = 1;
             freqBuffer_[bufferIdx + 1] = 1;
             freqBuffer_[bufferIdx + 2] = 1;
             freqBuffer_[bufferIdx + 3] = 1;
+#endif
         }
 
         bufferIdx += STREAMVBYTE_GROUP_SIZE;
         remaining -= STREAMVBYTE_GROUP_SIZE;
     }
 
-    // Use VInt fallback for remaining docs (< 4)
+    // Handle remainder (< 4 docs) with VInt fallback
     int spaceLeft = BUFFER_SIZE - bufferIdx;
     int docsToRead = std::min(remaining, spaceLeft);
 
-    if (docsToRead > 0) {
-        // Read VInt from batch buffer (not directly from file)
-        for (int i = 0; i < docsToRead; ++i) {
-            docDeltaBuffer_[bufferIdx + i] = static_cast<uint32_t>(readVIntFromBatch());
-            if (writeFreqs_) {
-                freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(readVIntFromBatch());
-            } else {
-                freqBuffer_[bufferIdx + i] = 1;
-            }
+    for (int i = 0; i < docsToRead; ++i) {
+        // Store delta (not absolute docID - accumulation happens in nextDoc())
+        docDeltaBuffer_[bufferIdx + i] = static_cast<uint32_t>(readVIntFromBatch());
+
+        if (writeFreqs_) {
+            freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(readVIntFromBatch());
+        } else {
+            freqBuffer_[bufferIdx + i] = 1;
         }
-        bufferIdx += docsToRead;
     }
+    bufferIdx += docsToRead;
 
     bufferLimit_ = bufferIdx;
 }
 
 int Lucene104PostingsEnumOptimized::advance(int target) {
+
     // Simple implementation: just call nextDoc() until we reach target
     // TODO: Use skip lists for efficient advance()
     while (currentDoc_ < target) {

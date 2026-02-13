@@ -15,7 +15,6 @@ namespace diagon {
 // Forward declarations in correct namespace
 namespace index {
 class Fields;
-class NormsProducer;
 class Terms;
 }
 
@@ -24,6 +23,7 @@ namespace codecs {
 // Forward declarations
 class FieldsConsumer;
 class FieldsProducer;
+class NormsProducer;
 
 /**
  * PostingsFormat encodes/decodes inverted index.
@@ -108,7 +108,7 @@ public:
      * @param fields Fields to write (provides iterator over fields/terms)
      * @param norms Norms producer (optional, can be nullptr)
      */
-    virtual void write(index::Fields& fields, index::NormsProducer* norms) = 0;
+    virtual void write(index::Fields& fields, codecs::NormsProducer* norms) = 0;
 
     /**
      * Close and flush

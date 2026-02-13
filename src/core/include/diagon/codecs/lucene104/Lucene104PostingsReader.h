@@ -132,7 +132,7 @@ public:
      * @param writeFreqs Whether frequencies are encoded
      * @param skipEntries Skip entries with impacts (from .skp file)
      */
-    Lucene104PostingsEnumWithImpacts(store::IndexInput* docIn, const TermState& termState,
+    Lucene104PostingsEnumWithImpacts(std::unique_ptr<store::IndexInput> docIn, const TermState& termState,
                                      bool writeFreqs,
                                      const std::vector<SkipEntry>& skipEntries);
 
@@ -155,14 +155,35 @@ public:
     /**
      * Shallow advance to target without fully decoding.
      * Updates skip list position for accurate max score queries.
+     * Returns the doc ID at the end of the current impact block
+     * (i.e., the skip entry covering target), or NO_MORE_DOCS.
      *
      * @param target Target doc ID
+     * @return Block boundary doc ID (inclusive)
      */
-    void advanceShallow(int target);
+    int advanceShallow(int target);
 
     /**
-     * Get maximum score achievable up to upTo doc ID.
-     * Uses skip entry impacts (max_freq, max_norm) for upper bound.
+     * Get maximum frequency in range [currentDoc, upTo].
+     * Used to compute BM25 upper bounds for WAND.
+     *
+     * @param upTo Upper bound doc ID (inclusive)
+     * @return Maximum term frequency in range
+     */
+    int getMaxFreq(int upTo) const;
+
+    /**
+     * Get maximum norm (encoded doc length) in range [currentDoc, upTo].
+     * Used to compute BM25 upper bounds for WAND.
+     *
+     * @param upTo Upper bound doc ID (inclusive)
+     * @return Maximum norm value (0-127, higher = shorter doc)
+     */
+    int getMaxNorm(int upTo) const;
+
+    /**
+     * DEPRECATED: Get maximum score achievable up to upTo doc ID.
+     * This method couples PostingsEnum to BM25. Use getMaxFreq/getMaxNorm instead.
      *
      * @param upTo Upper bound doc ID (inclusive)
      * @param k1 BM25 k1 parameter
@@ -172,8 +193,37 @@ public:
      */
     float getMaxScore(int upTo, float k1, float b, float avgFieldLength) const;
 
+    /**
+     * Get next block boundary after target (Phase 2: Smart upTo).
+     *
+     * Returns the doc ID at the start of the next block from skip metadata.
+     * This allows WANDScorer to align max score updates with actual block
+     * boundaries instead of using fixed 128-doc windows.
+     *
+     * @param target Target doc ID to search from
+     * @return Next block boundary doc ID, or NO_MORE_DOCS if no more blocks
+     */
+    int getNextBlockBoundary(int target) const override;
+
+    /**
+     * Non-virtual batch drain: output docs+freqs from current position.
+     *
+     * Outputs the current doc (if valid and < upTo), then advances through
+     * the internal StreamVByte buffer outputting subsequent docs.
+     * After return, docID() is the first doc >= upTo, or NO_MORE_DOCS.
+     *
+     * Non-virtual: called through typed pointer for zero vtable overhead.
+     *
+     * @param upTo Upper bound (exclusive)
+     * @param outDocs Output doc IDs
+     * @param outFreqs Output frequencies
+     * @param maxCount Max docs to output
+     * @return Number of docs output
+     */
+    int drainBatch(int upTo, int* outDocs, int* outFreqs, int maxCount);
+
 private:
-    store::IndexInput* docIn_;  // Not owned
+    std::unique_ptr<store::IndexInput> docIn_;  // Owned clone for thread-safety
     int docFreq_;
     int64_t totalTermFreq_;
     bool writeFreqs_;
@@ -223,7 +273,7 @@ public:
      * @param termState Term state with file pointers
      * @param writeFreqs Whether frequencies are encoded
      */
-    Lucene104PostingsEnum(store::IndexInput* docIn, const TermState& termState, bool writeFreqs);
+    Lucene104PostingsEnum(std::unique_ptr<store::IndexInput> docIn, const TermState& termState, bool writeFreqs);
 
     // ==================== DocIdSetIterator ====================
 
@@ -240,7 +290,7 @@ public:
     int freq() const override { return currentFreq_; }
 
 private:
-    store::IndexInput* docIn_;  // Not owned
+    std::unique_ptr<store::IndexInput> docIn_;  // Owned clone for thread-safety
     int docFreq_;
     int64_t totalTermFreq_;
     bool writeFreqs_;

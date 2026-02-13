@@ -65,6 +65,20 @@ public:
     virtual int endOffset() const {
         return -1;  // Not supported in Phase 2 MVP
     }
+
+    /**
+     * Get next block boundary after target for impacts-aware scorers.
+     *
+     * Used by WAND (Phase 2) to align max score updates with actual block
+     * boundaries from skip list metadata, instead of using fixed windows.
+     *
+     * @param target Target doc ID to search from
+     * @return Next block boundary doc ID, or NO_MORE_DOCS if no more blocks
+     */
+    virtual int getNextBlockBoundary(int target) const {
+        // Default: Fixed 128-doc window (backward compatible)
+        return (target < NO_MORE_DOCS - 128) ? target + 128 : NO_MORE_DOCS;
+    }
 };
 
 }  // namespace index

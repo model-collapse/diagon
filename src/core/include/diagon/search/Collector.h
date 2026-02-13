@@ -89,6 +89,19 @@ public:
     virtual void setMinCompetitiveScore(float minScore) {
         // Default: no-op (not all scorers support this)
     }
+
+    /**
+     * Get total number of documents that matched the query.
+     *
+     * This includes ALL matching documents, not just those collected for top-K.
+     * For scorers with early termination (e.g., WAND), this count may be higher
+     * than the number of documents passed to the collector.
+     *
+     * @return Total matching document count, or -1 if not tracked
+     */
+    virtual int getTotalMatches() const {
+        return -1;  // Default: not tracked
+    }
 };
 
 /**

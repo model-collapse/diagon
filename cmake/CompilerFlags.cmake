@@ -98,17 +98,18 @@ endif()
 
 # ==================== Link-Time Optimization (LTO) ====================
 
-if(CMAKE_BUILD_TYPE MATCHES "Release")
-    include(CheckIPOSupported)
-    check_ipo_supported(RESULT IPO_SUPPORTED OUTPUT IPO_ERROR)
-
-    if(IPO_SUPPORTED)
-        message(STATUS "Link-Time Optimization (LTO) enabled")
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-    else()
-        message(STATUS "Link-Time Optimization (LTO) not supported: ${IPO_ERROR}")
-    endif()
-endif()
+# Temporarily disabled for profiling (LTO optimizes away ProfileScope objects)
+# if(CMAKE_BUILD_TYPE MATCHES "Release")
+#     include(CheckIPOSupported)
+#     check_ipo_supported(RESULT IPO_SUPPORTED OUTPUT IPO_ERROR)
+#
+#     if(IPO_SUPPORTED)
+#         message(STATUS "Link-Time Optimization (LTO) enabled")
+#         set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+#     else()
+#         message(STATUS "Link-Time Optimization (LTO) not supported: ${IPO_ERROR}")
+#     endif()
+# endif()
 
 # ==================== Position Independent Code ====================
 

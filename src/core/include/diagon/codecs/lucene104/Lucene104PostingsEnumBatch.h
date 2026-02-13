@@ -47,7 +47,7 @@ public:
      * @param termState Term state with file pointers
      * @param writeFreqs Whether frequencies are encoded
      */
-    Lucene104PostingsEnumBatch(store::IndexInput* docIn,
+    Lucene104PostingsEnumBatch(std::unique_ptr<store::IndexInput> docIn,
                                const TermState& termState,
                                bool writeFreqs);
 
@@ -79,7 +79,7 @@ public:
     int nextBatch(index::PostingsBatch& batch) override;
 
 private:
-    store::IndexInput* docIn_;  // Not owned
+    std::unique_ptr<store::IndexInput> docIn_;  // Owned clone
     int docFreq_;
     int64_t totalTermFreq_;
     bool writeFreqs_;

@@ -6,6 +6,7 @@
 #include "diagon/index/IndexReader.h"
 #include "diagon/index/LeafReaderContext.h"
 #include "diagon/search/IndexSearcher.h"
+#include "diagon/search/MaxScoreBulkScorer.h"
 #include "diagon/search/Scorer.h"
 #include "diagon/search/WANDScorer.h"
 #include "diagon/search/BM25Similarity.h"
@@ -402,20 +403,32 @@ public:
             } else {
                 // Pure disjunction - check if we should use WAND
                 const auto& config = searcher_.getConfig();
+                int minShouldMatch = query_.getMinimumNumberShouldMatch();
+
+                // WAND is beneficial when:
+                // 1. ScoreMode requires scoring (COMPLETE or TOP_SCORES)
+                //    - TOP_SCORES is the primary WAND mode: enables early termination
+                //      via setMinCompetitiveScore() from TopScoreDocCollector
+                //    - COMPLETE also benefits from block-max skipping
+                // 2. We have 2+ terms (WAND needs multiple posting lists)
+                //
+                // Note: Even 2-term queries benefit from WAND when minCompetitiveScore
+                // is set (TOP_SCORES mode), because WAND can skip entire blocks where
+                // the block-max score cannot beat the threshold.
                 bool useWAND = config.enable_block_max_wand &&
-                               shouldScorers.size() >= 2 &&  // At least 2 terms
-                               scoreMode_ == ScoreMode::COMPLETE;  // Need scoring
+                               scoreMode_ != ScoreMode::COMPLETE_NO_SCORES &&
+                               shouldScorers.size() >= 2;
 
                 if (useWAND) {
                     // Use Block-Max WAND for early termination
-                    // TODO: Get BM25Similarity from somewhere
                     BM25Similarity similarity;  // Default parameters
                     reqScorer = std::make_unique<WANDScorer>(
-                        shouldScorers, similarity, query_.getMinimumNumberShouldMatch());
+                        shouldScorers, similarity, minShouldMatch);
                 } else {
-                    // Use standard disjunction
+                    // Use standard exhaustive disjunction
+                    // This is optimal for simple queries (< 3 terms with minShouldMatch=0)
                     reqScorer = std::make_unique<DisjunctionScorer>(
-                        *this, std::move(shouldScorers), query_.getMinimumNumberShouldMatch());
+                        *this, std::move(shouldScorers), minShouldMatch);
                 }
             }
         }
@@ -434,6 +447,33 @@ public:
         }
 
         return reqScorer;
+    }
+
+    std::unique_ptr<BulkScorer> bulkScorer(const index::LeafReaderContext& context) const override {
+        const auto& config = searcher_.getConfig();
+
+        // MaxScoreBulkScorer is only used for pure disjunctions with WAND enabled
+        // and scoring requested (TOP_SCORES or COMPLETE)
+        if (!config.enable_block_max_wand) return nullptr;
+        if (scoreMode_ == ScoreMode::COMPLETE_NO_SCORES) return nullptr;
+        if (!query_.isPureDisjunction()) return nullptr;
+
+        int minShouldMatch = query_.getMinimumNumberShouldMatch();
+        if (minShouldMatch > 1) return nullptr;  // Not supported yet
+
+        // Create scorers for SHOULD clauses
+        std::vector<std::unique_ptr<Scorer>> scorers;
+        for (const auto& wc : weights_) {
+            auto scorer = wc.weight->scorer(context);
+            if (scorer) {
+                scorers.push_back(std::move(scorer));
+            }
+        }
+
+        if (scorers.size() < 2) return nullptr;  // Need 2+ for window-based scoring
+
+        int maxDoc = context.reader ? context.reader->maxDoc() : 0;
+        return std::make_unique<MaxScoreBulkScorer>(maxDoc, std::move(scorers));
     }
 
     const Query& getQuery() const override { return query_; }

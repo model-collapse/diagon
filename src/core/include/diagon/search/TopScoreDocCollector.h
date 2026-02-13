@@ -7,6 +7,7 @@
 #include "diagon/search/Collector.h"
 #include "diagon/search/TopDocs.h"
 
+#include <limits>
 #include <memory>
 #include <queue>
 #include <vector>
@@ -39,12 +40,24 @@ namespace search {
 class TopScoreDocCollector : public Collector {
 public:
     /**
-     * Create collector for top-K results.
+     * Create collector for top-K results with default threshold (1000).
      *
      * @param numHits Number of top hits to collect
      * @return Collector instance
      */
     static std::unique_ptr<TopScoreDocCollector> create(int numHits);
+
+    /**
+     * Create collector for top-K results with approximate hit counting.
+     *
+     * @param numHits Number of top hits to collect
+     * @param totalHitsThreshold Stop exact counting after this many hits.
+     *        When exceeded, switches to ScoreMode::TOP_SCORES for WAND early termination.
+     *        Use INT_MAX for exact counting (slower).
+     *        Default: 1000 (matches Lucene default).
+     * @return Collector instance
+     */
+    static std::unique_ptr<TopScoreDocCollector> create(int numHits, int totalHitsThreshold);
 
     /**
      * Create collector for top-K results after a given doc (pagination).
@@ -75,13 +88,17 @@ public:
 
     LeafCollector* getLeafCollector(const index::LeafReaderContext& context) override;
 
-    ScoreMode scoreMode() const override { return ScoreMode::COMPLETE; }
+    ScoreMode scoreMode() const override {
+        return totalHitsThreshold_ == std::numeric_limits<int>::max()
+            ? ScoreMode::COMPLETE
+            : ScoreMode::TOP_SCORES;
+    }
 
 private:
     /**
      * Private constructor (use create() factory methods)
      */
-    TopScoreDocCollector(int numHits, const ScoreDoc* after);
+    TopScoreDocCollector(int numHits, const ScoreDoc* after, int totalHitsThreshold);
 
     /**
      * Internal leaf collector for a single segment
@@ -93,7 +110,12 @@ private:
 
         ~TopScoreLeafCollector();
 
-        void setScorer(Scorable* scorer) override { scorer_ = scorer; }
+        void setScorer(Scorable* scorer) override {
+            scorer_ = scorer;
+            // Check if scorer tracks total matches
+            scorerTracksTotalMatches_ = (scorer && scorer->getTotalMatches() >= 0);
+            segmentHitsFromCollect_ = 0;
+        }
 
         void collect(int doc) override;
 
@@ -101,6 +123,7 @@ private:
 
     private:
         void collectSingle(int doc, float score);
+        void updateMinCompetitiveScore();
         void flushBatch();
 
 #if defined(DIAGON_HAVE_AVX512)
@@ -119,6 +142,8 @@ private:
         int docBase_;
         Scorable* scorer_;
         const ScoreDoc* after_;
+        int segmentHitsFromCollect_;  // Hits counted via collect() for this segment
+        bool scorerTracksTotalMatches_;  // Whether scorer provides getTotalMatches()
     };
 
     friend class TopScoreLeafCollector;
@@ -144,6 +169,7 @@ private:
     bool hasAfter_;                          // Whether after_ is set
     int64_t totalHits_;                      // Total matching documents
     TotalHits::Relation totalHitsRelation_;  // Relation (exact or lower bound)
+    int totalHitsThreshold_;                 // Threshold for approximate counting
 
     // Priority queue: .top() returns worst document in top-K set
     // When queue is full, we can reject docs with score <= top

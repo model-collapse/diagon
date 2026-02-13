@@ -201,13 +201,6 @@ public:
                            static_cast<float>(collectionStats.docCount);
         }
 
-        static bool logged = false;
-        if (!logged) {
-            fprintf(stderr, "[DEBUG BM25Similarity::scorer] Computed avgFieldLength=%.2f (sumTotalTermFreq=%ld, docCount=%ld)\n",
-                    avgFieldLength, collectionStats.sumTotalTermFreq, collectionStats.docCount);
-            logged = true;
-        }
-
         return SimScorer(idfValue * boost, k1_, b_, avgFieldLength);
     }
 

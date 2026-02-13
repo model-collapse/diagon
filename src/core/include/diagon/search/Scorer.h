@@ -78,6 +78,61 @@ public:
     virtual void setMinCompetitiveScore(float minScore) {
         // Default: no-op (not all scorers support this)
     }
+
+    /**
+     * Get total number of documents that matched the query.
+     *
+     * This includes ALL matching documents, not just those collected for top-K.
+     * For scorers with early termination (e.g., WAND), this count may be higher
+     * than the number of documents passed to the collector.
+     *
+     * @return Total matching document count, or -1 if not tracked
+     */
+    virtual int getTotalMatches() const {
+        return -1;  // Default: not tracked
+    }
+
+    /**
+     * Get next block boundary after target for smart max score updates.
+     *
+     * Used by WANDScorer (Phase 2) to align max score updates with actual
+     * block boundaries instead of using fixed 128-doc windows.
+     *
+     * @param target Target doc ID to search from
+     * @return Next block boundary doc ID, or NO_MORE_DOCS if no more blocks
+     */
+    virtual int getNextBlockBoundary(int target) const {
+        // Default: Fixed 128-doc window (backward compatible)
+        return (target < NO_MORE_DOCS - 128) ? target + 128 : NO_MORE_DOCS;
+    }
+
+    // ==================== Batch Scoring ====================
+
+    static constexpr int SCORER_BATCH_SIZE = 32;
+
+    /**
+     * Score a batch of documents starting from the current position.
+     *
+     * Outputs docs and scores for all docs in [docID(), upTo), up to maxCount.
+     * After return, docID() is the first doc >= upTo, or NO_MORE_DOCS.
+     *
+     * @param upTo Upper bound (exclusive) for doc IDs to process
+     * @param outDocs Output array for doc IDs (caller-allocated, size >= maxCount)
+     * @param outScores Output array for scores (caller-allocated, size >= maxCount)
+     * @param maxCount Maximum docs to output per call
+     * @return Number of docs output (0 if no docs < upTo remain)
+     */
+    virtual int scoreBatch(int upTo, int* outDocs, float* outScores, int maxCount) {
+        int count = 0;
+        int doc = docID();
+        while (doc < upTo && doc != NO_MORE_DOCS && count < maxCount) {
+            outDocs[count] = doc;
+            outScores[count] = score();
+            count++;
+            doc = nextDoc();
+        }
+        return count;
+    }
 };
 
 /**

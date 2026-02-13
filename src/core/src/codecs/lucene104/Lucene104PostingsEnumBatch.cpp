@@ -3,17 +3,19 @@
 
 #include "diagon/codecs/lucene104/Lucene104PostingsEnumBatch.h"
 #include "diagon/util/StreamVByte.h"
+#include "diagon/util/SIMDPrefixSum.h"
 
 #include <algorithm>
+#include <cstring>
 
 namespace diagon {
 namespace codecs {
 namespace lucene104 {
 
-Lucene104PostingsEnumBatch::Lucene104PostingsEnumBatch(store::IndexInput* docIn,
+Lucene104PostingsEnumBatch::Lucene104PostingsEnumBatch(std::unique_ptr<store::IndexInput> docIn,
                                                        const TermState& termState,
                                                        bool writeFreqs)
-    : docIn_(docIn)
+    : docIn_(std::move(docIn))
     , docFreq_(termState.docFreq)
     , totalTermFreq_(termState.totalTermFreq)
     , writeFreqs_(writeFreqs)
@@ -56,27 +58,54 @@ int Lucene104PostingsEnumBatch::nextBatch(index::PostingsBatch& batch) {
         int available = bufferLimit_ - bufferPos_;
         int toTake = std::min(toReturn - count, available);
 
-        // Copy docs from buffer and convert deltas to absolute IDs
-        for (int i = 0; i < toTake; i++) {
-            int docDelta = static_cast<int>(docDeltaBuffer_[bufferPos_]);
+        // Phase 4: SIMD-optimized delta decoding
+        // Try SIMD path for aligned batches (16 or 8 docs)
+        if (toTake == 16 || toTake == 8) {
+            // SIMD prefix sum: convert deltas to absolute IDs in-place
+            int32_t* deltaPtr = reinterpret_cast<int32_t*>(&docDeltaBuffer_[bufferPos_]);
+            util::SIMDPrefixSum::prefixSum(deltaPtr, toTake, baseDoc);
 
-            // Convert delta to absolute doc ID
-            if (baseDoc == -1) {
-                baseDoc = docDelta;  // First doc is absolute
+            // Copy absolute IDs to output batch (SIMD-optimized memcpy)
+            std::memcpy(&batch.docs[count], deltaPtr, toTake * sizeof(int32_t));
+
+            // Copy frequencies
+            if (writeFreqs_) {
+                std::memcpy(&batch.freqs[count], &freqBuffer_[bufferPos_], toTake * sizeof(int32_t));
             } else {
-                baseDoc += docDelta;
+                // Fill with 1s
+                for (int i = 0; i < toTake; i++) {
+                    batch.freqs[count + i] = 1;
+                }
             }
 
-            batch.docs[count] = baseDoc;
-            batch.freqs[count] = writeFreqs_
-                ? static_cast<int>(freqBuffer_[bufferPos_])
-                : 1;
+            // Update baseDoc to last element
+            baseDoc = batch.docs[count + toTake - 1];
+            bufferPos_ += toTake;
+            count += toTake;
+            docsRead_ += toTake;
 
-            bufferPos_++;
-            count++;
+        } else {
+            // Scalar fallback for partial batches (< 8 docs)
+            for (int i = 0; i < toTake; i++) {
+                int docDelta = static_cast<int>(docDeltaBuffer_[bufferPos_]);
+
+                // Convert delta to absolute doc ID
+                if (baseDoc == -1) {
+                    baseDoc = docDelta;  // First doc is absolute
+                } else {
+                    baseDoc += docDelta;
+                }
+
+                batch.docs[count] = baseDoc;
+                batch.freqs[count] = writeFreqs_
+                    ? static_cast<int>(freqBuffer_[bufferPos_])
+                    : 1;
+
+                bufferPos_++;
+                count++;
+            }
+            docsRead_ += toTake;
         }
-
-        docsRead_ += toTake;
     }
 
     // Update current position for one-at-a-time compatibility

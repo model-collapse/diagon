@@ -62,6 +62,16 @@ public:
 
 private:
     /**
+     * Field-level metadata read from .tmd file
+     */
+    struct FieldMetadata {
+        int64_t numTerms;
+        int64_t sumTotalTermFreq;
+        int64_t sumDocFreq;
+        int docCount;
+    };
+
+    /**
      * Holds a field reader and its cloned inputs.
      * Each field needs independent IndexInput clones to avoid file pointer conflicts.
      */
@@ -73,6 +83,9 @@ private:
 
     std::string segmentName_;
     const index::FieldInfos& fieldInfos_;
+
+    // Field metadata map (fieldName -> stats)
+    std::map<std::string, FieldMetadata> fieldMetadata_;
 
     // Index inputs for .tim and .tip files
     std::unique_ptr<store::IndexInput> timInput_;

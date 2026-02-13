@@ -59,6 +59,16 @@ public:
      * @return 64-bit signed integer value
      */
     virtual int64_t longValue() const = 0;
+
+    /**
+     * Direct access to underlying norms array for batch scoring.
+     * Returns nullptr if direct access is not supported.
+     * When non-null, outSize is set to the array length.
+     */
+    virtual const int8_t* normsData(int* outSize) const {
+        (void)outSize;
+        return nullptr;
+    }
 };
 
 /**

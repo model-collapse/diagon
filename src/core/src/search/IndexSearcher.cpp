@@ -4,10 +4,12 @@
 #include "diagon/search/IndexSearcher.h"
 
 #include "diagon/index/IndexReader.h"
+#include "diagon/search/BulkScorer.h"
 #include "diagon/search/Collector.h"
 #include "diagon/search/Scorer.h"
 #include "diagon/search/TopDocs.h"
 #include "diagon/search/TopScoreDocCollector.h"
+#include "diagon/search/TotalHitCountCollector.h"
 #include "diagon/search/Weight.h"
 
 namespace diagon {
@@ -32,6 +34,11 @@ public:
         scorer_->setMinCompetitiveScore(minScore);
     }
 
+    int getTotalMatches() const override {
+        // Forward to underlying scorer (WAND totalHits fix)
+        return scorer_->getTotalMatches();
+    }
+
 private:
     Scorer* scorer_;
 };
@@ -39,8 +46,12 @@ private:
 // ==================== IndexSearcher Implementation ====================
 
 TopDocs IndexSearcher::search(const Query& query, int numHits) {
-    // Create collector
-    auto collector = TopScoreDocCollector::create(numHits);
+    return search(query, numHits, 1000);
+}
+
+TopDocs IndexSearcher::search(const Query& query, int numHits, int totalHitsThreshold) {
+    // Create collector with threshold for WAND early termination
+    auto collector = TopScoreDocCollector::create(numHits, totalHitsThreshold);
 
     // Execute search
     search(query, collector.get());
@@ -50,9 +61,6 @@ TopDocs IndexSearcher::search(const Query& query, int numHits) {
 }
 
 void IndexSearcher::search(const Query& query, Collector* collector) {
-    // Phase 4: Simplified - no query rewriting
-    // TODO Phase 5: Implement query rewriting
-
     // Create weight for query
     auto weight = query.createWeight(*this, collector->scoreMode(), 1.0f);
 
@@ -67,7 +75,16 @@ void IndexSearcher::search(const Query& query, Collector* collector) {
             continue;  // Collector doesn't want this segment
         }
 
-        // Create scorer for this segment
+        // Try BulkScorer first (window-based, significantly faster for disjunctions)
+        auto bulkScorer = weight->bulkScorer(ctx);
+        if (bulkScorer) {
+            // BulkScorer drives iteration internally and calls collector.collect()
+            bulkScorer->score(leafCollector, 0, DocIdSetIterator::NO_MORE_DOCS);
+            leafCollector->finishSegment();
+            continue;
+        }
+
+        // Fallback: doc-at-a-time iteration via Scorer
         auto scorer = weight->scorer(ctx);
         if (!scorer) {
             continue;  // No matches in this segment
@@ -89,10 +106,33 @@ void IndexSearcher::search(const Query& query, Collector* collector) {
 }
 
 int IndexSearcher::count(const Query& query) {
-    // Phase 4: Simple implementation using search
-    // TODO Phase 5: Optimize with dedicated counting (no scoring)
-    auto results = search(query, Integer::MAX_VALUE);
-    return static_cast<int>(results.totalHits.value);
+    // Create weight with COMPLETE_NO_SCORES (no scoring needed)
+    auto weight = query.createWeight(*this, ScoreMode::COMPLETE_NO_SCORES, 1.0f);
+
+    // Try to count using Weight::count() per segment (O(1) for TermQuery)
+    int totalCount = 0;
+    bool allSegmentsCounted = true;
+    auto leaves = reader_.leaves();
+
+    for (const auto& ctx : leaves) {
+        int leafCount = weight->count(ctx);
+        if (leafCount >= 0) {
+            totalCount += leafCount;
+        } else {
+            allSegmentsCounted = false;
+            break;
+        }
+    }
+
+    if (allSegmentsCounted) {
+        return totalCount;  // O(1) fast path
+    }
+
+    // Fallback: use TotalHitCountCollector (iterates but doesn't score)
+    TotalHitCountCollector collector;
+    collector.setWeight(weight.get());
+    search(query, &collector);
+    return collector.getTotalHits();
 }
 
 }  // namespace search

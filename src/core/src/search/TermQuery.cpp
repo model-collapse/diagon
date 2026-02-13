@@ -3,18 +3,18 @@
 
 #include "diagon/search/TermQuery.h"
 
-#include "diagon/index/BatchDocValues.h"
-#include "diagon/index/BatchPostingsEnum.h"
+#include "diagon/codecs/blocktree/BlockTreeTermsReader.h"
+#include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
 #include "diagon/index/DocValues.h"
 #include "diagon/index/IndexReader.h"
 #include "diagon/index/PostingsEnum.h"
 #include "diagon/index/Terms.h"
 #include "diagon/index/TermsEnum.h"
-#include "diagon/search/BatchBM25Scorer.h"
 #include "diagon/search/BM25Similarity.h"
 #include "diagon/search/IndexSearcher.h"
 #include "diagon/search/Scorer.h"
 
+#include <algorithm>
 #include <sstream>
 
 namespace diagon {
@@ -37,7 +37,10 @@ public:
         , simScorer_(simScorer)
         , norms_(norms)
         , doc_(-1)
-        , freq_(0) {}
+        , freq_(0)
+        , impactsEnum_(dynamic_cast<codecs::lucene104::Lucene104PostingsEnumWithImpacts*>(postings_.get()))
+        , normsSize_(0)
+        , normsData_(norms ? norms->normsData(&normsSize_) : nullptr) {}
 
     // ==================== DocIdSetIterator ====================
 
@@ -60,9 +63,14 @@ public:
     }
 
     int64_t cost() const override {
-        // Cost is approximately the document frequency
-        // TODO: Get actual docFreq from terms
-        return 1000;  // Placeholder
+        return postings_->cost();
+    }
+
+    int advanceShallow(int target) override {
+        if (impactsEnum_) {
+            return impactsEnum_->advanceShallow(target);
+        }
+        return NO_MORE_DOCS;
     }
 
     // ==================== Scorer ====================
@@ -78,6 +86,73 @@ public:
 
     const Weight& getWeight() const override { return weight_; }
 
+    // Block-Max WAND support: compute maximum possible score
+    float getMaxScore(int upTo) const override {
+        if (impactsEnum_) {
+            // Get max frequency and max norm from skip metadata
+            int maxFreq = impactsEnum_->getMaxFreq(upTo);
+            int maxNorm = impactsEnum_->getMaxNorm(upTo);
+
+            // Compute BM25 upper bound with these maximums
+            return simScorer_.score(static_cast<float>(maxFreq), maxNorm);
+        } else {
+            // Fallback: use conservative global maximum
+            constexpr float MAX_FREQ = 10000.0f;
+            constexpr long SHORTEST_DOC_NORM = 127;  // Length 1.0
+            return simScorer_.score(MAX_FREQ, SHORTEST_DOC_NORM);
+        }
+    }
+
+    // Phase 2: Smart upTo calculation - get next block boundary
+    int getNextBlockBoundary(int target) const override {
+        // Delegate to PostingsEnum (which knows about skip entries)
+        return postings_->getNextBlockBoundary(target);
+    }
+
+    // ==================== Batch Scoring ====================
+
+    int scoreBatch(int upTo, int* outDocs, float* outScores, int maxCount) override {
+        if (!impactsEnum_) {
+            return Scorer::scoreBatch(upTo, outDocs, outScores, maxCount);
+        }
+
+        int freqsBuf[SCORER_BATCH_SIZE];
+        int batchSize = std::min(maxCount, static_cast<int>(SCORER_BATCH_SIZE));
+
+        // Phase 1: Batch decode docs+freqs (non-virtual, direct buffer drain)
+        int count = impactsEnum_->drainBatch(upTo, outDocs, freqsBuf, batchSize);
+
+        if (count == 0) {
+            doc_ = impactsEnum_->docID();
+            return 0;
+        }
+
+        // Phase 2: Batch norms lookup + BM25 scoring
+        if (normsData_) {
+            // Fast path: direct array access (no virtual dispatch)
+            for (int i = 0; i < count; i++) {
+                long norm = (outDocs[i] < normsSize_)
+                    ? static_cast<long>(normsData_[outDocs[i]]) : 1L;
+                outScores[i] = simScorer_.score(static_cast<float>(freqsBuf[i]), norm);
+            }
+        } else {
+            // Fallback: virtual dispatch per doc
+            for (int i = 0; i < count; i++) {
+                long norm = 1L;
+                if (norms_ && norms_->advanceExact(outDocs[i])) {
+                    norm = norms_->longValue();
+                }
+                outScores[i] = simScorer_.score(static_cast<float>(freqsBuf[i]), norm);
+            }
+        }
+
+        // Update TermScorer state to match impacts enum
+        doc_ = impactsEnum_->docID();
+        freq_ = freqsBuf[count - 1];
+
+        return count;
+    }
+
 private:
     const Weight& weight_;
     std::unique_ptr<index::PostingsEnum> postings_;
@@ -85,191 +160,9 @@ private:
     index::NumericDocValues* norms_;  // Non-owning pointer to norms
     int doc_;
     int freq_;
-};
-
-// ==================== BatchTermScorer ====================
-
-/**
- * BatchTermScorer - Batch-at-a-time scorer for TermQuery
- *
- * P1 optimization: Eliminates one-at-a-time iterator overhead
- * using batch postings decoding and SIMD BM25 scoring.
- *
- * Expected improvement: +19% search latency
- */
-class BatchTermScorer : public Scorer {
-public:
-    BatchTermScorer(const Weight& weight,
-                   std::unique_ptr<index::PostingsEnum> postings,
-                   const BM25Similarity::SimScorer& simScorer,
-                   index::NumericDocValues* norms,
-                   int batch_size,
-                   BatchBuffers& buffers)  // Phase 3: Use external buffers
-        : weight_(weight)
-        , postings_(std::move(postings))
-        , simScorer_(simScorer)
-        , norms_(norms)
-        , batch_size_(batch_size)
-        , batch_(batch_size)
-        , batch_pos_(0)
-        , buffers_(buffers)  // Phase 3: Store reference (must match declaration order)
-        , doc_(-1)
-        , freq_(0)
-        , score_(0.0f) {
-
-        // Phase 3: Ensure external buffers have capacity (cheap if already sized)
-        buffers_.ensureCapacity(batch_size);
-
-        // Cache batch interface checks (Phase 3 optimization: move from hot path)
-        batch_postings_ = dynamic_cast<index::BatchPostingsEnum*>(postings_.get());
-        batch_norms_ = dynamic_cast<index::BatchNumericDocValues*>(norms_);
-    }
-
-    // ==================== DocIdSetIterator ====================
-
-    int docID() const override { return doc_; }
-
-    int nextDoc() override {
-        // Check if we need to fetch next batch
-        if (batch_pos_ >= batch_.count) {
-            if (!fetchNextBatch()) {
-                doc_ = NO_MORE_DOCS;
-                return doc_;
-            }
-        }
-
-        // Return next document from batch
-        doc_ = batch_.docs[batch_pos_];
-        freq_ = batch_.freqs[batch_pos_];
-        score_ = buffers_.scores[batch_pos_];  // Phase 3: Use external buffer
-        batch_pos_++;
-
-        return doc_;
-    }
-
-    int advance(int target) override {
-        // For simplicity, use nextDoc until we reach target
-        // TODO: Optimize with batch skipping
-        int doc = doc_;
-        while (doc < target && doc != NO_MORE_DOCS) {
-            doc = nextDoc();
-        }
-        return doc;
-    }
-
-    int64_t cost() const override {
-        return 1000;  // Placeholder
-    }
-
-    // ==================== Scorer ====================
-
-    float score() const override {
-        // Score already computed in batch
-        return score_;
-    }
-
-    const Weight& getWeight() const override { return weight_; }
-
-private:
-    /**
-     * Fetch and score next batch of documents
-     *
-     * Returns false if no more documents available.
-     *
-     * Phase 3.3: Optimized with pointer arithmetic and inline hint
-     */
-    __attribute__((always_inline)) bool fetchNextBatch() {
-        // Try batch decoding if available
-        if (batch_postings_) {
-            batch_.count = batch_postings_->nextBatch(batch_);
-        } else {
-            // Fallback: collect batch from one-at-a-time interface
-            // Phase 3.3: Use pointer arithmetic for faster access
-            int* doc_ptr = batch_.docs;
-            int* freq_ptr = batch_.freqs;
-            int count = 0;
-
-            for (int i = 0; i < batch_size_; i++) {
-                int doc = postings_->nextDoc();
-                if (doc == NO_MORE_DOCS) {
-                    break;
-                }
-                *doc_ptr++ = doc;
-                *freq_ptr++ = postings_->freq();
-                count++;
-            }
-            batch_.count = count;
-        }
-
-        if (batch_.count == 0) {
-            return false;  // Exhausted
-        }
-
-        // Batch lookup norms (Phase 3: Use external buffer)
-        if (batch_norms_) {
-            // Fast path: batch interface available
-            batch_norms_->getBatch(batch_.docs, buffers_.norms.data(), batch_.count);
-        } else {
-            // Fallback: one-at-a-time norm lookup with prefetching
-            // Phase 3.3: Use pointer arithmetic
-            // Phase 4: Add prefetching to reduce memory latency (P3 Task #38)
-            long* norm_ptr = buffers_.norms.data();
-            const int* doc_ptr = batch_.docs;
-
-            constexpr int PREFETCH_DISTANCE = 12;  // Optimal: covers L3/RAM latency (~330 cycles)
-
-            for (int i = 0; i < batch_.count; i++) {
-                // Prefetch norm data for future documents
-                // This hides memory latency by fetching data before it's needed
-                if (i + PREFETCH_DISTANCE < batch_.count && norms_) {
-                    // Prefetch to L1 cache (hint: 3 = high temporal locality)
-                    // Prefetch the doc ID array location for the future document
-                    __builtin_prefetch(&doc_ptr[PREFETCH_DISTANCE], 0, 3);
-                }
-
-                long norm = 1L;
-                if (norms_ && norms_->advanceExact(*doc_ptr++)) {
-                    norm = norms_->longValue();
-                }
-                *norm_ptr++ = norm;
-            }
-        }
-
-        // SIMD batch scoring (Phase 3: Use external buffer)
-        BatchBM25Scorer::scoreBatch(
-            batch_.freqs,
-            buffers_.norms.data(),
-            simScorer_.getIDF(),
-            simScorer_.getK1(),
-            simScorer_.getB(),
-            50.0f,  // avgLength (TODO: get from stats)
-            buffers_.scores.data(),
-            batch_.count
-        );
-
-        batch_pos_ = 0;
-        return true;
-    }
-
-    const Weight& weight_;
-    std::unique_ptr<index::PostingsEnum> postings_;
-    BM25Similarity::SimScorer simScorer_;
-    index::NumericDocValues* norms_;  // Non-owning pointer
-
-    // Batch processing
-    int batch_size_;
-    index::PostingsBatch batch_;
-    int batch_pos_;
-    BatchBuffers& buffers_;  // Phase 3: External pre-allocated buffers
-
-    // Batch interface pointers (cached at construction, Phase 3 optimization)
-    index::BatchPostingsEnum* batch_postings_ = nullptr;
-    index::BatchNumericDocValues* batch_norms_ = nullptr;
-
-    // Cached values
-    int doc_;
-    int freq_;
-    float score_;
+    codecs::lucene104::Lucene104PostingsEnumWithImpacts* impactsEnum_;  // Cached typed pointer (non-owning)
+    int normsSize_;            // Size of normsData_ array (must be declared before normsData_ for init order)
+    const int8_t* normsData_;  // Direct norms array pointer (from any NumericDocValues with normsData())
 };
 
 // ==================== TermWeight ====================
@@ -291,24 +184,81 @@ public:
 private:
     static BM25Similarity::SimScorer createScorer(const TermQuery& query, IndexSearcher& searcher,
                                                   float boost) {
-        // Get collection statistics
-        // Phase 4: Simplified - use reader's maxDoc
-        int64_t docCount = searcher.getIndexReader().maxDoc();
+        // Get actual collection statistics from index
+        const std::string& field = query.getTerm().field();
+        auto& reader = searcher.getIndexReader();
 
-        // TODO Phase 5: Get actual statistics from IndexSearcher
+        int64_t maxDoc = reader.maxDoc();
+        int64_t sumTotalTermFreq = 0;
+        int64_t sumDocFreq = 0;
+
+        // Aggregate statistics across all segments
+        for (const auto& ctx : reader.leaves()) {
+            auto terms = ctx.reader->terms(field);
+            if (!terms) continue;
+
+            int64_t segmentSumTotalTermFreq = terms->getSumTotalTermFreq();
+            int64_t segmentSumDocFreq = terms->getSumDocFreq();
+
+            // Only accumulate if valid (not -1)
+            if (segmentSumTotalTermFreq > 0) {
+                sumTotalTermFreq += segmentSumTotalTermFreq;
+            }
+            if (segmentSumDocFreq > 0) {
+                sumDocFreq += segmentSumDocFreq;
+            }
+        }
+
+        // Fallback to estimates if statistics not available
+        if (sumTotalTermFreq <= 0) {
+            sumTotalTermFreq = maxDoc * 10;
+        }
+        if (sumDocFreq <= 0) {
+            sumDocFreq = maxDoc;
+        }
+
+        // IMPORTANT: Use maxDoc for docCount (total documents in index)
+        // This matches Lucene's CollectionStatistics behavior
+        // Do NOT use terms.getDocCount() which only counts documents with terms
+        int64_t docCount = maxDoc;
+
         CollectionStatistics collectionStats(
-            query.getTerm().field(),
-            docCount,       // maxDoc
-            docCount,       // docCount (all docs have field - simplified)
-            docCount * 10,  // sumTotalTermFreq (estimated)
-            docCount        // sumDocFreq (estimated)
+            field,
+            maxDoc,
+            docCount,
+            sumTotalTermFreq,
+            sumDocFreq
         );
 
-        // TODO Phase 5: Get actual term statistics
+        // Get actual term statistics by seeking to the term
+        int64_t termDocFreq = 0;
+        int64_t termTotalTermFreq = 0;
+
+        for (const auto& ctx : reader.leaves()) {
+            auto terms = ctx.reader->terms(field);
+            if (!terms) continue;
+
+            auto termsEnum = terms->iterator();
+            if (!termsEnum) continue;
+
+            if (termsEnum->seekExact(query.getTerm().bytes())) {
+                termDocFreq += termsEnum->docFreq();
+                int64_t ttf = termsEnum->totalTermFreq();
+                if (ttf > 0) {
+                    termTotalTermFreq += ttf;
+                }
+            }
+        }
+
+        // Fallback if term not found (shouldn't happen in normal search)
+        if (termDocFreq == 0) {
+            termDocFreq = maxDoc / 10;
+            termTotalTermFreq = maxDoc;
+        }
+
         TermStatistics termStats(query.getTerm().bytes(),
-                                 docCount / 10,  // docFreq (estimated - 10% of docs)
-                                 docCount        // totalTermFreq (estimated)
-        );
+                                 termDocFreq,
+                                 termTotalTermFreq);
 
         // Create similarity scorer
         BM25Similarity similarity;
@@ -334,12 +284,25 @@ public:
             return nullptr;  // Term doesn't exist in this segment
         }
 
-        // Check if batch mode is enabled
         const auto& config = searcher_.getConfig();
-        bool useBatch = config.enable_batch_scoring;
+        bool useWAND = config.enable_block_max_wand;
 
-        // Get postings (with batch mode if enabled)
-        auto postings = termsEnum->postings(useBatch);
+        // Get postings - try impacts-aware if WAND is enabled
+        std::unique_ptr<index::PostingsEnum> postings;
+
+        if (useWAND) {
+            // Try to get impacts-aware postings for WAND optimization
+            auto* segmentTermsEnum = dynamic_cast<codecs::blocktree::SegmentTermsEnum*>(termsEnum.get());
+            if (segmentTermsEnum) {
+                postings = segmentTermsEnum->impactsPostings();
+            }
+        }
+
+        // Fallback to regular postings if impacts not available
+        if (!postings) {
+            postings = termsEnum->postings(false);
+        }
+
         if (!postings) {
             return nullptr;
         }
@@ -347,16 +310,27 @@ public:
         // Get norms for BM25 length normalization
         auto* norms = context.reader->getNormValues(query_.getTerm().field());
 
-        if (useBatch) {
-            // Create batch scorer (P1 optimization, Phase 3: reuse buffers)
-            return std::make_unique<BatchTermScorer>(
-                *this, std::move(postings), simScorer_, norms, config.batch_size,
-                searcher_.getBatchBuffers());
-        } else {
-            // Create regular scorer (default)
-            return std::make_unique<TermScorer>(
-                *this, std::move(postings), simScorer_, norms);
+        // TermScorer has built-in batch capability via scoreBatch()
+        return std::make_unique<TermScorer>(
+            *this, std::move(postings), simScorer_, norms);
+    }
+
+    int count(const index::LeafReaderContext& context) const override {
+        // Fast path: no deletions → docFreq() is exact (O(1))
+        if (!context.reader->hasDeletions()) {
+            auto terms = context.reader->terms(query_.getTerm().field());
+            if (!terms) return 0;
+
+            auto termsEnum = terms->iterator();
+            if (!termsEnum) return 0;
+
+            if (termsEnum->seekExact(query_.getTerm().bytes())) {
+                return termsEnum->docFreq();
+            }
+            return 0;  // Term not in this segment
         }
+        // With deletions: cannot count without iterating
+        return -1;
     }
 
     const Query& getQuery() const override { return query_; }

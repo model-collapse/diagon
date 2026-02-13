@@ -7,6 +7,7 @@
 #include "diagon/util/Exceptions.h"
 
 #include <algorithm>
+#include <cstring>
 #include <iostream>
 #include <stdexcept>
 
@@ -67,7 +68,8 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
                 fst_ = util::FST::deserialize(fstData);
 
                 // Extract block metadata from FST for compatibility with iteration code
-                auto fstEntries = fst_->getAllEntries();
+                // Use const reference to avoid copying 12,804 entries (~256 KB)
+                const auto& fstEntries = fst_->getAllEntries();
                 blockIndex_.reserve(fstEntries.size());
                 for (const auto& [termBytes, blockFP] : fstEntries) {
                     blockIndex_.emplace_back(
@@ -120,46 +122,64 @@ void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
     }
 
     int termCount = timIn_->readVInt();
-    block.terms.clear();
-    block.termData.clear();
+
+    // Clear but reuse allocated capacity (no realloc after warmup)
+    block.arena_.clear();
+    block.termOffsets_.clear();
+    block.termLengths_.clear();
     block.stats.clear();
-    block.terms.reserve(termCount);
-    block.termData.reserve(termCount);
-    block.stats.reserve(termCount);
 
-    // Read each term
+    // Read all terms into flat arena - zero per-term allocations
     for (int i = 0; i < termCount; i++) {
-        // Read suffix
         int suffixLen = timIn_->readVInt();
+        int termLen = prefixLen + suffixLen;
 
-        // Create term bytes storage
-        std::vector<uint8_t> termBytes(prefixLen + suffixLen);
+        // Record offset before appending
+        uint32_t offset = static_cast<uint32_t>(block.arena_.size());
+        block.termOffsets_.push_back(offset);
+        block.termLengths_.push_back(static_cast<uint16_t>(termLen));
+
+        // Grow arena and write term bytes in-place
+        block.arena_.resize(block.arena_.size() + termLen);
+        uint8_t* dest = block.arena_.data() + offset;
 
         // Copy prefix
         if (prefixLen > 0) {
-            std::copy(block.prefixData.data(), block.prefixData.data() + prefixLen,
-                      termBytes.begin());
+            std::memcpy(dest, block.prefixData.data(), prefixLen);
         }
 
-        // Read suffix
+        // Read suffix directly into arena
         if (suffixLen > 0) {
-            timIn_->readBytes(termBytes.data() + prefixLen, suffixLen);
+            timIn_->readBytes(dest + prefixLen, suffixLen);
         }
-
-        // Store term bytes
-        block.termData.push_back(std::move(termBytes));
-
-        // Create BytesRef pointing to stored data
-        const auto& storedBytes = block.termData.back();
-        block.terms.emplace_back(storedBytes.data(), storedBytes.size());
 
         // Read stats
         BlockTreeTermsWriter::TermStats stats;
         stats.docFreq = timIn_->readVInt();
         stats.totalTermFreq = timIn_->readVLong();
         stats.postingsFP = timIn_->readVLong();
+        stats.skipStartFP = timIn_->readVLong();  // Block-Max WAND support
         block.stats.push_back(stats);
     }
+
+    // Build BytesRef pointers into arena (single pass, no allocation)
+    block.rebuildTermRefs();
+}
+
+std::shared_ptr<BlockTreeTermsReader::TermBlock> BlockTreeTermsReader::getCachedBlock(int blockIndex) {
+    // Check cache first
+    auto it = blockCache_.find(blockIndex);
+    if (it != blockCache_.end()) {
+        return it->second;
+    }
+
+    // Cache miss: load from disk and cache
+    auto block = std::make_shared<TermBlock>();
+    int64_t blockFP = blockIndex_[blockIndex].blockFP;
+    loadBlock(blockFP, *block);
+
+    blockCache_[blockIndex] = block;
+    return block;
 }
 
 std::unique_ptr<index::TermsEnum> BlockTreeTermsReader::iterator() {
@@ -203,8 +223,7 @@ void SegmentTermsEnum::loadBlockByIndex(int blockIndex) {
     }
 
     currentBlockIndex_ = blockIndex;
-    int64_t blockFP = reader_->blockIndex_[blockIndex].blockFP;
-    reader_->loadBlock(blockFP, currentBlock_);
+    currentBlock_ = reader_->getCachedBlock(blockIndex);
 }
 
 bool SegmentTermsEnum::next() {
@@ -218,13 +237,13 @@ bool SegmentTermsEnum::next() {
         loadBlockByIndex(0);
         currentTermIndex_ = 0;
         positioned_ = true;
-        return !currentBlock_.terms.empty();
+        return !currentBlock_->terms.empty();
     }
 
     // Move to next term in current block
     currentTermIndex_++;
 
-    if (currentTermIndex_ < static_cast<int>(currentBlock_.terms.size())) {
+    if (currentTermIndex_ < static_cast<int>(currentBlock_->terms.size())) {
         return true;
     }
 
@@ -232,7 +251,7 @@ bool SegmentTermsEnum::next() {
     if (currentBlockIndex_ + 1 < static_cast<int>(reader_->blockIndex_.size())) {
         loadBlockByIndex(currentBlockIndex_ + 1);
         currentTermIndex_ = 0;
-        return !currentBlock_.terms.empty();
+        return !currentBlock_->terms.empty();
     }
 
     // No more blocks
@@ -249,16 +268,18 @@ bool SegmentTermsEnum::seekExact(const util::BytesRef& text) {
         return false;
     }
 
-    // Load the block
-    loadBlockByIndex(blockIndex);
+    // Load the block (uses shared cache - O(1) if already loaded)
+    if (blockIndex != currentBlockIndex_) {
+        loadBlockByIndex(blockIndex);
+    }
 
     // Binary search within block
     auto it = std::lower_bound(
-        currentBlock_.terms.begin(), currentBlock_.terms.end(), text,
+        currentBlock_->terms.begin(), currentBlock_->terms.end(), text,
         [](const util::BytesRef& a, const util::BytesRef& b) { return a < b; });
 
-    if (it != currentBlock_.terms.end() && *it == text) {
-        currentTermIndex_ = static_cast<int>(it - currentBlock_.terms.begin());
+    if (it != currentBlock_->terms.end() && *it == text) {
+        currentTermIndex_ = static_cast<int>(it - currentBlock_->terms.begin());
         positioned_ = true;
         return true;
     }
@@ -283,15 +304,17 @@ index::TermsEnum::SeekStatus SegmentTermsEnum::seekCeil(const util::BytesRef& te
         return SeekStatus::NOT_FOUND;
     }
 
-    // Load the block
-    loadBlockByIndex(blockIndex);
+    // Load the block (uses shared cache)
+    if (blockIndex != currentBlockIndex_) {
+        loadBlockByIndex(blockIndex);
+    }
 
     // Binary search for ceiling
     auto it = std::lower_bound(
-        currentBlock_.terms.begin(), currentBlock_.terms.end(), text,
+        currentBlock_->terms.begin(), currentBlock_->terms.end(), text,
         [](const util::BytesRef& a, const util::BytesRef& b) { return a < b; });
 
-    if (it == currentBlock_.terms.end()) {
+    if (it == currentBlock_->terms.end()) {
         // Term is after all terms in this block - try next block
         if (currentBlockIndex_ + 1 < static_cast<int>(reader_->blockIndex_.size())) {
             loadBlockByIndex(currentBlockIndex_ + 1);
@@ -302,7 +325,7 @@ index::TermsEnum::SeekStatus SegmentTermsEnum::seekCeil(const util::BytesRef& te
         return SeekStatus::END;
     }
 
-    currentTermIndex_ = static_cast<int>(it - currentBlock_.terms.begin());
+    currentTermIndex_ = static_cast<int>(it - currentBlock_->terms.begin());
     positioned_ = true;
 
     if (*it == text) {
@@ -314,26 +337,26 @@ index::TermsEnum::SeekStatus SegmentTermsEnum::seekCeil(const util::BytesRef& te
 
 util::BytesRef SegmentTermsEnum::term() const {
     if (!positioned_ || currentTermIndex_ < 0 ||
-        currentTermIndex_ >= static_cast<int>(currentBlock_.terms.size())) {
+        currentTermIndex_ >= static_cast<int>(currentBlock_->terms.size())) {
         return util::BytesRef();
     }
-    return currentBlock_.terms[currentTermIndex_];
+    return currentBlock_->terms[currentTermIndex_];
 }
 
 int SegmentTermsEnum::docFreq() const {
     if (!positioned_ || currentTermIndex_ < 0 ||
-        currentTermIndex_ >= static_cast<int>(currentBlock_.stats.size())) {
+        currentTermIndex_ >= static_cast<int>(currentBlock_->stats.size())) {
         return 0;
     }
-    return currentBlock_.stats[currentTermIndex_].docFreq;
+    return currentBlock_->stats[currentTermIndex_].docFreq;
 }
 
 int64_t SegmentTermsEnum::totalTermFreq() const {
     if (!positioned_ || currentTermIndex_ < 0 ||
-        currentTermIndex_ >= static_cast<int>(currentBlock_.stats.size())) {
+        currentTermIndex_ >= static_cast<int>(currentBlock_->stats.size())) {
         return 0;
     }
-    return currentBlock_.stats[currentTermIndex_].totalTermFreq;
+    return currentBlock_->stats[currentTermIndex_].totalTermFreq;
 }
 
 std::unique_ptr<index::PostingsEnum> SegmentTermsEnum::postings() {
@@ -342,7 +365,7 @@ std::unique_ptr<index::PostingsEnum> SegmentTermsEnum::postings() {
 
 std::unique_ptr<index::PostingsEnum> SegmentTermsEnum::postings(bool useBatch) {
     if (!positioned_ || currentTermIndex_ < 0 ||
-        currentTermIndex_ >= static_cast<int>(currentBlock_.stats.size())) {
+        currentTermIndex_ >= static_cast<int>(currentBlock_->stats.size())) {
         throw std::runtime_error("No current term (call next() or seek first)");
     }
 
@@ -351,7 +374,7 @@ std::unique_ptr<index::PostingsEnum> SegmentTermsEnum::postings(bool useBatch) {
     }
 
     // Get term state
-    const auto& stats = currentBlock_.stats[currentTermIndex_];
+    const auto& stats = currentBlock_->stats[currentTermIndex_];
 
     // Create TermState for postings reader
     codecs::lucene104::TermState termState;
@@ -364,6 +387,35 @@ std::unique_ptr<index::PostingsEnum> SegmentTermsEnum::postings(bool useBatch) {
 
     // Get postings from reader
     return reader->postings(*fieldInfo_, termState, useBatch);
+}
+
+std::unique_ptr<index::PostingsEnum> SegmentTermsEnum::impactsPostings() {
+    if (!positioned_ || currentTermIndex_ < 0 ||
+        currentTermIndex_ >= static_cast<int>(currentBlock_->stats.size())) {
+        throw std::runtime_error("No current term (call next() or seek first)");
+    }
+
+    if (!postingsReader_ || !fieldInfo_) {
+        throw std::runtime_error("PostingsReader not set (internal error)");
+    }
+
+    // Get term state
+    const auto& stats = currentBlock_->stats[currentTermIndex_];
+
+    // Create TermState for postings reader
+    codecs::lucene104::TermState termState;
+    termState.docStartFP = stats.postingsFP;
+    termState.docFreq = stats.docFreq;
+    termState.totalTermFreq = stats.totalTermFreq;
+    termState.skipStartFP = stats.skipStartFP;  // Block-Max WAND support
+
+    // Cast postings reader back to correct type
+    auto* reader = static_cast<codecs::lucene104::Lucene104PostingsReader*>(postingsReader_);
+
+    // Get impacts-aware postings from reader
+    auto result = reader->impactsPostings(*fieldInfo_, termState);
+
+    return result;
 }
 
 }  // namespace blocktree

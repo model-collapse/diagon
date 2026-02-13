@@ -80,6 +80,26 @@ Runs both benchmarks for comprehensive evaluation.
 - **Boolean AND**: <2ms (2,000 μs)
 - **Boolean OR (2-term)**: <3ms (3,000 μs)
 - **Boolean OR (5-term)**: <5ms (5,000 μs)
+- **Boolean OR (10-term)**: <15ms (15,000 μs)
+- **Boolean OR (20-term)**: <20ms (20,000 μs)
+- **Boolean OR (50-term)**: <30ms (30,000 μs)
+
+### MANDATORY: Percentile Reporting
+
+**All benchmark reports MUST include P50, P90, and P99 percentiles** for every query type. Reporting only P99 is insufficient.
+
+| Percentile | What It Measures | Why It Matters |
+|------------|-----------------|----------------|
+| P50 | Typical latency | User experience for median queries |
+| P90 | Tail latency start | First sign of degradation |
+| P99 | Worst-case latency | SLA compliance, outlier detection |
+
+Reports must present results in this format:
+```
+| Query | P50 (ms) | P90 (ms) | P99 (ms) | Hits |
+```
+
+When comparing with Lucene, compare **each percentile separately** (P50 vs P50, P90 vs P90, P99 vs P99).
 
 ## Baseline Comparison
 
@@ -340,8 +360,9 @@ done
 - Time (seconds) - should stay 2-5
 
 **Queries**:
-- P99 latency per query type
-- Should meet targets (<1ms, <2ms, <5ms)
+- P50/P90/P99 latency per query type
+- Should meet targets (<1ms, <2ms, <5ms, <15ms, <20ms, <30ms)
+- OR-20 and OR-50 queries included for high-term-count scaling analysis
 
 **Trends**:
 - Improving: ✅ Good
@@ -436,7 +457,7 @@ Both use same dataset and report template, just different focus.
 
 ---
 
-**Last Updated**: 2026-02-09
+**Last Updated**: 2026-02-13
 **Skill Version**: 1.0.0
 **Dataset**: Reuters-21578 (21,578 documents)
 **Focus**: Pure Diagon performance and trend tracking

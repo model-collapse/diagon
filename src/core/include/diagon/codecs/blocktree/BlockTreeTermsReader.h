@@ -11,6 +11,7 @@
 #include "diagon/util/FST.h"
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 namespace diagon {
@@ -47,6 +48,10 @@ public:
 
     /**
      * Term block loaded from disk.
+     *
+     * Uses a flat arena for all term bytes to avoid per-term heap allocations.
+     * loadBlock() reuses the arena across calls (clear + append, no realloc
+     * once the arena reaches steady-state size).
      */
     struct TermBlock {
         /** Common prefix for all terms */
@@ -55,11 +60,17 @@ public:
         /** Storage for prefix bytes */
         std::vector<uint8_t> prefixData;
 
-        /** Terms in block (full terms, not just suffixes) */
+        /** Terms in block (BytesRef pointing into arena_) */
         std::vector<util::BytesRef> terms;
 
-        /** Storage for term bytes (each term owns its bytes) */
-        std::vector<std::vector<uint8_t>> termData;
+        /** Flat arena: all term bytes packed contiguously */
+        std::vector<uint8_t> arena_;
+
+        /** Offsets into arena_ where each term starts */
+        std::vector<uint32_t> termOffsets_;
+
+        /** Lengths of each term in arena_ */
+        std::vector<uint16_t> termLengths_;
 
         /** Statistics for each term */
         std::vector<BlockTreeTermsWriter::TermStats> stats;
@@ -68,7 +79,23 @@ public:
         int64_t blockFP;
 
         TermBlock()
-            : blockFP(0) {}
+            : blockFP(0) {
+            // Pre-allocate for typical block sizes to avoid initial allocs
+            arena_.reserve(4096);
+            terms.reserve(64);
+            termOffsets_.reserve(64);
+            termLengths_.reserve(64);
+            stats.reserve(64);
+        }
+
+        /** Rebuild BytesRef pointers after arena_ is filled.
+         *  Must be called after all terms are appended to arena_. */
+        void rebuildTermRefs() {
+            terms.resize(termOffsets_.size());
+            for (size_t i = 0; i < termOffsets_.size(); i++) {
+                terms[i] = util::BytesRef(arena_.data() + termOffsets_[i], termLengths_[i]);
+            }
+        }
     };
 
     /**
@@ -107,6 +134,12 @@ private:
     /** Block index: list of all blocks with their first terms */
     std::vector<BlockMetadata> blockIndex_;
 
+    /** Shared block cache: maps block index → loaded TermBlock.
+     *  All SegmentTermsEnum instances share this cache via the reader pointer.
+     *  Eliminates redundant disk reads when the same blocks are accessed
+     *  across multiple search() calls (e.g., repeated queries). */
+    std::unordered_map<int, std::shared_ptr<TermBlock>> blockCache_;
+
     /**
      * Load term block at given file pointer.
      *
@@ -114,6 +147,14 @@ private:
      * @param block Output: loaded block
      */
     void loadBlock(int64_t blockFP, TermBlock& block);
+
+    /**
+     * Get a cached block by index, loading from disk if not cached.
+     *
+     * @param blockIndex Index into blockIndex_
+     * @return Shared pointer to cached TermBlock
+     */
+    std::shared_ptr<TermBlock> getCachedBlock(int blockIndex);
 
     /**
      * Find block that may contain the given term.
@@ -150,6 +191,14 @@ public:
     std::unique_ptr<index::PostingsEnum> postings(bool useBatch) override;
 
     /**
+     * Get impacts-aware postings for WAND optimization.
+     * Returns PostingsEnum with skip entry support for accurate max score computation.
+     *
+     * @return Impacts-aware PostingsEnum
+     */
+    std::unique_ptr<index::PostingsEnum> impactsPostings();
+
+    /**
      * Set postings reader for retrieving postings.
      * Must be called before calling postings().
      *
@@ -163,7 +212,7 @@ public:
 
 private:
     BlockTreeTermsReader* reader_;
-    BlockTreeTermsReader::TermBlock currentBlock_;
+    std::shared_ptr<BlockTreeTermsReader::TermBlock> currentBlock_;  // Shared from reader cache
     int currentBlockIndex_;  // Which block we're in (index into blockIndex_)
     int currentTermIndex_;   // Which term within the block
     bool positioned_;

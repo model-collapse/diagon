@@ -118,15 +118,22 @@ DIAGON provides diverse indexing capabilities through specialized index architec
 
 ### Performance Targets
 
-**General Queries:**
-- Single-term: <1ms P99 latency
-- Boolean AND (2-term): <2ms P99 latency
-- Boolean OR (2-term): <3ms P99 latency
+**General Queries (P99):**
+- Single-term: <1ms
+- Boolean AND (2-term): <2ms
+- Boolean OR (2-term): <3ms
 
-**Multi-Term Queries:**
-- 2-term AND: <2ms, OR: <3ms
-- 5-term AND: <5ms, OR: <8ms
-- 10-term AND: <10ms, OR: <15ms
+**Multi-Term OR Queries (P99):**
+- OR-2: <3ms
+- OR-5: <8ms
+- OR-10: <15ms
+- OR-20: <20ms
+- OR-50: <30ms
+
+**Multi-Term AND Queries (P99):**
+- AND-2: <2ms
+- AND-3: <3ms
+- AND-5: <5ms
 
 **Indexing:**
 - Throughput: ≥5,000 docs/sec (Reuters-21578)
@@ -134,7 +141,32 @@ DIAGON provides diverse indexing capabilities through specialized index architec
 
 **Competitive Targets:**
 - 3-10x faster than Lucene (general queries)
-- 3.5-6x faster than Lucene (multi-term OR queries with WAND) 
+- 3.5-6x faster than Lucene (multi-term OR queries with WAND)
+
+### MANDATORY: Percentile Comparison Policy
+
+**All benchmark reports MUST report P50, P90, and P99 percentiles** for every query type. Single-percentile reporting (e.g., P99 only) is insufficient and masks performance characteristics.
+
+**When comparing Diagon vs Lucene**, compare each percentile separately:
+
+| Query | Diagon P50 | Lucene P50 | Speedup | Diagon P90 | Lucene P90 | Speedup | Diagon P99 | Lucene P99 | Speedup |
+|-------|-----------|-----------|---------|-----------|-----------|---------|-----------|-----------|---------|
+
+**Standard query set** for all benchmarks (must include all of these):
+- Single-term queries (dollar, oil, trade)
+- Boolean AND (2-term)
+- Boolean OR: 2, 5, 10, 20, 50 terms
+
+**Standard term list** (50 terms, shared across Diagon and Lucene benchmarks):
+```
+market, company, stock, trade, price, bank, dollar, oil, export, government,
+share, billion, profit, exchange, interest, economic, report, industry, investment, revenue,
+million, percent, year, said, would, new, also, last, first, group,
+accord, tax, rate, growth, debt, loss, quarter, month, net, income,
+sales, earnings, bond, foreign, loan, budget, deficit, surplus, inflation, central
+```
+
+OR-N queries use the first N terms from this list. Both Diagon (`ReutersWANDBenchmark.cpp`, `reuters_benchmark.cpp`) and Lucene (`LuceneMultiTermBenchmark.java`) use the same term list for fair comparison.
 
 ## Build Standard Operating Procedure (SOP)
 
@@ -347,6 +379,275 @@ cd /home/ubuntu/diagon/build/benchmarks
 ./ReutersBenchmark
 ./ReutersWANDBenchmark
 ```
+
+## CRITICAL: Directory I/O Strategy
+
+**Mandatory Rule**: Always use **MMapDirectory** for read-heavy workloads (search, benchmarks, query profiling).
+
+### Why MMapDirectory is Required
+
+**Performance Impact** (verified via profiling, see `docs/TASK51_PHASE4_MMAP_BREAKTHROUGH.md`):
+- **39-65% faster queries** across all query types
+- **42% faster for multi-term OR queries** (OR-5: 921 µs → 565 µs)
+- Closes gap with Lucene from 6.4x slower to 1.06x slower (nearly competitive)
+
+**Root Cause**: FSDirectory's 8KB buffered I/O is catastrophic for WAND's random access pattern:
+- Every seek triggers buffer refills via system calls
+- 2-3 copies per read (kernel → buffer → application)
+- Random access pattern causes constant buffer misses
+
+**MMapDirectory Advantages**:
+- **Zero-copy reads**: Direct memory access via mmap()
+- **OS page cache**: Reuters (12MB) fits entirely in memory
+- **No system calls**: Seeks are pointer arithmetic
+- **Perfect for WAND**: Random access becomes direct memory lookups
+
+### Directory Selection Guide
+
+#### For Search/Benchmarks (Read-Heavy) - Use MMapDirectory ✅
+
+**All benchmarks MUST use MMapDirectory:**
+
+```cpp
+// ✅ CORRECT (for search/benchmarks):
+#include "diagon/store/MMapDirectory.h"
+
+auto dir = store::MMapDirectory::open(indexPath);
+auto reader = index::DirectoryReader::open(*dir);
+```
+
+**Applies to**:
+- All query benchmarks (ReutersBenchmark, WANDBenchmark, etc.)
+- All profilers (DetailedQueryProfiler, PostingsDecodingProfiler, etc.)
+- Search applications
+- Read-heavy workloads
+- Datasets < 1GB (fits in page cache)
+
+**Performance**: 2-3x faster random reads than FSDirectory
+
+#### For Indexing (Write-Heavy) - Use FSDirectory ✅
+
+**Indexing should use FSDirectory:**
+
+```cpp
+// ✅ CORRECT (for indexing):
+#include "diagon/store/FSDirectory.h"
+
+auto dir = store::FSDirectory::open(indexPath);
+auto writer = std::make_unique<index::IndexWriter>(*dir, config);
+```
+
+**Applies to**:
+- IndexWriter operations
+- Bulk document ingestion
+- Write-heavy workloads
+- Very large files (>16GB per file)
+
+**Reason**: Simpler, no address space limits, good for streaming writes
+
+#### Mixed Workloads - Use MMapDirectory for Reading ✅
+
+**For indexing + querying (e.g., benchmarks that do both):**
+
+```cpp
+// Indexing phase:
+auto writeDir = store::FSDirectory::open(indexPath);
+auto writer = std::make_unique<index::IndexWriter>(*writeDir, config);
+// ... index documents ...
+writer->commit();
+writer->close();
+
+// Query phase:
+auto readDir = store::MMapDirectory::open(indexPath);  // ← Switch to MMapDirectory
+auto reader = index::DirectoryReader::open(*readDir);
+// ... run queries (42% faster!) ...
+```
+
+### Verification Checklist
+
+**Before running benchmarks**, verify:
+
+```bash
+# 1. Check benchmark uses MMapDirectory
+grep -n "MMapDirectory::open" benchmarks/ReutersBenchmark.cpp
+# Should find usage in query phase
+
+# 2. Check profilers use MMapDirectory
+grep -n "MMapDirectory::open" benchmarks/DetailedQueryProfiler.cpp
+# Should find usage
+
+# 3. NO FSDirectory in query code paths
+grep -n "FSDirectory::open.*search\|FSDirectory::open.*query" benchmarks/*.cpp
+# Should return nothing (or only indexing phases)
+```
+
+### Performance Evidence
+
+**Reuters OR-5 Query** (measured, see `docs/REUTERS_MMAP_COMPARISON.md`):
+
+| I/O Method | Latency | vs Lucene | Status |
+|------------|---------|-----------|--------|
+| **FSDirectory** | 921 µs | 6.4x slower | ❌ Unacceptable |
+| **MMapDirectory** | 565 µs | 1.06x slower | ✅ Competitive |
+
+**All Query Types**:
+- Single-term: 65% faster (300 µs → 106 µs)
+- OR-2: 47% faster (450 µs → 239 µs)
+- OR-5: 39% faster (921 µs → 565 µs)
+- OR-10: 28% faster (1,600 µs → 1,157 µs)
+- AND-2: 45% faster (340 µs → 188 µs)
+
+### Common Mistake: Using FSDirectory for Queries ❌
+
+**WRONG**:
+```cpp
+// ❌ NEVER DO THIS for queries:
+auto dir = store::FSDirectory::open(indexPath);
+auto reader = index::DirectoryReader::open(*dir);
+// Queries will be 2-3x slower!
+```
+
+**Impact**: Loses 39-65% performance, makes Diagon appear slower than it actually is.
+
+### Exception: Testing FSDirectory
+
+**Only use FSDirectory in queries** for:
+- Testing FSDirectory itself
+- Comparing FSDirectory vs MMapDirectory
+- Debugging I/O issues
+
+**Always document** when FSDirectory is intentionally used:
+```cpp
+// Testing FSDirectory performance for comparison (NOT production)
+auto dir = store::FSDirectory::open(indexPath);
+```
+
+### Documentation References
+
+- **Root cause analysis**: `docs/TASK51_PHASE4_MMAP_BREAKTHROUGH.md`
+- **Performance comparison**: `docs/REUTERS_MMAP_COMPARISON.md`
+- **Postings profiling**: `docs/POSTINGS_DECODING_ANALYSIS.md`
+- **FST profiling**: `docs/FST_TRAVERSAL_ANALYSIS.md`
+
+## CRITICAL: Hit Count Profiling — Use `IndexSearcher.count(Query)` Only
+
+**Mandatory Rule**: Use `IndexSearcher.count(Query)` as the **only** method for profiling hit counts. Never read hit counts from `TopDocs.totalHits`.
+
+### Background (LUCENE-8060)
+
+Since Lucene 8.0, `TopDocs.totalHits` returns **approximate** counts by default (threshold=1,000). This caused a 4+ hour false alarm investigation where Diagon's 2,871 hits appeared to mismatch Lucene's reported 1,007 hits. Both were actually correct — Lucene was returning a lower bound. See `docs/HIT_COUNT_INVESTIGATION_RESOLUTION.md`.
+
+### The Solution: `IndexSearcher.count(Query)`
+
+Lucene provides a dedicated **sub-linear** counting API that bypasses all approximation:
+
+```java
+// ✅ THE ONLY CORRECT WAY to get hit counts
+int exactCount = searcher.count(query);
+```
+
+**Why this is fundamentally better than any `search()` variant**:
+
+| Aspect | `searcher.count(query)` | `search(query, MAX_VALUE threshold)` |
+|--------|------------------------|--------------------------------------|
+| Scoring | None (`COMPLETE_NO_SCORES`) | Full scoring (`COMPLETE`) |
+| TermQuery (no deletions) | **O(1)** — reads `docFreq()` from metadata | O(n) — iterates all postings |
+| Top-K heap | None | Maintained |
+| WAND | N/A | Disabled (visits all docs) |
+| Result | `int` (always exact) | `TopDocs` with approximate count |
+
+**Internal mechanism** (`IndexSearcher.java:490-518`):
+1. Wraps query in `ConstantScoreQuery` (no scoring)
+2. Calls `Weight.count(LeafReaderContext)` per segment — **O(1) for TermQuery** via `termsEnum.docFreq()`
+3. For 2-clause OR without deletions: uses **inclusion-exclusion principle** (`|A∪B| = |A| + |B| - |A∩B|`)
+4. Falls back to `TotalHitCountCollector` only when metadata-based counting is unavailable
+
+**Query types with O(1) counting** (from `Weight.count()` overrides):
+- `TermQuery` → `termsEnum.docFreq()` (no deletions)
+- `MatchAllDocsQuery` → `reader.numDocs()`
+- `PointRangeQuery` → BKD tree traversal (O(log n))
+- `FieldExistsQuery` → index metadata
+- `BooleanQuery` → set algebra on clause counts
+
+### Rules
+
+#### For Hit Count Profiling — `count()` Only ✅
+
+```java
+// Lucene profilers — THE ONLY WAY to report hit counts
+int hits = searcher.count(query);
+System.out.println("Hits: " + hits);  // Always exact, always fast
+```
+
+```cpp
+// Diagon equivalent (to be implemented)
+int hits = searcher.count(query);
+```
+
+#### For Performance Benchmarks — `search()` with Low topK ✅
+
+```java
+// Performance measurement — do NOT read hit count from this
+TopDocs topDocs = searcher.search(query, 10);
+// Use topDocs.scoreDocs for top-K results
+// NEVER use topDocs.totalHits for hit count verification
+```
+
+#### Forbidden Patterns ❌
+
+```java
+// ❌ NEVER use TopDocs.totalHits for hit count profiling
+TopDocs results = searcher.search(query, 10);
+int hits = (int) results.totalHits.value();  // WRONG — approximate!
+
+// ❌ NEVER use high topK to force exact counts
+TopDocs results = searcher.search(query, 10000);  // WRONG — slow and fragile
+
+// ❌ NEVER use totalHitsThreshold=MAX_VALUE for counting
+TopScoreDocCollectorManager mgr = new TopScoreDocCollectorManager(10, Integer.MAX_VALUE);
+// WRONG — forces scoring of every document, 2-50x slower than count()
+```
+
+### Lucene Profiler Pattern
+
+All Lucene profilers in this project **must** follow this pattern:
+
+```java
+// Correct profiler structure
+public void profileQuery(IndexSearcher searcher, Query query, String name) {
+    // 1. Get exact hit count (fast, sub-linear for TermQuery)
+    int hits = searcher.count(query);
+
+    // 2. Measure search latency separately (low topK, WAND enabled)
+    for (int i = 0; i < iterations; i++) {
+        long start = System.nanoTime();
+        TopDocs topDocs = searcher.search(query, 10);
+        long end = System.nanoTime();
+        latencies[i] = end - start;
+    }
+
+    // 3. Report both
+    System.out.printf("%s | Hits: %d | P99: %.1f µs%n", name, hits, p99);
+}
+```
+
+### Diagon Implementation Status
+
+**Current** (as of 2026-02-12):
+- ✅ Diagon always returns exact hit counts (no threshold optimization)
+- ❌ `IndexSearcher::count(Query)` not yet implemented
+- ❌ `Weight::count(LeafReaderContext)` not yet implemented
+
+**To implement**:
+1. `Weight::count(LeafReaderContext)` — return `termsEnum.docFreq()` for TermQuery (O(1))
+2. `IndexSearcher::count(Query)` — use `TotalHitCountCollector` with `Weight::count()` delegation
+3. `totalHitsThreshold` in `TopScoreDocCollector` — enable WAND early termination for fair benchmarks
+
+### Documentation References
+
+- **Investigation**: `docs/HIT_COUNT_INVESTIGATION_RESOLUTION.md`
+- **JIRA**: LUCENE-8060 (introduced TotalHits approximation in Lucene 8.0)
+- **Lucene source**: `IndexSearcher.java:490-518`, `TotalHitCountCollector.java`, `Weight.java:185-200`
 
 ## Design Methodology
 
@@ -700,6 +1001,6 @@ This project uses Claude Code skills for all build and benchmark operations. **A
 
 ---
 
-**Last Updated:** 2026-02-09
+**Last Updated:** 2026-02-13
 **Skills:** 6 production-ready skills available
 **Status:** ✅ All workflows use skills for build and benchmark operations

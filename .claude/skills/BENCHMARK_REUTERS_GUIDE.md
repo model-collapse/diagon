@@ -56,7 +56,10 @@ The `/benchmark_reuters_lucene` skill runs the standard Reuters-21578 dataset be
    - Boolean AND: "oil AND price"
    - Boolean OR (2-term): "trade OR export"
    - Boolean OR (5-term): "oil OR trade OR market OR price OR dollar"
-   - Measures P99 latency and hit counts
+   - Boolean OR (10-term): 10 common financial terms
+   - Boolean OR (20-term): 20 broad financial terms
+   - Boolean OR (50-term): 50 comprehensive financial terms
+   - Measures P50/P90/P99 latency and hit counts
 
 **Output**:
 ```
@@ -165,17 +168,38 @@ Example:
 | Boolean AND | 1-2 ms | 200-500 μs | 3-5x faster |
 | Boolean OR (2) | 2-4 ms | 500-1000 μs | 3-4x faster |
 | Boolean OR (5) | 5-10 ms | 1-2 ms | 3-5x faster |
+| Boolean OR (10) | 10-15 ms | 2-5 ms | 4-5x faster |
+| Boolean OR (20) | 15-25 ms | 3-8 ms | 4-6x faster |
+| Boolean OR (50) | 25-40 ms | 5-15 ms | 4-6x faster |
 
 **Key Goal**: 3-10x faster than Lucene on search queries.
 
+### MANDATORY: Percentile Reporting
+
+**All benchmark reports MUST include P50, P90, and P99 percentiles** for every query type, for both Diagon and Lucene. When comparing, align percentiles: P50 vs P50, P90 vs P90, P99 vs P99.
+
 ## Interpreting Results
+
+### Hit Count Profiling Rule
+
+**Mandatory**: Use `IndexSearcher.count(Query)` as the **only** method for hit count verification.
+
+```java
+// ✅ CORRECT — O(1) for TermQuery, always exact
+int hits = searcher.count(query);
+
+// ❌ FORBIDDEN — TopDocs.totalHits is approximate by default
+int hits = (int) topDocs.totalHits.value();
+```
+
+See CLAUDE.md section "Hit Count Profiling" for full rationale (LUCENE-8060).
 
 ### Good Results ✅
 - Indexing throughput > 5,000 docs/sec
 - Query latency significantly lower than Lucene
 - Index size comparable to Lucene
 - No crashes or errors
-- All queries return correct hit counts
+- Hit counts verified via `searcher.count()` match between Diagon and Lucene
 
 ### Concerning Results ⚠️
 - Indexing slower than 3,000 docs/sec
@@ -257,9 +281,10 @@ ant run-task -Dtask.alg=conf/reuters.alg
    - Diagon vs Lucene docs/sec
    - Should be competitive (±20%)
 
-2. **Query Latency**
+2. **Query Latency** (P50/P90/P99 for each)
    - Target: 3-10x faster
-   - Compare P99 latencies directly
+   - Compare each percentile separately (P50 vs P50, P90 vs P90, P99 vs P99)
+   - Include OR-2, OR-5, OR-10, OR-20, OR-50 scaling analysis
 
 3. **Index Size**
    - Should be similar (within 10-20%)
@@ -339,6 +364,6 @@ fi
 
 ---
 
-**Last Updated**: 2026-02-09
+**Last Updated**: 2026-02-13
 **Dataset**: Reuters-21578 (21,578 documents)
 **Target**: 3-10x faster than Apache Lucene

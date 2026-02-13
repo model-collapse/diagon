@@ -134,6 +134,12 @@ private:
 
         int64_t cost() const override { return norms_.size(); }
 
+        /** Direct access to norm array (eliminates virtual dispatch for batch norms lookup) */
+        const int8_t* normsData(int* outSize) const override {
+            if (outSize) *outSize = static_cast<int>(norms_.size());
+            return norms_.data();
+        }
+
     private:
         std::vector<int8_t> norms_;
         int docID_;

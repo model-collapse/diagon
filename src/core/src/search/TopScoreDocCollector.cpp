@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/search/TopScoreDocCollector.h"
+#include "diagon/util/SearchProfiler.h"
 
 #include <algorithm>
 #include <cmath>
@@ -17,22 +18,29 @@ namespace search {
 // ==================== Factory Methods ====================
 
 std::unique_ptr<TopScoreDocCollector> TopScoreDocCollector::create(int numHits) {
-    return std::unique_ptr<TopScoreDocCollector>(new TopScoreDocCollector(numHits, nullptr));
+    return create(numHits, 1000);
+}
+
+std::unique_ptr<TopScoreDocCollector> TopScoreDocCollector::create(int numHits, int totalHitsThreshold) {
+    int effectiveThreshold = std::max(totalHitsThreshold, numHits);
+    return std::unique_ptr<TopScoreDocCollector>(
+        new TopScoreDocCollector(numHits, nullptr, effectiveThreshold));
 }
 
 std::unique_ptr<TopScoreDocCollector> TopScoreDocCollector::create(int numHits,
                                                                    const ScoreDoc& after) {
-    return std::unique_ptr<TopScoreDocCollector>(new TopScoreDocCollector(numHits, &after));
+    return std::unique_ptr<TopScoreDocCollector>(new TopScoreDocCollector(numHits, &after, 1000));
 }
 
 // ==================== Constructor ====================
 
-TopScoreDocCollector::TopScoreDocCollector(int numHits, const ScoreDoc* after)
+TopScoreDocCollector::TopScoreDocCollector(int numHits, const ScoreDoc* after, int totalHitsThreshold)
     : numHits_(numHits)
     , after_(after ? *after : ScoreDoc())
     , hasAfter_(after != nullptr)
     , totalHits_(0)
     , totalHitsRelation_(TotalHits::Relation::EQUAL_TO)
+    , totalHitsThreshold_(totalHitsThreshold)
     , pq_()
     , leafCollector_(nullptr) {
     if (numHits <= 0) {
@@ -96,6 +104,8 @@ TopScoreDocCollector::TopScoreLeafCollector::TopScoreLeafCollector(
     , docBase_(context.docBase)
     , scorer_(nullptr)
     , after_(parent->hasAfter_ ? &parent->after_ : nullptr)
+    , segmentHitsFromCollect_(0)
+    , scorerTracksTotalMatches_(false)
 {
 }
 
@@ -104,12 +114,30 @@ TopScoreDocCollector::TopScoreLeafCollector::~TopScoreLeafCollector() {
     // Flush any remaining documents in batch
     flushBatch();
 #endif
+
+    // Note: Do NOT access scorer_ here - it may be out of scope!
+    // Total matches are captured in finishSegment() instead.
 }
 
 void TopScoreDocCollector::TopScoreLeafCollector::finishSegment() {
 #if defined(DIAGON_HAVE_AVX512) || defined(DIAGON_HAVE_AVX2)
     flushBatch();
 #endif
+
+    // Use scorer's total matches if available (for WAND and other early-terminating scorers)
+    if (scorer_ && parent_ && scorerTracksTotalMatches_) {
+        int totalMatches = scorer_->getTotalMatches();
+        if (totalMatches >= 0) {
+            // Scorer tracks total matches for this segment.
+            // For WAND, this is the number of documents that were examined and matched,
+            // which is a LOWER BOUND (WAND skips blocks without examining all docs).
+            parent_->totalHits_ += totalMatches;
+
+            // Mark as approximate since WAND provides lower bound
+            parent_->totalHitsRelation_ = TotalHits::Relation::GREATER_THAN_OR_EQUAL_TO;
+        }
+    }
+    // else: totalHits_ was already incremented correctly in collect()
 }
 
 void TopScoreDocCollector::TopScoreLeafCollector::collect(int doc) {
@@ -118,7 +146,14 @@ void TopScoreDocCollector::TopScoreLeafCollector::collect(int doc) {
     }
 
     float score = scorer_->score();
-    parent_->totalHits_++;
+
+    // Count hits for this segment:
+    // - If scorer tracks matches, we'll replace this with scorer's count in finishSegment()
+    // - Otherwise, this count is the accurate totalHits for this segment
+    if (!scorerTracksTotalMatches_) {
+        parent_->totalHits_++;
+    }
+    segmentHitsFromCollect_++;
 
     // Skip NaN and infinite scores (invalid)
     if (std::isnan(score) || std::isinf(score)) {
@@ -163,10 +198,9 @@ void TopScoreDocCollector::TopScoreLeafCollector::collectSingle(int globalDoc, f
         // Queue not full yet, just add
         parent_->pq_.push(scoreDoc);
 
-        // Check if queue just became full - update threshold for first time
-        if (static_cast<int>(parent_->pq_.size()) == parent_->numHits_ && scorer_) {
-            float minScore = parent_->pq_.top().score;
-            scorer_->setMinCompetitiveScore(minScore);
+        // Check if queue just became full - update threshold
+        if (static_cast<int>(parent_->pq_.size()) == parent_->numHits_) {
+            updateMinCompetitiveScore();
         }
     } else {
         // Queue is full, check if this doc beats the worst doc
@@ -179,12 +213,28 @@ void TopScoreDocCollector::TopScoreLeafCollector::collectSingle(int globalDoc, f
             parent_->pq_.pop();
             parent_->pq_.push(scoreDoc);
 
-            // Threshold changed - notify scorer (P0 Task #39: WAND feedback)
-            if (scorer_) {
-                float newMinScore = parent_->pq_.top().score;
-                scorer_->setMinCompetitiveScore(newMinScore);
-            }
+            // Threshold changed - update min competitive score
+            updateMinCompetitiveScore();
         }
+    }
+}
+
+void TopScoreDocCollector::TopScoreLeafCollector::updateMinCompetitiveScore() {
+    if (!scorer_ || static_cast<int>(parent_->pq_.size()) < parent_->numHits_) return;
+
+    // When we've exceeded the totalHitsThreshold, activate WAND early termination
+    // by setting the min competitive score and marking hits as approximate
+    if (parent_->totalHits_ > parent_->totalHitsThreshold_) {
+        float minScore = parent_->pq_.top().score;
+        if (minScore > 0.0f) {
+            scorer_->setMinCompetitiveScore(minScore);
+            parent_->totalHitsRelation_ = TotalHits::Relation::GREATER_THAN_OR_EQUAL_TO;
+        }
+    } else {
+        // Below threshold: still set min competitive score for WAND feedback
+        // but keep exact counting
+        float minScore = parent_->pq_.top().score;
+        scorer_->setMinCompetitiveScore(minScore);
     }
 }
 

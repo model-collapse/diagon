@@ -203,6 +203,7 @@ void SegmentReader::loadFieldsProducer() const {
 
 
     // Phase 4.3: Get codec and create appropriate FieldsProducer
+    std::string segmentName = segmentInfo_->name();
     try {
         // Get codec name from segment info
         std::string codecName = segmentInfo_->codecName();
@@ -211,8 +212,6 @@ void SegmentReader::loadFieldsProducer() const {
         auto& postingsFormat = codec.postingsFormat();
 
         // Create segment read state (using index::SegmentReadState)
-        std::string segmentName = segmentInfo_->name();
-
         SegmentReadState readState(&directory_, segmentName, segmentInfo_->maxDoc(),
                                    segmentInfo_->fieldInfos(), "");
 

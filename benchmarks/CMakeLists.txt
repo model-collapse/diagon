@@ -732,6 +732,20 @@ target_link_libraries(CheckLongTokens
         diagon_core
 )
 
+# Search-only profiler (for perf profiling without indexing contamination)
+add_executable(SearchOnlyProfiler SearchOnlyProfiler.cpp)
+target_link_libraries(SearchOnlyProfiler
+    PRIVATE
+        diagon_core
+)
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(SearchOnlyProfiler PRIVATE ICU::uc ICU::i18n)
+endif()
+target_include_directories(SearchOnlyProfiler
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/core/include
+)
+
 # FST Efficiency Gate (Performance Regression Detection)
 add_diagon_benchmark(FSTEfficiencyGate FSTEfficiencyGate.cpp)
 

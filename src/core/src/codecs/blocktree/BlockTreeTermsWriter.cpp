@@ -21,7 +21,10 @@ BlockTreeTermsWriter::BlockTreeTermsWriter(store::IndexOutput* timOut, store::In
     , config_(config)
     , numTerms_(0)
     , termsStartFP_(timOut->getFilePointer())  // Capture starting FP for this field
-    , finished_(false) {
+    , finished_(false)
+    , sumTotalTermFreq_(0)
+    , sumDocFreq_(0)
+    , docCount_(0) {
     // DEBUG: Show what file pointer we captured
 
     if (!timOut_ || !tipOut_) {
@@ -54,6 +57,10 @@ void BlockTreeTermsWriter::addTerm(const util::BytesRef& term, const TermStats& 
     lastTermData_.assign(term.data(), term.data() + term.length());
     lastTerm_ = util::BytesRef(lastTermData_.data(), lastTermData_.size());
     numTerms_++;
+
+    // Accumulate field-level statistics
+    sumTotalTermFreq_ += stats.totalTermFreq;
+    sumDocFreq_ += stats.docFreq;
 
     // Flush block if we hit max size
     if (static_cast<int>(pendingTerms_.size()) >= config_.maxItemsInBlock) {
@@ -126,6 +133,7 @@ void BlockTreeTermsWriter::writeBlock() {
         timOut_->writeVInt(stats.docFreq);
         timOut_->writeVLong(stats.totalTermFreq);
         timOut_->writeVLong(stats.postingsFP);
+        timOut_->writeVLong(stats.skipStartFP);  // Block-Max WAND support
     }
 
     // Add block to FST

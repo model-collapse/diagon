@@ -199,4 +199,122 @@ int64_t MMapIndexInput::length() const {
     return is_slice_ ? slice_length_ : file_length_;
 }
 
+// ==================== Fast Direct-Access Methods ====================
+
+int32_t MMapIndexInput::readVInt() {
+    const uint8_t* ptr;
+    size_t remaining;
+
+    // Fast path: enough bytes in current chunk for max VInt (5 bytes)
+    if (getDirectPointer(5, ptr, remaining)) {
+        uint8_t b = ptr[0];
+        if ((b & 0x80) == 0) {
+            pos_ += 1;
+            return static_cast<int32_t>(b);
+        }
+        int32_t i = b & 0x7F;
+
+        b = ptr[1];
+        i |= (b & 0x7F) << 7;
+        if ((b & 0x80) == 0) {
+            pos_ += 2;
+            return i;
+        }
+
+        b = ptr[2];
+        i |= (b & 0x7F) << 14;
+        if ((b & 0x80) == 0) {
+            pos_ += 3;
+            return i;
+        }
+
+        b = ptr[3];
+        i |= (b & 0x7F) << 21;
+        if ((b & 0x80) == 0) {
+            pos_ += 4;
+            return i;
+        }
+
+        b = ptr[4];
+        i |= (b & 0x0F) << 28;
+        pos_ += 5;
+        return i;
+    }
+
+    // Slow path: cross-chunk read (extremely rare)
+    return IndexInput::readVInt();
+}
+
+int64_t MMapIndexInput::readVLong() {
+    const uint8_t* ptr;
+    size_t remaining;
+
+    // Fast path: enough bytes in current chunk for max VLong (9 bytes)
+    if (getDirectPointer(9, ptr, remaining)) {
+        uint8_t b = ptr[0];
+        if ((b & 0x80) == 0) {
+            pos_ += 1;
+            return static_cast<int64_t>(b);
+        }
+        int64_t i = b & 0x7FL;
+        int consumed = 1;
+
+        for (int shift = 7; shift < 63; shift += 7) {
+            b = ptr[consumed];
+            consumed++;
+            i |= (b & 0x7FL) << shift;
+            if ((b & 0x80) == 0) {
+                pos_ += consumed;
+                return i;
+            }
+        }
+
+        // 9th byte
+        b = ptr[consumed];
+        consumed++;
+        i |= (b & 0x7FL) << 63;
+        pos_ += consumed;
+        return i;
+    }
+
+    // Slow path: cross-chunk read
+    return IndexInput::readVLong();
+}
+
+int32_t MMapIndexInput::readInt() {
+    const uint8_t* ptr;
+    size_t remaining;
+
+    if (getDirectPointer(4, ptr, remaining)) {
+        int32_t result = (static_cast<int32_t>(ptr[0]) << 24) |
+                         (static_cast<int32_t>(ptr[1]) << 16) |
+                         (static_cast<int32_t>(ptr[2]) << 8) |
+                         static_cast<int32_t>(ptr[3]);
+        pos_ += 4;
+        return result;
+    }
+
+    return IndexInput::readInt();
+}
+
+int64_t MMapIndexInput::readLong() {
+    const uint8_t* ptr;
+    size_t remaining;
+
+    if (getDirectPointer(8, ptr, remaining)) {
+        int64_t result = (static_cast<int64_t>(ptr[0]) << 56) |
+                         (static_cast<int64_t>(ptr[1]) << 48) |
+                         (static_cast<int64_t>(ptr[2]) << 40) |
+                         (static_cast<int64_t>(ptr[3]) << 32) |
+                         (static_cast<int64_t>(ptr[4]) << 24) |
+                         (static_cast<int64_t>(ptr[5]) << 16) |
+                         (static_cast<int64_t>(ptr[6]) << 8) |
+                         static_cast<int64_t>(ptr[7]);
+        pos_ += 8;
+        return result;
+    }
+
+    return IndexInput::readLong();
+}
+
 }  // namespace diagon::store

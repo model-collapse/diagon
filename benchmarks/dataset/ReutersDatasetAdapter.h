@@ -164,9 +164,14 @@ private:
 
         std::string body = bodyStream.str();
 
-        // Skip if title or body is empty (malformed document)
-        if (title.empty() || body.empty()) {
-            return false;
+        // Skip documents with empty body (match Lucene behavior)
+        // Lucene filters documents without body content:
+        //   - 737 files with only date (2 lines)
+        //   - 1,798 files with title but no body (4 lines)
+        // Total filtered: 2,535 files
+        // This reduces index from 21,578 files to 19,043 docs
+        if (body.empty()) {
+            return false; // Skip documents without body
         }
 
         // Populate document
