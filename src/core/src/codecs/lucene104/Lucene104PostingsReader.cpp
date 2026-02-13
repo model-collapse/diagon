@@ -9,6 +9,7 @@
 #include "diagon/util/Exceptions.h"
 #include "diagon/util/StreamVByte.h"
 
+#include <cstring>
 #include <iostream>
 
 namespace diagon {
@@ -155,6 +156,7 @@ Lucene104PostingsEnumWithImpacts::Lucene104PostingsEnumWithImpacts(
     std::unique_ptr<store::IndexInput> docIn, const TermState& termState, bool writeFreqs,
     const std::vector<SkipEntry>& skipEntries)
     : docIn_(std::move(docIn))
+    , mmapInput_(dynamic_cast<store::MMapIndexInput*>(docIn_.get()))
     , docFreq_(termState.docFreq)
     , totalTermFreq_(termState.totalTermFreq)
     , writeFreqs_(writeFreqs)
@@ -308,52 +310,113 @@ void Lucene104PostingsEnumWithImpacts::refillBuffer() {
     bufferPos_ = 0;
     int remaining = docFreq_ - docsRead_;
     int bufferIdx = 0;
+    int numGroups = std::min(remaining / STREAMVBYTE_GROUP_SIZE,
+                             (BUFFER_SIZE - bufferIdx) / STREAMVBYTE_GROUP_SIZE);
 
-    // Fill buffer with as many complete StreamVByte groups (4 docs each) as possible
-    while (remaining >= STREAMVBYTE_GROUP_SIZE && bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
-        // Read StreamVByte-encoded group of 4 docs
-        uint8_t docDeltaEncoded[17];  // Max: 1 control + 4*4 data bytes
-        uint8_t controlByte = docIn_->readByte();
-        docDeltaEncoded[0] = controlByte;
+    // Fast path: direct pointer into mmap'd memory (no virtual calls)
+    if (mmapInput_ && numGroups > 0) {
+        // Max bytes per group: 1 control + 16 data (docs) + 1 control + 16 data (freqs) = 34
+        size_t maxBytes = static_cast<size_t>(numGroups) * (writeFreqs_ ? 34 : 17);
+        const uint8_t* ptr;
+        size_t avail;
 
-        // Calculate data bytes needed from control byte
-        int dataBytes = 0;
-        for (int i = 0; i < 4; ++i) {
-            int length = ((controlByte >> (i * 2)) & 0x03) + 1;
-            dataBytes += length;
-        }
+        if (mmapInput_->getDirectPointer(maxBytes, ptr, avail)) {
+            const uint8_t* start = ptr;
 
-        // Read data bytes
-        docIn_->readBytes(docDeltaEncoded + 1, dataBytes);
+            for (int g = 0; g < numGroups; g++) {
+                // Doc deltas: control byte + data
+                uint8_t docEncoded[17];
+                uint8_t controlByte = *ptr++;
+                docEncoded[0] = controlByte;
+                int dataBytes = 0;
+                for (int i = 0; i < 4; ++i) {
+                    dataBytes += ((controlByte >> (i * 2)) & 0x03) + 1;
+                }
+                std::memcpy(docEncoded + 1, ptr, dataBytes);
+                ptr += dataBytes;
+                util::StreamVByte::decode4(docEncoded, &docDeltaBuffer_[bufferIdx]);
 
-        // Decode 4 doc deltas directly into buffer at current position
-        util::StreamVByte::decode4(docDeltaEncoded, &docDeltaBuffer_[bufferIdx]);
+                // Frequencies: control byte + data
+                if (writeFreqs_) {
+                    uint8_t freqEncoded[17];
+                    controlByte = *ptr++;
+                    freqEncoded[0] = controlByte;
+                    dataBytes = 0;
+                    for (int i = 0; i < 4; ++i) {
+                        dataBytes += ((controlByte >> (i * 2)) & 0x03) + 1;
+                    }
+                    std::memcpy(freqEncoded + 1, ptr, dataBytes);
+                    ptr += dataBytes;
+                    util::StreamVByte::decode4(freqEncoded, &freqBuffer_[bufferIdx]);
+                }
 
-        // Read frequencies if present
-        if (writeFreqs_) {
-            uint8_t freqEncoded[17];
-            controlByte = docIn_->readByte();
-            freqEncoded[0] = controlByte;
-
-            // Calculate data bytes for frequencies
-            dataBytes = 0;
-            for (int i = 0; i < 4; ++i) {
-                int length = ((controlByte >> (i * 2)) & 0x03) + 1;
-                dataBytes += length;
+                bufferIdx += STREAMVBYTE_GROUP_SIZE;
+                remaining -= STREAMVBYTE_GROUP_SIZE;
             }
 
-            docIn_->readBytes(freqEncoded + 1, dataBytes);
-            util::StreamVByte::decode4(freqEncoded, &freqBuffer_[bufferIdx]);
-        }
+            // Advance mmap position by bytes consumed
+            size_t consumed = static_cast<size_t>(ptr - start);
+            mmapInput_->seek(mmapInput_->getFilePointer() + static_cast<int64_t>(consumed));
+        } else {
+            // Chunk boundary or insufficient data: fall back to virtual calls
+            while (remaining >= STREAMVBYTE_GROUP_SIZE && bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
+                uint8_t docDeltaEncoded[17];
+                uint8_t controlByte = docIn_->readByte();
+                docDeltaEncoded[0] = controlByte;
+                int dataBytes = 0;
+                for (int i = 0; i < 4; ++i) {
+                    dataBytes += ((controlByte >> (i * 2)) & 0x03) + 1;
+                }
+                docIn_->readBytes(docDeltaEncoded + 1, dataBytes);
+                util::StreamVByte::decode4(docDeltaEncoded, &docDeltaBuffer_[bufferIdx]);
 
-        bufferIdx += STREAMVBYTE_GROUP_SIZE;
-        remaining -= STREAMVBYTE_GROUP_SIZE;
+                if (writeFreqs_) {
+                    uint8_t freqEncoded[17];
+                    controlByte = docIn_->readByte();
+                    freqEncoded[0] = controlByte;
+                    dataBytes = 0;
+                    for (int i = 0; i < 4; ++i) {
+                        dataBytes += ((controlByte >> (i * 2)) & 0x03) + 1;
+                    }
+                    docIn_->readBytes(freqEncoded + 1, dataBytes);
+                    util::StreamVByte::decode4(freqEncoded, &freqBuffer_[bufferIdx]);
+                }
+                bufferIdx += STREAMVBYTE_GROUP_SIZE;
+                remaining -= STREAMVBYTE_GROUP_SIZE;
+            }
+        }
+    } else {
+        // No mmap or no full groups: original per-group virtual call path
+        while (remaining >= STREAMVBYTE_GROUP_SIZE && bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
+            uint8_t docDeltaEncoded[17];
+            uint8_t controlByte = docIn_->readByte();
+            docDeltaEncoded[0] = controlByte;
+            int dataBytes = 0;
+            for (int i = 0; i < 4; ++i) {
+                dataBytes += ((controlByte >> (i * 2)) & 0x03) + 1;
+            }
+            docIn_->readBytes(docDeltaEncoded + 1, dataBytes);
+            util::StreamVByte::decode4(docDeltaEncoded, &docDeltaBuffer_[bufferIdx]);
+
+            if (writeFreqs_) {
+                uint8_t freqEncoded[17];
+                controlByte = docIn_->readByte();
+                freqEncoded[0] = controlByte;
+                dataBytes = 0;
+                for (int i = 0; i < 4; ++i) {
+                    dataBytes += ((controlByte >> (i * 2)) & 0x03) + 1;
+                }
+                docIn_->readBytes(freqEncoded + 1, dataBytes);
+                util::StreamVByte::decode4(freqEncoded, &freqBuffer_[bufferIdx]);
+            }
+            bufferIdx += STREAMVBYTE_GROUP_SIZE;
+            remaining -= STREAMVBYTE_GROUP_SIZE;
+        }
     }
 
-    // Use VInt fallback for remaining docs (< 4), but only if there's buffer space
+    // VInt tail for remaining < 4 docs
     int spaceLeft = BUFFER_SIZE - bufferIdx;
     int docsToRead = std::min(remaining, spaceLeft);
-
     if (docsToRead > 0) {
         for (int i = 0; i < docsToRead; ++i) {
             docDeltaBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());

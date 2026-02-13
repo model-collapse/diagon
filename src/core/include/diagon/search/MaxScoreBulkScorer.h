@@ -56,10 +56,11 @@ private:
         int doc;                  // Current doc ID
         int64_t cost;             // Estimated cost
         float maxWindowScore;     // Max score in current outer window
+        float efficiencyRatio;    // maxWindowScore / max(1, cost), updated per outer window
 
-        DisiWrapper() : scorer(nullptr), doc(-1), cost(0), maxWindowScore(0.0f) {}
+        DisiWrapper() : scorer(nullptr), doc(-1), cost(0), maxWindowScore(0.0f), efficiencyRatio(0.0f) {}
         explicit DisiWrapper(Scorer* s)
-            : scorer(s), doc(s->docID()), cost(s->cost()), maxWindowScore(0.0f) {}
+            : scorer(s), doc(s->docID()), cost(s->cost()), maxWindowScore(0.0f), efficiencyRatio(0.0f) {}
     };
 
     /**
@@ -82,7 +83,7 @@ private:
     // Document/score buffer for batch passing to non-essential scoring + collection
     struct DocScoreBuffer {
         std::vector<int> docs;
-        std::vector<double> scores;
+        std::vector<float> scores;
         int size = 0;
 
         void clear() { size = 0; }
@@ -92,7 +93,7 @@ private:
                 scores.resize(n);
             }
         }
-        void add(int doc, double score) {
+        void add(int doc, float score) {
             if (size >= static_cast<int>(docs.size())) {
                 docs.resize(size + 256);
                 scores.resize(size + 256);
@@ -125,7 +126,7 @@ private:
 
     // Inner window state
     std::array<uint64_t, INNER_WINDOW_SIZE / 64> windowMatches_{};
-    std::array<double, INNER_WINDOW_SIZE> windowScores_{};
+    std::array<float, INNER_WINDOW_SIZE> windowScores_{};
 
     // Batch scoring buffers (reused across inner window calls)
     static constexpr int BATCH_SIZE = Scorer::SCORER_BATCH_SIZE;
@@ -198,7 +199,7 @@ private:
     /**
      * Filter out docs from buffer where accumulated score + maxRemainingScore < minCompetitiveScore.
      */
-    void filterCompetitiveHits(double maxRemainingScore);
+    void filterCompetitiveHits(float maxRemainingScore);
 
     /**
      * Add scores from an optional (non-essential) clause to matching docs in buffer.

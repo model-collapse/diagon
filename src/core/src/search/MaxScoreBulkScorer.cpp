@@ -10,6 +10,10 @@
 #include <limits>
 #include <numeric>
 
+#ifdef __AVX2__
+#include <immintrin.h>
+#endif
+
 namespace diagon {
 namespace search {
 
@@ -37,7 +41,7 @@ MaxScoreBulkScorer::MaxScoreBulkScorer(int maxDoc, std::vector<std::unique_ptr<S
 
     // Pre-fill window arrays with zeros
     windowMatches_.fill(0);
-    windowScores_.fill(0.0);
+    windowScores_.fill(0.0f);
 
     // Reserve buffer capacity
     buffer_.docs.reserve(INNER_WINDOW_SIZE);
@@ -167,6 +171,9 @@ void MaxScoreBulkScorer::updateMaxWindowScores(int windowMin, int windowMax) {
         // getMaxScore(upTo) returns max score for docs in [current, upTo]
         // windowMax-1 because outer window is [min, max)
         w.maxWindowScore = w.scorer->getMaxScore(windowMax - 1);
+        w.efficiencyRatio = static_cast<float>(
+            static_cast<double>(w.maxWindowScore) /
+            static_cast<double>(std::max(w.cost, int64_t(1))));
     }
 }
 
@@ -194,16 +201,11 @@ bool MaxScoreBulkScorer::partitionScorers() {
         scratch_[i] = &allScorers_[i];
     }
 
-    // Sort by efficiency ratio: maxWindowScore / cost (ascending)
+    // Sort by pre-computed efficiency ratio (ascending)
     // Low-ratio scorers are cheap to evaluate, high-ratio are expensive
     std::sort(scratch_.begin(), scratch_.begin() + n,
               [](const DisiWrapper* a, const DisiWrapper* b) {
-                  // Ascending by maxWindowScore / max(1, cost)
-                  double ratioA = static_cast<double>(a->maxWindowScore) /
-                                  static_cast<double>(std::max(a->cost, int64_t(1)));
-                  double ratioB = static_cast<double>(b->maxWindowScore) /
-                                  static_cast<double>(std::max(b->cost, int64_t(1)));
-                  return ratioA < ratioB;
+                  return a->efficiencyRatio < b->efficiencyRatio;
               });
 
     // Greedy accumulation: non-essential scorers are those whose cumulative
@@ -313,7 +315,7 @@ void MaxScoreBulkScorer::scoreInnerWindowSingleEssential(LeafCollector* collecto
         if (count == 0) break;
 
         for (int j = 0; j < count; j++) {
-            buffer_.add(batchDocs_[j], static_cast<double>(batchScores_[j]));
+            buffer_.add(batchDocs_[j], batchScores_[j]);
         }
     }
 
@@ -361,7 +363,7 @@ void MaxScoreBulkScorer::scoreInnerWindowMultipleEssentials(LeafCollector* colle
     for (int bit = windowNextSetBit(0, innerWindowSize); bit < innerWindowSize;
          bit = windowNextSetBit(bit + 1, innerWindowSize)) {
         buffer_.add(innerWindowMin + bit, windowScores_[bit]);
-        windowScores_[bit] = 0.0;  // Reset for next window
+        windowScores_[bit] = 0.0f;  // Reset for next window
     }
 
     // Clear bitset
@@ -401,18 +403,40 @@ void MaxScoreBulkScorer::scoreNonEssentialClauses(LeafCollector* collector,
 
     // Collect all remaining docs
     for (int i = 0; i < buffer_.size; i++) {
-        scorable_.score_ = static_cast<float>(buffer_.scores[i]);
+        scorable_.score_ = buffer_.scores[i];
         scorable_.docID_ = buffer_.docs[i];
         collector->collect(buffer_.docs[i]);
     }
 }
 
-void MaxScoreBulkScorer::filterCompetitiveHits(double maxRemainingScore) {
-    double minRequired = static_cast<double>(scorable_.minCompetitiveScore) - maxRemainingScore;
-    if (minRequired <= 0.0) return;
+void MaxScoreBulkScorer::filterCompetitiveHits(float maxRemainingScore) {
+    float minRequired = scorable_.minCompetitiveScore - maxRemainingScore;
+    if (minRequired <= 0.0f) return;
 
     int newSize = 0;
-    for (int i = 0; i < buffer_.size; i++) {
+    int i = 0;
+
+#ifdef __AVX2__
+    // AVX2: process 8 floats at a time
+    __m256 vMin = _mm256_set1_ps(minRequired);
+    for (; i + 8 <= buffer_.size; i += 8) {
+        __m256 vScores = _mm256_loadu_ps(&buffer_.scores[i]);
+        __m256 cmp = _mm256_cmp_ps(vScores, vMin, _CMP_GE_OQ);
+        int mask = _mm256_movemask_ps(cmp);
+
+        // Compact surviving elements
+        while (mask != 0) {
+            int bit = __builtin_ctz(mask);
+            buffer_.docs[newSize] = buffer_.docs[i + bit];
+            buffer_.scores[newSize] = buffer_.scores[i + bit];
+            newSize++;
+            mask &= mask - 1;  // Clear lowest set bit
+        }
+    }
+#endif
+
+    // Scalar tail
+    for (; i < buffer_.size; i++) {
         if (buffer_.scores[i] >= minRequired) {
             buffer_.docs[newSize] = buffer_.docs[i];
             buffer_.scores[newSize] = buffer_.scores[i];

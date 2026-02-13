@@ -7,6 +7,7 @@
 #include "diagon/index/PostingsEnum.h"
 #include "diagon/index/SegmentWriteState.h"
 #include "diagon/store/IndexInput.h"
+#include "diagon/store/MMapIndexInput.h"
 
 #include <cstdint>
 #include <memory>
@@ -224,6 +225,7 @@ public:
 
 private:
     std::unique_ptr<store::IndexInput> docIn_;  // Owned clone for thread-safety
+    store::MMapIndexInput* mmapInput_;           // Cached typed pointer (non-owning)
     int docFreq_;
     int64_t totalTermFreq_;
     bool writeFreqs_;
