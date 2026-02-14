@@ -4,12 +4,12 @@
 #pragma once
 
 #include "diagon/index/PostingsEnum.h"
-#include "diagon/search/Scorer.h"
 #include "diagon/search/BM25Similarity.h"
+#include "diagon/search/Scorer.h"
 
+#include <cstdint>
 #include <memory>
 #include <vector>
-#include <cstdint>
 
 namespace diagon {
 namespace search {
@@ -36,14 +36,18 @@ public:
      * Wrapper for a term scorer with impact information.
      */
     struct ScorerWrapper {
-        Scorer* scorer;                    // Not owned (owned by parent)
-        int64_t scaledMaxScore;            // Maximum score for current block (scaled to integer)
-        int doc;                           // Current doc ID
-        int64_t cost;                      // Cost estimate
-        ScorerWrapper* next;               // Linked list pointer for lead
+        Scorer* scorer;          // Not owned (owned by parent)
+        int64_t scaledMaxScore;  // Maximum score for current block (scaled to integer)
+        int doc;                 // Current doc ID
+        int64_t cost;            // Cost estimate
+        ScorerWrapper* next;     // Linked list pointer for lead
 
         ScorerWrapper(Scorer* s, int64_t c)
-            : scorer(s), scaledMaxScore(0), doc(-1), cost(c), next(nullptr) {}
+            : scorer(s)
+            , scaledMaxScore(0)
+            , doc(-1)
+            , cost(c)
+            , next(nullptr) {}
     };
 
     /**
@@ -52,8 +56,7 @@ public:
      * @param similarity BM25 similarity for score computation
      * @param minShouldMatch Minimum number of terms that must match
      */
-    WANDScorer(std::vector<std::unique_ptr<Scorer>>& scorers,
-               const BM25Similarity& similarity,
+    WANDScorer(std::vector<std::unique_ptr<Scorer>>& scorers, const BM25Similarity& similarity,
                int minShouldMatch = 0);
 
     ~WANDScorer() override;
@@ -143,39 +146,39 @@ private:
     int minShouldMatch_;
 
     // Integer scaling for exact threshold comparisons (Phase 1)
-    int scalingFactor_;               // Scaling factor to bring scores into [2^23, 2^24)
-    int64_t minCompetitiveScore_;     // Minimum competitive score (scaled to integer)
-    int64_t leadCost_;                // Cost of lead scorer (for cost-based filtering)
+    int scalingFactor_;            // Scaling factor to bring scores into [2^23, 2^24)
+    int64_t minCompetitiveScore_;  // Minimum competitive score (scaled to integer)
+    int64_t leadCost_;             // Cost of lead scorer (for cost-based filtering)
 
     // All scorers (owned)
     std::vector<std::unique_ptr<Scorer>> allScorers_;
     std::vector<ScorerWrapper> wrappers_;  // One wrapper per scorer
 
     // Three heaps
-    ScorerWrapper* lead_;     // Linked list of scorers on current doc
-    std::vector<ScorerWrapper*> head_;     // Heap of scorers ahead (ordered by doc ID)
-    std::vector<ScorerWrapper*> tail_;     // Heap of scorers behind (ordered by max score)
+    ScorerWrapper* lead_;               // Linked list of scorers on current doc
+    std::vector<ScorerWrapper*> head_;  // Heap of scorers ahead (ordered by doc ID)
+    std::vector<ScorerWrapper*> tail_;  // Heap of scorers behind (ordered by max score)
 
-    int doc_;                 // Current doc ID
-    float leadScore_;         // Sum of scores from lead scorers
-    int freq_;                // Number of lead scorers (matching terms)
+    int doc_;          // Current doc ID
+    float leadScore_;  // Sum of scores from lead scorers
+    int freq_;         // Number of lead scorers (matching terms)
 
-    int64_t tailMaxScore_;    // Sum of scaled max scores in tail (integer)
+    int64_t tailMaxScore_;  // Sum of scaled max scores in tail (integer)
     int tailSize_;
 
-    int64_t cost_;            // Total cost
-    int upTo_;                // Upper bound for current block max scores
+    int64_t cost_;  // Total cost
+    int upTo_;      // Upper bound for current block max scores
 
     // Instrumentation counters (diagnostic)
-    mutable int docsScored_;       // Documents actually scored (advanced through)
-    mutable int tailPromotions_;   // Tail scorers promoted to head
-    mutable int maxScoreUpdates_;  // Times updateMaxScores was called
-    mutable int matchingDocs_;     // Documents that matched constraints
-    mutable int blockBoundaryHits_;   // Times upTo aligned with block boundary (Phase 2)
-    mutable int blockBoundaryMisses_; // Times upTo fell back to fixed window (Phase 2)
-    mutable int blocksSkipped_;    // Blocks skipped by moveToNextBlock (Phase 3)
-    mutable int moveToNextBlockCalls_; // Times moveToNextBlock was called (Phase 3)
-    bool debugPrint_;              // Print statistics on destruction
+    mutable int docsScored_;            // Documents actually scored (advanced through)
+    mutable int tailPromotions_;        // Tail scorers promoted to head
+    mutable int maxScoreUpdates_;       // Times updateMaxScores was called
+    mutable int matchingDocs_;          // Documents that matched constraints
+    mutable int blockBoundaryHits_;     // Times upTo aligned with block boundary (Phase 2)
+    mutable int blockBoundaryMisses_;   // Times upTo fell back to fixed window (Phase 2)
+    mutable int blocksSkipped_;         // Blocks skipped by moveToNextBlock (Phase 3)
+    mutable int moveToNextBlockCalls_;  // Times moveToNextBlock was called (Phase 3)
+    bool debugPrint_;                   // Print statistics on destruction
 
     /**
      * Add a scorer to the lead list (scorers positioned on current doc).

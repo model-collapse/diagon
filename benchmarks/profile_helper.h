@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
 
 // Lightweight profiling using RDTSC (CPU timestamp counter)
@@ -25,14 +25,12 @@ public:
     // Read CPU timestamp counter
     static inline uint64_t rdtsc() {
         uint32_t lo, hi;
-        __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+        __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
         return ((uint64_t)hi << 32) | lo;
     }
 
     // Start timing a section
-    void start(const std::string& name) {
-        starts_[name] = rdtsc();
-    }
+    void start(const std::string& name) { starts_[name] = rdtsc(); }
 
     // End timing a section
     void end(const std::string& name) {
@@ -52,9 +50,7 @@ public:
     }
 
     // Get statistics
-    const std::map<std::string, Stats>& getStats() const {
-        return stats_;
-    }
+    const std::map<std::string, Stats>& getStats() const { return stats_; }
 
     // Reset all stats
     void reset() {
@@ -65,19 +61,14 @@ public:
     // Print report
     void printReport(double cpu_freq_ghz = 2.5) const {
         printf("\n=== ProfileHelper Report (CPU: %.2f GHz) ===\n", cpu_freq_ghz);
-        printf("%-40s %12s %12s %12s %12s %12s\n",
-               "Section", "Calls", "Avg Cycles", "Min Cycles", "Max Cycles", "Avg Time(ns)");
-        printf("%-40s %12s %12s %12s %12s %12s\n",
-               "----------------------------------------",
+        printf("%-40s %12s %12s %12s %12s %12s\n", "Section", "Calls", "Avg Cycles", "Min Cycles",
+               "Max Cycles", "Avg Time(ns)");
+        printf("%-40s %12s %12s %12s %12s %12s\n", "----------------------------------------",
                "------------", "------------", "------------", "------------", "------------");
 
         for (const auto& [name, stat] : stats_) {
-            printf("%-40s %12lu %12.0f %12lu %12lu %12.1f\n",
-                   name.c_str(),
-                   stat.calls,
-                   stat.avg_cycles(),
-                   stat.min_cycles,
-                   stat.max_cycles,
+            printf("%-40s %12lu %12.0f %12lu %12lu %12.1f\n", name.c_str(), stat.calls,
+                   stat.avg_cycles(), stat.min_cycles, stat.max_cycles,
                    stat.avg_cycles() / cpu_freq_ghz);
         }
         printf("\n");
@@ -92,13 +83,12 @@ private:
 // RAII helper for automatic start/end
 class ScopedProfile {
 public:
-    explicit ScopedProfile(const std::string& name) : name_(name) {
+    explicit ScopedProfile(const std::string& name)
+        : name_(name) {
         ProfileHelper::getInstance().start(name_);
     }
 
-    ~ScopedProfile() {
-        ProfileHelper::getInstance().end(name_);
-    }
+    ~ScopedProfile() { ProfileHelper::getInstance().end(name_); }
 
 private:
     std::string name_;

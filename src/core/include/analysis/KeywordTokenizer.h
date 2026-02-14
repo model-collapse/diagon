@@ -31,10 +31,8 @@ public:
     // Tokenizer interface
     std::vector<Token> tokenize(const std::string& text) override;
     std::string name() const override { return "keyword"; }
-    std::string description() const override {
-        return "Treats entire input as a single token";
-    }
+    std::string description() const override { return "Treats entire input as a single token"; }
 };
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

@@ -2,8 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene105/Lucene105PostingsWriter.h"
-#include "diagon/index/SegmentWriteState.h"
+
 #include "diagon/index/FieldInfo.h"
+#include "diagon/index/SegmentWriteState.h"
 #include "diagon/store/ByteBuffersIndexInput.h"
 
 #include <gtest/gtest.h>
@@ -70,7 +71,7 @@ TEST_F(Lucene105PostingsWriterTest, SkipEntriesCreated) {
 
     // Verify skip entries were created
     EXPECT_EQ(256, state.docFreq);
-    EXPECT_GE(state.skipStartFP, 0);  // Skip data was written
+    EXPECT_GE(state.skipStartFP, 0);     // Skip data was written
     EXPECT_EQ(2, state.skipEntryCount);  // 2 skip entries (128 docs each)
 
     writer.close();
@@ -86,14 +87,14 @@ TEST_F(Lucene105PostingsWriterTest, ImpactsTrackedCorrectly) {
 
     // First block (128 docs): max_freq=50, max_norm=100
     for (int i = 0; i < 128; i++) {
-        int freq = (i == 64) ? 50 : 10;  // Peak freq at doc 64
+        int freq = (i == 64) ? 50 : 10;      // Peak freq at doc 64
         int8_t norm = (i == 32) ? 100 : 50;  // Peak norm at doc 32
         writer.startDoc(i, freq, norm);
     }
 
     // Second block (128 docs): max_freq=75, max_norm=120
     for (int i = 128; i < 256; i++) {
-        int freq = (i == 192) ? 75 : 15;  // Peak freq at doc 192
+        int freq = (i == 192) ? 75 : 15;      // Peak freq at doc 192
         int8_t norm = (i == 200) ? 120 : 60;  // Peak norm at doc 200
         writer.startDoc(i, freq, norm);
     }
@@ -122,7 +123,7 @@ TEST_F(Lucene105PostingsWriterTest, ImpactsTrackedCorrectly) {
     uint8_t maxNorm1 = skipIn->readByte();
 
     EXPECT_GT(docDelta1, 0);
-    EXPECT_EQ(50, maxFreq1);  // First block peak
+    EXPECT_EQ(50, maxFreq1);   // First block peak
     EXPECT_EQ(100, maxNorm1);  // First block peak
 
     // Read second skip entry
@@ -132,7 +133,7 @@ TEST_F(Lucene105PostingsWriterTest, ImpactsTrackedCorrectly) {
     uint8_t maxNorm2 = skipIn->readByte();
 
     EXPECT_GT(docDelta2, 0);
-    EXPECT_EQ(75, maxFreq2);  // Second block peak
+    EXPECT_EQ(75, maxFreq2);   // Second block peak
     EXPECT_EQ(120, maxNorm2);  // Second block peak
 
     writer.close();

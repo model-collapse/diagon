@@ -3,23 +3,23 @@
 
 #pragma once
 
-#include "diagon/index/skipindex/IMergeTreeIndexGranule.h"
+#include "diagon/index/skipindex/IMergeTreeIndex.h"
 #include "diagon/index/skipindex/IMergeTreeIndexAggregator.h"
 #include "diagon/index/skipindex/IMergeTreeIndexCondition.h"
-#include "diagon/index/skipindex/IMergeTreeIndex.h"
+#include "diagon/index/skipindex/IMergeTreeIndexGranule.h"
 #include "diagon/util/BloomFilter.h"
 
-#include <vector>
 #include <memory>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace diagon {
 
 namespace store {
 class IndexOutput;
 class IndexInput;
-}
+}  // namespace store
 
 namespace index {
 namespace skipindex {
@@ -37,10 +37,8 @@ namespace skipindex {
 
 class MergeTreeIndexGranuleBloomFilter : public IMergeTreeIndexGranule {
 public:
-    MergeTreeIndexGranuleBloomFilter(
-        size_t bits_per_row,
-        size_t hash_functions,
-        size_t num_columns);
+    MergeTreeIndexGranuleBloomFilter(size_t bits_per_row, size_t hash_functions,
+                                     size_t num_columns);
 
     // ==================== Serialization ====================
 
@@ -61,15 +59,11 @@ public:
 
     // ==================== Properties ====================
 
-    bool empty() const override {
-        return total_rows_ == 0;
-    }
+    bool empty() const override { return total_rows_ == 0; }
 
     size_t memoryUsageBytes() const override;
 
-    const std::vector<util::BloomFilterPtr>& getFilters() const {
-        return bloom_filters_;
-    }
+    const std::vector<util::BloomFilterPtr>& getFilters() const { return bloom_filters_; }
 
     size_t totalRows() const { return total_rows_; }
     size_t bitsPerRow() const { return bits_per_row_; }
@@ -89,16 +83,12 @@ private:
 
 class MergeTreeIndexAggregatorBloomFilter : public IMergeTreeIndexAggregator {
 public:
-    MergeTreeIndexAggregatorBloomFilter(
-        size_t bits_per_row,
-        size_t hash_functions,
-        const std::vector<std::string>& column_names);
+    MergeTreeIndexAggregatorBloomFilter(size_t bits_per_row, size_t hash_functions,
+                                        const std::vector<std::string>& column_names);
 
     // ==================== State Management ====================
 
-    bool empty() const override {
-        return total_rows_ == 0;
-    }
+    bool empty() const override { return total_rows_ == 0; }
 
     MergeTreeIndexGranulePtr getGranuleAndReset() override;
 
@@ -139,23 +129,18 @@ private:
  */
 class MergeTreeIndexConditionBloomFilter : public IMergeTreeIndexCondition {
 public:
-    MergeTreeIndexConditionBloomFilter(
-        const std::vector<std::string>& index_columns,
-        size_t hash_functions);
+    MergeTreeIndexConditionBloomFilter(const std::vector<std::string>& index_columns,
+                                       size_t hash_functions);
 
     // ==================== Query Analysis ====================
 
-    bool alwaysUnknownOrTrue() const override {
-        return predicates_.empty();
-    }
+    bool alwaysUnknownOrTrue() const override { return predicates_.empty(); }
 
     // ==================== Granule Filtering ====================
 
     bool mayBeTrueOnGranule(MergeTreeIndexGranulePtr granule) const override;
 
-    std::string getDescription() const override {
-        return "bloom_filter index condition";
-    }
+    std::string getDescription() const override { return "bloom_filter index condition"; }
 
     // ==================== Predicate Building ====================
 
@@ -173,8 +158,7 @@ public:
      * @param column_name Column name
      * @param value_hashes Hashes of values to search for
      */
-    void addInPredicate(const std::string& column_name,
-                       const std::vector<uint64_t>& value_hashes);
+    void addInPredicate(const std::string& column_name, const std::vector<uint64_t>& value_hashes);
 
 private:
     enum class PredicateType {
@@ -201,19 +185,16 @@ private:
      * Check if predicate matches granule
      */
     bool checkPredicate(const Predicate& pred,
-                       const MergeTreeIndexGranuleBloomFilter* granule) const;
+                        const MergeTreeIndexGranuleBloomFilter* granule) const;
 };
 
 // ==================== INDEX ====================
 
 class MergeTreeIndexBloomFilter : public IMergeTreeIndex {
 public:
-    MergeTreeIndexBloomFilter(
-        const std::string& index_name,
-        const std::vector<std::string>& columns,
-        size_t granularity,
-        size_t bits_per_row = 8,
-        size_t hash_functions = 3);
+    MergeTreeIndexBloomFilter(const std::string& index_name,
+                              const std::vector<std::string>& columns, size_t granularity,
+                              size_t bits_per_row = 8, size_t hash_functions = 3);
 
     // ==================== Factory Methods ====================
 
@@ -225,9 +206,7 @@ public:
 
     // ==================== File Naming ====================
 
-    std::string getFileExtension() const override {
-        return ".idx";
-    }
+    std::string getFileExtension() const override { return ".idx"; }
 
     // ==================== Parameters ====================
 

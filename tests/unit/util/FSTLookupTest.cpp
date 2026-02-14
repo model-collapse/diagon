@@ -13,8 +13,9 @@
 #include "diagon/util/FST.h"
 
 #include <gtest/gtest.h>
-#include <vector>
+
 #include <string>
+#include <vector>
 
 using namespace diagon::util;
 
@@ -48,7 +49,7 @@ std::unique_ptr<FST> buildTestFST(const std::vector<std::pair<std::string, int64
     return builder.finish();
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== Task 2.1: Exact Match Lookup Tests ====================
 
@@ -59,11 +60,7 @@ std::unique_ptr<FST> buildTestFST(const std::vector<std::pair<std::string, int64
  * Reference: org.apache.lucene.util.fst.FST.get()
  */
 TEST(FSTLookupTest, ExactMatchFound) {
-    auto fst = buildTestFST({
-        {"apple", 1},
-        {"banana", 2},
-        {"cherry", 3}
-    });
+    auto fst = buildTestFST({{"apple", 1}, {"banana", 2}, {"cherry", 3}});
 
     EXPECT_EQ(1, fst->get(toBytes("apple")));
     EXPECT_EQ(2, fst->get(toBytes("banana")));
@@ -76,10 +73,7 @@ TEST(FSTLookupTest, ExactMatchFound) {
  * Lucene Behavior: Non-existent term returns null/NO_OUTPUT
  */
 TEST(FSTLookupTest, ExactMatchNotFound) {
-    auto fst = buildTestFST({
-        {"apple", 1},
-        {"cherry", 3}
-    });
+    auto fst = buildTestFST({{"apple", 1}, {"cherry", 3}});
 
     // Not in FST
     EXPECT_EQ(FST::NO_OUTPUT, fst->get(toBytes("banana")));
@@ -92,9 +86,7 @@ TEST(FSTLookupTest, ExactMatchNotFound) {
  * Lucene Behavior: Prefix of stored term does not match (unless explicitly stored)
  */
 TEST(FSTLookupTest, PrefixIsNotMatch) {
-    auto fst = buildTestFST({
-        {"testing", 10}
-    });
+    auto fst = buildTestFST({{"testing", 10}});
 
     // "test" is a prefix of "testing" but not stored
     EXPECT_EQ(FST::NO_OUTPUT, fst->get(toBytes("test")));
@@ -111,9 +103,7 @@ TEST(FSTLookupTest, PrefixIsNotMatch) {
  * Lucene Behavior: Extension of stored term does not match
  */
 TEST(FSTLookupTest, ExtensionIsNotMatch) {
-    auto fst = buildTestFST({
-        {"test", 10}
-    });
+    auto fst = buildTestFST({{"test", 10}});
 
     // "testing" is an extension of "test" but not stored
     EXPECT_EQ(FST::NO_OUTPUT, fst->get(toBytes("testing")));
@@ -130,10 +120,7 @@ TEST(FSTLookupTest, ExtensionIsNotMatch) {
  * Lucene Behavior: If both prefix and extension stored, each returns its own output
  */
 TEST(FSTLookupTest, PrefixAndExtensionBothStored) {
-    auto fst = buildTestFST({
-        {"test", 10},
-        {"testing", 20}
-    });
+    auto fst = buildTestFST({{"test", 10}, {"testing", 20}});
 
     EXPECT_EQ(10, fst->get(toBytes("test")));
     EXPECT_EQ(20, fst->get(toBytes("testing")));
@@ -149,11 +136,7 @@ TEST(FSTLookupTest, PrefixAndExtensionBothStored) {
  * Lucene Behavior: Terms with common prefixes look up independently
  */
 TEST(FSTLookupTest, CommonPrefixLookup) {
-    auto fst = buildTestFST({
-        {"cat", 1},
-        {"caterpillar", 2},
-        {"cats", 3}
-    });
+    auto fst = buildTestFST({{"cat", 1}, {"caterpillar", 2}, {"cats", 3}});
 
     EXPECT_EQ(1, fst->get(toBytes("cat")));
     EXPECT_EQ(2, fst->get(toBytes("caterpillar")));
@@ -170,11 +153,7 @@ TEST(FSTLookupTest, CommonPrefixLookup) {
  * Lucene Behavior: FST can be queried multiple times without state corruption
  */
 TEST(FSTLookupTest, MultipleLookupsSameFST) {
-    auto fst = buildTestFST({
-        {"alpha", 100},
-        {"beta", 200},
-        {"gamma", 300}
-    });
+    auto fst = buildTestFST({{"alpha", 100}, {"beta", 200}, {"gamma", 300}});
 
     // Multiple lookups in random order
     EXPECT_EQ(200, fst->get(toBytes("beta")));
@@ -209,10 +188,7 @@ TEST(FSTLookupTest, EmptyStringLookup) {
  * Lucene Behavior: If empty string not stored, lookup returns null
  */
 TEST(FSTLookupTest, EmptyStringNotStored) {
-    auto fst = buildTestFST({
-        {"a", 1},
-        {"b", 2}
-    });
+    auto fst = buildTestFST({{"a", 1}, {"b", 2}});
 
     EXPECT_EQ(FST::NO_OUTPUT, fst->get(toBytes("")));
 }
@@ -223,11 +199,7 @@ TEST(FSTLookupTest, EmptyStringNotStored) {
  * Lucene Behavior: Single-byte terms work correctly
  */
 TEST(FSTLookupTest, SingleByteTermLookup) {
-    auto fst = buildTestFST({
-        {"a", 1},
-        {"b", 2},
-        {"z", 26}
-    });
+    auto fst = buildTestFST({{"a", 1}, {"b", 2}, {"z", 26}});
 
     EXPECT_EQ(1, fst->get(toBytes("a")));
     EXPECT_EQ(2, fst->get(toBytes("b")));
@@ -348,9 +320,9 @@ TEST(FSTLookupTest, AllByteValues) {
  */
 TEST(FSTLookupTest, MultiByteUTF8Lookup) {
     auto fst = buildTestFST({
-        {"café", 1},        // é = 2 bytes (0xC3 0xA9)
-        {"日本語", 2},       // 3 bytes per character
-        {"🚀", 3}           // 4-byte emoji
+        {"café", 1},    // é = 2 bytes (0xC3 0xA9)
+        {"日本語", 2},  // 3 bytes per character
+        {"🚀", 3}        // 4-byte emoji
     });
 
     EXPECT_EQ(1, fst->get(toBytes("café")));
@@ -364,9 +336,7 @@ TEST(FSTLookupTest, MultiByteUTF8Lookup) {
  * Lucene Behavior: Partial UTF-8 sequence doesn't match (byte boundaries)
  */
 TEST(FSTLookupTest, UTF8PartialMatch) {
-    auto fst = buildTestFST({
-        {"café", 1}
-    });
+    auto fst = buildTestFST({{"café", 1}});
 
     // Full match works
     EXPECT_EQ(1, fst->get(toBytes("café")));
@@ -388,9 +358,9 @@ TEST(FSTLookupTest, UTF8SortOrder) {
     FST::Builder builder;
 
     // Byte-wise order: 0x61 < 0x62 < 0xC3
-    builder.add(toBytes("a"), 1);    // 0x61
-    builder.add(toBytes("b"), 2);    // 0x62
-    builder.add(toBytes("à"), 3);    // 0xC3 0xA0
+    builder.add(toBytes("a"), 1);  // 0x61
+    builder.add(toBytes("b"), 2);  // 0x62
+    builder.add(toBytes("à"), 3);  // 0xC3 0xA0
 
     auto fst = builder.finish();
 
@@ -408,8 +378,8 @@ TEST(FSTLookupTest, CombiningCharacters) {
     FST::Builder builder;
 
     // é can be single code point (U+00E9) or combining (e + U+0301)
-    std::string precomposed = "café";         // é = 0xC3 0xA9
-    std::string decomposed = "cafe\u0301";    // e + combining accent
+    std::string precomposed = "café";       // é = 0xC3 0xA9
+    std::string decomposed = "cafe\u0301";  // e + combining accent
 
     // These are different byte sequences
     builder.add(toBytes(decomposed), 1);
@@ -433,12 +403,7 @@ TEST(FSTLookupTest, CombiningCharacters) {
 TEST(FSTLookupTest, MixedASCIIAndUTF8) {
     // Correct byte-wise order: 0x61 < 0x63 < 0x7A < 0xE6
     // "apple" (0x61...) < "café" (0x63...) < "zebra" (0x7A...) < "日本語" (0xE6...)
-    auto fst = buildTestFST({
-        {"apple", 1},
-        {"café", 2},
-        {"zebra", 4},
-        {"日本語", 3}
-    });
+    auto fst = buildTestFST({{"apple", 1}, {"café", 2}, {"zebra", 4}, {"日本語", 3}});
 
     EXPECT_EQ(1, fst->get(toBytes("apple")));
     EXPECT_EQ(2, fst->get(toBytes("café")));
@@ -482,11 +447,7 @@ TEST(FSTLookupTest, LargeFSTLookup) {
  * Lucene Behavior: FST can be serialized/deserialized and lookups still work
  */
 TEST(FSTLookupTest, LookupAfterSerialization) {
-    auto original = buildTestFST({
-        {"apple", 1},
-        {"banana", 2},
-        {"cherry", 3}
-    });
+    auto original = buildTestFST({{"apple", 1}, {"banana", 2}, {"cherry", 3}});
 
     // Serialize
     std::vector<uint8_t> serialized = original->serialize();
@@ -548,10 +509,7 @@ TEST(FSTLookupTest, SingleEntryVariousLookups) {
  * Lucene Behavior: Lookups are case-sensitive (byte-wise)
  */
 TEST(FSTLookupTest, CaseSensitivity) {
-    auto fst = buildTestFST({
-        {"Apple", 1},
-        {"apple", 2}
-    });
+    auto fst = buildTestFST({{"Apple", 1}, {"apple", 2}});
 
     // Case matters
     EXPECT_EQ(1, fst->get(toBytes("Apple")));

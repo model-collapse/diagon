@@ -20,8 +20,10 @@ namespace fs = std::filesystem;
 int main(int argc, char* argv[]) {
     int numTerms = 5;
     int iterations = 10000;
-    if (argc > 1) numTerms = std::atoi(argv[1]);
-    if (argc > 2) iterations = std::atoi(argv[2]);
+    if (argc > 1)
+        numTerms = std::atoi(argv[1]);
+    if (argc > 2)
+        iterations = std::atoi(argv[2]);
 
     fs::path indexPath = "/tmp/diagon_reuters_index";
     if (!fs::exists(indexPath)) {
@@ -37,22 +39,19 @@ int main(int argc, char* argv[]) {
     search::IndexSearcher searcher(*reader, config);
 
     static const std::vector<std::string> queryTerms = {
-        "market", "company", "stock", "trade", "price",
-        "bank", "dollar", "oil", "export", "government",
-        "share", "billion", "profit", "exchange", "interest",
-        "economic", "report", "industry", "investment", "revenue",
-        "million", "percent", "year", "said", "would",
-        "new", "also", "last", "first", "group",
-        "accord", "tax", "rate", "growth", "debt",
-        "loss", "quarter", "month", "net", "income",
-        "sales", "earnings", "bond", "foreign", "loan",
-        "budget", "deficit", "surplus", "inflation", "central"
-    };
+        "market",   "company",  "stock",      "trade",    "price",      "bank",    "dollar",
+        "oil",      "export",   "government", "share",    "billion",    "profit",  "exchange",
+        "interest", "economic", "report",     "industry", "investment", "revenue", "million",
+        "percent",  "year",     "said",       "would",    "new",        "also",    "last",
+        "first",    "group",    "accord",     "tax",      "rate",       "growth",  "debt",
+        "loss",     "quarter",  "month",      "net",      "income",     "sales",   "earnings",
+        "bond",     "foreign",  "loan",       "budget",   "deficit",    "surplus", "inflation",
+        "central"};
 
     search::BooleanQuery::Builder builder;
     for (int i = 0; i < numTerms && i < static_cast<int>(queryTerms.size()); i++) {
-        builder.add(std::make_shared<search::TermQuery>(
-            search::Term("body", queryTerms[i])), search::Occur::SHOULD);
+        builder.add(std::make_shared<search::TermQuery>(search::Term("body", queryTerms[i])),
+                    search::Occur::SHOULD);
     }
     auto query = builder.build();
 
@@ -68,6 +67,7 @@ int main(int argc, char* argv[]) {
     }
     auto end = std::chrono::high_resolution_clock::now();
     double us = std::chrono::duration<double, std::micro>(end - start).count() / iterations;
-    std::cout << "OR-" << numTerms << " WAND: " << us << " us/query (" << iterations << " iterations)" << std::endl;
+    std::cout << "OR-" << numTerms << " WAND: " << us << " us/query (" << iterations
+              << " iterations)" << std::endl;
     return 0;
 }

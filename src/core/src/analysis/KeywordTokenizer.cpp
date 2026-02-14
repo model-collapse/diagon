@@ -20,5 +20,5 @@ std::vector<Token> KeywordTokenizer::tokenize(const std::string& text) {
     return tokens;
 }
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

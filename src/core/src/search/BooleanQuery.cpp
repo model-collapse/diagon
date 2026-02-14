@@ -5,11 +5,11 @@
 
 #include "diagon/index/IndexReader.h"
 #include "diagon/index/LeafReaderContext.h"
+#include "diagon/search/BM25Similarity.h"
 #include "diagon/search/IndexSearcher.h"
 #include "diagon/search/MaxScoreBulkScorer.h"
 #include "diagon/search/Scorer.h"
 #include "diagon/search/WANDScorer.h"
-#include "diagon/search/BM25Similarity.h"
 
 #include <algorithm>
 #include <sstream>
@@ -422,13 +422,13 @@ public:
                 if (useWAND) {
                     // Use Block-Max WAND for early termination
                     BM25Similarity similarity;  // Default parameters
-                    reqScorer = std::make_unique<WANDScorer>(
-                        shouldScorers, similarity, minShouldMatch);
+                    reqScorer = std::make_unique<WANDScorer>(shouldScorers, similarity,
+                                                             minShouldMatch);
                 } else {
                     // Use standard exhaustive disjunction
                     // This is optimal for simple queries (< 3 terms with minShouldMatch=0)
-                    reqScorer = std::make_unique<DisjunctionScorer>(
-                        *this, std::move(shouldScorers), minShouldMatch);
+                    reqScorer = std::make_unique<DisjunctionScorer>(*this, std::move(shouldScorers),
+                                                                    minShouldMatch);
                 }
             }
         }
@@ -442,7 +442,7 @@ public:
         if (!mustNotScorers.empty()) {
             for (auto& exclScorer : mustNotScorers) {
                 reqScorer = std::make_unique<ReqExclScorer>(std::move(reqScorer),
-                                                             std::move(exclScorer));
+                                                            std::move(exclScorer));
             }
         }
 
@@ -454,12 +454,16 @@ public:
 
         // MaxScoreBulkScorer is only used for pure disjunctions with WAND enabled
         // and scoring requested (TOP_SCORES or COMPLETE)
-        if (!config.enable_block_max_wand) return nullptr;
-        if (scoreMode_ == ScoreMode::COMPLETE_NO_SCORES) return nullptr;
-        if (!query_.isPureDisjunction()) return nullptr;
+        if (!config.enable_block_max_wand)
+            return nullptr;
+        if (scoreMode_ == ScoreMode::COMPLETE_NO_SCORES)
+            return nullptr;
+        if (!query_.isPureDisjunction())
+            return nullptr;
 
         int minShouldMatch = query_.getMinimumNumberShouldMatch();
-        if (minShouldMatch > 1) return nullptr;  // Not supported yet
+        if (minShouldMatch > 1)
+            return nullptr;  // Not supported yet
 
         // Create scorers for SHOULD clauses
         std::vector<std::unique_ptr<Scorer>> scorers;
@@ -470,7 +474,8 @@ public:
             }
         }
 
-        if (scorers.size() < 2) return nullptr;  // Need 2+ for window-based scoring
+        if (scorers.size() < 2)
+            return nullptr;  // Need 2+ for window-based scoring
 
         int maxDoc = context.reader ? context.reader->maxDoc() : 0;
         return std::make_unique<MaxScoreBulkScorer>(maxDoc, std::move(scorers));
@@ -547,7 +552,7 @@ bool BooleanQuery::isRequired() const {
 }
 
 std::unique_ptr<Weight> BooleanQuery::createWeight(IndexSearcher& searcher, ScoreMode scoreMode,
-                                                    float boost) const {
+                                                   float boost) const {
     return std::make_unique<BooleanWeight>(*this, searcher, scoreMode, boost);
 }
 
@@ -642,7 +647,7 @@ std::unique_ptr<Query> BooleanQuery::clone() const {
     std::vector<BooleanClause> clonedClauses;
     for (const auto& clause : clauses_) {
         clonedClauses.emplace_back(std::shared_ptr<Query>(clause.query->clone().release()),
-                                    clause.occur);
+                                   clause.occur);
     }
     return std::unique_ptr<BooleanQuery>(
         new BooleanQuery(std::move(clonedClauses), minimumNumberShouldMatch_));

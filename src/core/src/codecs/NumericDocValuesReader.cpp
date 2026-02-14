@@ -32,8 +32,8 @@ void NumericDocValuesReader::readMetadata() {
 
     int version = metaInput_->readVInt();
     if (version != VERSION) {
-        throw std::runtime_error("Invalid version: " + std::to_string(version) +
-                                 " (expected " + std::to_string(VERSION) + ")");
+        throw std::runtime_error("Invalid version: " + std::to_string(version) + " (expected " +
+                                 std::to_string(VERSION) + ")");
     }
 
     // Read number of fields
@@ -57,8 +57,8 @@ void NumericDocValuesReader::readMetadata() {
     }
 }
 
-std::unique_ptr<index::NumericDocValues> NumericDocValuesReader::getNumeric(
-    const std::string& fieldName) {
+std::unique_ptr<index::NumericDocValues>
+NumericDocValuesReader::getNumeric(const std::string& fieldName) {
     auto it = fieldsByName_.find(fieldName);
     if (it == fieldsByName_.end()) {
         return nullptr;
@@ -71,8 +71,7 @@ std::unique_ptr<index::NumericDocValues> NumericDocValuesReader::getNumeric(
     return std::make_unique<MemoryNumericDocValues>(std::move(values));
 }
 
-std::unique_ptr<index::NumericDocValues> NumericDocValuesReader::getNumeric(
-    int32_t fieldNumber) {
+std::unique_ptr<index::NumericDocValues> NumericDocValuesReader::getNumeric(int32_t fieldNumber) {
     auto it = fieldsByNumber_.find(fieldNumber);
     if (it == fieldsByNumber_.end()) {
         return nullptr;
@@ -93,8 +92,8 @@ bool NumericDocValuesReader::hasField(int32_t fieldNumber) const {
     return fieldsByNumber_.find(fieldNumber) != fieldsByNumber_.end();
 }
 
-const NumericDocValuesReader::FieldMetadata* NumericDocValuesReader::getFieldMetadata(
-    const std::string& fieldName) const {
+const NumericDocValuesReader::FieldMetadata*
+NumericDocValuesReader::getFieldMetadata(const std::string& fieldName) const {
     auto it = fieldsByName_.find(fieldName);
     if (it == fieldsByName_.end()) {
         return nullptr;

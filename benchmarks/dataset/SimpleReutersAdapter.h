@@ -17,6 +17,7 @@
 
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -28,7 +29,8 @@ namespace diagon::benchmarks {
 class SimpleReutersAdapter {
 public:
     explicit SimpleReutersAdapter(const std::string& datasetPath)
-        : currentIndex_(0), docCount_(0) {
+        : currentIndex_(0)
+        , docCount_(0) {
         namespace fs = std::filesystem;
         for (const auto& entry : fs::directory_iterator(datasetPath)) {
             if (entry.is_regular_file() && entry.path().extension() == ".txt") {
@@ -41,19 +43,22 @@ public:
     bool nextDocument(document::Document& doc) {
         while (currentIndex_ < files_.size()) {
             std::ifstream ifs(files_[currentIndex_++]);
-            if (!ifs.is_open()) continue;
+            if (!ifs.is_open())
+                continue;
 
             std::string line;
 
             // Line 1: Date
-            if (!std::getline(ifs, line)) continue;
+            if (!std::getline(ifs, line))
+                continue;
             std::string date = line;
 
             // Line 2: Empty (skip)
             std::getline(ifs, line);
 
             // Line 3: Title
-            if (!std::getline(ifs, line)) continue;
+            if (!std::getline(ifs, line))
+                continue;
             std::string title = line;
 
             // Line 4: Empty (skip)
@@ -63,13 +68,15 @@ public:
             std::ostringstream body;
             bool first = true;
             while (std::getline(ifs, line)) {
-                if (!first) body << " ";
+                if (!first)
+                    body << " ";
                 body << line;
                 first = false;
             }
 
             std::string bodyStr = body.str();
-            if (bodyStr.empty()) continue;
+            if (bodyStr.empty())
+                continue;
 
             doc.add(std::make_unique<document::TextField>("title", title));
             doc.add(std::make_unique<document::TextField>("body", bodyStr));
@@ -94,4 +101,4 @@ private:
     int docCount_;
 };
 
-} // namespace diagon::benchmarks
+}  // namespace diagon::benchmarks

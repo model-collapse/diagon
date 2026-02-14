@@ -10,27 +10,27 @@
 #include "diagon/c_api/diagon_c_api.h"
 
 // Diagon C++ headers
+#include "diagon/document/Document.h"
+#include "diagon/document/Field.h"
+#include "diagon/index/DirectoryReader.h"
+#include "diagon/index/IndexWriter.h"
+#include "diagon/search/BooleanClause.h"
+#include "diagon/search/BooleanQuery.h"
+#include "diagon/search/DoubleRangeQuery.h"
+#include "diagon/search/IndexSearcher.h"
+#include "diagon/search/MatchAllDocsQuery.h"
+#include "diagon/search/NumericRangeQuery.h"
+#include "diagon/search/TermQuery.h"
+#include "diagon/search/TopDocs.h"
 #include "diagon/store/Directory.h"
 #include "diagon/store/FSDirectory.h"
 #include "diagon/store/MMapDirectory.h"
-#include "diagon/index/IndexWriter.h"
-#include "diagon/index/DirectoryReader.h"
-#include "diagon/document/Document.h"
-#include "diagon/document/Field.h"
-#include "diagon/search/IndexSearcher.h"
-#include "diagon/search/TermQuery.h"
-#include "diagon/search/NumericRangeQuery.h"
-#include "diagon/search/DoubleRangeQuery.h"
-#include "diagon/search/BooleanQuery.h"
-#include "diagon/search/BooleanClause.h"
-#include "diagon/search/TopDocs.h"
-#include "diagon/search/MatchAllDocsQuery.h"
 
 #include <bit>
 #include <cstring>
+#include <exception>
 #include <memory>
 #include <string>
-#include <exception>
 
 // ==================== Error Handling ====================
 
@@ -110,10 +110,17 @@ void diagon_config_set_open_mode(DiagonIndexWriterConfig config, int mode) {
     if (config) {
         diagon::index::IndexWriterConfig::OpenMode open_mode;
         switch (mode) {
-            case 0: open_mode = diagon::index::IndexWriterConfig::OpenMode::CREATE; break;
-            case 1: open_mode = diagon::index::IndexWriterConfig::OpenMode::APPEND; break;
-            case 2: open_mode = diagon::index::IndexWriterConfig::OpenMode::CREATE_OR_APPEND; break;
-            default: return;
+            case 0:
+                open_mode = diagon::index::IndexWriterConfig::OpenMode::CREATE;
+                break;
+            case 1:
+                open_mode = diagon::index::IndexWriterConfig::OpenMode::APPEND;
+                break;
+            case 2:
+                open_mode = diagon::index::IndexWriterConfig::OpenMode::CREATE_OR_APPEND;
+                break;
+            default:
+                return;
         }
         static_cast<diagon::index::IndexWriterConfig*>(config)->setOpenMode(open_mode);
     }
@@ -309,9 +316,7 @@ DiagonField diagon_create_stored_field(const char* name, const char* value) {
     try {
         // Stored-only field: not indexed, only stored
         auto field = std::make_unique<diagon::document::Field>(
-            name, value,
-            diagon::document::FieldType::storedOnly()
-        );
+            name, value, diagon::document::FieldType::storedOnly());
         return static_cast<DiagonField>(field.release());
     } catch (const std::exception& e) {
         set_error(e);
@@ -343,7 +348,8 @@ DiagonField diagon_create_double_field(const char* name, double value) {
     try {
         // Cast double to int64 for NumericDocValuesField
         // TODO: Add proper double field support
-        auto field = std::make_unique<diagon::document::NumericDocValuesField>(name, static_cast<int64_t>(value));
+        auto field = std::make_unique<diagon::document::NumericDocValuesField>(
+            name, static_cast<int64_t>(value));
         return static_cast<DiagonField>(field.release());
     } catch (const std::exception& e) {
         set_error(e);
@@ -361,9 +367,10 @@ DiagonField diagon_create_indexed_long_field(const char* name, int64_t value) {
         // Create FieldType for indexed numeric field
         diagon::document::FieldType fieldType;
         fieldType.indexOptions = diagon::index::IndexOptions::DOCS;  // Index for searching
-        fieldType.stored = true;  // Store for retrieval
-        fieldType.tokenized = false;  // Don't tokenize numbers
-        fieldType.docValuesType = diagon::index::DocValuesType::NUMERIC;  // Enable doc values for range queries
+        fieldType.stored = true;                                     // Store for retrieval
+        fieldType.tokenized = false;                                 // Don't tokenize numbers
+        fieldType.docValuesType =
+            diagon::index::DocValuesType::NUMERIC;  // Enable doc values for range queries
         fieldType.numericType = diagon::document::NumericType::LONG;  // Track as LONG type
 
         // Create field with numeric value
@@ -385,9 +392,10 @@ DiagonField diagon_create_indexed_double_field(const char* name, double value) {
         // Create FieldType for indexed numeric field
         diagon::document::FieldType fieldType;
         fieldType.indexOptions = diagon::index::IndexOptions::DOCS;  // Index for searching
-        fieldType.stored = true;  // Store for retrieval
-        fieldType.tokenized = false;  // Don't tokenize numbers
-        fieldType.docValuesType = diagon::index::DocValuesType::NUMERIC;  // Enable doc values for range queries
+        fieldType.stored = true;                                     // Store for retrieval
+        fieldType.tokenized = false;                                 // Don't tokenize numbers
+        fieldType.docValuesType =
+            diagon::index::DocValuesType::NUMERIC;  // Enable doc values for range queries
         fieldType.numericType = diagon::document::NumericType::DOUBLE;  // Track as DOUBLE type
 
         // Convert double to int64_t using bit_cast to preserve full precision
@@ -419,7 +427,8 @@ DiagonIndexReader diagon_open_index_reader(DiagonDirectory dir) {
 
     try {
         auto* directory = static_cast<diagon::store::Directory*>(dir);
-        std::shared_ptr<diagon::index::DirectoryReader> reader = diagon::index::DirectoryReader::open(*directory);
+        std::shared_ptr<diagon::index::DirectoryReader> reader =
+            diagon::index::DirectoryReader::open(*directory);
 
         // Store shared_ptr in heap to manage lifetime
         auto* reader_ptr = new std::shared_ptr<diagon::index::DirectoryReader>(reader);
@@ -560,13 +569,9 @@ DiagonQuery diagon_create_match_all_query() {
     }
 }
 
-DiagonQuery diagon_create_numeric_range_query(
-    const char* field_name,
-    double lower_value,
-    double upper_value,
-    bool include_lower,
-    bool include_upper)
-{
+DiagonQuery diagon_create_numeric_range_query(const char* field_name, double lower_value,
+                                              double upper_value, bool include_lower,
+                                              bool include_upper) {
     if (!field_name) {
         set_error("Field name is required");
         return nullptr;
@@ -583,12 +588,7 @@ DiagonQuery diagon_create_numeric_range_query(
         int64_t upper = std::bit_cast<int64_t>(upper_value);
 
         auto query = std::make_unique<diagon::search::NumericRangeQuery>(
-            std::string(field_name),
-            lower,
-            upper,
-            include_lower,
-            include_upper
-        );
+            std::string(field_name), lower, upper, include_lower, include_upper);
 
         return query.release();
     } catch (const std::exception& e) {
@@ -597,13 +597,9 @@ DiagonQuery diagon_create_numeric_range_query(
     }
 }
 
-DiagonQuery diagon_create_double_range_query(
-    const char* field_name,
-    double lower_value,
-    double upper_value,
-    bool include_lower,
-    bool include_upper)
-{
+DiagonQuery diagon_create_double_range_query(const char* field_name, double lower_value,
+                                             double upper_value, bool include_lower,
+                                             bool include_upper) {
     if (!field_name) {
         set_error("Field name is required");
         return nullptr;
@@ -611,12 +607,7 @@ DiagonQuery diagon_create_double_range_query(
 
     try {
         auto query = std::make_unique<diagon::search::DoubleRangeQuery>(
-            std::string(field_name),
-            lower_value,
-            upper_value,
-            include_lower,
-            include_upper
-        );
+            std::string(field_name), lower_value, upper_value, include_lower, include_upper);
 
         return query.release();
     } catch (const std::exception& e) {
@@ -856,7 +847,8 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
         auto* reader_ptr = static_cast<std::shared_ptr<diagon::index::DirectoryReader>*>(reader);
         auto* dir_reader = reader_ptr->get();  // Get raw pointer from shared_ptr
 
-        fprintf(stderr, "[C API] Got DirectoryReader=%p from shared_ptr\n", static_cast<void*>(dir_reader));
+        fprintf(stderr, "[C API] Got DirectoryReader=%p from shared_ptr\n",
+                static_cast<void*>(dir_reader));
         fflush(stderr);
 
         if (!dir_reader) {
@@ -894,7 +886,8 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
             int maxDoc = ctx.reader->maxDoc();
             int docBase = ctx.docBase;
 
-            fprintf(stderr, "[C API] Checking segment ord=%d, docBase=%d, maxDoc=%d, range=[%d, %d)\n",
+            fprintf(stderr,
+                    "[C API] Checking segment ord=%d, docBase=%d, maxDoc=%d, range=[%d, %d)\n",
                     ctx.ord, docBase, maxDoc, docBase, docBase + maxDoc);
             fflush(stderr);
 
@@ -905,7 +898,8 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
                 // Convert global ID to segment-local ID
                 segment_local_doc_id = doc_id - docBase;
 
-                fprintf(stderr, "[C API] Found! Segment ord=%d contains global doc_id=%d (local_id=%d)\n",
+                fprintf(stderr,
+                        "[C API] Found! Segment ord=%d contains global doc_id=%d (local_id=%d)\n",
                         ctx.ord, doc_id, segment_local_doc_id);
                 fflush(stderr);
                 break;
@@ -915,15 +909,16 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
         if (!leaf_reader) {
             char error_msg[256];
             snprintf(error_msg, sizeof(error_msg),
-                     "Document ID %d not found in any segment (total segments: %zu)",
-                     doc_id, leaves.size());
+                     "Document ID %d not found in any segment (total segments: %zu)", doc_id,
+                     leaves.size());
             set_error(error_msg);
             fprintf(stderr, "[C API] ERROR: %s\n", error_msg);
             fflush(stderr);
             return nullptr;
         }
 
-        fprintf(stderr, "[C API] Got leaf_reader=%p for segment\n", static_cast<void*>(leaf_reader));
+        fprintf(stderr, "[C API] Got leaf_reader=%p for segment\n",
+                static_cast<void*>(leaf_reader));
         fflush(stderr);
 
         // Get stored fields reader from the leaf reader
@@ -931,7 +926,8 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
         fflush(stderr);
         auto* stored_fields_reader = leaf_reader->storedFieldsReader();
 
-        fprintf(stderr, "[C API] Got stored_fields_reader=%p\n", static_cast<void*>(stored_fields_reader));
+        fprintf(stderr, "[C API] Got stored_fields_reader=%p\n",
+                static_cast<void*>(stored_fields_reader));
         fflush(stderr);
 
         if (!stored_fields_reader) {
@@ -942,7 +938,8 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
         }
 
         // Read document fields using SEGMENT-LOCAL doc_id
-        fprintf(stderr, "[C API] Reading document fields for global_doc_id=%d, segment_local_doc_id=%d\n",
+        fprintf(stderr,
+                "[C API] Reading document fields for global_doc_id=%d, segment_local_doc_id=%d\n",
                 doc_id, segment_local_doc_id);
         fflush(stderr);
         auto fields = stored_fields_reader->document(segment_local_doc_id);
@@ -986,8 +983,8 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
     }
 }
 
-bool diagon_document_get_field_value(DiagonDocument doc, const char* field_name,
-                                     char* out_value, size_t out_value_len) {
+bool diagon_document_get_field_value(DiagonDocument doc, const char* field_name, char* out_value,
+                                     size_t out_value_len) {
     if (!doc || !field_name || !out_value) {
         return false;
     }
@@ -1118,4 +1115,4 @@ void diagon_free_postings_enum(DiagonPostingsEnum postings) {
     // No-op
 }
 
-} // extern "C"
+}  // extern "C"

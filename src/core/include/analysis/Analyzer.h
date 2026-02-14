@@ -1,10 +1,11 @@
 #pragma once
 
-#include "Tokenizer.h"
 #include "TokenFilter.h"
-#include <vector>
-#include <string>
+#include "Tokenizer.h"
+
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace diagon {
 namespace analysis {
@@ -75,8 +76,7 @@ public:
      * @param tokenizer Tokenizer to use
      * @param filters Vector of filters to apply in order
      */
-    CompositeAnalyzer(const std::string& name,
-                      std::unique_ptr<Tokenizer> tokenizer,
+    CompositeAnalyzer(const std::string& name, std::unique_ptr<Tokenizer> tokenizer,
                       std::vector<std::unique_ptr<TokenFilter>> filters);
 
     virtual ~CompositeAnalyzer() = default;
@@ -143,5 +143,5 @@ public:
     static std::unique_ptr<Analyzer> createSearch();
 };
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

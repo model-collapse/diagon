@@ -71,7 +71,7 @@ public:
      * @return BitSet of live documents, or nullptr if no deletions
      */
     std::unique_ptr<util::BitSet> readLiveDocs(store::Directory& directory,
-                                                 const std::string& segmentName, int maxDoc);
+                                               const std::string& segmentName, int maxDoc);
 
     /**
      * Check if live docs file exists

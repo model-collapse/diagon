@@ -3,13 +3,13 @@
 
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
-#include "diagon/index/IndexWriter.h"
 #include "diagon/index/DirectoryReader.h"
-#include "diagon/search/IndexSearcher.h"
-#include "diagon/search/TermQuery.h"
-#include "diagon/search/BooleanQuery.h"
+#include "diagon/index/IndexWriter.h"
 #include "diagon/search/BooleanClause.h"
+#include "diagon/search/BooleanQuery.h"
+#include "diagon/search/IndexSearcher.h"
 #include "diagon/search/NumericRangeQuery.h"
+#include "diagon/search/TermQuery.h"
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
@@ -61,7 +61,8 @@ protected:
             // Combine terms into single field
             std::string content;
             for (size_t i = 0; i < terms.size(); i++) {
-                if (i > 0) content += " ";
+                if (i > 0)
+                    content += " ";
                 content += terms[i];
             }
             doc.add(std::make_unique<TextField>("content", content));
@@ -117,19 +118,14 @@ protected:
     std::unique_ptr<Directory> dir_;
 };
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== TermQuery Tests ====================
 
 TEST_F(QueryCorrectnessTest, TermQuery_SingleMatch) {
     // Create index with simple documents
     // doc0: apple, doc1: banana, doc2: apple, doc3: cherry
-    createIndex({
-        {"apple"},
-        {"banana"},
-        {"apple"},
-        {"cherry"}
-    });
+    createIndex({{"apple"}, {"banana"}, {"apple"}, {"cherry"}});
 
     // Query for "apple"
     TermQuery query(search::Term("content", "apple"));
@@ -142,10 +138,7 @@ TEST_F(QueryCorrectnessTest, TermQuery_SingleMatch) {
 }
 
 TEST_F(QueryCorrectnessTest, TermQuery_NoMatch) {
-    createIndex({
-        {"apple"},
-        {"banana"}
-    });
+    createIndex({{"apple"}, {"banana"}});
 
     // Query for non-existent term
     TermQuery query(search::Term("content", "zebra"));
@@ -158,10 +151,10 @@ TEST_F(QueryCorrectnessTest, TermQuery_OrderedByScore) {
     // Create documents with different term frequencies
     // doc0: freq=1, doc1: freq=2, doc2: freq=3, doc3: other
     createIndex({
-        {"apple"},                                    // doc0, freq=1
-        {"apple", "apple"},                          // doc1, freq=2
-        {"apple", "apple", "apple"},                 // doc2, freq=3
-        {"banana"}                                   // doc3
+        {"apple"},                    // doc0, freq=1
+        {"apple", "apple"},           // doc1, freq=2
+        {"apple", "apple", "apple"},  // doc2, freq=3
+        {"banana"}                    // doc3
     });
 
     TermQuery query(search::Term("content", "apple"));
@@ -185,20 +178,13 @@ TEST_F(QueryCorrectnessTest, TermQuery_OrderedByScore) {
 
 TEST_F(QueryCorrectnessTest, BooleanAND_Intersection) {
     // doc0: apple, doc1: banana, doc2: apple+banana, doc3: apple+cherry, doc4: banana+cherry
-    createIndex({
-        {"apple"},
-        {"banana"},
-        {"apple", "banana"},
-        {"apple", "cherry"},
-        {"banana", "cherry"}
-    });
+    createIndex(
+        {{"apple"}, {"banana"}, {"apple", "banana"}, {"apple", "cherry"}, {"banana", "cherry"}});
 
     // Query: apple AND banana
     BooleanQuery::Builder builder;
-    builder.add(std::make_unique<TermQuery>(search::Term("content", "apple")),
-                Occur::MUST);
-    builder.add(std::make_unique<TermQuery>(search::Term("content", "banana")),
-                Occur::MUST);
+    builder.add(std::make_unique<TermQuery>(search::Term("content", "apple")), Occur::MUST);
+    builder.add(std::make_unique<TermQuery>(search::Term("content", "banana")), Occur::MUST);
     auto query = builder.build();
 
     auto results = executeQuerySet(*query);
@@ -209,18 +195,12 @@ TEST_F(QueryCorrectnessTest, BooleanAND_Intersection) {
 }
 
 TEST_F(QueryCorrectnessTest, BooleanAND_EmptyIntersection) {
-    createIndex({
-        {"apple"},
-        {"banana"},
-        {"cherry"}
-    });
+    createIndex({{"apple"}, {"banana"}, {"cherry"}});
 
     // Query: apple AND banana (no document has both)
     BooleanQuery::Builder builder;
-    builder.add(std::make_unique<TermQuery>(search::Term("content", "apple")),
-                Occur::MUST);
-    builder.add(std::make_unique<TermQuery>(search::Term("content", "banana")),
-                Occur::MUST);
+    builder.add(std::make_unique<TermQuery>(search::Term("content", "apple")), Occur::MUST);
+    builder.add(std::make_unique<TermQuery>(search::Term("content", "banana")), Occur::MUST);
     auto query = builder.build();
 
     auto results = executeQuerySet(*query);
@@ -229,21 +209,16 @@ TEST_F(QueryCorrectnessTest, BooleanAND_EmptyIntersection) {
 }
 
 TEST_F(QueryCorrectnessTest, BooleanAND_ThreeTerms) {
-    createIndex({
-        {"apple", "banana"},
-        {"apple", "banana", "cherry"},
-        {"apple", "cherry"},
-        {"banana", "cherry"}
-    });
+    createIndex({{"apple", "banana"},
+                 {"apple", "banana", "cherry"},
+                 {"apple", "cherry"},
+                 {"banana", "cherry"}});
 
     // Query: apple AND banana AND cherry
     BooleanQuery::Builder builder;
-    builder.add(std::make_unique<TermQuery>(search::Term("content", "apple")),
-                Occur::MUST);
-    builder.add(std::make_unique<TermQuery>(search::Term("content", "banana")),
-                Occur::MUST);
-    builder.add(std::make_unique<TermQuery>(search::Term("content", "cherry")),
-                Occur::MUST);
+    builder.add(std::make_unique<TermQuery>(search::Term("content", "apple")), Occur::MUST);
+    builder.add(std::make_unique<TermQuery>(search::Term("content", "banana")), Occur::MUST);
+    builder.add(std::make_unique<TermQuery>(search::Term("content", "cherry")), Occur::MUST);
     auto query = builder.build();
 
     auto results = executeQuerySet(*query);
@@ -256,19 +231,12 @@ TEST_F(QueryCorrectnessTest, BooleanAND_ThreeTerms) {
 // ==================== BooleanQuery OR Tests ====================
 
 TEST_F(QueryCorrectnessTest, BooleanOR_Union) {
-    createIndex({
-        {"apple"},
-        {"banana"},
-        {"apple", "banana"},
-        {"cherry"}
-    });
+    createIndex({{"apple"}, {"banana"}, {"apple", "banana"}, {"cherry"}});
 
     // Query: apple OR banana
     BooleanQuery::Builder builder;
-    builder.add(std::make_unique<TermQuery>(search::Term("content", "apple")),
-                Occur::SHOULD);
-    builder.add(std::make_unique<TermQuery>(search::Term("content", "banana")),
-                Occur::SHOULD);
+    builder.add(std::make_unique<TermQuery>(search::Term("content", "apple")), Occur::SHOULD);
+    builder.add(std::make_unique<TermQuery>(search::Term("content", "banana")), Occur::SHOULD);
     auto query = builder.build();
 
     auto results = executeQuerySet(*query);
@@ -283,19 +251,12 @@ TEST_F(QueryCorrectnessTest, BooleanOR_Union) {
 // ==================== BooleanQuery MUST_NOT Tests ====================
 
 TEST_F(QueryCorrectnessTest, BooleanMUST_NOT_Exclusion) {
-    createIndex({
-        {"apple"},
-        {"apple", "banana"},
-        {"apple", "cherry"},
-        {"banana"}
-    });
+    createIndex({{"apple"}, {"apple", "banana"}, {"apple", "cherry"}, {"banana"}});
 
     // Query: apple AND NOT banana
     BooleanQuery::Builder builder;
-    builder.add(std::make_unique<TermQuery>(search::Term("content", "apple")),
-                Occur::MUST);
-    builder.add(std::make_unique<TermQuery>(search::Term("content", "banana")),
-                Occur::MUST_NOT);
+    builder.add(std::make_unique<TermQuery>(search::Term("content", "apple")), Occur::MUST);
+    builder.add(std::make_unique<TermQuery>(search::Term("content", "banana")), Occur::MUST_NOT);
     auto query = builder.build();
 
     auto results = executeQuerySet(*query);
@@ -380,11 +341,7 @@ TEST_F(QueryCorrectnessTest, TopK_LimitResults) {
 }
 
 TEST_F(QueryCorrectnessTest, TopK_FewerThanK) {
-    createIndex({
-        {"apple"},
-        {"apple"},
-        {"apple"}
-    });
+    createIndex({{"apple"}, {"apple"}, {"apple"}});
 
     // Query for top 10 (but only 3 matches exist)
     TermQuery query(search::Term("content", "apple"));

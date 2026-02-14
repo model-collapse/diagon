@@ -2,9 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
-#include "diagon/codecs/lucene104/Lucene104PostingsReaderOptimized.h"
-#include "diagon/codecs/lucene104/Lucene104PostingsEnumBatch.h"
 
+#include "diagon/codecs/lucene104/Lucene104PostingsEnumBatch.h"
+#include "diagon/codecs/lucene104/Lucene104PostingsReaderOptimized.h"
 #include "diagon/store/ByteBuffersIndexInput.h"
 #include "diagon/util/Exceptions.h"
 #include "diagon/util/StreamVByte.h"
@@ -75,7 +75,8 @@ Lucene104PostingsReader::postings(const index::FieldInfo& fieldInfo, const TermS
         return std::make_unique<Lucene104PostingsEnumBatch>(docIn_->clone(), termState, writeFreqs);
     } else {
         // Return regular optimized version
-        return std::make_unique<Lucene104PostingsEnumOptimized>(docIn_->clone(), termState, writeFreqs);
+        return std::make_unique<Lucene104PostingsEnumOptimized>(docIn_->clone(), termState,
+                                                                writeFreqs);
     }
 }
 
@@ -94,8 +95,8 @@ Lucene104PostingsReader::impactsPostings(const index::FieldInfo& fieldInfo,
 
     // Return impacts-aware enum
     // Clone IndexInput for thread-safe independent reading
-    return std::make_unique<Lucene104PostingsEnumWithImpacts>(docIn_->clone(), termState, writeFreqs,
-                                                               skipEntries);
+    return std::make_unique<Lucene104PostingsEnumWithImpacts>(docIn_->clone(), termState,
+                                                              writeFreqs, skipEntries);
 }
 
 void Lucene104PostingsReader::close() {
@@ -244,7 +245,7 @@ int Lucene104PostingsEnumWithImpacts::advanceShallow(int target) {
 }
 
 float Lucene104PostingsEnumWithImpacts::getMaxScore(int upTo, float k1, float b,
-                                                     float avgFieldLength) const {
+                                                    float avgFieldLength) const {
     if (skipEntries_.empty()) {
         // No skip data, use term-level max (conservative)
         // This would require storing term-level max_freq/max_norm
@@ -298,7 +299,7 @@ int64_t Lucene104PostingsEnumWithImpacts::skipToTarget(int target) {
 
     if (bestIdx >= 0) {
         currentDoc_ = skipEntries_[bestIdx].doc - 1;  // Will advance to this doc
-        docsRead_ = (bestIdx + 1) * 128;  // Approximate docs read
+        docsRead_ = (bestIdx + 1) * 128;              // Approximate docs read
         currentSkipIndex_ = bestIdx;
         return skipEntries_[bestIdx].docFP;
     }
@@ -359,7 +360,8 @@ void Lucene104PostingsEnumWithImpacts::refillBuffer() {
             mmapInput_->seek(mmapInput_->getFilePointer() + static_cast<int64_t>(consumed));
         } else {
             // Chunk boundary or insufficient data: fall back to virtual calls
-            while (remaining >= STREAMVBYTE_GROUP_SIZE && bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
+            while (remaining >= STREAMVBYTE_GROUP_SIZE &&
+                   bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
                 uint8_t docDeltaEncoded[17];
                 uint8_t controlByte = docIn_->readByte();
                 docDeltaEncoded[0] = controlByte;
@@ -387,7 +389,8 @@ void Lucene104PostingsEnumWithImpacts::refillBuffer() {
         }
     } else {
         // No mmap or no full groups: original per-group virtual call path
-        while (remaining >= STREAMVBYTE_GROUP_SIZE && bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
+        while (remaining >= STREAMVBYTE_GROUP_SIZE &&
+               bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
             uint8_t docDeltaEncoded[17];
             uint8_t controlByte = docIn_->readByte();
             docDeltaEncoded[0] = controlByte;
@@ -430,7 +433,8 @@ void Lucene104PostingsEnumWithImpacts::refillBuffer() {
     bufferLimit_ = bufferIdx;
 }
 
-int Lucene104PostingsEnumWithImpacts::drainBatch(int upTo, int* outDocs, int* outFreqs, int maxCount) {
+int Lucene104PostingsEnumWithImpacts::drainBatch(int upTo, int* outDocs, int* outFreqs,
+                                                 int maxCount) {
     int count = 0;
 
     while (count < maxCount && currentDoc_ < upTo && currentDoc_ != NO_MORE_DOCS) {
@@ -521,7 +525,8 @@ int Lucene104PostingsEnumWithImpacts::getMaxNorm(int upTo) const {
     return maxNorm > 0 ? maxNorm : 127;
 }
 
-void Lucene104PostingsEnumWithImpacts::getMaxFreqAndNorm(int upTo, int& outMaxFreq, int& outMaxNorm) const {
+void Lucene104PostingsEnumWithImpacts::getMaxFreqAndNorm(int upTo, int& outMaxFreq,
+                                                         int& outMaxNorm) const {
     if (skipEntries_.empty()) {
         outMaxFreq = std::numeric_limits<int>::max();
         outMaxNorm = 127;
@@ -575,8 +580,8 @@ int Lucene104PostingsEnumWithImpacts::getNextBlockBoundary(int target) const {
 
 // ==================== Lucene104PostingsEnum ====================
 
-Lucene104PostingsEnum::Lucene104PostingsEnum(std::unique_ptr<store::IndexInput> docIn, const TermState& termState,
-                                             bool writeFreqs)
+Lucene104PostingsEnum::Lucene104PostingsEnum(std::unique_ptr<store::IndexInput> docIn,
+                                             const TermState& termState, bool writeFreqs)
     : docIn_(std::move(docIn))
     , docFreq_(termState.docFreq)
     , totalTermFreq_(termState.totalTermFreq)
@@ -627,7 +632,8 @@ void Lucene104PostingsEnum::refillBuffer() {
     int bufferIdx = 0;
 
     // Fill buffer with as many complete StreamVByte groups (4 docs each) as possible
-    while (remaining >= STREAMVBYTE_GROUP_SIZE && bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
+    while (remaining >= STREAMVBYTE_GROUP_SIZE &&
+           bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
         // Read StreamVByte-encoded group of 4 docs
         uint8_t docDeltaEncoded[17];  // Max: 1 control + 4*4 data bytes
         uint8_t controlByte = docIn_->readByte();

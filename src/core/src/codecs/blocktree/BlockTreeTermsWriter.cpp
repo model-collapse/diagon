@@ -95,7 +95,8 @@ void BlockTreeTermsWriter::writeBlock() {
     // DEBUG: Show first term being written
     if (!pendingTerms_.empty()) {
         const auto& firstTerm = pendingTerms_[0].term;
-        std::string firstTermStr(reinterpret_cast<const char*>(firstTerm.data()), firstTerm.length());
+        std::string firstTermStr(reinterpret_cast<const char*>(firstTerm.data()),
+                                 firstTerm.length());
     }
 
     // Compute common prefix for all terms in block
@@ -152,16 +153,15 @@ void BlockTreeTermsWriter::writeFST() {
     // Write block index to .tip file
     // Format: [magic][fieldName][startFP][numTerms][fstSize][fstData]
 
-    tipOut_->writeInt(0x54495032);  // "TIP2" magic (version 2 with FST)
+    tipOut_->writeInt(0x54495032);          // "TIP2" magic (version 2 with FST)
     tipOut_->writeString(fieldInfo_.name);  // Field name
-    tipOut_->writeVLong(termsStartFP_);  // Starting file pointer for this field's terms
+    tipOut_->writeVLong(termsStartFP_);     // Starting file pointer for this field's terms
     tipOut_->writeVLong(numTerms_);
 
     // Serialize FST
     auto fstData = fst->serialize();
     tipOut_->writeVInt(static_cast<int>(fstData.size()));
     tipOut_->writeBytes(fstData.data(), fstData.size());
-
 }
 
 int BlockTreeTermsWriter::sharedPrefixLength(const util::BytesRef& a,

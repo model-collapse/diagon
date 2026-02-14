@@ -1,4 +1,5 @@
 #include "analysis/SynonymFilter.h"
+
 #include <algorithm>
 #include <cctype>
 #include <fstream>
@@ -7,14 +8,10 @@
 namespace diagon {
 namespace analysis {
 
-SynonymFilter::SynonymFilter(
-    const SynonymMap& synonyms,
-    bool ignoreCase,
-    bool expand)
+SynonymFilter::SynonymFilter(const SynonymMap& synonyms, bool ignoreCase, bool expand)
     : synonyms_(synonyms)
     , ignoreCase_(ignoreCase)
     , expand_(expand) {
-
     // Normalize all keys in the synonym map if case-insensitive
     if (ignoreCase_) {
         SynonymMap normalized;
@@ -195,5 +192,5 @@ size_t SynonymFilter::loadFromFile(const std::string& filePath) {
     return count;
 }
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

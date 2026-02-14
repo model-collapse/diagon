@@ -4,11 +4,11 @@
 #pragma once
 
 #include <chrono>
+#include <iomanip>
+#include <iostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <iostream>
-#include <iomanip>
 
 namespace diagon {
 namespace util {
@@ -34,13 +34,13 @@ public:
         void add(int64_t nanos) {
             totalNanos += nanos;
             count++;
-            if (nanos < minNanos) minNanos = nanos;
-            if (nanos > maxNanos) maxNanos = nanos;
+            if (nanos < minNanos)
+                minNanos = nanos;
+            if (nanos > maxNanos)
+                maxNanos = nanos;
         }
 
-        double avgNanos() const {
-            return count > 0 ? (double)totalNanos / count : 0.0;
-        }
+        double avgNanos() const { return count > 0 ? (double)totalNanos / count : 0.0; }
     };
 
     static QueryProfiler& instance() {
@@ -64,8 +64,8 @@ public:
         auto it = activePhases_.find(name);
         if (it != activePhases_.end()) {
             auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - it->second
-            ).count();
+                               std::chrono::high_resolution_clock::now() - it->second)
+                               .count();
             phases_[name].add(elapsed);
             activePhases_.erase(it);
         }
@@ -106,36 +106,30 @@ public:
 
         out << "Phases (sorted by total time):\n";
         out << std::string(80, '-') << "\n";
-        out << std::setw(30) << std::left << "Phase"
-            << std::setw(12) << std::right << "Total (ns)"
-            << std::setw(10) << "Count"
-            << std::setw(12) << "Avg (ns)"
-            << std::setw(8) << "% Time\n";
+        out << std::setw(30) << std::left << "Phase" << std::setw(12) << std::right << "Total (ns)"
+            << std::setw(10) << "Count" << std::setw(12) << "Avg (ns)" << std::setw(8)
+            << "% Time\n";
         out << std::string(80, '-') << "\n";
 
         for (const auto& [name, stats] : sorted) {
             double pct = totalTime > 0 ? (100.0 * stats.totalNanos / totalTime) : 0.0;
-            out << std::setw(30) << std::left << name
-                << std::setw(12) << std::right << stats.totalNanos
-                << std::setw(10) << stats.count
-                << std::setw(12) << std::fixed << std::setprecision(1) << stats.avgNanos()
-                << std::setw(7) << std::fixed << std::setprecision(1) << pct << "%\n";
+            out << std::setw(30) << std::left << name << std::setw(12) << std::right
+                << stats.totalNanos << std::setw(10) << stats.count << std::setw(12) << std::fixed
+                << std::setprecision(1) << stats.avgNanos() << std::setw(7) << std::fixed
+                << std::setprecision(1) << pct << "%\n";
         }
 
         out << std::string(80, '-') << "\n";
-        out << std::setw(30) << std::left << "TOTAL"
-            << std::setw(12) << std::right << totalTime
-            << std::setw(10) << ""
-            << std::setw(12) << ""
-            << std::setw(7) << "100.0%\n";
+        out << std::setw(30) << std::left << "TOTAL" << std::setw(12) << std::right << totalTime
+            << std::setw(10) << "" << std::setw(12) << "" << std::setw(7) << "100.0%\n";
 
         // Print counters
         if (!counters_.empty()) {
             out << "\nCounters:\n";
             out << std::string(50, '-') << "\n";
             for (const auto& [name, value] : counters_) {
-                out << std::setw(40) << std::left << name
-                    << std::setw(10) << std::right << value << "\n";
+                out << std::setw(40) << std::left << name << std::setw(10) << std::right << value
+                    << "\n";
             }
         }
 
@@ -153,13 +147,12 @@ private:
 // RAII helper for automatic phase timing
 class ScopedPhase {
 public:
-    explicit ScopedPhase(const std::string& name) : name_(name) {
+    explicit ScopedPhase(const std::string& name)
+        : name_(name) {
         QueryProfiler::instance().beginPhase(name_);
     }
 
-    ~ScopedPhase() {
-        QueryProfiler::instance().endPhase(name_);
-    }
+    ~ScopedPhase() { QueryProfiler::instance().endPhase(name_); }
 
 private:
     std::string name_;
@@ -167,15 +160,24 @@ private:
 
 // Macros for convenient profiling
 #ifdef DIAGON_PROFILING
-#define PROFILE_PHASE(name) diagon::util::ScopedPhase _profile_##__LINE__(name)
-#define PROFILE_BEGIN(name) diagon::util::QueryProfiler::instance().beginPhase(name)
-#define PROFILE_END(name) diagon::util::QueryProfiler::instance().endPhase(name)
-#define PROFILE_COUNT(name, value) diagon::util::QueryProfiler::instance().incrementCounter(name, value)
+#    define PROFILE_PHASE(name) diagon::util::ScopedPhase _profile_##__LINE__(name)
+#    define PROFILE_BEGIN(name) diagon::util::QueryProfiler::instance().beginPhase(name)
+#    define PROFILE_END(name) diagon::util::QueryProfiler::instance().endPhase(name)
+#    define PROFILE_COUNT(name, value)                                                             \
+        diagon::util::QueryProfiler::instance().incrementCounter(name, value)
 #else
-#define PROFILE_PHASE(name) do {} while(0)
-#define PROFILE_BEGIN(name) do {} while(0)
-#define PROFILE_END(name) do {} while(0)
-#define PROFILE_COUNT(name, value) do {} while(0)
+#    define PROFILE_PHASE(name)                                                                    \
+        do {                                                                                       \
+        } while (0)
+#    define PROFILE_BEGIN(name)                                                                    \
+        do {                                                                                       \
+        } while (0)
+#    define PROFILE_END(name)                                                                      \
+        do {                                                                                       \
+        } while (0)
+#    define PROFILE_COUNT(name, value)                                                             \
+        do {                                                                                       \
+        } while (0)
 #endif
 
 }  // namespace util

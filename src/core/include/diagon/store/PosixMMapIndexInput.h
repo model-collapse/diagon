@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "diagon/store/MMapIndexInput.h"
 #include "diagon/store/IOContext.h"
+#include "diagon/store/MMapIndexInput.h"
 
 #include <filesystem>
 
@@ -63,9 +63,7 @@ public:
      * File descriptor is kept open until all clones/slices are destroyed
      * (managed by shared_ptr reference counting).
      */
-    PosixMMapIndexInput(const std::filesystem::path& path,
-                        int chunk_power,
-                        bool preload,
+    PosixMMapIndexInput(const std::filesystem::path& path, int chunk_power, bool preload,
                         IOContext::ReadAdvice advice = IOContext::ReadAdvice::NORMAL);
 
     /**
@@ -102,8 +100,7 @@ public:
      * @return Unique pointer to sliced IndexInput
      * @throws IOException if offset+length exceeds file length
      */
-    std::unique_ptr<IndexInput> slice(const std::string& sliceDescription,
-                                      int64_t offset,
+    std::unique_ptr<IndexInput> slice(const std::string& sliceDescription, int64_t offset,
                                       int64_t length) const override;
 
 protected:

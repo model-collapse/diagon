@@ -7,8 +7,8 @@
 #include "diagon/index/DocumentsWriterPerThread.h"
 #include "diagon/index/SegmentReader.h"
 #include "diagon/store/FSDirectory.h"
-#include "diagon/store/MMapDirectory.h"
 #include "diagon/store/IOContext.h"
+#include "diagon/store/MMapDirectory.h"
 
 #include <gtest/gtest.h>
 
@@ -34,9 +34,7 @@ protected:
         std::filesystem::create_directories(test_dir);
     }
 
-    void TearDown() override {
-        std::filesystem::remove_all(test_dir);
-    }
+    void TearDown() override { std::filesystem::remove_all(test_dir); }
 
     std::filesystem::path test_dir;
 };
@@ -377,10 +375,7 @@ TEST_F(MMapDirectoryIntegrationTest, PreloadConfiguration) {
 TEST_F(MMapDirectoryIntegrationTest, FileNotFoundError) {
     auto mmap_dir = MMapDirectory::open(test_dir);
 
-    EXPECT_THROW(
-        mmap_dir->openInput("nonexistent.bin", IOContext::DEFAULT),
-        std::exception
-    );
+    EXPECT_THROW(mmap_dir->openInput("nonexistent.bin", IOContext::DEFAULT), std::exception);
 }
 
 TEST_F(MMapDirectoryIntegrationTest, ReadPastEOF) {
@@ -401,7 +396,7 @@ TEST_F(MMapDirectoryIntegrationTest, ReadPastEOF) {
 
     // Read past end
     input->seek(99);
-    input->readByte();  // OK - last byte
+    input->readByte();                                // OK - last byte
     EXPECT_THROW(input->readByte(), std::exception);  // Past EOF
 }
 

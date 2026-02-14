@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/search/BooleanQuery.h"
+
 #include "diagon/search/NumericRangeQuery.h"
 #include "diagon/search/TermQuery.h"
 
@@ -29,9 +30,7 @@ TEST(BooleanQueryTest, EmptyQuery) {
 }
 
 TEST(BooleanQueryTest, SingleMustClause) {
-    auto query = BooleanQuery::Builder()
-                     .add(termQuery("field", "value"), Occur::MUST)
-                     .build();
+    auto query = BooleanQuery::Builder().add(termQuery("field", "value"), Occur::MUST).build();
 
     ASSERT_EQ(1u, query->clauses().size());
     EXPECT_EQ(Occur::MUST, query->clauses()[0].occur);
@@ -40,9 +39,7 @@ TEST(BooleanQueryTest, SingleMustClause) {
 }
 
 TEST(BooleanQueryTest, SingleShouldClause) {
-    auto query = BooleanQuery::Builder()
-                     .add(termQuery("field", "value"), Occur::SHOULD)
-                     .build();
+    auto query = BooleanQuery::Builder().add(termQuery("field", "value"), Occur::SHOULD).build();
 
     ASSERT_EQ(1u, query->clauses().size());
     EXPECT_EQ(Occur::SHOULD, query->clauses()[0].occur);
@@ -101,23 +98,18 @@ TEST(BooleanQueryTest, IsPureDisjunction) {
 
 TEST(BooleanQueryTest, IsRequired) {
     // Has MUST clause
-    auto withMust = BooleanQuery::Builder()
-                        .add(termQuery("f1", "v1"), Occur::MUST)
-                        .build();
+    auto withMust = BooleanQuery::Builder().add(termQuery("f1", "v1"), Occur::MUST).build();
 
     EXPECT_TRUE(withMust->isRequired());
 
     // Has FILTER clause
-    auto withFilter = BooleanQuery::Builder()
-                          .add(rangeQuery("price", 100, 1000), Occur::FILTER)
-                          .build();
+    auto withFilter =
+        BooleanQuery::Builder().add(rangeQuery("price", 100, 1000), Occur::FILTER).build();
 
     EXPECT_TRUE(withFilter->isRequired());
 
     // Only SHOULD clauses
-    auto onlyShould = BooleanQuery::Builder()
-                          .add(termQuery("f1", "v1"), Occur::SHOULD)
-                          .build();
+    auto onlyShould = BooleanQuery::Builder().add(termQuery("f1", "v1"), Occur::SHOULD).build();
 
     EXPECT_FALSE(onlyShould->isRequired());
 }
@@ -125,20 +117,16 @@ TEST(BooleanQueryTest, IsRequired) {
 // ==================== toString Tests ====================
 
 TEST(BooleanQueryTest, ToStringMustClause) {
-    auto query = BooleanQuery::Builder()
-                     .add(termQuery("field", "value"), Occur::MUST)
-                     .build();
+    auto query = BooleanQuery::Builder().add(termQuery("field", "value"), Occur::MUST).build();
 
     std::string str = query->toString("field");
     // BytesRef outputs as hex, so "value" becomes "[76 61 6c 75 65]"
-    EXPECT_TRUE(str.find("+") == 0);  // Should start with +
+    EXPECT_TRUE(str.find("+") == 0);                  // Should start with +
     EXPECT_TRUE(str.find("[") != std::string::npos);  // Contains hex bytes
 }
 
 TEST(BooleanQueryTest, ToStringShouldClause) {
-    auto query = BooleanQuery::Builder()
-                     .add(termQuery("field", "value"), Occur::SHOULD)
-                     .build();
+    auto query = BooleanQuery::Builder().add(termQuery("field", "value"), Occur::SHOULD).build();
 
     std::string str = query->toString("field");
     // SHOULD clause has no prefix
@@ -148,18 +136,14 @@ TEST(BooleanQueryTest, ToStringShouldClause) {
 }
 
 TEST(BooleanQueryTest, ToStringMustNotClause) {
-    auto query = BooleanQuery::Builder()
-                     .add(termQuery("field", "value"), Occur::MUST_NOT)
-                     .build();
+    auto query = BooleanQuery::Builder().add(termQuery("field", "value"), Occur::MUST_NOT).build();
 
     std::string str = query->toString("field");
     EXPECT_TRUE(str.find("-") == 0);  // Should start with -
 }
 
 TEST(BooleanQueryTest, ToStringFilterClause) {
-    auto query = BooleanQuery::Builder()
-                     .add(termQuery("field", "value"), Occur::FILTER)
-                     .build();
+    auto query = BooleanQuery::Builder().add(termQuery("field", "value"), Occur::FILTER).build();
 
     std::string str = query->toString("field");
     EXPECT_TRUE(str.find("#") == 0);  // Should start with #
@@ -195,38 +179,26 @@ TEST(BooleanQueryTest, ToStringWithMinimumShouldMatch) {
 // ==================== Equality Tests ====================
 
 TEST(BooleanQueryTest, EqualityTrue) {
-    auto q1 = BooleanQuery::Builder()
-                  .add(termQuery("field", "value"), Occur::MUST)
-                  .build();
+    auto q1 = BooleanQuery::Builder().add(termQuery("field", "value"), Occur::MUST).build();
 
-    auto q2 = BooleanQuery::Builder()
-                  .add(termQuery("field", "value"), Occur::MUST)
-                  .build();
+    auto q2 = BooleanQuery::Builder().add(termQuery("field", "value"), Occur::MUST).build();
 
     EXPECT_TRUE(q1->equals(*q2));
     EXPECT_TRUE(q2->equals(*q1));
 }
 
 TEST(BooleanQueryTest, EqualityFalseDifferentClauses) {
-    auto q1 = BooleanQuery::Builder()
-                  .add(termQuery("field1", "value1"), Occur::MUST)
-                  .build();
+    auto q1 = BooleanQuery::Builder().add(termQuery("field1", "value1"), Occur::MUST).build();
 
-    auto q2 = BooleanQuery::Builder()
-                  .add(termQuery("field2", "value2"), Occur::MUST)
-                  .build();
+    auto q2 = BooleanQuery::Builder().add(termQuery("field2", "value2"), Occur::MUST).build();
 
     EXPECT_FALSE(q1->equals(*q2));
 }
 
 TEST(BooleanQueryTest, EqualityFalseDifferentOccur) {
-    auto q1 = BooleanQuery::Builder()
-                  .add(termQuery("field", "value"), Occur::MUST)
-                  .build();
+    auto q1 = BooleanQuery::Builder().add(termQuery("field", "value"), Occur::MUST).build();
 
-    auto q2 = BooleanQuery::Builder()
-                  .add(termQuery("field", "value"), Occur::SHOULD)
-                  .build();
+    auto q2 = BooleanQuery::Builder().add(termQuery("field", "value"), Occur::SHOULD).build();
 
     EXPECT_FALSE(q1->equals(*q2));
 }
@@ -257,7 +229,8 @@ TEST(BooleanQueryTest, Clone) {
     auto cloned = original->clone();
 
     EXPECT_TRUE(original->equals(*cloned));
-    EXPECT_EQ(original->clauses().size(), dynamic_cast<BooleanQuery*>(cloned.get())->clauses().size());
+    EXPECT_EQ(original->clauses().size(),
+              dynamic_cast<BooleanQuery*>(cloned.get())->clauses().size());
     EXPECT_EQ(original->getMinimumNumberShouldMatch(),
               dynamic_cast<BooleanQuery*>(cloned.get())->getMinimumNumberShouldMatch());
 }
@@ -265,25 +238,17 @@ TEST(BooleanQueryTest, Clone) {
 // ==================== HashCode Tests ====================
 
 TEST(BooleanQueryTest, HashCodeConsistency) {
-    auto q1 = BooleanQuery::Builder()
-                  .add(termQuery("field", "value"), Occur::MUST)
-                  .build();
+    auto q1 = BooleanQuery::Builder().add(termQuery("field", "value"), Occur::MUST).build();
 
-    auto q2 = BooleanQuery::Builder()
-                  .add(termQuery("field", "value"), Occur::MUST)
-                  .build();
+    auto q2 = BooleanQuery::Builder().add(termQuery("field", "value"), Occur::MUST).build();
 
     EXPECT_EQ(q1->hashCode(), q2->hashCode());
 }
 
 TEST(BooleanQueryTest, HashCodeDifferent) {
-    auto q1 = BooleanQuery::Builder()
-                  .add(termQuery("field1", "value1"), Occur::MUST)
-                  .build();
+    auto q1 = BooleanQuery::Builder().add(termQuery("field1", "value1"), Occur::MUST).build();
 
-    auto q2 = BooleanQuery::Builder()
-                  .add(termQuery("field2", "value2"), Occur::MUST)
-                  .build();
+    auto q2 = BooleanQuery::Builder().add(termQuery("field2", "value2"), Occur::MUST).build();
 
     // Different queries will likely have different hashes (not guaranteed)
     EXPECT_GT(q1->hashCode(), 0UL);
@@ -383,9 +348,7 @@ TEST(BooleanQueryTest, AllFilterClauses) {
 
 TEST(BooleanQueryTest, OnlyMustNotClauses) {
     // Query with only MUST_NOT is unusual but valid (matches nothing in isolation)
-    auto query = BooleanQuery::Builder()
-                     .add(termQuery("spam", "true"), Occur::MUST_NOT)
-                     .build();
+    auto query = BooleanQuery::Builder().add(termQuery("spam", "true"), Occur::MUST_NOT).build();
 
     EXPECT_EQ(1u, query->clauses().size());
     EXPECT_FALSE(query->isRequired());

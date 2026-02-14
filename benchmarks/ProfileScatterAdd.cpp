@@ -2,11 +2,13 @@
 // Uses RDTSC for cycle-accurate timing of hot code paths
 
 #include "diagon/index/BlockMaxQuantizedIndex.h"
+
 #include "profile_helper.h"
+
 #include <fstream>
 #include <iostream>
-#include <vector>
 #include <random>
+#include <vector>
 
 using namespace diagon::index;
 
@@ -62,7 +64,8 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Micro-profiling BlockMaxQuantizedIndex scatter-add..." << std::endl;
     std::cout << "Queries: " << num_queries << ", Alpha: " << alpha << std::endl;
-    std::cout << "CPU Frequency: " << cpu_freq_ghz << " GHz (override with --cpu-freq)" << std::endl;
+    std::cout << "CPU Frequency: " << cpu_freq_ghz << " GHz (override with --cpu-freq)"
+              << std::endl;
     std::cout << std::endl;
 
     // Load index

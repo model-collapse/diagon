@@ -117,8 +117,8 @@ TEST(DeletionIntegrationTest, UpdateDocument) {
 
     // Verify update
     reader = DirectoryReader::open(*directory);
-    EXPECT_EQ(reader->numDocs(), 1);   // Still 1 document
-    EXPECT_EQ(reader->maxDoc(), 2);    // But maxDoc increased (old + new)
+    EXPECT_EQ(reader->numDocs(), 1);  // Still 1 document
+    EXPECT_EQ(reader->maxDoc(), 2);   // But maxDoc increased (old + new)
     EXPECT_TRUE(reader->hasDeletions());
 
     reader->decRef();
@@ -153,7 +153,7 @@ TEST(DeletionIntegrationTest, MultipleDeletesInSameSegment) {
 
     // Verify deletions
     auto reader = DirectoryReader::open(*directory);
-    EXPECT_EQ(reader->numDocs(), 5);   // 5 odd numbers left
+    EXPECT_EQ(reader->numDocs(), 5);  // 5 odd numbers left
     EXPECT_EQ(reader->maxDoc(), 10);
 
     reader->decRef();

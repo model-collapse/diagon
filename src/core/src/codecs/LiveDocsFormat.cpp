@@ -9,7 +9,7 @@ namespace diagon {
 namespace codecs {
 
 void LiveDocsFormat::writeLiveDocs(store::Directory& directory, const std::string& segmentName,
-                                    const util::BitSet& liveDocs, int delCount) {
+                                   const util::BitSet& liveDocs, int delCount) {
     std::string fileName = segmentName + EXTENSION;
 
     // Create output file
@@ -36,8 +36,8 @@ void LiveDocsFormat::writeLiveDocs(store::Directory& directory, const std::strin
 }
 
 std::unique_ptr<util::BitSet> LiveDocsFormat::readLiveDocs(store::Directory& directory,
-                                                             const std::string& segmentName,
-                                                             int maxDoc) {
+                                                           const std::string& segmentName,
+                                                           int maxDoc) {
     std::string fileName = segmentName + EXTENSION;
 
     // Check if file exists

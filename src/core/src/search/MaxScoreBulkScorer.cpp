@@ -11,7 +11,7 @@
 #include <numeric>
 
 #ifdef __AVX2__
-#include <immintrin.h>
+#    include <immintrin.h>
 #endif
 
 namespace diagon {
@@ -22,7 +22,6 @@ namespace search {
 MaxScoreBulkScorer::MaxScoreBulkScorer(int maxDoc, std::vector<std::unique_ptr<Scorer>> scorers)
     : maxDoc_(maxDoc)
     , cost_(0) {
-
     ownedScorers_ = std::move(scorers);
 
     int n = static_cast<int>(ownedScorers_.size());
@@ -126,12 +125,14 @@ int MaxScoreBulkScorer::computeOuterWindowMax(int windowMin) {
 
     // Use impact block boundaries from essential scorers
     int firstLead = std::min(firstEssentialScorer_, static_cast<int>(allScorers_.size()) - 1);
-    if (firstLead < 0) firstLead = 0;
+    if (firstLead < 0)
+        firstLead = 0;
 
     for (int i = firstLead; i < static_cast<int>(allScorers_.size()); i++) {
         DisiWrapper& w = allScorers_[i];
         int target = std::max(w.doc, windowMin);
-        if (target >= NO_MORE_DOCS) continue;
+        if (target >= NO_MORE_DOCS)
+            continue;
 
         // advanceShallow returns the end of the current impact block
         int upTo = w.scorer->advanceShallow(target);
@@ -171,9 +172,8 @@ void MaxScoreBulkScorer::updateMaxWindowScores(int windowMin, int windowMax) {
         // getMaxScore(upTo) returns max score for docs in [current, upTo]
         // windowMax-1 because outer window is [min, max)
         w.maxWindowScore = w.scorer->getMaxScore(windowMax - 1);
-        w.efficiencyRatio = static_cast<float>(
-            static_cast<double>(w.maxWindowScore) /
-            static_cast<double>(std::max(w.cost, int64_t(1))));
+        w.efficiencyRatio = static_cast<float>(static_cast<double>(w.maxWindowScore) /
+                                               static_cast<double>(std::max(w.cost, int64_t(1))));
     }
 }
 
@@ -284,7 +284,8 @@ bool MaxScoreBulkScorer::partitionScorers() {
 
 void MaxScoreBulkScorer::scoreInnerWindow(LeafCollector* collector, int max) {
     DisiWrapper* top = essentialQueueTop();
-    if (top == nullptr) return;
+    if (top == nullptr)
+        return;
 
     DisiWrapper* top2 = essentialQueueTop2();
 
@@ -304,7 +305,8 @@ void MaxScoreBulkScorer::scoreInnerWindow(LeafCollector* collector, int max) {
 
 void MaxScoreBulkScorer::scoreInnerWindowSingleEssential(LeafCollector* collector, int upTo) {
     DisiWrapper* top = essentialQueueTop();
-    if (top == nullptr) return;
+    if (top == nullptr)
+        return;
 
     buffer_.clear();
     Scorer* scorer = top->scorer;
@@ -312,7 +314,8 @@ void MaxScoreBulkScorer::scoreInnerWindowSingleEssential(LeafCollector* collecto
     // Batch scoring: process docs in chunks of BATCH_SIZE
     while (true) {
         int count = scorer->scoreBatch(upTo, batchDocs_, batchScores_, BATCH_SIZE);
-        if (count == 0) break;
+        if (count == 0)
+            break;
 
         for (int j = 0; j < count; j++) {
             buffer_.add(batchDocs_[j], batchScores_[j]);
@@ -331,7 +334,8 @@ void MaxScoreBulkScorer::scoreInnerWindowSingleEssential(LeafCollector* collecto
 
 void MaxScoreBulkScorer::scoreInnerWindowMultipleEssentials(LeafCollector* collector, int max) {
     DisiWrapper* top = essentialQueueTop();
-    if (top == nullptr) return;
+    if (top == nullptr)
+        return;
 
     int innerWindowMin = top->doc;
     int innerWindowMax = std::min(max, innerWindowMin + INNER_WINDOW_SIZE);
@@ -344,7 +348,8 @@ void MaxScoreBulkScorer::scoreInnerWindowMultipleEssentials(LeafCollector* colle
         // Batch scoring: process docs in chunks of BATCH_SIZE
         while (true) {
             int count = scorer->scoreBatch(innerWindowMax, batchDocs_, batchScores_, BATCH_SIZE);
-            if (count == 0) break;
+            if (count == 0)
+                break;
 
             for (int j = 0; j < count; j++) {
                 int i = batchDocs_[j] - innerWindowMin;
@@ -376,7 +381,7 @@ void MaxScoreBulkScorer::scoreInnerWindowMultipleEssentials(LeafCollector* colle
 // ==================== Non-Essential Scoring + Collection ====================
 
 void MaxScoreBulkScorer::scoreNonEssentialClauses(LeafCollector* collector,
-                                                   int numNonEssentialClauses) {
+                                                  int numNonEssentialClauses) {
     numCandidates_ += buffer_.size;
 
     // Process non-essential scorers in reverse order (highest max score first)
@@ -387,7 +392,8 @@ void MaxScoreBulkScorer::scoreNonEssentialClauses(LeafCollector* collector,
             // Filter out docs that cannot be competitive even with remaining scorers
             filterCompetitiveHits(maxScoreSums_[i]);
 
-            if (buffer_.size == 0) return;  // All filtered out
+            if (buffer_.size == 0)
+                return;  // All filtered out
         }
 
         if (i >= firstRequiredScorer_) {
@@ -411,7 +417,8 @@ void MaxScoreBulkScorer::scoreNonEssentialClauses(LeafCollector* collector,
 
 void MaxScoreBulkScorer::filterCompetitiveHits(float maxRemainingScore) {
     float minRequired = scorable_.minCompetitiveScore - maxRemainingScore;
-    if (minRequired <= 0.0f) return;
+    if (minRequired <= 0.0f)
+        return;
 
     int newSize = 0;
     int i = 0;
@@ -497,8 +504,10 @@ void MaxScoreBulkScorer::essentialQueuePush(DisiWrapper* w) {
 
 MaxScoreBulkScorer::DisiWrapper* MaxScoreBulkScorer::essentialQueueTop2() {
     // Second-smallest element in min-heap is one of the children of root
-    if (essentialQueueSize_ < 2) return nullptr;
-    if (essentialQueueSize_ == 2) return essentialQueue_[1];
+    if (essentialQueueSize_ < 2)
+        return nullptr;
+    if (essentialQueueSize_ == 2)
+        return essentialQueue_[1];
 
     // Return child with smaller doc
     if (essentialQueue_[1]->doc <= essentialQueue_[2]->doc) {
@@ -521,7 +530,8 @@ void MaxScoreBulkScorer::essentialQueueSiftDown(int i) {
             childNode = essentialQueue_[right];
         }
 
-        if (node->doc <= childNode->doc) break;
+        if (node->doc <= childNode->doc)
+            break;
 
         essentialQueue_[i] = childNode;
         i = child;
@@ -535,7 +545,8 @@ void MaxScoreBulkScorer::essentialQueueSiftUp(int i) {
 
     while (i > 0) {
         int parent = (i - 1) / 2;
-        if (essentialQueue_[parent]->doc <= node->doc) break;
+        if (essentialQueue_[parent]->doc <= node->doc)
+            break;
 
         essentialQueue_[i] = essentialQueue_[parent];
         i = parent;

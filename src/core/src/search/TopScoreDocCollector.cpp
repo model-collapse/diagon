@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/search/TopScoreDocCollector.h"
+
 #include "diagon/util/SearchProfiler.h"
 
 #include <algorithm>
@@ -21,7 +22,8 @@ std::unique_ptr<TopScoreDocCollector> TopScoreDocCollector::create(int numHits) 
     return create(numHits, 1000);
 }
 
-std::unique_ptr<TopScoreDocCollector> TopScoreDocCollector::create(int numHits, int totalHitsThreshold) {
+std::unique_ptr<TopScoreDocCollector> TopScoreDocCollector::create(int numHits,
+                                                                   int totalHitsThreshold) {
     int effectiveThreshold = std::max(totalHitsThreshold, numHits);
     return std::unique_ptr<TopScoreDocCollector>(
         new TopScoreDocCollector(numHits, nullptr, effectiveThreshold));
@@ -34,7 +36,8 @@ std::unique_ptr<TopScoreDocCollector> TopScoreDocCollector::create(int numHits,
 
 // ==================== Constructor ====================
 
-TopScoreDocCollector::TopScoreDocCollector(int numHits, const ScoreDoc* after, int totalHitsThreshold)
+TopScoreDocCollector::TopScoreDocCollector(int numHits, const ScoreDoc* after,
+                                           int totalHitsThreshold)
     : numHits_(numHits)
     , after_(after ? *after : ScoreDoc())
     , hasAfter_(after != nullptr)
@@ -105,8 +108,7 @@ TopScoreDocCollector::TopScoreLeafCollector::TopScoreLeafCollector(
     , scorer_(nullptr)
     , after_(parent->hasAfter_ ? &parent->after_ : nullptr)
     , segmentHitsFromCollect_(0)
-    , scorerTracksTotalMatches_(false)
-{
+    , scorerTracksTotalMatches_(false) {
 }
 
 TopScoreDocCollector::TopScoreLeafCollector::~TopScoreLeafCollector() {
@@ -220,7 +222,8 @@ void TopScoreDocCollector::TopScoreLeafCollector::collectSingle(int globalDoc, f
 }
 
 void TopScoreDocCollector::TopScoreLeafCollector::updateMinCompetitiveScore() {
-    if (!scorer_ || static_cast<int>(parent_->pq_.size()) < parent_->numHits_) return;
+    if (!scorer_ || static_cast<int>(parent_->pq_.size()) < parent_->numHits_)
+        return;
 
     // When we've exceeded the totalHitsThreshold, activate WAND early termination
     // by setting the min competitive score and marking hits as approximate

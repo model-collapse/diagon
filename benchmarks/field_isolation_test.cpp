@@ -1,14 +1,14 @@
 // Test to verify field isolation in FreqProxTermsWriter
 // Checks that terms in one field don't appear in another field
 
-#include "diagon/index/IndexWriter.h"
-#include "diagon/index/DirectoryReader.h"
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/DirectoryReader.h"
+#include "diagon/index/IndexWriter.h"
 #include "diagon/store/FSDirectory.h"
 
-#include <iostream>
 #include <cassert>
+#include <iostream>
 
 using namespace diagon;
 
@@ -80,13 +80,16 @@ int main() {
     }
 
     // Expected in field1: "apple", "banana", "common", "grape", "orange", "test"
-    std::vector<std::string> expectedField1 = {"apple", "banana", "common", "grape", "orange", "test"};
+    std::vector<std::string> expectedField1 = {"apple", "banana", "common",
+                                               "grape", "orange", "test"};
     if (field1TermList != expectedField1) {
         std::cerr << "✗ field1 terms don't match expected" << std::endl;
         std::cerr << "  Expected: ";
-        for (const auto& t : expectedField1) std::cerr << t << " ";
+        for (const auto& t : expectedField1)
+            std::cerr << t << " ";
         std::cerr << "\n  Got: ";
-        for (const auto& t : field1TermList) std::cerr << t << " ";
+        for (const auto& t : field1TermList)
+            std::cerr << t << " ";
         std::cerr << std::endl;
     } else {
         std::cout << "✓ field1 has correct terms" << std::endl;
@@ -110,13 +113,16 @@ int main() {
     }
 
     // Expected in field2: "apple", "banana", "grape", "orange", "shared", "test"
-    std::vector<std::string> expectedField2 = {"apple", "banana", "grape", "orange", "shared", "test"};
+    std::vector<std::string> expectedField2 = {"apple",  "banana", "grape",
+                                               "orange", "shared", "test"};
     if (field2TermList != expectedField2) {
         std::cerr << "✗ field2 terms don't match expected" << std::endl;
         std::cerr << "  Expected: ";
-        for (const auto& t : expectedField2) std::cerr << t << " ";
+        for (const auto& t : expectedField2)
+            std::cerr << t << " ";
         std::cerr << "\n  Got: ";
-        for (const auto& t : field2TermList) std::cerr << t << " ";
+        for (const auto& t : field2TermList)
+            std::cerr << t << " ";
         std::cerr << std::endl;
     } else {
         std::cout << "✓ field2 has correct terms" << std::endl;

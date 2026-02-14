@@ -35,8 +35,7 @@ public:
 
     // ==================== Merge Selection ====================
 
-    MergeSpecification* findMerges(MergeTrigger trigger,
-                                   const SegmentInfos& segmentInfos) override;
+    MergeSpecification* findMerges(MergeTrigger trigger, const SegmentInfos& segmentInfos) override;
 
     MergeSpecification*
     findForcedMerges(const SegmentInfos& segmentInfos, int maxSegmentCount,

@@ -63,8 +63,7 @@ public:
      * @return PostingsEnum (may be batch-capable)
      */
     std::unique_ptr<index::PostingsEnum> postings(const index::FieldInfo& fieldInfo,
-                                                  const TermState& termState,
-                                                  bool useBatch);
+                                                  const TermState& termState, bool useBatch);
 
     /**
      * Get impacts-aware postings for Block-Max WAND (Phase 2).
@@ -133,8 +132,8 @@ public:
      * @param writeFreqs Whether frequencies are encoded
      * @param skipEntries Skip entries with impacts (from .skp file)
      */
-    Lucene104PostingsEnumWithImpacts(std::unique_ptr<store::IndexInput> docIn, const TermState& termState,
-                                     bool writeFreqs,
+    Lucene104PostingsEnumWithImpacts(std::unique_ptr<store::IndexInput> docIn,
+                                     const TermState& termState, bool writeFreqs,
                                      const std::vector<SkipEntry>& skipEntries);
 
     // ==================== DocIdSetIterator ====================
@@ -235,7 +234,7 @@ public:
 
 private:
     std::unique_ptr<store::IndexInput> docIn_;  // Owned clone for thread-safety
-    store::MMapIndexInput* mmapInput_;           // Cached typed pointer (non-owning)
+    store::MMapIndexInput* mmapInput_;          // Cached typed pointer (non-owning)
     int docFreq_;
     int64_t totalTermFreq_;
     bool writeFreqs_;
@@ -285,7 +284,8 @@ public:
      * @param termState Term state with file pointers
      * @param writeFreqs Whether frequencies are encoded
      */
-    Lucene104PostingsEnum(std::unique_ptr<store::IndexInput> docIn, const TermState& termState, bool writeFreqs);
+    Lucene104PostingsEnum(std::unique_ptr<store::IndexInput> docIn, const TermState& termState,
+                          bool writeFreqs);
 
     // ==================== DocIdSetIterator ====================
 

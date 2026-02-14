@@ -39,7 +39,6 @@ Lucene104PostingsWriter::Lucene104PostingsWriter(index::SegmentWriteState& state
     , docsSinceLastSkip_(0)
     , lastSkipDocFP_(0)
     , lastSkipDoc_(0) {
-
     // Create .doc output file name
     docFileName_ = segmentName_;
     if (!segmentSuffix_.empty()) {

@@ -12,12 +12,13 @@
  * Test workload: 1M integers with varying sizes
  */
 
-#include <benchmark/benchmark.h>
 #include "diagon/util/StreamVByte.h"
 
+#include <benchmark/benchmark.h>
+
+#include <cstring>
 #include <random>
 #include <vector>
-#include <cstring>
 
 using namespace diagon::util;
 
@@ -25,7 +26,7 @@ using namespace diagon::util;
 
 class StreamVByteFixture : public benchmark::Fixture {
 public:
-    static constexpr int NUM_INTS = 1000000;  // 1M integers
+    static constexpr int NUM_INTS = 1000000;               // 1M integers
     static constexpr int MAX_ENCODED_SIZE = NUM_INTS * 5;  // Worst case: 5 bytes/int
 
     std::vector<uint32_t> values_;
@@ -81,16 +82,12 @@ BENCHMARK_DEFINE_F(StreamVByteFixture, Decode_1M_Integers)(benchmark::State& sta
 
     // Calculate throughput
     double intsPerSec = (NUM_INTS * state.iterations()) /
-                        (state.iterations() * state.iterations() /
-                         (double)state.iterations());
-    state.counters["ints/sec"] = benchmark::Counter(
-        intsPerSec * 1e9 / state.iterations(),  // Convert to ints/sec
-        benchmark::Counter::kIsRate
-    );
-    state.counters["bytes/int"] = benchmark::Counter(
-        (double)encodedSize_ / NUM_INTS,
-        benchmark::Counter::kAvgThreads
-    );
+                        (state.iterations() * state.iterations() / (double)state.iterations());
+    state.counters["ints/sec"] = benchmark::Counter(intsPerSec * 1e9 /
+                                                        state.iterations(),  // Convert to ints/sec
+                                                    benchmark::Counter::kIsRate);
+    state.counters["bytes/int"] = benchmark::Counter((double)encodedSize_ / NUM_INTS,
+                                                     benchmark::Counter::kAvgThreads);
 }
 
 BENCHMARK_REGISTER_F(StreamVByteFixture, Decode_1M_Integers)
@@ -112,20 +109,19 @@ static void BM_StreamVByte_Decode4_SmallInts(benchmark::State& state) {
     }
 
     // Expected: 4 ints in ~1-2 nanoseconds (2-4 billion ints/sec)
-    state.counters["ints/sec"] = benchmark::Counter(
-        4, benchmark::Counter::kIsIterationInvariantRate
-    );
+    state.counters["ints/sec"] = benchmark::Counter(4,
+                                                    benchmark::Counter::kIsIterationInvariantRate);
 }
 BENCHMARK(BM_StreamVByte_Decode4_SmallInts);
 
 static void BM_StreamVByte_Decode4_MixedSizes(benchmark::State& state) {
     // Mixed sizes: 1,2,3,4 bytes = 10 bytes data + 1 control = 11 bytes
     uint8_t encoded[17] = {
-        0xE4,  // Control: 0b11_10_01_00 = 4,3,2,1 bytes
-        10,                              // Int0: 1 byte (10)
-        0x20, 0x30,                      // Int1: 2 bytes (12320)
-        0x40, 0x50, 0x60,                // Int2: 3 bytes (6312000)
-        0x70, 0x80, 0x90, 0xA0           // Int3: 4 bytes (2694918256)
+        0xE4,                   // Control: 0b11_10_01_00 = 4,3,2,1 bytes
+        10,                     // Int0: 1 byte (10)
+        0x20, 0x30,             // Int1: 2 bytes (12320)
+        0x40, 0x50, 0x60,       // Int2: 3 bytes (6312000)
+        0x70, 0x80, 0x90, 0xA0  // Int3: 4 bytes (2694918256)
     };
     uint32_t output[4];
 
@@ -135,9 +131,8 @@ static void BM_StreamVByte_Decode4_MixedSizes(benchmark::State& state) {
         benchmark::DoNotOptimize(output);
     }
 
-    state.counters["ints/sec"] = benchmark::Counter(
-        4, benchmark::Counter::kIsIterationInvariantRate
-    );
+    state.counters["ints/sec"] = benchmark::Counter(4,
+                                                    benchmark::Counter::kIsIterationInvariantRate);
 }
 BENCHMARK(BM_StreamVByte_Decode4_MixedSizes);
 
@@ -165,9 +160,8 @@ static void BM_StreamVByte_DecodeBulk_1K(benchmark::State& state) {
         benchmark::DoNotOptimize(decoded.data());
     }
 
-    state.counters["ints/sec"] = benchmark::Counter(
-        N, benchmark::Counter::kIsIterationInvariantRate
-    );
+    state.counters["ints/sec"] = benchmark::Counter(N,
+                                                    benchmark::Counter::kIsIterationInvariantRate);
 }
 BENCHMARK(BM_StreamVByte_DecodeBulk_1K);
 
@@ -191,9 +185,8 @@ static void BM_StreamVByte_Encode_1K(benchmark::State& state) {
         benchmark::DoNotOptimize(encodedSize);
     }
 
-    state.counters["ints/sec"] = benchmark::Counter(
-        N, benchmark::Counter::kIsIterationInvariantRate
-    );
+    state.counters["ints/sec"] = benchmark::Counter(N,
+                                                    benchmark::Counter::kIsIterationInvariantRate);
 }
 BENCHMARK(BM_StreamVByte_Encode_1K);
 

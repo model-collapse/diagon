@@ -103,7 +103,7 @@ private:
     float idf_;
     float k1_;
     float b_;
-    float k1_plus_1_;  // Precomputed k1 + 1
+    float k1_plus_1_;       // Precomputed k1 + 1
     float avgFieldLength_;  // Average field length (for getMaxScore)
 
     /**
@@ -113,7 +113,7 @@ private:
 
 #if defined(DIAGON_HAVE_AVX2) || defined(DIAGON_HAVE_NEON)
     // Platform-specific SIMD types and functions
-#ifdef DIAGON_HAVE_AVX2
+#    ifdef DIAGON_HAVE_AVX2
     // AVX2: 256-bit vectors (8 floats)
     using FloatVec = __m256;
     using IntVec = __m256i;
@@ -129,7 +129,7 @@ private:
     FloatVec decodeNormsVec(const IntVec norms_vec) const;
     FloatVec int32ToFloat(IntVec int_vec) const;
 
-#elif defined(DIAGON_HAVE_NEON)
+#    elif defined(DIAGON_HAVE_NEON)
     // NEON: 128-bit vectors (4 floats)
     using FloatVec = float32x4_t;
     using IntVec = int32x4_t;
@@ -144,7 +144,7 @@ private:
 
     FloatVec decodeNormsVec(const IntVec norms_vec) const;
     FloatVec int32ToFloat(IntVec int_vec) const;
-#endif
+#    endif
 #endif  // DIAGON_HAVE_AVX2 || DIAGON_HAVE_NEON
 };
 

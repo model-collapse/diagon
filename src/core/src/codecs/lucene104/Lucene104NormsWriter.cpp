@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104NormsWriter.h"
-#include "diagon/codecs/lucene104/Lucene104NormsReader.h"
 
+#include "diagon/codecs/lucene104/Lucene104NormsReader.h"
 #include "diagon/index/SegmentInfo.h"
 #include "diagon/store/Directory.h"
 #include "diagon/util/Exceptions.h"
@@ -82,7 +82,7 @@ Lucene104NormsWriter::~Lucene104NormsWriter() {
 // ==================== NormsConsumer Implementation ====================
 
 void Lucene104NormsWriter::addNormsField(const index::FieldInfo& field,
-                                          NormsProducer& normsProducer) {
+                                         NormsProducer& normsProducer) {
     if (closed_) {
         throw AlreadyClosedException("NormsWriter already closed");
     }
@@ -116,7 +116,7 @@ void Lucene104NormsWriter::addNormsField(const index::FieldInfo& field,
 }
 
 void Lucene104NormsWriter::writeNormsData(const index::FieldInfo& field,
-                                           const std::vector<int8_t>& norms) {
+                                          const std::vector<int8_t>& norms) {
     // Write metadata: field number, offset, length
     meta_->writeInt(field.number);
     meta_->writeLong(data_->getFilePointer());
@@ -154,7 +154,8 @@ void Lucene104NormsWriter::close() {
 
 // ==================== Format Implementation ====================
 
-std::unique_ptr<NormsConsumer> Lucene104NormsFormat::normsConsumer(index::SegmentWriteState& state) {
+std::unique_ptr<NormsConsumer>
+Lucene104NormsFormat::normsConsumer(index::SegmentWriteState& state) {
     return std::make_unique<Lucene104NormsWriter>(state);
 }
 

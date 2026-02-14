@@ -13,9 +13,10 @@
 #include "diagon/util/FST.h"
 
 #include <gtest/gtest.h>
-#include <vector>
-#include <string>
+
 #include <set>
+#include <string>
+#include <vector>
 
 using namespace diagon::util;
 
@@ -50,15 +51,14 @@ std::vector<std::pair<std::string, int64_t>> collectAllTerms(const FST& fst) {
 
     const auto& entries = fst.getAllEntries();
     for (const auto& [termBytes, output] : entries) {
-        std::string term(reinterpret_cast<const char*>(termBytes.data()),
-                        termBytes.size());
+        std::string term(reinterpret_cast<const char*>(termBytes.data()), termBytes.size());
         result.emplace_back(term, output);
     }
 
     return result;
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== Task 3.1: Iteration Order Tests ====================
 
@@ -69,11 +69,7 @@ std::vector<std::pair<std::string, int64_t>> collectAllTerms(const FST& fst) {
  * Reference: org.apache.lucene.util.fst.IntsRefFSTEnum
  */
 TEST(FSTIterationTest, IterationOrderMatchesInputOrder) {
-    auto fst = buildTestFST({
-        {"apple", 1},
-        {"banana", 2},
-        {"cherry", 3}
-    });
+    auto fst = buildTestFST({{"apple", 1}, {"banana", 2}, {"cherry", 3}});
 
     auto terms = collectAllTerms(*fst);
 
@@ -116,10 +112,10 @@ TEST(FSTIterationTest, ByteWiseSortOrder) {
     // Byte order: 0x61 < 0x62 < 0xC3 < 0xE6
     // a < b < à < 日
     auto fst = buildTestFST({
-        {"a", 1},      // 0x61
-        {"b", 2},      // 0x62
-        {"à", 3},      // 0xC3 0xA0
-        {"日", 4}      // 0xE6 0x97 0xA5
+        {"a", 1},  // 0x61
+        {"b", 2},  // 0x62
+        {"à", 3},  // 0xC3 0xA0
+        {"日", 4}  // 0xE6 0x97 0xA5
     });
 
     auto terms = collectAllTerms(*fst);
@@ -159,13 +155,8 @@ TEST(FSTIterationTest, CaseSensitiveSortOrder) {
  * Lucene Behavior: Shorter prefix comes before longer extension
  */
 TEST(FSTIterationTest, CommonPrefixOrdering) {
-    auto fst = buildTestFST({
-        {"cat", 1},
-        {"caterpillar", 2},
-        {"cats", 3},
-        {"dog", 4},
-        {"doghouse", 5}
-    });
+    auto fst = buildTestFST(
+        {{"cat", 1}, {"caterpillar", 2}, {"cats", 3}, {"dog", 4}, {"doghouse", 5}});
 
     auto terms = collectAllTerms(*fst);
 
@@ -285,12 +276,7 @@ TEST(FSTIterationTest, LargeFSTIteration) {
  * Lucene Behavior: Single-character terms iterate in byte order
  */
 TEST(FSTIterationTest, SingleByteTermsIteration) {
-    auto fst = buildTestFST({
-        {"a", 1},
-        {"b", 2},
-        {"m", 13},
-        {"z", 26}
-    });
+    auto fst = buildTestFST({{"a", 1}, {"b", 2}, {"m", 13}, {"z", 26}});
 
     auto terms = collectAllTerms(*fst);
 
@@ -338,10 +324,10 @@ TEST(FSTIterationTest, VeryLongTermsIteration) {
  */
 TEST(FSTIterationTest, UTF8TermsIteration) {
     auto fst = buildTestFST({
-        {"café", 1},        // 0x63 0x61 0x66 0xC3 0xA9
-        {"naïve", 2},       // 0x6E 0x61 0xC3 0xAF 0x76 0x65
-        {"résumé", 3},      // 0x72 0xC3 0xA9...
-        {"日本語", 4}       // 0xE6 0x97 0xA5...
+        {"café", 1},    // 0x63 0x61 0x66 0xC3 0xA9
+        {"naïve", 2},   // 0x6E 0x61 0xC3 0xAF 0x76 0x65
+        {"résumé", 3},  // 0x72 0xC3 0xA9...
+        {"日本語", 4}   // 0xE6 0x97 0xA5...
     });
 
     auto terms = collectAllTerms(*fst);
@@ -444,11 +430,7 @@ TEST(FSTIterationTest, TermsWithNullBytesIteration) {
  * Lucene Behavior: FST can be iterated multiple times independently
  */
 TEST(FSTIterationTest, MultipleIterationsSameFST) {
-    auto fst = buildTestFST({
-        {"alpha", 1},
-        {"beta", 2},
-        {"gamma", 3}
-    });
+    auto fst = buildTestFST({{"alpha", 1}, {"beta", 2}, {"gamma", 3}});
 
     // First iteration
     auto terms1 = collectAllTerms(*fst);
@@ -471,11 +453,7 @@ TEST(FSTIterationTest, MultipleIterationsSameFST) {
  * Lucene Behavior: Multiple calls return consistent results
  */
 TEST(FSTIterationTest, RepeatedGetAllEntriesCalls) {
-    auto fst = buildTestFST({
-        {"one", 1},
-        {"three", 3},
-        {"two", 2}
-    });
+    auto fst = buildTestFST({{"one", 1}, {"three", 3}, {"two", 2}});
 
     // First call
     const auto& entries1 = fst->getAllEntries();
@@ -498,11 +476,7 @@ TEST(FSTIterationTest, RepeatedGetAllEntriesCalls) {
  * Lucene Behavior: FST iteration works after serialize/deserialize
  */
 TEST(FSTIterationTest, IterationAfterSerialization) {
-    auto original = buildTestFST({
-        {"apple", 1},
-        {"banana", 2},
-        {"cherry", 3}
-    });
+    auto original = buildTestFST({{"apple", 1}, {"banana", 2}, {"cherry", 3}});
 
     // Serialize
     std::vector<uint8_t> serialized = original->serialize();
@@ -530,14 +504,12 @@ TEST(FSTIterationTest, IterationAfterSerialization) {
  * Lucene Behavior: Multi-level common prefixes iterate in correct order
  */
 TEST(FSTIterationTest, NestedCommonPrefixesIteration) {
-    auto fst = buildTestFST({
-        {"pre", 1},
-        {"prefix", 2},
-        {"prefixes", 3},
-        {"preform", 4},
-        {"prepare", 5},
-        {"prepared", 6}
-    });
+    auto fst = buildTestFST({{"pre", 1},
+                             {"prefix", 2},
+                             {"prefixes", 3},
+                             {"preform", 4},
+                             {"prepare", 5},
+                             {"prepared", 6}});
 
     auto terms = collectAllTerms(*fst);
 
@@ -579,13 +551,7 @@ TEST(FSTIterationTest, AlphabetIteration) {
  * Lucene Behavior: Numeric strings iterate as strings (lexicographic)
  */
 TEST(FSTIterationTest, NumericStringIteration) {
-    auto fst = buildTestFST({
-        {"1", 1},
-        {"10", 10},
-        {"100", 100},
-        {"2", 2},
-        {"20", 20}
-    });
+    auto fst = buildTestFST({{"1", 1}, {"10", 10}, {"100", 100}, {"2", 2}, {"20", 20}});
 
     auto terms = collectAllTerms(*fst);
 

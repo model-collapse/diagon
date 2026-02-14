@@ -25,6 +25,7 @@
 #include "diagon/util/BytesRef.h"
 
 #include <gtest/gtest.h>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -53,12 +54,10 @@ FieldInfo createFieldInfo(const std::string& name) {
 /**
  * Write terms and return reader
  */
-std::unique_ptr<BlockTreeTermsReader> writeAndCreateReader(
-    const std::vector<std::pair<std::string, int64_t>>& terms,
-    const FieldInfo& fieldInfo,
-    ByteBuffersIndexInput** timInOut,
-    ByteBuffersIndexInput** tipInOut) {
-
+std::unique_ptr<BlockTreeTermsReader>
+writeAndCreateReader(const std::vector<std::pair<std::string, int64_t>>& terms,
+                     const FieldInfo& fieldInfo, ByteBuffersIndexInput** timInOut,
+                     ByteBuffersIndexInput** tipInOut) {
     // Write phase
     static ByteBuffersIndexOutput timOut("test.tim");
     static ByteBuffersIndexOutput tipOut("test.tip");
@@ -101,7 +100,7 @@ std::unique_ptr<BlockTreeTermsReader> writeAndCreateReader(
     return std::make_unique<BlockTreeTermsReader>(timIn.get(), tipIn.get(), fieldInfo);
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== Task 6.1: FST Construction in BlockTree ====================
 
@@ -128,8 +127,7 @@ TEST(BlockTreeFSTIntegrationTest, FSTBuiltCorrectlyFromTerms) {
     // Verify all terms can be found
     auto termsEnum = reader->iterator();
     for (const auto& [term, output] : terms) {
-        EXPECT_TRUE(termsEnum->seekExact(BytesRef(term)))
-            << "Failed to find term: " << term;
+        EXPECT_TRUE(termsEnum->seekExact(BytesRef(term))) << "Failed to find term: " << term;
     }
 
     // Verify total count
@@ -165,9 +163,7 @@ TEST(BlockTreeFSTIntegrationTest, EmptyFieldHasEmptyFST) {
 TEST(BlockTreeFSTIntegrationTest, SingleTermCreatesSingleBlockFST) {
     FieldInfo fieldInfo = createFieldInfo("single_term_field");
 
-    std::vector<std::pair<std::string, int64_t>> terms = {
-        {"onlyterm", 42}
-    };
+    std::vector<std::pair<std::string, int64_t>> terms = {{"onlyterm", 42}};
 
     ByteBuffersIndexInput* timIn = nullptr;
     ByteBuffersIndexInput* tipIn = nullptr;
@@ -205,8 +201,7 @@ TEST(BlockTreeFSTIntegrationTest, FSTFindsCorrectBlockForTerm) {
     // All terms should be findable
     auto termsEnum = reader->iterator();
     for (const auto& [term, _] : terms) {
-        EXPECT_TRUE(termsEnum->seekExact(BytesRef(term)))
-            << "Term not found: " << term;
+        EXPECT_TRUE(termsEnum->seekExact(BytesRef(term))) << "Term not found: " << term;
     }
 }
 
@@ -219,10 +214,7 @@ TEST(BlockTreeFSTIntegrationTest, FSTReturnsNoOutputForNonExistentTerms) {
     FieldInfo fieldInfo = createFieldInfo("test_field");
 
     std::vector<std::pair<std::string, int64_t>> terms = {
-        {"apple", 1},
-        {"banana", 2},
-        {"cherry", 3}
-    };
+        {"apple", 1}, {"banana", 2}, {"cherry", 3}};
 
     ByteBuffersIndexInput* timIn = nullptr;
     ByteBuffersIndexInput* tipIn = nullptr;
@@ -250,12 +242,7 @@ TEST(BlockTreeFSTIntegrationTest, FSTHandlesPrefixQueriesCorrectly) {
     FieldInfo fieldInfo = createFieldInfo("prefix_field");
 
     std::vector<std::pair<std::string, int64_t>> terms = {
-        {"apple", 1},
-        {"application", 2},
-        {"apply", 3},
-        {"banana", 4},
-        {"band", 5}
-    };
+        {"apple", 1}, {"application", 2}, {"apply", 3}, {"banana", 4}, {"band", 5}};
 
     ByteBuffersIndexInput* timIn = nullptr;
     ByteBuffersIndexInput* tipIn = nullptr;
@@ -267,22 +254,19 @@ TEST(BlockTreeFSTIntegrationTest, FSTHandlesPrefixQueriesCorrectly) {
     auto status = termsEnum->seekCeil(BytesRef("app"));
     EXPECT_EQ(TermsEnum::SeekStatus::NOT_FOUND, status);
     BytesRef term1 = termsEnum->term();
-    EXPECT_EQ("apple", std::string(reinterpret_cast<const char*>(term1.data()),
-                                   term1.size()));
+    EXPECT_EQ("apple", std::string(reinterpret_cast<const char*>(term1.data()), term1.size()));
 
     // SeekCeil to "appl" should find "apple"
     status = termsEnum->seekCeil(BytesRef("appl"));
     EXPECT_EQ(TermsEnum::SeekStatus::NOT_FOUND, status);
     BytesRef term2 = termsEnum->term();
-    EXPECT_EQ("apple", std::string(reinterpret_cast<const char*>(term2.data()),
-                                   term2.size()));
+    EXPECT_EQ("apple", std::string(reinterpret_cast<const char*>(term2.data()), term2.size()));
 
     // SeekCeil to "apple" should find "apple" (exact)
     status = termsEnum->seekCeil(BytesRef("apple"));
     EXPECT_EQ(TermsEnum::SeekStatus::FOUND, status);
     BytesRef term3 = termsEnum->term();
-    EXPECT_EQ("apple", std::string(reinterpret_cast<const char*>(term3.data()),
-                                   term3.size()));
+    EXPECT_EQ("apple", std::string(reinterpret_cast<const char*>(term3.data()), term3.size()));
 }
 
 // ==================== Task 6.3: FST Iteration in BlockTree ====================
@@ -296,12 +280,7 @@ TEST(BlockTreeFSTIntegrationTest, IterationThroughFSTReturnsAllTerms) {
     FieldInfo fieldInfo = createFieldInfo("iteration_field");
 
     std::vector<std::pair<std::string, int64_t>> terms = {
-        {"apple", 1},
-        {"banana", 2},
-        {"cherry", 3},
-        {"date", 4},
-        {"elderberry", 5}
-    };
+        {"apple", 1}, {"banana", 2}, {"cherry", 3}, {"date", 4}, {"elderberry", 5}};
 
     ByteBuffersIndexInput* timIn = nullptr;
     ByteBuffersIndexInput* tipIn = nullptr;
@@ -312,8 +291,7 @@ TEST(BlockTreeFSTIntegrationTest, IterationThroughFSTReturnsAllTerms) {
     auto termsEnum = reader->iterator();
     while (termsEnum->next()) {
         BytesRef term = termsEnum->term();
-        foundTerms.push_back(std::string(reinterpret_cast<const char*>(term.data()),
-                                         term.size()));
+        foundTerms.push_back(std::string(reinterpret_cast<const char*>(term.data()), term.size()));
     }
 
     // Verify all terms found in order
@@ -366,12 +344,7 @@ TEST(BlockTreeFSTIntegrationTest, FSTMaintainsSortedOrderInBlockTree) {
     FieldInfo fieldInfo = createFieldInfo("sorted_field");
 
     std::vector<std::pair<std::string, int64_t>> terms = {
-        {"a", 1},
-        {"b", 2},
-        {"c", 3},
-        {"d", 4},
-        {"e", 5}
-    };
+        {"a", 1}, {"b", 2}, {"c", 3}, {"d", 4}, {"e", 5}};
 
     ByteBuffersIndexInput* timIn = nullptr;
     ByteBuffersIndexInput* tipIn = nullptr;
@@ -399,11 +372,7 @@ TEST(BlockTreeFSTIntegrationTest, FSTMaintainsSortedOrderInBlockTree) {
 TEST(BlockTreeFSTIntegrationTest, FSTHandlesUTF8TermsInBlockTree) {
     FieldInfo fieldInfo = createFieldInfo("utf8_field");
 
-    std::vector<std::pair<std::string, int64_t>> terms = {
-        {"café", 1},
-        {"naïve", 2},
-        {"日本語", 3}
-    };
+    std::vector<std::pair<std::string, int64_t>> terms = {{"café", 1}, {"naïve", 2}, {"日本語", 3}};
 
     ByteBuffersIndexInput* timIn = nullptr;
     ByteBuffersIndexInput* tipIn = nullptr;
@@ -485,13 +454,7 @@ TEST(BlockTreeFSTIntegrationTest, SharedPrefixesInBlockTreeFST) {
     FieldInfo fieldInfo = createFieldInfo("prefix_sharing_field");
 
     std::vector<std::pair<std::string, int64_t>> terms = {
-        {"cat", 1},
-        {"caterpillar", 2},
-        {"cats", 3},
-        {"dog", 4},
-        {"doghouse", 5},
-        {"dogs", 6}
-    };
+        {"cat", 1}, {"caterpillar", 2}, {"cats", 3}, {"dog", 4}, {"doghouse", 5}, {"dogs", 6}};
 
     ByteBuffersIndexInput* timIn = nullptr;
     ByteBuffersIndexInput* tipIn = nullptr;
@@ -499,8 +462,7 @@ TEST(BlockTreeFSTIntegrationTest, SharedPrefixesInBlockTreeFST) {
 
     auto termsEnum = reader->iterator();
     for (const auto& [term, _] : terms) {
-        EXPECT_TRUE(termsEnum->seekExact(BytesRef(term)))
-            << "Failed to find term: " << term;
+        EXPECT_TRUE(termsEnum->seekExact(BytesRef(term))) << "Failed to find term: " << term;
     }
 
     // Partial prefixes don't match

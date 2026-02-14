@@ -72,10 +72,8 @@ public:
      * @param termMeta Term metadata (file pointers, doc freq, etc.)
      * @return PostingsEnum for iterating postings
      */
-    static std::unique_ptr<index::PostingsEnum> open(
-        store::IndexInput* input,
-        const TermState& termMeta
-    );
+    static std::unique_ptr<index::PostingsEnum> open(store::IndexInput* input,
+                                                     const TermState& termMeta);
 
     /**
      * Open postings with batch support
@@ -86,10 +84,8 @@ public:
      * @param termMeta Term metadata
      * @return BatchPostingsEnum with direct block access
      */
-    static std::unique_ptr<index::BatchPostingsEnum> openBatch(
-        store::IndexInput* input,
-        const TermState& termMeta
-    );
+    static std::unique_ptr<index::BatchPostingsEnum> openBatch(store::IndexInput* input,
+                                                               const TermState& termMeta);
 };
 
 /**
@@ -138,8 +134,8 @@ private:
     int docsRead_;
 
     // Block state
-    int currentBlockIndex_;   // Which block we're on (0-based)
-    int blockDocCount_;       // Docs in current block (1-16)
+    int currentBlockIndex_;  // Which block we're on (0-based)
+    int blockDocCount_;      // Docs in current block (1-16)
 
     // Cached block data (for one-at-a-time access)
     static constexpr int BLOCK_SIZE = 16;

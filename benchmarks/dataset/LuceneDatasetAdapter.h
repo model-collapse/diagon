@@ -2,6 +2,7 @@
 
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+
 #include <fstream>
 #include <string>
 
@@ -29,7 +30,8 @@ public:
      * @param path Path to the line doc file
      */
     explicit LuceneDatasetAdapter(const std::string& path)
-        : file_(path), documentCount_(0) {
+        : file_(path)
+        , documentCount_(0) {
         if (!file_.is_open()) {
             throw std::runtime_error("Failed to open dataset file: " + path);
         }
@@ -84,9 +86,7 @@ public:
      * Get the number of documents read so far.
      * @return Document count
      */
-    size_t documentCount() const {
-        return documentCount_;
-    }
+    size_t documentCount() const { return documentCount_; }
 
     /**
      * Reset the file to beginning for re-reading.
@@ -102,4 +102,4 @@ private:
     size_t documentCount_;
 };
 
-} // namespace diagon::benchmarks
+}  // namespace diagon::benchmarks

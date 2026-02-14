@@ -2,8 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/search/MatchAllDocsQuery.h"
-#include "diagon/index/LeafReaderContext.h"
+
 #include "diagon/index/IndexReader.h"
+#include "diagon/index/LeafReaderContext.h"
 
 namespace diagon {
 namespace search {
@@ -18,5 +19,5 @@ std::unique_ptr<Scorer> MatchAllWeight::scorer(const index::LeafReaderContext& c
     return std::make_unique<MatchAllScorer>(this, maxDoc, boost_);
 }
 
-} // namespace search
-} // namespace diagon
+}  // namespace search
+}  // namespace diagon

@@ -2,10 +2,10 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104FieldsProducer.h"
-#include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
-#include "diagon/codecs/blocktree/BlockTreeTermsReader.h"
 
 #include "diagon/codecs/SegmentState.h"
+#include "diagon/codecs/blocktree/BlockTreeTermsReader.h"
+#include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
 #include "diagon/index/Terms.h"
 #include "diagon/store/IOContext.h"
 
@@ -24,11 +24,8 @@ namespace lucene104 {
 class BlockTreeTerms : public index::Terms {
 public:
     BlockTreeTerms(std::shared_ptr<blocktree::BlockTreeTermsReader> reader,
-                   Lucene104PostingsReader* postingsReader,
-                   const index::FieldInfo* fieldInfo,
-                   int64_t sumTotalTermFreq,
-                   int64_t sumDocFreq,
-                   int docCount)
+                   Lucene104PostingsReader* postingsReader, const index::FieldInfo* fieldInfo,
+                   int64_t sumTotalTermFreq, int64_t sumDocFreq, int docCount)
         : reader_(reader)
         , postingsReader_(postingsReader)
         , fieldInfo_(fieldInfo)
@@ -38,31 +35,23 @@ public:
 
     std::unique_ptr<index::TermsEnum> iterator() const override {
         auto termsEnum = reader_->iterator();
-        
+
         // Cast to SegmentTermsEnum to set PostingsReader
         auto* segmentEnum = dynamic_cast<blocktree::SegmentTermsEnum*>(termsEnum.get());
         if (segmentEnum && postingsReader_ && fieldInfo_) {
             segmentEnum->setPostingsReader(postingsReader_, fieldInfo_);
         }
-        
+
         return termsEnum;
     }
 
-    int64_t size() const override {
-        return reader_->getNumTerms();
-    }
+    int64_t size() const override { return reader_->getNumTerms(); }
 
-    int getDocCount() const override {
-        return docCount_;
-    }
+    int getDocCount() const override { return docCount_; }
 
-    int64_t getSumTotalTermFreq() const override {
-        return sumTotalTermFreq_;
-    }
+    int64_t getSumTotalTermFreq() const override { return sumTotalTermFreq_; }
 
-    int64_t getSumDocFreq() const override {
-        return sumDocFreq_;
-    }
+    int64_t getSumDocFreq() const override { return sumDocFreq_; }
 
 private:
     std::shared_ptr<blocktree::BlockTreeTermsReader> reader_;
@@ -78,8 +67,6 @@ private:
 Lucene104FieldsProducer::Lucene104FieldsProducer(index::SegmentReadState& state)
     : segmentName_(state.segmentName)
     , fieldInfos_(state.fieldInfos) {
-
-
     // Open .tim file (term blocks)
     std::string timFile = segmentName_ + ".tim";
     timInput_ = state.directory->openInput(timFile, store::IOContext::READ);
@@ -140,7 +127,6 @@ Lucene104FieldsProducer::~Lucene104FieldsProducer() {
 }
 
 std::unique_ptr<index::Terms> Lucene104FieldsProducer::terms(const std::string& field) {
-
     // Check if field exists in FieldInfos
     const index::FieldInfo* fieldInfo = fieldInfos_.fieldInfo(field);
     if (!fieldInfo) {
@@ -165,9 +151,8 @@ std::unique_ptr<index::Terms> Lucene104FieldsProducer::terms(const std::string& 
     // Check if we already have a reader for this field
     auto it = fieldReaders_.find(field);
     if (it != fieldReaders_.end()) {
-        return std::make_unique<BlockTreeTerms>(
-            it->second.reader, postingsReader_.get(), fieldInfo,
-            sumTotalTermFreq, sumDocFreq, docCount);
+        return std::make_unique<BlockTreeTerms>(it->second.reader, postingsReader_.get(), fieldInfo,
+                                                sumTotalTermFreq, sumDocFreq, docCount);
     }
 
     // Clone inputs so each field reader has independent file pointers
@@ -188,9 +173,8 @@ std::unique_ptr<index::Terms> Lucene104FieldsProducer::terms(const std::string& 
     fieldReaders_[field] = std::move(holder);
 
     // Return Terms wrapper with PostingsReader wired up and field metadata
-    return std::make_unique<BlockTreeTerms>(
-        reader, postingsReader_.get(), fieldInfo,
-        sumTotalTermFreq, sumDocFreq, docCount);
+    return std::make_unique<BlockTreeTerms>(reader, postingsReader_.get(), fieldInfo,
+                                            sumTotalTermFreq, sumDocFreq, docCount);
 }
 
 void Lucene104FieldsProducer::checkIntegrity() {

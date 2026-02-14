@@ -10,6 +10,7 @@
 #include "diagon/util/StreamVByte.h"
 
 #include <gtest/gtest.h>
+
 #include <iostream>
 
 using namespace diagon::codecs::lucene104;

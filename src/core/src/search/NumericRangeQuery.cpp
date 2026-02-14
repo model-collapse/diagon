@@ -135,16 +135,20 @@ private:
 
             // Check lower bound
             if (includeLower_) {
-                if (value < lower) return false;
+                if (value < lower)
+                    return false;
             } else {
-                if (value <= lower) return false;
+                if (value <= lower)
+                    return false;
             }
 
             // Check upper bound
             if (includeUpper_) {
-                if (value > upper) return false;
+                if (value > upper)
+                    return false;
             } else {
-                if (value >= upper) return false;
+                if (value >= upper)
+                    return false;
             }
 
             return true;
@@ -152,16 +156,20 @@ private:
             // LONG type: direct int64_t comparison
             // Check lower bound
             if (includeLower_) {
-                if (longValue < lowerValue_) return false;
+                if (longValue < lowerValue_)
+                    return false;
             } else {
-                if (longValue <= lowerValue_) return false;
+                if (longValue <= lowerValue_)
+                    return false;
             }
 
             // Check upper bound
             if (includeUpper_) {
-                if (longValue > upperValue_) return false;
+                if (longValue > upperValue_)
+                    return false;
             } else {
-                if (longValue >= upperValue_) return false;
+                if (longValue >= upperValue_)
+                    return false;
             }
 
             return true;
@@ -216,11 +224,9 @@ public:
         int maxDoc = context.reader->maxDoc();
 
         // Create scorer with type detection
-        return std::make_unique<NumericRangeScorer>(*this, values, maxDoc, query_.getLowerValue(),
-                                                     query_.getUpperValue(),
-                                                     query_.getIncludeLower(),
-                                                     query_.getIncludeUpper(), isDoubleField,
-                                                     constantScore_);
+        return std::make_unique<NumericRangeScorer>(
+            *this, values, maxDoc, query_.getLowerValue(), query_.getUpperValue(),
+            query_.getIncludeLower(), query_.getIncludeUpper(), isDoubleField, constantScore_);
     }
 
     const Query& getQuery() const override { return query_; }
@@ -252,26 +258,26 @@ NumericRangeQuery::NumericRangeQuery(const std::string& field, int64_t lowerValu
 }
 
 std::unique_ptr<NumericRangeQuery> NumericRangeQuery::newUpperBoundQuery(const std::string& field,
-                                                                          int64_t upperValue,
-                                                                          bool includeUpper) {
-    return std::make_unique<NumericRangeQuery>(
-        field, std::numeric_limits<int64_t>::min(), upperValue, true, includeUpper);
+                                                                         int64_t upperValue,
+                                                                         bool includeUpper) {
+    return std::make_unique<NumericRangeQuery>(field, std::numeric_limits<int64_t>::min(),
+                                               upperValue, true, includeUpper);
 }
 
 std::unique_ptr<NumericRangeQuery> NumericRangeQuery::newLowerBoundQuery(const std::string& field,
-                                                                          int64_t lowerValue,
-                                                                          bool includeLower) {
+                                                                         int64_t lowerValue,
+                                                                         bool includeLower) {
     return std::make_unique<NumericRangeQuery>(
         field, lowerValue, std::numeric_limits<int64_t>::max(), includeLower, true);
 }
 
 std::unique_ptr<NumericRangeQuery> NumericRangeQuery::newExactQuery(const std::string& field,
-                                                                     int64_t value) {
+                                                                    int64_t value) {
     return std::make_unique<NumericRangeQuery>(field, value, value, true, true);
 }
 
 std::unique_ptr<Weight> NumericRangeQuery::createWeight(IndexSearcher& searcher,
-                                                         ScoreMode scoreMode, float boost) const {
+                                                        ScoreMode scoreMode, float boost) const {
     return std::make_unique<NumericRangeWeight>(*this, searcher, boost);
 }
 
@@ -323,7 +329,7 @@ size_t NumericRangeQuery::hashCode() const {
 
 std::unique_ptr<Query> NumericRangeQuery::clone() const {
     return std::make_unique<NumericRangeQuery>(field_, lowerValue_, upperValue_, includeLower_,
-                                                includeUpper_);
+                                               includeUpper_);
 }
 
 }  // namespace search

@@ -32,17 +32,11 @@ public:
         samples_[name].push_back(nanoseconds);
     }
 
-    const std::map<std::string, std::vector<int64_t>>& samples() const {
-        return samples_;
-    }
+    const std::map<std::string, std::vector<int64_t>>& samples() const { return samples_; }
 
-    void clear() {
-        samples_.clear();
-    }
+    void clear() { samples_.clear(); }
 
-    void reset() {
-        samples_.clear();
-    }
+    void reset() { samples_.clear(); }
 
 private:
     std::map<std::string, std::vector<int64_t>> samples_;
@@ -69,14 +63,17 @@ private:
 };
 
 // Helper macros to properly expand __LINE__
-#define PROFILE_CONCAT_IMPL(x, y) x##y
-#define PROFILE_CONCAT(x, y) PROFILE_CONCAT_IMPL(x, y)
-#define PROFILE_SCOPE(name) ::diagon::util::ProfileScope PROFILE_CONCAT(__profile_scope_, __LINE__)(name)
+#    define PROFILE_CONCAT_IMPL(x, y) x##y
+#    define PROFILE_CONCAT(x, y) PROFILE_CONCAT_IMPL(x, y)
+#    define PROFILE_SCOPE(name)                                                                    \
+        ::diagon::util::ProfileScope PROFILE_CONCAT(__profile_scope_, __LINE__)(name)
 
 #else
 
 // No-op when profiling is disabled
-#define PROFILE_SCOPE(name) do {} while(0)
+#    define PROFILE_SCOPE(name)                                                                    \
+        do {                                                                                       \
+        } while (0)
 
 class SearchProfiler {
 public:

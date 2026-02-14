@@ -44,17 +44,16 @@ namespace {
 
 // Sample vocabulary (100 common words)
 const std::vector<std::string> VOCABULARY = {
-    "the", "be", "to", "of", "and", "a", "in", "that", "have", "i",
-    "it", "for", "not", "on", "with", "he", "as", "you", "do", "at",
-    "this", "but", "his", "by", "from", "they", "we", "say", "her", "she",
-    "or", "an", "will", "my", "one", "all", "would", "there", "their", "what",
-    "so", "up", "out", "if", "about", "who", "get", "which", "go", "me",
-    "when", "make", "can", "like", "time", "no", "just", "him", "know", "take",
-    "people", "into", "year", "your", "good", "some", "could", "them", "see", "other",
-    "than", "then", "now", "look", "only", "come", "its", "over", "think", "also",
-    "back", "after", "use", "two", "how", "our", "work", "first", "well", "way",
-    "even", "new", "want", "because", "any", "these", "give", "day", "most", "us"
-};
+    "the",    "be",    "to",   "of",      "and",   "a",     "in",    "that",  "have",  "i",
+    "it",     "for",   "not",  "on",      "with",  "he",    "as",    "you",   "do",    "at",
+    "this",   "but",   "his",  "by",      "from",  "they",  "we",    "say",   "her",   "she",
+    "or",     "an",    "will", "my",      "one",   "all",   "would", "there", "their", "what",
+    "so",     "up",    "out",  "if",      "about", "who",   "get",   "which", "go",    "me",
+    "when",   "make",  "can",  "like",    "time",  "no",    "just",  "him",   "know",  "take",
+    "people", "into",  "year", "your",    "good",  "some",  "could", "them",  "see",   "other",
+    "than",   "then",  "now",  "look",    "only",  "come",  "its",   "over",  "think", "also",
+    "back",   "after", "use",  "two",     "how",   "our",   "work",  "first", "well",  "way",
+    "even",   "new",   "want", "because", "any",   "these", "give",  "day",   "most",  "us"};
 
 /**
  * Generate synthetic document with random words
@@ -64,7 +63,8 @@ std::string generateDocument(std::mt19937& rng, int numWords) {
 
     std::string doc;
     for (int i = 0; i < numWords; i++) {
-        if (i > 0) doc += " ";
+        if (i > 0)
+            doc += " ";
         doc += VOCABULARY[dist(rng)];
     }
     return doc;
@@ -77,7 +77,6 @@ class TestIndex {
 public:
     TestIndex(int numDocs, int avgDocLength)
         : rng_(42) {
-
         // Create temp directory
         testDir_ = fs::temp_directory_path() / "diagon_lucene_comparison";
         fs::create_directories(testDir_);
@@ -134,7 +133,7 @@ void SetupTestIndex(int numDocs, int avgDocLength) {
     }
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== Search Benchmarks ====================
 
@@ -157,8 +156,7 @@ static void BM_Search_TermQuery_Common(benchmark::State& state) {
 
     // Report queries per second
     state.SetItemsProcessed(state.iterations());
-    state.counters["QPS"] = benchmark::Counter(
-        state.iterations(), benchmark::Counter::kIsRate);
+    state.counters["QPS"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
 }
 
 /**
@@ -178,8 +176,7 @@ static void BM_Search_TermQuery_Rare(benchmark::State& state) {
     }
 
     state.SetItemsProcessed(state.iterations());
-    state.counters["QPS"] = benchmark::Counter(
-        state.iterations(), benchmark::Counter::kIsRate);
+    state.counters["QPS"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
 }
 
 /**
@@ -204,8 +201,7 @@ static void BM_Search_BooleanAND(benchmark::State& state) {
     }
 
     state.SetItemsProcessed(state.iterations());
-    state.counters["QPS"] = benchmark::Counter(
-        state.iterations(), benchmark::Counter::kIsRate);
+    state.counters["QPS"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
 }
 
 /**
@@ -230,8 +226,7 @@ static void BM_Search_BooleanOR(benchmark::State& state) {
     }
 
     state.SetItemsProcessed(state.iterations());
-    state.counters["QPS"] = benchmark::Counter(
-        state.iterations(), benchmark::Counter::kIsRate);
+    state.counters["QPS"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
 }
 
 /**
@@ -258,8 +253,7 @@ static void BM_Search_Boolean3Terms(benchmark::State& state) {
     }
 
     state.SetItemsProcessed(state.iterations());
-    state.counters["QPS"] = benchmark::Counter(
-        state.iterations(), benchmark::Counter::kIsRate);
+    state.counters["QPS"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
 }
 
 /**
@@ -280,8 +274,7 @@ static void BM_Search_TopK(benchmark::State& state) {
     }
 
     state.SetItemsProcessed(state.iterations());
-    state.counters["QPS"] = benchmark::Counter(
-        state.iterations(), benchmark::Counter::kIsRate);
+    state.counters["QPS"] = benchmark::Counter(state.iterations(), benchmark::Counter::kIsRate);
 }
 
 // Register benchmarks

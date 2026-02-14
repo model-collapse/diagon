@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/util/StreamVByte.h"
+
 #include "diagon/util/VByte.h"
 
 #include <gtest/gtest.h>
@@ -34,10 +35,10 @@ TEST(StreamVByteTest, EncodeDecode4_Mixed) {
     // Test mixed sizes: 1, 2, 3, 3 bytes
     // Note: 10000000 = 0x989680 = 3 bytes (< 16777216)
     uint32_t values[4] = {
-        100,           // 1 byte
-        1000,          // 2 bytes
-        100000,        // 3 bytes
-        10000000       // 3 bytes (0x989680)
+        100,      // 1 byte
+        1000,     // 2 bytes
+        100000,   // 3 bytes
+        10000000  // 3 bytes (0x989680)
     };
     uint8_t buffer[20];
 
@@ -55,12 +56,7 @@ TEST(StreamVByteTest, EncodeDecode4_Mixed) {
 
 TEST(StreamVByteTest, EncodeDecode4_Large) {
     // Test large values (4 bytes each)
-    uint32_t values[4] = {
-        0xFFFFFFFF,
-        0x12345678,
-        0xABCDEF00,
-        0x80000000
-    };
+    uint32_t values[4] = {0xFFFFFFFF, 0x12345678, 0xABCDEF00, 0x80000000};
     uint8_t buffer[20];
 
     int encoded = StreamVByte::encode(values, 4, buffer);
@@ -200,7 +196,8 @@ TEST(StreamVByteTest, CompareWithVByte_DocIDDeltas) {
     int stream_offset = 0;
     for (size_t i = 0; i < deltas.size(); i += 4) {
         int count = std::min(4, static_cast<int>(deltas.size() - i));
-        stream_offset += StreamVByte::encode(deltas.data() + i, count, stream_buffer + stream_offset);
+        stream_offset += StreamVByte::encode(deltas.data() + i, count,
+                                             stream_buffer + stream_offset);
     }
 
     // Encode with regular VByte
@@ -236,11 +233,8 @@ TEST(StreamVByteTest, CompareWithVByte_DocIDDeltas) {
 TEST(StreamVByteTest, MaxUInt32) {
     // Test maximum uint32 value
     uint32_t values[4] = {
-        std::numeric_limits<uint32_t>::max(),
-        std::numeric_limits<uint32_t>::max() - 1,
-        std::numeric_limits<uint32_t>::max() - 100,
-        std::numeric_limits<uint32_t>::max() - 1000
-    };
+        std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint32_t>::max() - 1,
+        std::numeric_limits<uint32_t>::max() - 100, std::numeric_limits<uint32_t>::max() - 1000};
     uint8_t buffer[20];
 
     int encoded = StreamVByte::encode(values, 4, buffer);
@@ -258,10 +252,10 @@ TEST(StreamVByteTest, MaxUInt32) {
 TEST(StreamVByteTest, PowersOf256) {
     // Test boundary values (powers of 256)
     uint32_t values[4] = {
-        255,          // 1 byte max
-        256,          // 2 bytes min
-        65535,        // 2 bytes max
-        65536         // 3 bytes min
+        255,    // 1 byte max
+        256,    // 2 bytes min
+        65535,  // 2 bytes max
+        65536   // 3 bytes min
     };
     uint8_t buffer[20];
 

@@ -4,6 +4,7 @@
 #include "diagon/sparse/SparseVector.h"
 
 #include <gtest/gtest.h>
+
 #include <cmath>
 
 using namespace diagon::sparse;
@@ -154,9 +155,9 @@ TEST(SparseVectorTest, DotProduct) {
     vec1.add(100, 0.5f);
 
     SparseVector vec2;
-    vec2.add(10, 0.5f);    // Match
-    vec2.add(50, 1.0f);    // No match
-    vec2.add(100, 2.0f);   // Match
+    vec2.add(10, 0.5f);   // Match
+    vec2.add(50, 1.0f);   // No match
+    vec2.add(100, 2.0f);  // Match
 
     float dot = vec1.dot(vec2);
     // Expected: 0.8*0.5 + 0.5*2.0 = 0.4 + 1.0 = 1.4
@@ -256,9 +257,9 @@ TEST(SparseVectorTest, PruneTopK) {
 
 TEST(SparseVectorTest, PruneByMass) {
     SparseVector vec;
-    vec.add(10, 1.0f);   // 25% of mass
-    vec.add(25, 2.0f);   // 50% of mass
-    vec.add(50, 1.0f);   // 25% of mass
+    vec.add(10, 1.0f);  // 25% of mass
+    vec.add(25, 2.0f);  // 50% of mass
+    vec.add(50, 1.0f);  // 25% of mass
     // Total mass: 4.0
 
     vec.pruneByMass(0.75f);  // Keep 75% of mass (3.0)
@@ -286,10 +287,10 @@ TEST(SparseVectorTest, PruneByThreshold) {
     vec.pruneByThreshold(0.6f);
 
     EXPECT_EQ(2, vec.size());
-    EXPECT_TRUE(vec.contains(25));  // 1.2 >= 0.6
-    EXPECT_TRUE(vec.contains(50));  // 0.8 >= 0.6
-    EXPECT_FALSE(vec.contains(10)); // 0.5 < 0.6
-    EXPECT_FALSE(vec.contains(75)); // 0.3 < 0.6
+    EXPECT_TRUE(vec.contains(25));   // 1.2 >= 0.6
+    EXPECT_TRUE(vec.contains(50));   // 0.8 >= 0.6
+    EXPECT_FALSE(vec.contains(10));  // 0.5 < 0.6
+    EXPECT_FALSE(vec.contains(75));  // 0.3 < 0.6
 }
 
 // ==================== Normalization Tests ====================
@@ -305,8 +306,8 @@ TEST(SparseVectorTest, Normalize) {
     EXPECT_FLOAT_EQ(1.0f, norm);
 
     // Values should be scaled by 1/5
-    EXPECT_FLOAT_EQ(0.6f, vec.get(10));   // 3/5
-    EXPECT_FLOAT_EQ(0.8f, vec.get(25));   // 4/5
+    EXPECT_FLOAT_EQ(0.6f, vec.get(10));  // 3/5
+    EXPECT_FLOAT_EQ(0.8f, vec.get(25));  // 4/5
 }
 
 TEST(SparseVectorTest, Scale) {

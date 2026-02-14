@@ -4,9 +4,9 @@
 #include "diagon/codecs/SimpleFieldsConsumer.h"
 
 #include "diagon/index/Fields.h"
+#include "diagon/index/PostingsEnum.h"
 #include "diagon/index/Terms.h"
 #include "diagon/index/TermsEnum.h"
-#include "diagon/index/PostingsEnum.h"
 #include "diagon/util/Exceptions.h"
 
 #include <algorithm>

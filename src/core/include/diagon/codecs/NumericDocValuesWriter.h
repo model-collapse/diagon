@@ -94,9 +94,9 @@ private:
     struct FieldBuffer {
         std::string fieldName;
         int32_t fieldNumber{-1};
-        std::vector<int64_t> values;  // Dense array, one per doc
+        std::vector<int64_t> values;      // Dense array, one per doc
         std::vector<bool> docsWithField;  // Bitmap of which docs have values
-        int32_t numValues{0};  // Count of docs with values
+        int32_t numValues{0};             // Count of docs with values
         int64_t minValue{0};
         int64_t maxValue{0};
         bool finished{false};

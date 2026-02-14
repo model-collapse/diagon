@@ -81,7 +81,8 @@ ReutersDocument loadReutersDocument(const std::string& filepath) {
  * Create index from Reuters-21578 dataset
  */
 void createReutersIndex(const fs::path& indexPath) {
-    const std::string reutersPath = "/home/ubuntu/opensearch_warmroom/lucene/lucene/benchmark/work/reuters-out";
+    const std::string reutersPath =
+        "/home/ubuntu/opensearch_warmroom/lucene/lucene/benchmark/work/reuters-out";
 
     if (fs::exists(indexPath)) {
         std::cout << "Using existing Reuters index at " << indexPath << std::endl;
@@ -176,9 +177,11 @@ static void BM_Reuters_WAND_2Terms(benchmark::State& state) {
 
     // Common business terms in Reuters
     auto query = BooleanQuery::Builder()
-        .add(std::make_shared<TermQuery>(search::Term("body", "market")), Occur::SHOULD)
-        .add(std::make_shared<TermQuery>(search::Term("body", "company")), Occur::SHOULD)
-        .build();
+                     .add(std::make_shared<TermQuery>(search::Term("body", "market")),
+                          Occur::SHOULD)
+                     .add(std::make_shared<TermQuery>(search::Term("body", "company")),
+                          Occur::SHOULD)
+                     .build();
 
     // Warmup
     for (int i = 0; i < 10; i++) {
@@ -212,21 +215,19 @@ static void BM_Reuters_WAND_MultiTerm(benchmark::State& state) {
 
     // Common Reuters terms (business/finance vocabulary, 50 terms)
     static const std::vector<std::string> queryTerms = {
-        "market", "company", "stock", "trade", "price",
-        "bank", "dollar", "oil", "export", "government",
-        "share", "billion", "profit", "exchange", "interest",
-        "economic", "report", "industry", "investment", "revenue",
-        "million", "percent", "year", "said", "would",
-        "new", "also", "last", "first", "group",
-        "accord", "tax", "rate", "growth", "debt",
-        "loss", "quarter", "month", "net", "income",
-        "sales", "earnings", "bond", "foreign", "loan",
-        "budget", "deficit", "surplus", "inflation", "central"
-    };
+        "market",   "company",  "stock",      "trade",    "price",      "bank",    "dollar",
+        "oil",      "export",   "government", "share",    "billion",    "profit",  "exchange",
+        "interest", "economic", "report",     "industry", "investment", "revenue", "million",
+        "percent",  "year",     "said",       "would",    "new",        "also",    "last",
+        "first",    "group",    "accord",     "tax",      "rate",       "growth",  "debt",
+        "loss",     "quarter",  "month",      "net",      "income",     "sales",   "earnings",
+        "bond",     "foreign",  "loan",       "budget",   "deficit",    "surplus", "inflation",
+        "central"};
 
     BooleanQuery::Builder builder;
     for (int i = 0; i < numTerms && i < static_cast<int>(queryTerms.size()); i++) {
-        builder.add(std::make_shared<TermQuery>(search::Term("body", queryTerms[i])), Occur::SHOULD);
+        builder.add(std::make_shared<TermQuery>(search::Term("body", queryTerms[i])),
+                    Occur::SHOULD);
     }
     auto query = builder.build();
 
@@ -262,10 +263,12 @@ static void BM_Reuters_WAND_TopK(benchmark::State& state) {
 
     // 3-term OR query
     auto query = BooleanQuery::Builder()
-        .add(std::make_shared<TermQuery>(search::Term("body", "market")), Occur::SHOULD)
-        .add(std::make_shared<TermQuery>(search::Term("body", "company")), Occur::SHOULD)
-        .add(std::make_shared<TermQuery>(search::Term("body", "trade")), Occur::SHOULD)
-        .build();
+                     .add(std::make_shared<TermQuery>(search::Term("body", "market")),
+                          Occur::SHOULD)
+                     .add(std::make_shared<TermQuery>(search::Term("body", "company")),
+                          Occur::SHOULD)
+                     .add(std::make_shared<TermQuery>(search::Term("body", "trade")), Occur::SHOULD)
+                     .build();
 
     // Warmup
     for (int i = 0; i < 5; i++) {
@@ -299,9 +302,10 @@ static void BM_Reuters_WAND_RareTerm(benchmark::State& state) {
 
     // Rare terms with low document frequency
     auto query = BooleanQuery::Builder()
-        .add(std::make_shared<TermQuery>(search::Term("body", "cocoa")), Occur::SHOULD)
-        .add(std::make_shared<TermQuery>(search::Term("body", "coffee")), Occur::SHOULD)
-        .build();
+                     .add(std::make_shared<TermQuery>(search::Term("body", "cocoa")), Occur::SHOULD)
+                     .add(std::make_shared<TermQuery>(search::Term("body", "coffee")),
+                          Occur::SHOULD)
+                     .build();
 
     // Warmup
     for (int i = 0; i < 10; i++) {
@@ -323,38 +327,38 @@ static void BM_Reuters_WAND_RareTerm(benchmark::State& state) {
 
 // 2-term OR queries
 BENCHMARK(BM_Reuters_WAND_2Terms)
-    ->Arg(0)    // Exhaustive
-    ->Arg(1)    // WAND
+    ->Arg(0)  // Exhaustive
+    ->Arg(1)  // WAND
     ->Unit(benchmark::kMicrosecond);
 
 // Multi-term OR queries
 BENCHMARK(BM_Reuters_WAND_MultiTerm)
-    ->Args({2, 0})    // 2 terms, exhaustive
-    ->Args({2, 1})    // 2 terms, WAND
-    ->Args({5, 0})    // 5 terms, exhaustive
-    ->Args({5, 1})    // 5 terms, WAND
-    ->Args({10, 0})   // 10 terms, exhaustive
-    ->Args({10, 1})   // 10 terms, WAND
-    ->Args({20, 0})   // 20 terms, exhaustive
-    ->Args({20, 1})   // 20 terms, WAND
-    ->Args({50, 0})   // 50 terms, exhaustive
-    ->Args({50, 1})   // 50 terms, WAND
+    ->Args({2, 0})   // 2 terms, exhaustive
+    ->Args({2, 1})   // 2 terms, WAND
+    ->Args({5, 0})   // 5 terms, exhaustive
+    ->Args({5, 1})   // 5 terms, WAND
+    ->Args({10, 0})  // 10 terms, exhaustive
+    ->Args({10, 1})  // 10 terms, WAND
+    ->Args({20, 0})  // 20 terms, exhaustive
+    ->Args({20, 1})  // 20 terms, WAND
+    ->Args({50, 0})  // 50 terms, exhaustive
+    ->Args({50, 1})  // 50 terms, WAND
     ->Unit(benchmark::kMicrosecond);
 
 // Different topK values
 BENCHMARK(BM_Reuters_WAND_TopK)
-    ->Args({10, 0})     // top-10, exhaustive
-    ->Args({10, 1})     // top-10, WAND
-    ->Args({100, 0})    // top-100, exhaustive
-    ->Args({100, 1})    // top-100, WAND
-    ->Args({1000, 0})   // top-1000, exhaustive
-    ->Args({1000, 1})   // top-1000, WAND
+    ->Args({10, 0})    // top-10, exhaustive
+    ->Args({10, 1})    // top-10, WAND
+    ->Args({100, 0})   // top-100, exhaustive
+    ->Args({100, 1})   // top-100, WAND
+    ->Args({1000, 0})  // top-1000, exhaustive
+    ->Args({1000, 1})  // top-1000, WAND
     ->Unit(benchmark::kMicrosecond);
 
 // Rare term queries
 BENCHMARK(BM_Reuters_WAND_RareTerm)
-    ->Arg(0)    // Exhaustive
-    ->Arg(1)    // WAND
+    ->Arg(0)  // Exhaustive
+    ->Arg(1)  // WAND
     ->Unit(benchmark::kMicrosecond);
 
 BENCHMARK_MAIN();

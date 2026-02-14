@@ -88,8 +88,8 @@ DirectoryReader::createSegmentReaders(store::Directory& dir, const SegmentInfos&
 
 // ==================== Reader Reopening (NRT) ====================
 
-std::shared_ptr<DirectoryReader> DirectoryReader::openIfChanged(
-    std::shared_ptr<DirectoryReader> oldReader) {
+std::shared_ptr<DirectoryReader>
+DirectoryReader::openIfChanged(std::shared_ptr<DirectoryReader> oldReader) {
     if (!oldReader) {
         return nullptr;
     }
@@ -120,19 +120,17 @@ std::shared_ptr<DirectoryReader> DirectoryReader::doOpenIfChanged() {
     SegmentInfos newInfos = SegmentInfos::read(directory_, fileName);
 
     // Create segment readers, reusing old ones where possible
-    auto newReaders =
-        createSegmentReadersWithReuse(directory_, newInfos, segmentReaders_, segmentInfos_);
+    auto newReaders = createSegmentReadersWithReuse(directory_, newInfos, segmentReaders_,
+                                                    segmentInfos_);
 
     // Create new DirectoryReader
     return std::shared_ptr<DirectoryReader>(
         new DirectoryReader(directory_, std::move(newReaders), newInfos));
 }
 
-std::vector<std::shared_ptr<SegmentReader>>
-DirectoryReader::createSegmentReadersWithReuse(
+std::vector<std::shared_ptr<SegmentReader>> DirectoryReader::createSegmentReadersWithReuse(
     store::Directory& dir, const SegmentInfos& newInfos,
     const std::vector<std::shared_ptr<SegmentReader>>& oldReaders, const SegmentInfos& oldInfos) {
-
     std::vector<std::shared_ptr<SegmentReader>> readers;
     readers.reserve(newInfos.size());
 
@@ -166,7 +164,7 @@ DirectoryReader::createSegmentReadersWithReuse(
 }
 
 int DirectoryReader::findSegment(const std::shared_ptr<SegmentInfo>& target,
-                                  const SegmentInfos& oldInfos) {
+                                 const SegmentInfos& oldInfos) {
     // Search for segment by name
     for (int i = 0; i < oldInfos.size(); i++) {
         if (oldInfos.info(i)->name() == target->name()) {

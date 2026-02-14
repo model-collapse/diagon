@@ -47,10 +47,10 @@ public:
     struct FieldMetadata {
         std::string fieldName;
         int32_t fieldNumber{-1};
-        int32_t numDocs{0};      // Total docs in segment
-        int32_t numValues{0};    // Docs with values
-        int64_t dataOffset{0};   // Offset in .dvd file
-        int64_t dataLength{0};   // Length in .dvd file
+        int32_t numDocs{0};     // Total docs in segment
+        int32_t numValues{0};   // Docs with values
+        int64_t dataOffset{0};  // Offset in .dvd file
+        int64_t dataLength{0};  // Length in .dvd file
         int64_t minValue{0};
         int64_t maxValue{0};
     };
@@ -142,9 +142,7 @@ public:
 
     // Reset iterator to initial state (docID = -1)
     // Call this before reusing a cached iterator
-    void reset() override {
-        docID_ = -1;
-    }
+    void reset() override { docID_ = -1; }
 
 private:
     std::vector<int64_t> values_;

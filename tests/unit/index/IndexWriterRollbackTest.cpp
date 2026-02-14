@@ -1,12 +1,13 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/index/IndexWriter.h"
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/IndexWriter.h"
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 #include <memory>
 
@@ -220,9 +221,11 @@ TEST_F(IndexWriterRollbackTest, RollbackClosesWriter) {
     EXPECT_FALSE(writer.isOpen());
 
     // Subsequent operations should throw AlreadyClosedException
-    EXPECT_THROW({
-        Document doc2;
-        doc2.add(std::make_unique<TextField>("content", "after rollback"));
-        writer.addDocument(doc2);
-    }, AlreadyClosedException);
+    EXPECT_THROW(
+        {
+            Document doc2;
+            doc2.add(std::make_unique<TextField>("content", "after rollback"));
+            writer.addDocument(doc2);
+        },
+        AlreadyClosedException);
 }

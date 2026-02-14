@@ -4,6 +4,7 @@
 #pragma once
 
 #include "diagon/util/SIMDUtils.h"
+
 #include <cmath>
 
 namespace diagon {
@@ -59,10 +60,10 @@ public:
         // AVX2 doesn't have direct i64→f32, so we do it in two steps
         __m128 norm_lo = _mm_cvtepi32_ps(
             _mm_set_epi32(static_cast<int>(norms[3]), static_cast<int>(norms[2]),
-                         static_cast<int>(norms[1]), static_cast<int>(norms[0])));
+                          static_cast<int>(norms[1]), static_cast<int>(norms[0])));
         __m128 norm_hi = _mm_cvtepi32_ps(
             _mm_set_epi32(static_cast<int>(norms[7]), static_cast<int>(norms[6]),
-                         static_cast<int>(norms[5]), static_cast<int>(norms[4])));
+                          static_cast<int>(norms[5]), static_cast<int>(norms[4])));
 
         __m256 norm_vec = _mm256_set_m128(norm_hi, norm_lo);
 
@@ -91,8 +92,8 @@ public:
      */
 #if defined(DIAGON_HAVE_AVX2)
     __attribute__((always_inline)) static void scoreBatchAVX2(const int* freqs, const long* norms,
-                               float idf, float k1, float b, float avgLength,
-                               float* scores) {
+                                                              float idf, float k1, float b,
+                                                              float avgLength, float* scores) {
         // Load 8 frequencies
         __m256 freq_vec = _mm256_cvtepi32_ps(_mm256_loadu_si256((__m256i*)freqs));
 
@@ -147,15 +148,13 @@ public:
         // Load 16 norms as int64 → convert to float
         // Convert to int32 first (norms are small values)
         __m256i norms_lo_i32 = _mm256_set_epi32(
-            static_cast<int>(norms[7]), static_cast<int>(norms[6]),
-            static_cast<int>(norms[5]), static_cast<int>(norms[4]),
-            static_cast<int>(norms[3]), static_cast<int>(norms[2]),
+            static_cast<int>(norms[7]), static_cast<int>(norms[6]), static_cast<int>(norms[5]),
+            static_cast<int>(norms[4]), static_cast<int>(norms[3]), static_cast<int>(norms[2]),
             static_cast<int>(norms[1]), static_cast<int>(norms[0]));
 
         __m256i norms_hi_i32 = _mm256_set_epi32(
-            static_cast<int>(norms[15]), static_cast<int>(norms[14]),
-            static_cast<int>(norms[13]), static_cast<int>(norms[12]),
-            static_cast<int>(norms[11]), static_cast<int>(norms[10]),
+            static_cast<int>(norms[15]), static_cast<int>(norms[14]), static_cast<int>(norms[13]),
+            static_cast<int>(norms[12]), static_cast<int>(norms[11]), static_cast<int>(norms[10]),
             static_cast<int>(norms[9]), static_cast<int>(norms[8]));
 
         // Convert to float
@@ -189,8 +188,8 @@ public:
      * @param scores Output scores [16]
      */
     __attribute__((always_inline)) static void scoreBatchAVX512(const int* freqs, const long* norms,
-                                 float idf, float k1, float b, float avgLength,
-                                 float* scores) {
+                                                                float idf, float k1, float b,
+                                                                float avgLength, float* scores) {
         // Load 16 frequencies
         __m512 freq_vec = _mm512_cvtepi32_ps(_mm512_loadu_si512((__m512i*)freqs));
 
@@ -235,8 +234,9 @@ public:
      * @param count Number of documents to score (variable)
      */
     __attribute__((always_inline)) static void scoreBatchScalar(const int* freqs, const long* norms,
-                                 float idf, float k1, float b, float avgLength,
-                                 float* scores, int count) {
+                                                                float idf, float k1, float b,
+                                                                float avgLength, float* scores,
+                                                                int count) {
         for (int i = 0; i < count; i++) {
             if (freqs[i] == 0) {
                 scores[i] = 0.0f;
@@ -271,8 +271,9 @@ public:
      * Phase 3.5: Inline hint for hot path optimization
      */
     __attribute__((always_inline)) static void scoreBatch(const int* freqs, const long* norms,
-                          float idf, float k1, float b, float avgLength,
-                          float* scores, int count) {
+                                                          float idf, float k1, float b,
+                                                          float avgLength, float* scores,
+                                                          int count) {
 #if defined(DIAGON_HAVE_AVX512)
         if (count == 16) {
             scoreBatchAVX512(freqs, norms, idf, k1, b, avgLength, scores);

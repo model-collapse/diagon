@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/document/SparseVectorField.h"
+
 #include "diagon/sparse/SparseVector.h"
 
 #include <gtest/gtest.h>

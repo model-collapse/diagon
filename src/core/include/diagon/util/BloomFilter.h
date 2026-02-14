@@ -189,9 +189,7 @@ public:
     // ==================== Comparison ====================
 
     friend bool operator==(const BloomFilter& a, const BloomFilter& b);
-    friend bool operator!=(const BloomFilter& a, const BloomFilter& b) {
-        return !(a == b);
-    }
+    friend bool operator!=(const BloomFilter& a, const BloomFilter& b) { return !(a == b); }
 
 private:
     // Constants for seed generation
@@ -200,13 +198,13 @@ private:
     static constexpr size_t WORD_BITS = 8 * sizeof(Word);
 
     // Parameters
-    size_t size_bytes_;     // Size in bytes
-    size_t num_hashes_;     // Number of hash functions
-    uint64_t seed_;         // Random seed
+    size_t size_bytes_;  // Size in bytes
+    size_t num_hashes_;  // Number of hash functions
+    uint64_t seed_;      // Random seed
 
     // Derived values
-    size_t num_words_;      // Number of 64-bit words
-    size_t num_bits_;       // Total number of bits (8 * size_bytes)
+    size_t num_words_;  // Number of 64-bit words
+    size_t num_bits_;   // Total number of bits (8 * size_bytes)
 
     // Bit vector
     Container filter_;
@@ -230,9 +228,7 @@ private:
     /**
      * Set bit at position
      */
-    inline void setBit(size_t pos) {
-        filter_[pos / WORD_BITS] |= (1ULL << (pos % WORD_BITS));
-    }
+    inline void setBit(size_t pos) { filter_[pos / WORD_BITS] |= (1ULL << (pos % WORD_BITS)); }
 
     /**
      * Check if bit at position is set
@@ -244,5 +240,5 @@ private:
 
 using BloomFilterPtr = std::shared_ptr<BloomFilter>;
 
-} // namespace util
-} // namespace diagon
+}  // namespace util
+}  // namespace diagon

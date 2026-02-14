@@ -114,8 +114,8 @@ public:
      */
     struct FieldStats {
         int64_t sumTotalTermFreq = 0;  // Sum of all term frequencies in field
-        int64_t sumDocFreq = 0;         // Sum of document frequencies (docs per term)
-        int docCount = 0;               // Number of unique documents with this field
+        int64_t sumDocFreq = 0;        // Sum of document frequencies (docs per term)
+        int docCount = 0;              // Number of unique documents with this field
     };
 
     /**

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/search/BM25ScorerSIMD.h"
+
 #include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
 #include "diagon/util/SearchProfiler.h"
 
@@ -11,7 +12,8 @@ namespace diagon {
 namespace search {
 
 BM25ScorerSIMD::BM25ScorerSIMD(const Weight& weight, std::unique_ptr<index::PostingsEnum> postings,
-                               float idf, float k1, float b, float avgFieldLength, index::NumericDocValues* norms)
+                               float idf, float k1, float b, float avgFieldLength,
+                               index::NumericDocValues* norms)
     : weight_(weight)
     , postings_(std::move(postings))
     , norms_(norms)
@@ -42,7 +44,6 @@ BM25ScorerSIMD::BM25ScorerSIMD(const Weight& weight, std::unique_ptr<index::Post
 }
 
 int BM25ScorerSIMD::nextDoc() {
-
     doc_ = postings_->nextDoc();
     if (doc_ != index::PostingsEnum::NO_MORE_DOCS) {
         int freq = postings_->freq();
@@ -60,12 +61,10 @@ int BM25ScorerSIMD::docID() const {
 }
 
 float BM25ScorerSIMD::score() const {
-
     return currentScore_;
 }
 
 int BM25ScorerSIMD::advance(int target) {
-
     doc_ = postings_->advance(target);
     if (doc_ != index::PostingsEnum::NO_MORE_DOCS) {
         int freq = postings_->freq();
@@ -87,7 +86,6 @@ const Weight& BM25ScorerSIMD::getWeight() const {
 }
 
 float BM25ScorerSIMD::scoreScalar(int freq, long norm) const {
-
     if (freq == 0)
         return 0.0f;
 
@@ -233,7 +231,7 @@ void BM25ScorerSIMD::scoreBatch(const int* freqs, const long* norms, float* scor
 
     // Compute score = numerator / denominator
     // NEON doesn't have direct division, use reciprocal estimate + Newton-Raphson
-    FloatVec recip = vrecpeq_f32(denominator);  // Initial estimate
+    FloatVec recip = vrecpeq_f32(denominator);                  // Initial estimate
     recip = vmulq_f32(vrecpsq_f32(denominator, recip), recip);  // Newton-Raphson iteration
     FloatVec score_vec = vmulq_f32(numerator, recip);
 
@@ -254,15 +252,15 @@ void BM25ScorerSIMD::scoreBatchUniformNorm(const int* freqs, long norm, float* s
 
     // Compute k = k1 * (1 - b + b * fieldLength / avgFieldLength)
     // Use FMA if available (ARMv8.2+)
-#ifdef __ARM_FEATURE_FMA
+#    ifdef __ARM_FEATURE_FMA
     // k = k1 * (one_minus_b + b * fieldLength)
     FloatVec k = vfmaq_f32(one_minus_b_vec_, b_vec_, fieldLength);
     k = vmulq_f32(k1_vec_, k);
-#else
+#    else
     FloatVec b_times_fieldLength = vmulq_f32(b_vec_, fieldLength);
     FloatVec one_minus_b_plus_term = vaddq_f32(one_minus_b_vec_, b_times_fieldLength);
     FloatVec k = vmulq_f32(k1_vec_, one_minus_b_plus_term);
-#endif
+#    endif
 
     // Compute numerator = idf * freq * (k1 + 1)
     FloatVec numerator = vmulq_f32(idf_vec_, freq_floats);
@@ -297,18 +295,18 @@ BM25ScorerSIMD::FloatVec BM25ScorerSIMD::int32ToFloat(IntVec int_vec) const {
 
 float BM25ScorerSIMD::getMaxScore(int upTo) const {
     // Try to get impacts-aware postings
-    auto* impactsPostings = dynamic_cast<codecs::lucene104::Lucene104PostingsEnumWithImpacts*>(postings_.get());
+    auto* impactsPostings = dynamic_cast<codecs::lucene104::Lucene104PostingsEnumWithImpacts*>(
+        postings_.get());
 
     if (!impactsPostings) {
         // No impacts support - compute global max score as fallback
         // This is what Lucene does: score(Float.MAX_VALUE, 1L)
         // It's the theoretical maximum score for this term
         // Compute BM25 score with maximum frequency and shortest document
-        // BM25 (Lucene 8+) = IDF * (freq / (freq + k1 * (1 - b + b * fieldLength / avgFieldLength)))
-        // With very large freq and fieldLength=1 (shortest possible):
-        // score ≈ IDF
+        // BM25 (Lucene 8+) = IDF * (freq / (freq + k1 * (1 - b + b * fieldLength /
+        // avgFieldLength))) With very large freq and fieldLength=1 (shortest possible): score ≈ IDF
         // Note: norm encoding is fieldLength = (127/norm)², so norm=127 gives fieldLength=1
-        constexpr float MAX_FREQ = 1e6f;  // Large but finite
+        constexpr float MAX_FREQ = 1e6f;         // Large but finite
         constexpr long SHORTEST_DOC_NORM = 127;  // Shortest document (fieldLength=1)
 
         float maxScore = scoreScalar(static_cast<int>(MAX_FREQ), SHORTEST_DOC_NORM);
@@ -345,7 +343,8 @@ float BM25ScorerSIMD::getMaxScore(int upTo) const {
 
 int BM25ScorerSIMD::advanceShallow(int target) {
     // Try to get impacts-aware postings
-    auto* impactsPostings = dynamic_cast<codecs::lucene104::Lucene104PostingsEnumWithImpacts*>(postings_.get());
+    auto* impactsPostings = dynamic_cast<codecs::lucene104::Lucene104PostingsEnumWithImpacts*>(
+        postings_.get());
 
     if (impactsPostings) {
         // Use shallow advance to update skip list position without fully decoding
@@ -361,9 +360,10 @@ int BM25ScorerSIMD::advanceShallow(int target) {
 
 std::unique_ptr<BM25ScorerSIMD> createBM25Scorer(const Weight& weight,
                                                  std::unique_ptr<index::PostingsEnum> postings,
-                                                 float idf, float k1, float b,
-                                                 float avgFieldLength, index::NumericDocValues* norms) {
-    return std::make_unique<BM25ScorerSIMD>(weight, std::move(postings), idf, k1, b, avgFieldLength, norms);
+                                                 float idf, float k1, float b, float avgFieldLength,
+                                                 index::NumericDocValues* norms) {
+    return std::make_unique<BM25ScorerSIMD>(weight, std::move(postings), idf, k1, b, avgFieldLength,
+                                            norms);
 }
 
 }  // namespace search

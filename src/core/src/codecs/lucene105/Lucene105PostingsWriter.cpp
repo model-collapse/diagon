@@ -7,8 +7,8 @@
 #include "diagon/util/Exceptions.h"
 #include "diagon/util/StreamVByte.h"
 
-#include <stdexcept>
 #include <algorithm>
+#include <stdexcept>
 
 namespace diagon {
 namespace codecs {
@@ -38,7 +38,6 @@ Lucene105PostingsWriter::Lucene105PostingsWriter(index::SegmentWriteState& state
     , docDeltaBuffer_{}  // Zero-initialize
     , freqBuffer_{}      // Zero-initialize
     , bufferPos_(0) {
-
     // Create .doc output file
     std::string docFileName = segmentName_;
     if (!segmentSuffix_.empty()) {

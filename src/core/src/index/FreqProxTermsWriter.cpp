@@ -13,8 +13,7 @@ namespace index {
 
 // ==================== FreqProxTermsWriter ====================
 
-FreqProxTermsWriter::FreqProxTermsWriter(FieldInfosBuilder& fieldInfosBuilder,
-                                         size_t expectedTerms)
+FreqProxTermsWriter::FreqProxTermsWriter(FieldInfosBuilder& fieldInfosBuilder, size_t expectedTerms)
     : fieldInfosBuilder_(fieldInfosBuilder) {
     // Aggressive pre-sizing to minimize rehashing and malloc overhead
     // Rehashing is expensive: allocate new buckets + move all entries
@@ -35,7 +34,6 @@ FreqProxTermsWriter::FreqProxTermsWriter(FieldInfosBuilder& fieldInfosBuilder,
 }
 
 void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) {
-
     // Iterate over all fields in document
     for (const auto& field : doc.getFields()) {
         const std::string& fieldName = field->name();
@@ -115,8 +113,8 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
         bytesUsed_ += 64;  // Hash map node overhead (approximate)
 
         // Update field statistics incrementally (new term)
-        stats.sumTotalTermFreq += freq;     // Add term frequency
-        stats.sumDocFreq += 1;              // One document has this term
+        stats.sumTotalTermFreq += freq;  // Add term frequency
+        stats.sumDocFreq += 1;           // One document has this term
 
         // Add term to sorted index (O(log n) insert, eliminates O(n log n) sort during flush)
         fieldToSortedTerms_[fieldName].insert(term);
@@ -141,8 +139,8 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
         }
 
         // Update field statistics incrementally (existing term, new document)
-        stats.sumTotalTermFreq += freq;     // Add term frequency
-        stats.sumDocFreq += 1;              // Another document has this term
+        stats.sumTotalTermFreq += freq;  // Add term frequency
+        stats.sumDocFreq += 1;           // Another document has this term
     }
 }
 
@@ -199,7 +197,7 @@ std::vector<std::string> FreqProxTermsWriter::getTerms() const {
 }
 
 std::vector<int> FreqProxTermsWriter::getPostingList(const std::string& field,
-                                                      const std::string& term) const {
+                                                     const std::string& term) const {
     // Get field ID
     auto fieldIdIt = fieldNameToId_.find(field);
     if (fieldIdIt == fieldNameToId_.end()) {
@@ -228,7 +226,8 @@ std::vector<std::string> FreqProxTermsWriter::getTermsForField(const std::string
     return std::vector<std::string>(it->second.begin(), it->second.end());
 }
 
-FreqProxTermsWriter::FieldStats FreqProxTermsWriter::getFieldStats(const std::string& fieldName) const {
+FreqProxTermsWriter::FieldStats
+FreqProxTermsWriter::getFieldStats(const std::string& fieldName) const {
     auto it = fieldStats_.find(fieldName);
     if (it != fieldStats_.end()) {
         return it->second;

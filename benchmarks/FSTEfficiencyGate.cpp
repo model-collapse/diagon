@@ -22,10 +22,11 @@
 #include "diagon/util/FST.h"
 
 #include <benchmark/benchmark.h>
-#include <vector>
-#include <string>
-#include <random>
+
 #include <algorithm>
+#include <random>
+#include <string>
+#include <vector>
 
 using namespace diagon::util;
 
@@ -74,7 +75,8 @@ thread_local std::unique_ptr<FST> g_fst_100k;
 thread_local bool g_initialized = false;
 
 void InitializeTestData() {
-    if (g_initialized) return;
+    if (g_initialized)
+        return;
 
     g_terms_1k = generateTestTerms(1000);
     g_terms_10k = generateTestTerms(10000);
@@ -86,7 +88,7 @@ void InitializeTestData() {
     g_initialized = true;
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== FST Construction Benchmarks ====================
 

@@ -61,7 +61,8 @@ public:
      * @return nullptr if no changes; else, a new DirectoryReader instance
      * @throws IOException if there is an IO error
      */
-    static std::shared_ptr<DirectoryReader> openIfChanged(std::shared_ptr<DirectoryReader> oldReader);
+    static std::shared_ptr<DirectoryReader>
+    openIfChanged(std::shared_ptr<DirectoryReader> oldReader);
 
     /**
      * Destructor
@@ -150,8 +151,8 @@ private:
      */
     static std::vector<std::shared_ptr<SegmentReader>>
     createSegmentReadersWithReuse(store::Directory& dir, const SegmentInfos& newInfos,
-                                    const std::vector<std::shared_ptr<SegmentReader>>& oldReaders,
-                                    const SegmentInfos& oldInfos);
+                                  const std::vector<std::shared_ptr<SegmentReader>>& oldReaders,
+                                  const SegmentInfos& oldInfos);
 
     /**
      * Find matching segment in old readers list

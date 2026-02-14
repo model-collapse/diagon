@@ -72,10 +72,8 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
                 const auto& fstEntries = fst_->getAllEntries();
                 blockIndex_.reserve(fstEntries.size());
                 for (const auto& [termBytes, blockFP] : fstEntries) {
-                    blockIndex_.emplace_back(
-                        util::BytesRef(termBytes.data(), termBytes.size()),
-                        blockFP
-                    );
+                    blockIndex_.emplace_back(util::BytesRef(termBytes.data(), termBytes.size()),
+                                             blockFP);
                 }
 
             } else {
@@ -166,7 +164,8 @@ void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
     block.rebuildTermRefs();
 }
 
-std::shared_ptr<BlockTreeTermsReader::TermBlock> BlockTreeTermsReader::getCachedBlock(int blockIndex) {
+std::shared_ptr<BlockTreeTermsReader::TermBlock>
+BlockTreeTermsReader::getCachedBlock(int blockIndex) {
     // Check cache first
     auto it = blockCache_.find(blockIndex);
     if (it != blockCache_.end()) {
@@ -193,11 +192,10 @@ int BlockTreeTermsReader::findBlockForTerm(const util::BytesRef& term) const {
 
     // Binary search to find the rightmost block where firstTerm <= term
     // This is the block that may contain the term
-    auto it = std::upper_bound(
-        blockIndex_.begin(), blockIndex_.end(), term,
-        [](const util::BytesRef& term, const BlockMetadata& block) {
-            return term < block.firstTerm;
-        });
+    auto it = std::upper_bound(blockIndex_.begin(), blockIndex_.end(), term,
+                               [](const util::BytesRef& term, const BlockMetadata& block) {
+                                   return term < block.firstTerm;
+                               });
 
     // upper_bound returns first block where firstTerm > term
     // So we want the block before it (which has firstTerm <= term)

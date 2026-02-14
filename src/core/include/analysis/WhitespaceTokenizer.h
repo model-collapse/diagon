@@ -32,9 +32,7 @@ public:
     // Tokenizer interface
     std::vector<Token> tokenize(const std::string& text) override;
     std::string name() const override { return "whitespace"; }
-    std::string description() const override {
-        return "Splits text on whitespace characters";
-    }
+    std::string description() const override { return "Splits text on whitespace characters"; }
 
 private:
     /**
@@ -44,5 +42,5 @@ private:
     static bool isWhitespace(char c);
 };
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

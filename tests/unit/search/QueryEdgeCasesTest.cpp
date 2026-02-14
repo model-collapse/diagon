@@ -3,12 +3,12 @@
 
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
-#include "diagon/index/IndexWriter.h"
 #include "diagon/index/DirectoryReader.h"
+#include "diagon/index/IndexWriter.h"
+#include "diagon/search/BooleanClause.h"
+#include "diagon/search/BooleanQuery.h"
 #include "diagon/search/IndexSearcher.h"
 #include "diagon/search/TermQuery.h"
-#include "diagon/search/BooleanQuery.h"
-#include "diagon/search/BooleanClause.h"
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
@@ -57,7 +57,7 @@ protected:
     std::unique_ptr<Directory> dir_;
 };
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== Empty Index Tests ====================
 
@@ -98,10 +98,8 @@ TEST_F(QueryEdgeCasesTest, EmptyIndex_BooleanQueryReturnsZero) {
     IndexSearcher searcher(*reader);
 
     BooleanQuery::Builder builder;
-    builder.add(std::make_unique<TermQuery>(search::Term("content", "apple")),
-                Occur::MUST);
-    builder.add(std::make_unique<TermQuery>(search::Term("content", "banana")),
-                Occur::MUST);
+    builder.add(std::make_unique<TermQuery>(search::Term("content", "apple")), Occur::MUST);
+    builder.add(std::make_unique<TermQuery>(search::Term("content", "banana")), Occur::MUST);
     auto query = builder.build();
 
     auto results = searcher.search(*query, 10);

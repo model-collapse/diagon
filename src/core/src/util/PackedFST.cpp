@@ -4,8 +4,8 @@
 #include "diagon/util/PackedFST.h"
 
 #include <algorithm>
-#include <stdexcept>
 #include <cstring>
+#include <stdexcept>
 
 namespace diagon {
 namespace util {
@@ -152,7 +152,8 @@ PackedFST::ArcResult PackedFST::findArcDirectAddressing(ByteReader& reader, uint
     ArcResult result;
 
     // Read direct addressing metadata
-    // Format: [encoding:byte][isFinal:byte][finalOutput:vlong?][numArcs:vint][bytesPerArc:vint][firstLabel:byte][bitTable:bytes][arcs...]
+    // Format:
+    // [encoding:byte][isFinal:byte][finalOutput:vlong?][numArcs:vint][bytesPerArc:vint][firstLabel:byte][bitTable:bytes][arcs...]
     reader.readByte();  // Skip isFinal
     if (data_[reader.getPosition() - 1]) {
         reader.readVLong();  // Skip finalOutput
@@ -166,7 +167,7 @@ PackedFST::ArcResult PackedFST::findArcDirectAddressing(ByteReader& reader, uint
     int bitTableBytes = (numArcs + 7) / 8;
     size_t bitTableStart = reader.getPosition();
     std::vector<uint8_t> bitTable(data_.begin() + bitTableStart,
-                                   data_.begin() + bitTableStart + bitTableBytes);
+                                  data_.begin() + bitTableStart + bitTableBytes);
     reader.setPosition(bitTableStart + bitTableBytes);
 
     // Check if label is in range
@@ -324,14 +325,14 @@ int PackedFST::countBitsUpTo(int bitIndex, const std::vector<uint8_t>& bitTable)
 // ==================== Serialization Helpers ====================
 
 namespace {
-    void writeVInt(std::vector<uint8_t>& data, int32_t value) {
-        while (value > 0x7F) {
-            data.push_back(static_cast<uint8_t>((value & 0x7F) | 0x80));
-            value >>= 7;
-        }
-        data.push_back(static_cast<uint8_t>(value));
+void writeVInt(std::vector<uint8_t>& data, int32_t value) {
+    while (value > 0x7F) {
+        data.push_back(static_cast<uint8_t>((value & 0x7F) | 0x80));
+        value >>= 7;
     }
+    data.push_back(static_cast<uint8_t>(value));
 }
+}  // namespace
 
 // ==================== Serialization ====================
 
@@ -404,7 +405,8 @@ std::unique_ptr<PackedFST> PackedFST::deserialize(const std::vector<uint8_t>& da
     return fst;
 }
 
-const std::vector<std::pair<std::vector<uint8_t>, PackedFST::Output>>& PackedFST::getAllEntries() const {
+const std::vector<std::pair<std::vector<uint8_t>, PackedFST::Output>>&
+PackedFST::getAllEntries() const {
     loadEntriesIfNeeded();
     return entries_;
 }
@@ -516,7 +518,8 @@ std::unique_ptr<PackedFST> PackedFST::Builder::finish() {
         fstEntries.emplace_back(entry.termData, entry.output);
     }
 
-    auto fst = std::make_unique<PackedFST>(std::move(packedData), rootOffset, std::move(fstEntries));
+    auto fst = std::make_unique<PackedFST>(std::move(packedData), rootOffset,
+                                           std::move(fstEntries));
 
     // Clean up build tree
     deleteNodeRecursive(root_);
@@ -719,7 +722,8 @@ PackedFST::Builder::BuildNode::~BuildNode() {
     // Children are deleted by Builder::deleteNodeRecursive
 }
 
-const PackedFST::Builder::BuildNode::Arc* PackedFST::Builder::BuildNode::findArc(uint8_t label) const {
+const PackedFST::Builder::BuildNode::Arc*
+PackedFST::Builder::BuildNode::findArc(uint8_t label) const {
     auto it = std::lower_bound(arcs.begin(), arcs.end(), label,
                                [](const Arc& arc, uint8_t val) { return arc.label < val; });
     if (it != arcs.end() && it->label == label) {

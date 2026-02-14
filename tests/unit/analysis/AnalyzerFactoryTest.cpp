@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
 #include "analysis/Analyzer.h"
+
+#include <gtest/gtest.h>
 
 using namespace diagon::analysis;
 
@@ -67,9 +68,12 @@ TEST(AnalyzerFactoryTest, StandardAnalyzerBehavior) {
     bool has_fox = false;
 
     for (const auto& token : tokens) {
-        if (token.getText() == "quick") has_quick = true;
-        if (token.getText() == "brown") has_brown = true;
-        if (token.getText() == "fox") has_fox = true;
+        if (token.getText() == "quick")
+            has_quick = true;
+        if (token.getText() == "brown")
+            has_brown = true;
+        if (token.getText() == "fox")
+            has_fox = true;
     }
 
     EXPECT_TRUE(has_quick);
@@ -125,9 +129,12 @@ TEST(AnalyzerFactoryTest, EnglishAnalyzerBehavior) {
     bool has_service = false;
 
     for (const auto& token : tokens) {
-        if (token.getText() == "cafe") has_cafe = true;
-        if (token.getText() == "resume") has_resume = true;
-        if (token.getText() == "service") has_service = true;
+        if (token.getText() == "cafe")
+            has_cafe = true;
+        if (token.getText() == "resume")
+            has_resume = true;
+        if (token.getText() == "service")
+            has_service = true;
     }
 
     EXPECT_TRUE(has_cafe);
@@ -196,15 +203,10 @@ TEST(AnalyzerFactoryTest, AllAnalyzersHaveComponents) {
 }
 
 TEST(AnalyzerFactoryTest, EmptyTextHandling) {
-    auto analyzers = {
-        AnalyzerFactory::createStandard(),
-        AnalyzerFactory::createSimple(),
-        AnalyzerFactory::createWhitespace(),
-        AnalyzerFactory::createKeyword(),
-        AnalyzerFactory::createEnglish(),
-        AnalyzerFactory::createMultilingual(),
-        AnalyzerFactory::createSearch()
-    };
+    auto analyzers = {AnalyzerFactory::createStandard(),   AnalyzerFactory::createSimple(),
+                      AnalyzerFactory::createWhitespace(), AnalyzerFactory::createKeyword(),
+                      AnalyzerFactory::createEnglish(),    AnalyzerFactory::createMultilingual(),
+                      AnalyzerFactory::createSearch()};
 
     for (auto& analyzer : analyzers) {
         auto tokens = analyzer->analyze("");

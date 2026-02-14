@@ -8,16 +8,16 @@
  * Bypasses DocumentsWriterPerThread/SegmentReader to directly test codec performance.
  */
 
-#include "diagon/codecs/lucene104/Lucene104PostingsWriter.h"
-#include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
 #include "diagon/codecs/lucene104/Lucene104PostingsEnumBatch.h"
-#include "diagon/store/ByteBuffersIndexOutput.h"
+#include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
+#include "diagon/codecs/lucene104/Lucene104PostingsWriter.h"
 #include "diagon/index/BatchPostingsEnum.h"
 #include "diagon/index/SegmentWriteState.h"
 #include "diagon/store/ByteBuffersIndexInput.h"
 #include "diagon/store/ByteBuffersIndexOutput.h"
 
 #include <benchmark/benchmark.h>
+
 #include <random>
 #include <vector>
 
@@ -47,7 +47,8 @@ std::unique_ptr<ByteBuffersIndexInput> createTestPostings(int numDocs, int avgFr
         // Encode 4 doc deltas
         std::vector<uint32_t> docDeltas(4);
         for (int i = 0; i < 4; i++) {
-            docDeltas[i] = (group == 0 && i == 0) ? (i + 1) : 1;  // First doc absolute, rest delta=1
+            docDeltas[i] = (group == 0 && i == 0) ? (i + 1)
+                                                  : 1;  // First doc absolute, rest delta=1
         }
 
         // StreamVByte encode doc deltas
@@ -192,7 +193,8 @@ static void BM_Lucene104_BatchAtATime(benchmark::State& state) {
         int docsScored = 0;
         while (true) {
             int count = batchEnum.nextBatch(batch);
-            if (count == 0) break;
+            if (count == 0)
+                break;
             docsScored += count;
         }
 

@@ -11,15 +11,16 @@
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
 #include "diagon/document/FieldType.h"
+#include "diagon/index/DirectoryReader.h"
 #include "diagon/index/IndexWriter.h"
 #include "diagon/index/IndexWriterConfig.h"
-#include "diagon/index/DirectoryReader.h"
 #include "diagon/search/IndexSearcher.h"
 #include "diagon/search/TermQuery.h"
 #include "diagon/search/TopScoreDocCollector.h"
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 #include <iostream>
 

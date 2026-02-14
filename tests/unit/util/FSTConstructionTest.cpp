@@ -13,8 +13,9 @@
 #include "diagon/util/FST.h"
 
 #include <gtest/gtest.h>
-#include <vector>
+
 #include <string>
+#include <vector>
 
 using namespace diagon::util;
 
@@ -29,7 +30,7 @@ BytesRef toBytes(const std::string& str) {
     return BytesRef(str);
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== Task 1.1: Basic Construction Tests ====================
 
@@ -281,9 +282,7 @@ TEST(FSTConstructionTest, UnsortedInputThrows) {
     builder.add(toBytes("dog"), 1);
 
     // Adding "cat" after "dog" violates sort order ("cat" < "dog" lexicographically)
-    EXPECT_THROW({
-        builder.add(toBytes("cat"), 2);
-    }, std::invalid_argument);
+    EXPECT_THROW({ builder.add(toBytes("cat"), 2); }, std::invalid_argument);
 }
 
 /**
@@ -295,9 +294,9 @@ TEST(FSTConstructionTest, ByteWiseSortOrder) {
     FST::Builder builder;
 
     // Correct byte-wise order: 0x61 < 0x62 < 0xC3
-    builder.add(toBytes("a"), 1);        // 0x61
-    builder.add(toBytes("b"), 3);        // 0x62
-    builder.add(toBytes("à"), 2);        // 0xC3 0xA0 (UTF-8) - comes AFTER b!
+    builder.add(toBytes("a"), 1);  // 0x61
+    builder.add(toBytes("b"), 3);  // 0x62
+    builder.add(toBytes("à"), 2);  // 0xC3 0xA0 (UTF-8) - comes AFTER b!
 
     auto fst = builder.finish();
 
@@ -317,9 +316,7 @@ TEST(FSTConstructionTest, DuplicateTermThrows) {
     builder.add(toBytes("test"), 1);
 
     // Adding same term again should throw
-    EXPECT_THROW({
-        builder.add(toBytes("test"), 2);
-    }, std::invalid_argument);
+    EXPECT_THROW({ builder.add(toBytes("test"), 2); }, std::invalid_argument);
 }
 
 /**
@@ -353,7 +350,7 @@ TEST(FSTConstructionTest, CaseSensitiveSortOrder) {
 TEST(FSTConstructionTest, EmptyStringSortOrder) {
     FST::Builder builder;
 
-    builder.add(toBytes(""), 0);        // Empty string must be first
+    builder.add(toBytes(""), 0);  // Empty string must be first
     builder.add(toBytes("a"), 1);
     builder.add(toBytes("b"), 2);
 
@@ -375,9 +372,7 @@ TEST(FSTConstructionTest, CannotAddAfterEmptyStringWithPriorTerms) {
     builder.add(toBytes("a"), 1);
 
     // Cannot add empty string after "a" (empty < "a")
-    EXPECT_THROW({
-        builder.add(toBytes(""), 0);
-    }, std::invalid_argument);
+    EXPECT_THROW({ builder.add(toBytes(""), 0); }, std::invalid_argument);
 }
 
 // ==================== Construction with Various Data Patterns ====================
@@ -434,15 +429,8 @@ TEST(FSTConstructionTest, DictionaryPattern) {
 
     // Simulated dictionary entries (term -> frequency)
     std::vector<std::pair<std::string, int64_t>> dictionary = {
-        {"abandon", 42},
-        {"ability", 156},
-        {"able", 892},
-        {"about", 5234},
-        {"above", 234},
-        {"abroad", 89},
-        {"absence", 34},
-        {"absolute", 67}
-    };
+        {"abandon", 42}, {"ability", 156}, {"able", 892},   {"about", 5234},
+        {"above", 234},  {"abroad", 89},   {"absence", 34}, {"absolute", 67}};
 
     for (const auto& [term, freq] : dictionary) {
         builder.add(toBytes(term), freq);

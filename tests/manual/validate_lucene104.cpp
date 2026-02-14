@@ -8,6 +8,7 @@
 
 #include "diagon/codecs/Codec.h"
 #include "diagon/codecs/PostingsFormat.h"
+
 #include <iostream>
 
 using namespace diagon;
@@ -25,7 +26,8 @@ int main() {
         std::cout << "✓ PostingsFormat retrieved: " << postingsFormat.getName() << std::endl;
 
         std::cout << std::endl << "=== BASIC TESTS PASSED ===" << std::endl;
-        std::cout << "Note: Full end-to-end testing requires IndexWriter integration test" << std::endl;
+        std::cout << "Note: Full end-to-end testing requires IndexWriter integration test"
+                  << std::endl;
         return 0;
 
     } catch (const std::exception& e) {

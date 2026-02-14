@@ -1,7 +1,8 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-// Comprehensive round-trip tests: Write with Lucene104PostingsWriter, read with Lucene104PostingsReader
+// Comprehensive round-trip tests: Write with Lucene104PostingsWriter, read with
+// Lucene104PostingsReader
 
 #include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
 #include "diagon/codecs/lucene104/Lucene104PostingsWriter.h"
@@ -11,6 +12,7 @@
 #include "diagon/store/ByteBuffersIndexInput.h"
 
 #include <gtest/gtest.h>
+
 #include <iostream>
 #include <random>
 

@@ -5,22 +5,21 @@
 
 #include "diagon/util/Exceptions.h"
 
+#include <sys/mman.h>
+
 #include <cerrno>
 #include <cstring>
 #include <sstream>
 
 #include <fcntl.h>
-#include <sys/mman.h>
 #include <unistd.h>
 
 namespace diagon::store {
 
 // ==================== Constructor ====================
 
-PosixMMapIndexInput::PosixMMapIndexInput(const std::filesystem::path& path,
-                                         int chunk_power,
-                                         bool preload,
-                                         IOContext::ReadAdvice advice)
+PosixMMapIndexInput::PosixMMapIndexInput(const std::filesystem::path& path, int chunk_power,
+                                         bool preload, IOContext::ReadAdvice advice)
     : MMapIndexInput(path, chunk_power, preload) {
     // Base constructor sets up metadata
     // Now perform actual mmap
@@ -65,8 +64,7 @@ std::unique_ptr<IndexInput> PosixMMapIndexInput::clone() const {
 }
 
 std::unique_ptr<IndexInput> PosixMMapIndexInput::slice(const std::string& sliceDescription,
-                                                        int64_t offset,
-                                                        int64_t length) const {
+                                                       int64_t offset, int64_t length) const {
     // Validate slice bounds
     int64_t max_length = is_slice_ ? slice_length_ : file_length_;
     if (offset < 0 || length < 0 || offset + length > max_length) {
@@ -108,13 +106,12 @@ void PosixMMapIndexInput::mapChunks(int fd, int64_t file_length) {
         int64_t this_chunk_size = std::min(chunk_size, file_length - offset);
 
         // Perform mmap
-        void* mapped = ::mmap(
-            nullptr,                  // Let kernel choose address
-            static_cast<size_t>(this_chunk_size),  // Length to map
-            PROT_READ,                // Read-only protection
-            MAP_SHARED,               // Shared mapping (don't write changes back)
-            fd,                       // File descriptor
-            offset                    // Offset in file
+        void* mapped = ::mmap(nullptr,                               // Let kernel choose address
+                              static_cast<size_t>(this_chunk_size),  // Length to map
+                              PROT_READ,                             // Read-only protection
+                              MAP_SHARED,  // Shared mapping (don't write changes back)
+                              fd,          // File descriptor
+                              offset       // Offset in file
         );
 
         if (mapped == MAP_FAILED) {
@@ -149,8 +146,7 @@ void PosixMMapIndexInput::mapChunks(int fd, int64_t file_length) {
         }
 
         // Store chunk info
-        chunks[i] = MMapChunk(static_cast<uint8_t*>(mapped),
-                              static_cast<size_t>(this_chunk_size),
+        chunks[i] = MMapChunk(static_cast<uint8_t*>(mapped), static_cast<size_t>(this_chunk_size),
                               fd);
 
         offset += this_chunk_size;
@@ -160,8 +156,7 @@ void PosixMMapIndexInput::mapChunks(int fd, int64_t file_length) {
     // The deleter will unmap chunks when the last reference is destroyed
     // Note: We capture by value (num_chunks, fd) NOT by pointer (this) to avoid UB
     chunks_ = std::shared_ptr<MMapChunk[]>(
-        chunks,
-        [num_chunks = num_chunks_, fd](MMapChunk* chunks_to_delete) {
+        chunks, [num_chunks = num_chunks_, fd](MMapChunk* chunks_to_delete) {
             // Unmap all chunks (best-effort, ignore errors)
             for (size_t i = 0; i < num_chunks; ++i) {
                 if (chunks_to_delete[i].data &&
@@ -178,8 +173,7 @@ void PosixMMapIndexInput::mapChunks(int fd, int64_t file_length) {
 
             // Delete chunk array
             delete[] chunks_to_delete;
-        }
-    );
+        });
 }
 
 // ==================== Platform-Specific Unmapping ====================

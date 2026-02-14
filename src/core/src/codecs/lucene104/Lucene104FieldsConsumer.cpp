@@ -2,13 +2,14 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104FieldsConsumer.h"
-#include "diagon/codecs/lucene104/Lucene104PostingsWriter.h"
-#include "diagon/codecs/blocktree/BlockTreeTermsWriter.h"
+
 #include "diagon/codecs/NormsFormat.h"
+#include "diagon/codecs/blocktree/BlockTreeTermsWriter.h"
+#include "diagon/codecs/lucene104/Lucene104PostingsWriter.h"
 #include "diagon/index/DocValues.h"
+#include "diagon/index/PostingsEnum.h"
 #include "diagon/index/Terms.h"
 #include "diagon/index/TermsEnum.h"
-#include "diagon/index/PostingsEnum.h"
 #include "diagon/store/IOContext.h"
 #include "diagon/util/BytesRef.h"
 #include "diagon/util/Exceptions.h"
@@ -60,12 +61,10 @@ void Lucene104FieldsConsumer::write(index::Fields& fields, codecs::NormsProducer
     // Iterate over all fields
     auto fieldIterator = fields.iterator();
 
-
     int fieldCount = 0;
     while (fieldIterator->hasNext()) {
         std::string fieldName = fieldIterator->next();
         fieldCount++;
-
 
         // Get terms for this field
         auto terms = fields.terms(fieldName);
@@ -73,15 +72,13 @@ void Lucene104FieldsConsumer::write(index::Fields& fields, codecs::NormsProducer
             continue;  // Field has no terms
         }
 
-
         // Write this field with norms
         writeField(fieldName, *terms, norms);
-
     }
-
 }
 
-void Lucene104FieldsConsumer::writeField(const std::string& fieldName, index::Terms& terms, codecs::NormsProducer* norms) {
+void Lucene104FieldsConsumer::writeField(const std::string& fieldName, index::Terms& terms,
+                                         codecs::NormsProducer* norms) {
     // Get field info from state
     const auto* fieldInfo = state_.fieldInfos.fieldInfo(fieldName);
     if (!fieldInfo) {
@@ -102,7 +99,6 @@ void Lucene104FieldsConsumer::writeField(const std::string& fieldName, index::Te
 
     // Iterate over all terms for this field
     auto termsEnum = terms.iterator();
-
 
     int termCount = 0;
     while (termsEnum->next()) {
@@ -149,7 +145,6 @@ void Lucene104FieldsConsumer::writeField(const std::string& fieldName, index::Te
         termDictWriter.addTerm(termBytesRef, termStats);
         termCount++;
     }
-
 
     // Set document count before finish (from Terms)
     int docCount = terms.getDocCount();

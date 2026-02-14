@@ -2,10 +2,11 @@
 
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+
 #include <random>
-#include <vector>
-#include <string>
 #include <sstream>
+#include <string>
+#include <vector>
 
 namespace diagon::benchmarks {
 
@@ -29,7 +30,8 @@ public:
      * @param seed Random seed for reproducibility (default 42)
      */
     explicit SyntheticGenerator(uint32_t seed = 42)
-        : rng_(seed), word_dist_(0, vocab_.size() - 1) {}
+        : rng_(seed)
+        , word_dist_(0, vocab_.size() - 1) {}
 
     /**
      * Generate a document with the specified word count.
@@ -63,10 +65,17 @@ public:
     document::Document generateDocumentWithSize(int id, int sizeCategory) {
         int numWords;
         switch (sizeCategory % 3) {
-            case 0: numWords = 50; break;   // Small
-            case 1: numWords = 200; break;  // Medium
-            case 2: numWords = 1000; break; // Large
-            default: numWords = 200;
+            case 0:
+                numWords = 50;
+                break;  // Small
+            case 1:
+                numWords = 200;
+                break;  // Medium
+            case 2:
+                numWords = 1000;
+                break;  // Large
+            default:
+                numWords = 200;
         }
         return generateDocument(id, numWords);
     }
@@ -78,7 +87,8 @@ private:
     std::string generateText(int numWords) {
         std::ostringstream oss;
         for (int i = 0; i < numWords; i++) {
-            if (i > 0) oss << " ";
+            if (i > 0)
+                oss << " ";
             oss << vocab_[word_dist_(rng_)];
         }
         return oss.str();
@@ -91,17 +101,16 @@ private:
     // Taken from British National Corpus frequency list
     inline static const std::vector<std::string> vocab_ = {
         // Top 100 words
-        "the", "be", "to", "of", "and", "a", "in", "that", "have", "I",
-        "it", "for", "not", "on", "with", "he", "as", "you", "do", "at",
-        "this", "but", "his", "by", "from", "they", "we", "say", "her", "she",
-        "or", "an", "will", "my", "one", "all", "would", "there", "their", "what",
-        "so", "up", "out", "if", "about", "who", "get", "which", "go", "me",
-        "when", "make", "can", "like", "time", "no", "just", "him", "know", "take",
-        "people", "into", "year", "your", "good", "some", "could", "them", "see", "other",
-        "than", "then", "now", "look", "only", "come", "its", "over", "think", "also",
-        "back", "after", "use", "two", "how", "our", "work", "first", "well", "way",
-        "even", "new", "want", "because", "any", "these", "give", "day", "most", "us"
-    };
+        "the",    "be",    "to",   "of",      "and",   "a",     "in",    "that",  "have",  "I",
+        "it",     "for",   "not",  "on",      "with",  "he",    "as",    "you",   "do",    "at",
+        "this",   "but",   "his",  "by",      "from",  "they",  "we",    "say",   "her",   "she",
+        "or",     "an",    "will", "my",      "one",   "all",   "would", "there", "their", "what",
+        "so",     "up",    "out",  "if",      "about", "who",   "get",   "which", "go",    "me",
+        "when",   "make",  "can",  "like",    "time",  "no",    "just",  "him",   "know",  "take",
+        "people", "into",  "year", "your",    "good",  "some",  "could", "them",  "see",   "other",
+        "than",   "then",  "now",  "look",    "only",  "come",  "its",   "over",  "think", "also",
+        "back",   "after", "use",  "two",     "how",   "our",   "work",  "first", "well",  "way",
+        "even",   "new",   "want", "because", "any",   "these", "give",  "day",   "most",  "us"};
 };
 
-} // namespace diagon::benchmarks
+}  // namespace diagon::benchmarks

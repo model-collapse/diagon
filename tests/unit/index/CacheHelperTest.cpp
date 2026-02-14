@@ -1,9 +1,10 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
+#include "diagon/index/CacheHelper.h"
+
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
-#include "diagon/index/CacheHelper.h"
 #include "diagon/index/DirectoryReader.h"
 #include "diagon/index/IndexWriter.h"
 #include "diagon/index/SegmentReader.h"

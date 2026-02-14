@@ -10,6 +10,7 @@
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <chrono>
 #include <filesystem>
 #include <iostream>
@@ -35,9 +36,7 @@ protected:
         fs::create_directories(testDir_);
     }
 
-    void TearDown() override {
-        fs::remove_all(testDir_);
-    }
+    void TearDown() override { fs::remove_all(testDir_); }
 
     fs::path testDir_;
 };
@@ -103,8 +102,7 @@ TEST_F(BasicEndToEndTest, IndexingPerformance) {
 
         for (int i = 0; i < NUM_DOCS; i++) {
             Document doc;
-            std::string content = "Document " + std::to_string(i) +
-                                 " with some content to index";
+            std::string content = "Document " + std::to_string(i) + " with some content to index";
             doc.add(std::make_unique<TextField>("title", content));
             writer.addDocument(doc);
         }
@@ -138,7 +136,8 @@ TEST_F(BasicEndToEndTest, IndexingPerformance) {
         auto results = searcher.search(query, 10);
         auto searchEnd = std::chrono::high_resolution_clock::now();
 
-        auto searchDuration = std::chrono::duration_cast<std::chrono::microseconds>(searchEnd - searchStart);
+        auto searchDuration = std::chrono::duration_cast<std::chrono::microseconds>(searchEnd -
+                                                                                    searchStart);
 
         std::cout << "\n";
         std::cout << "=== Search Performance ===\n";
@@ -178,7 +177,8 @@ TEST_F(BasicEndToEndTest, BM25ScoringWithNorms) {
 
         // Long doc (10 terms)
         Document doc2;
-        doc2.add(std::make_unique<TextField>("body", "query apple banana cherry date elderberry fig grape honeydew "));
+        doc2.add(std::make_unique<TextField>(
+            "body", "query apple banana cherry date elderberry fig grape honeydew "));
         writer.addDocument(doc2);
 
         writer.commit();

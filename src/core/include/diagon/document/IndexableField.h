@@ -40,9 +40,9 @@ struct FieldType {
     index::IndexOptions indexOptions = index::IndexOptions::NONE;
     index::DocValuesType docValuesType = index::DocValuesType::NONE;
     NumericType numericType = NumericType::NONE;  // Track numeric field type
-    bool stored = false;     // Store original value
-    bool tokenized = false;  // Apply analysis/tokenization
-    bool omitNorms = false;  // Omit length normalization
+    bool stored = false;                          // Store original value
+    bool tokenized = false;                       // Apply analysis/tokenization
+    bool omitNorms = false;                       // Omit length normalization
 
     FieldType() = default;
 

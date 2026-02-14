@@ -3,8 +3,8 @@
 
 #include "diagon/index/InMemoryNormsProducer.h"
 
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 
 namespace diagon {
 namespace index {
@@ -20,7 +20,8 @@ void InMemoryNormsProducer::setNorm(const std::string& field, int docID, int8_t 
     fieldNorms[docID] = norm;
 }
 
-void InMemoryNormsProducer::setNormFromLength(const std::string& field, int docID, int fieldLength) {
+void InMemoryNormsProducer::setNormFromLength(const std::string& field, int docID,
+                                              int fieldLength) {
     int8_t norm = encodeNorm(fieldLength);
     setNorm(field, docID, norm);
 }

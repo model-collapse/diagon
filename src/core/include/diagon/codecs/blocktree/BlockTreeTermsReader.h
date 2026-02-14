@@ -38,7 +38,8 @@ public:
         /** File pointer to block */
         int64_t blockFP;
 
-        BlockMetadata() : blockFP(0) {}
+        BlockMetadata()
+            : blockFP(0) {}
 
         BlockMetadata(const util::BytesRef& term, int64_t fp)
             : firstTermData(term.data(), term.data() + term.length())

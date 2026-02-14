@@ -1,4 +1,5 @@
 #include "analysis/WhitespaceTokenizer.h"
+
 #include <cctype>
 
 namespace diagon {
@@ -50,5 +51,5 @@ std::vector<Token> WhitespaceTokenizer::tokenize(const std::string& text) {
     return tokens;
 }
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

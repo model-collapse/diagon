@@ -9,10 +9,10 @@
 #include "diagon/store/Directory.h"
 #include "diagon/store/MMapDirectory.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
-#include <cstdint>
 
 namespace diagon {
 namespace sparse {
@@ -154,9 +154,9 @@ public:
          * - MAX_RATIO: Threshold by α * max_gain
          */
         enum SelectionMode {
-            ALPHA_MASS,   // Default: best balance
-            TOP_K,        // Fixed budget
-            MAX_RATIO     // Threshold-based
+            ALPHA_MASS,  // Default: best balance
+            TOP_K,       // Fixed budget
+            MAX_RATIO    // Threshold-based
         };
         SelectionMode selection_mode = ALPHA_MASS;
 
@@ -438,10 +438,7 @@ private:
      * @param term Term ID
      * @param gains Output: gains[bin] = quant_val[bin] * query_weight
      */
-    void computeBlockGains(
-        float query_weight,
-        uint32_t term,
-        std::vector<float>& gains) const;
+    void computeBlockGains(float query_weight, uint32_t term, std::vector<float>& gains) const;
 };
 
 }  // namespace sparse

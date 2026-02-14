@@ -2,9 +2,11 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/sparse/QBlockIndex.h"
+
 #include "diagon/sparse/SparseVector.h"
 
 #include <gtest/gtest.h>
+
 #include <algorithm>
 
 using namespace diagon::sparse;
@@ -106,9 +108,9 @@ TEST(QBlockIndexTest, BuildSimpleIndex) {
     index.build(documents);
 
     EXPECT_EQ(4, index.numDocuments());
-    EXPECT_EQ(3, index.numTerms());  // Terms 0, 1, 2
+    EXPECT_EQ(3, index.numTerms());     // Terms 0, 1, 2
     EXPECT_EQ(9, index.numPostings());  // Total 9 postings (2+2+2+3)
-    EXPECT_EQ(2, index.numWindows());  // 4 docs / 2 per window = 2 windows
+    EXPECT_EQ(2, index.numWindows());   // 4 docs / 2 per window = 2 windows
 }
 
 TEST(QBlockIndexTest, BuildLargeIndex) {
@@ -179,8 +181,10 @@ TEST(QBlockIndexTest, SearchSimpleQuery) {
     bool found_doc0 = false;
     bool found_doc1 = false;
     for (const auto& result : results) {
-        if (result.doc_id == 0) found_doc0 = true;
-        if (result.doc_id == 1) found_doc1 = true;
+        if (result.doc_id == 0)
+            found_doc0 = true;
+        if (result.doc_id == 1)
+            found_doc1 = true;
     }
 
     EXPECT_TRUE(found_doc0);

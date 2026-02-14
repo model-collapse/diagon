@@ -13,8 +13,7 @@ namespace sparse {
 
 // ==================== Construction ====================
 
-SparseVector::SparseVector(const std::vector<uint32_t>& indices,
-                           const std::vector<float>& values) {
+SparseVector::SparseVector(const std::vector<uint32_t>& indices, const std::vector<float>& values) {
     if (indices.size() != values.size()) {
         throw std::invalid_argument("indices and values must have same size");
     }
@@ -37,7 +36,8 @@ SparseVector::SparseVector(const std::vector<SparseElement>& elements)
 // ==================== Modification ====================
 
 void SparseVector::add(uint32_t index, float value) {
-    if (value == 0.0f) return;
+    if (value == 0.0f)
+        return;
 
     auto it = findElement(index);
     if (it != elements_.end()) {
@@ -87,7 +87,8 @@ bool SparseVector::contains(uint32_t index) const {
 }
 
 uint32_t SparseVector::maxDimension() const {
-    if (elements_.empty()) return 0;
+    if (elements_.empty())
+        return 0;
     return elements_.back().index + 1;
 }
 
@@ -141,23 +142,23 @@ float SparseVector::cosineSimilarity(const SparseVector& other) const {
     float dot_product = dot(other);
     float norm_product = norm() * other.norm();
 
-    if (norm_product == 0.0f) return 0.0f;
+    if (norm_product == 0.0f)
+        return 0.0f;
     return dot_product / norm_product;
 }
 
 // ==================== Pruning ====================
 
 void SparseVector::pruneTopK(size_t k, bool by_value) {
-    if (elements_.size() <= k) return;
+    if (elements_.size() <= k)
+        return;
 
     if (by_value) {
         // Sort by absolute value (descending)
-        std::partial_sort(elements_.begin(),
-                         elements_.begin() + k,
-                         elements_.end(),
-                         [](const SparseElement& a, const SparseElement& b) {
-                             return std::abs(a.value) > std::abs(b.value);
-                         });
+        std::partial_sort(elements_.begin(), elements_.begin() + k, elements_.end(),
+                          [](const SparseElement& a, const SparseElement& b) {
+                              return std::abs(a.value) > std::abs(b.value);
+                          });
     }
 
     // Keep only top k
@@ -168,14 +169,14 @@ void SparseVector::pruneTopK(size_t k, bool by_value) {
 }
 
 void SparseVector::pruneByMass(float alpha) {
-    if (alpha >= 1.0f || elements_.empty()) return;
+    if (alpha >= 1.0f || elements_.empty())
+        return;
 
     // Sort by absolute value (descending)
     std::vector<SparseElement> sorted = elements_;
-    std::sort(sorted.begin(), sorted.end(),
-             [](const SparseElement& a, const SparseElement& b) {
-                 return std::abs(a.value) > std::abs(b.value);
-             });
+    std::sort(sorted.begin(), sorted.end(), [](const SparseElement& a, const SparseElement& b) {
+        return std::abs(a.value) > std::abs(b.value);
+    });
 
     // Calculate total mass
     float total_mass = 0.0f;
@@ -191,7 +192,8 @@ void SparseVector::pruneByMass(float alpha) {
     for (const auto& elem : sorted) {
         current_mass += std::abs(elem.value);
         threshold = std::abs(elem.value);
-        if (current_mass >= target_mass) break;
+        if (current_mass >= target_mass)
+            break;
     }
 
     // Filter by threshold
@@ -199,19 +201,19 @@ void SparseVector::pruneByMass(float alpha) {
 }
 
 void SparseVector::pruneByThreshold(float threshold) {
-    elements_.erase(
-        std::remove_if(elements_.begin(), elements_.end(),
-                      [threshold](const SparseElement& elem) {
-                          return std::abs(elem.value) < threshold;
-                      }),
-        elements_.end());
+    elements_.erase(std::remove_if(elements_.begin(), elements_.end(),
+                                   [threshold](const SparseElement& elem) {
+                                       return std::abs(elem.value) < threshold;
+                                   }),
+                    elements_.end());
 }
 
 // ==================== Normalization ====================
 
 void SparseVector::normalize() {
     float n = norm();
-    if (n == 0.0f) return;
+    if (n == 0.0f)
+        return;
 
     scale(1.0f / n);
 }
@@ -226,16 +228,14 @@ void SparseVector::scale(float factor) {
 
 void SparseVector::sortByIndex() {
     std::sort(elements_.begin(), elements_.end(),
-             [](const SparseElement& a, const SparseElement& b) {
-                 return a.index < b.index;
-             });
+              [](const SparseElement& a, const SparseElement& b) { return a.index < b.index; });
 }
 
 void SparseVector::sortByValue() {
     std::sort(elements_.begin(), elements_.end(),
-             [](const SparseElement& a, const SparseElement& b) {
-                 return std::abs(a.value) > std::abs(b.value);
-             });
+              [](const SparseElement& a, const SparseElement& b) {
+                  return std::abs(a.value) > std::abs(b.value);
+              });
 }
 
 // ==================== Conversion ====================
@@ -271,8 +271,7 @@ SparseVector SparseVector::fromDense(const std::vector<float>& dense, float thre
 // ==================== Private Methods ====================
 
 std::vector<SparseElement>::iterator SparseVector::findElement(uint32_t index) {
-    auto it = std::lower_bound(elements_.begin(), elements_.end(),
-                               SparseElement(index, 0.0f));
+    auto it = std::lower_bound(elements_.begin(), elements_.end(), SparseElement(index, 0.0f));
     if (it != elements_.end() && it->index == index) {
         return it;
     }
@@ -280,8 +279,7 @@ std::vector<SparseElement>::iterator SparseVector::findElement(uint32_t index) {
 }
 
 std::vector<SparseElement>::const_iterator SparseVector::findElement(uint32_t index) const {
-    auto it = std::lower_bound(elements_.begin(), elements_.end(),
-                               SparseElement(index, 0.0f));
+    auto it = std::lower_bound(elements_.begin(), elements_.end(), SparseElement(index, 0.0f));
     if (it != elements_.end() && it->index == index) {
         return it;
     }

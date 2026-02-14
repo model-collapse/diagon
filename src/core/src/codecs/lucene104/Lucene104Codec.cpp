@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104Codec.h"
+
 #include "diagon/codecs/lucene104/Lucene104FieldsConsumer.h"
 #include "diagon/codecs/lucene104/Lucene104FieldsProducer.h"
 #include "diagon/codecs/lucene104/Lucene104NormsWriter.h"
@@ -12,11 +13,13 @@ namespace lucene104 {
 
 // ==================== Lucene104PostingsFormat Implementation ====================
 
-std::unique_ptr<FieldsConsumer> Lucene104PostingsFormat::fieldsConsumer(index::SegmentWriteState& state) {
+std::unique_ptr<FieldsConsumer>
+Lucene104PostingsFormat::fieldsConsumer(index::SegmentWriteState& state) {
     return std::make_unique<Lucene104FieldsConsumer>(state);
 }
 
-std::unique_ptr<FieldsProducer> Lucene104PostingsFormat::fieldsProducer(index::SegmentReadState& state) {
+std::unique_ptr<FieldsProducer>
+Lucene104PostingsFormat::fieldsProducer(index::SegmentReadState& state) {
     return std::make_unique<Lucene104FieldsProducer>(state);
 }
 

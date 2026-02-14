@@ -113,7 +113,8 @@ private:
      * @param terms Terms for this field
      * @param norms Norms producer (optional, for Block-Max WAND impacts)
      */
-    void writeField(const std::string& fieldName, ::diagon::index::Terms& terms, ::diagon::codecs::NormsProducer* norms);
+    void writeField(const std::string& fieldName, ::diagon::index::Terms& terms,
+                    ::diagon::codecs::NormsProducer* norms);
 };
 
 }  // namespace lucene104

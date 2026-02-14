@@ -55,9 +55,7 @@ public:
      * @param vector Sparse vector data
      * @param stored Whether to store the original vector (default: false)
      */
-    SparseVectorField(std::string name,
-                      const sparse::SparseVector& vector,
-                      bool stored = false);
+    SparseVectorField(std::string name, const sparse::SparseVector& vector, bool stored = false);
 
     /**
      * Create a sparse vector field with custom field type
@@ -66,9 +64,7 @@ public:
      * @param vector Sparse vector data
      * @param type Custom field type configuration
      */
-    SparseVectorField(std::string name,
-                      const sparse::SparseVector& vector,
-                      FieldType type);
+    SparseVectorField(std::string name, const sparse::SparseVector& vector, FieldType type);
 
     // IndexableField implementation
     std::string name() const override { return name_; }

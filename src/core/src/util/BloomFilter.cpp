@@ -2,10 +2,11 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/util/BloomFilter.h"
+
 #include "diagon/util/CityHash.h"
 
-#include <stdexcept>
 #include <bit>  // std::popcount (C++20)
+#include <stdexcept>
 
 namespace diagon {
 namespace util {
@@ -22,7 +23,6 @@ BloomFilter::BloomFilter(size_t size_bytes, size_t num_hashes, uint64_t seed)
     , num_words_((size_bytes + sizeof(Word) - 1) / sizeof(Word))
     , num_bits_(size_bytes * 8)
     , filter_(num_words_, 0) {
-
     if (size_bytes == 0) {
         throw std::invalid_argument("BloomFilter size cannot be zero");
     }
@@ -145,8 +145,7 @@ bool BloomFilter::containsAll(const BloomFilter& other) const {
 
 void BloomFilter::merge(const BloomFilter& other) {
     if (size_bytes_ != other.size_bytes_ || seed_ != other.seed_) {
-        throw std::invalid_argument(
-            "BloomFilter::merge requires filters with same size and seed");
+        throw std::invalid_argument("BloomFilter::merge requires filters with same size and seed");
     }
 
     // Bitwise OR each word
@@ -196,9 +195,7 @@ double BloomFilter::estimateFalsePositiveRate() const {
 // ==================== Comparison ====================
 
 bool operator==(const BloomFilter& a, const BloomFilter& b) {
-    if (a.size_bytes_ != b.size_bytes_ ||
-        a.num_hashes_ != b.num_hashes_ ||
-        a.seed_ != b.seed_) {
+    if (a.size_bytes_ != b.size_bytes_ || a.num_hashes_ != b.num_hashes_ || a.seed_ != b.seed_) {
         return false;
     }
 
@@ -223,10 +220,8 @@ void BloomFilter::computePositions(const char* data, size_t len, size_t* positio
 void BloomFilter::computePositionsFromHash(uint64_t hash, size_t* positions) const {
     // Generate second hash from first
     uint64_t hash1 = hash;
-    uint64_t hash2 = CityHash64WithSeed(
-        reinterpret_cast<const char*>(&hash),
-        sizeof(hash),
-        SEED_GEN_A * seed_ + SEED_GEN_B);
+    uint64_t hash2 = CityHash64WithSeed(reinterpret_cast<const char*>(&hash), sizeof(hash),
+                                        SEED_GEN_A * seed_ + SEED_GEN_B);
 
     // Double hashing
     uint64_t acc = hash1;
@@ -236,5 +231,5 @@ void BloomFilter::computePositionsFromHash(uint64_t hash, size_t* positions) con
     }
 }
 
-} // namespace util
-} // namespace diagon
+}  // namespace util
+}  // namespace diagon

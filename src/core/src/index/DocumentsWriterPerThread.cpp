@@ -176,7 +176,8 @@ bool DocumentsWriterPerThread::addDocument(const document::Document& doc) {
                             break;
                     }
                     if (!numericTypeStr.empty()) {
-                        fieldInfosBuilder_.setAttribute(field->name(), "numeric_type", numericTypeStr);
+                        fieldInfosBuilder_.setAttribute(field->name(), "numeric_type",
+                                                        numericTypeStr);
                     }
                 }
 
@@ -311,7 +312,7 @@ bool DocumentsWriterPerThread::needsFlush() const {
  * @return Vector of encoded norm values (1 byte per document)
  */
 std::vector<int64_t> DocumentsWriterPerThread::computeNorms(const std::string& fieldName,
-                                                              int numDocs) {
+                                                            int numDocs) {
     // Initialize norm values (field length per document)
     std::vector<int64_t> fieldLengths(numDocs, 0);
 
@@ -432,7 +433,8 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
 
         // Add files to SegmentInfo (hack: cast to get files)
         // TODO Phase 4.1: Make getFiles() part of FieldsConsumer interface
-        auto* lucene104Consumer = dynamic_cast<codecs::lucene104::Lucene104FieldsConsumer*>(consumer.get());
+        auto* lucene104Consumer = dynamic_cast<codecs::lucene104::Lucene104FieldsConsumer*>(
+            consumer.get());
         auto* simpleConsumer = dynamic_cast<codecs::SimpleFieldsConsumer*>(consumer.get());
 
         if (lucene104Consumer) {
@@ -453,10 +455,10 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
             storedFieldsWriter_->finish(numDocsInRAM_);
 
             // Create output files for stored fields
-            auto dataOut =
-                directory_->createOutput(segmentName + ".fdt", store::IOContext::DEFAULT);
-            auto indexOut =
-                directory_->createOutput(segmentName + ".fdx", store::IOContext::DEFAULT);
+            auto dataOut = directory_->createOutput(segmentName + ".fdt",
+                                                    store::IOContext::DEFAULT);
+            auto indexOut = directory_->createOutput(segmentName + ".fdx",
+                                                     store::IOContext::DEFAULT);
 
             // Flush stored fields
             storedFieldsWriter_->flush(*dataOut, *indexOut);
@@ -480,10 +482,10 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
             }
 
             // Create output files for doc values
-            auto dataOut =
-                directory_->createOutput(segmentName + ".dvd", store::IOContext::DEFAULT);
-            auto metaOut =
-                directory_->createOutput(segmentName + ".dvm", store::IOContext::DEFAULT);
+            auto dataOut = directory_->createOutput(segmentName + ".dvd",
+                                                    store::IOContext::DEFAULT);
+            auto metaOut = directory_->createOutput(segmentName + ".dvm",
+                                                    store::IOContext::DEFAULT);
 
             // Flush doc values
             docValuesWriter_->flush(*dataOut, *metaOut);

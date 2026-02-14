@@ -1,20 +1,16 @@
-#include <gtest/gtest.h>
 #include "analysis/StopFilter.h"
+
+#include <gtest/gtest.h>
 
 using namespace diagon::analysis;
 
 TEST(StopFilterTest, EnglishStopWords) {
     StopFilter filter(StopFilter::StopWordSet::ENGLISH);
 
-    std::vector<Token> tokens{
-        Token("the", 0, 0, 3),
-        Token("quick", 1, 4, 9),
-        Token("brown", 2, 10, 15),
-        Token("fox", 3, 16, 19),
-        Token("and", 4, 20, 23),
-        Token("a", 5, 24, 25),
-        Token("dog", 6, 26, 29)
-    };
+    std::vector<Token> tokens{Token("the", 0, 0, 3),     Token("quick", 1, 4, 9),
+                              Token("brown", 2, 10, 15), Token("fox", 3, 16, 19),
+                              Token("and", 4, 20, 23),   Token("a", 5, 24, 25),
+                              Token("dog", 6, 26, 29)};
 
     auto result = filter.filter(tokens);
 
@@ -29,13 +25,8 @@ TEST(StopFilterTest, EnglishStopWords) {
 TEST(StopFilterTest, ChineseStopWords) {
     StopFilter filter(StopFilter::StopWordSet::CHINESE);
 
-    std::vector<Token> tokens{
-        Token("的", 0, 0, 3),
-        Token("北京", 1, 3, 9),
-        Token("是", 2, 9, 12),
-        Token("中国", 3, 12, 18),
-        Token("了", 4, 18, 21)
-    };
+    std::vector<Token> tokens{Token("的", 0, 0, 3), Token("北京", 1, 3, 9), Token("是", 2, 9, 12),
+                              Token("中国", 3, 12, 18), Token("了", 4, 18, 21)};
 
     auto result = filter.filter(tokens);
 
@@ -49,13 +40,9 @@ TEST(StopFilterTest, CustomStopWords) {
     std::unordered_set<std::string> custom_stops{"foo", "bar", "baz"};
     StopFilter filter(custom_stops);
 
-    std::vector<Token> tokens{
-        Token("hello", 0, 0, 5),
-        Token("foo", 1, 6, 9),
-        Token("world", 2, 10, 15),
-        Token("bar", 3, 16, 19),
-        Token("test", 4, 20, 24)
-    };
+    std::vector<Token> tokens{Token("hello", 0, 0, 5), Token("foo", 1, 6, 9),
+                              Token("world", 2, 10, 15), Token("bar", 3, 16, 19),
+                              Token("test", 4, 20, 24)};
 
     auto result = filter.filter(tokens);
 
@@ -79,11 +66,8 @@ TEST(StopFilterTest, EmptyTokens) {
 TEST(StopFilterTest, NoStopWords) {
     StopFilter filter(StopFilter::StopWordSet::ENGLISH);
 
-    std::vector<Token> tokens{
-        Token("quick", 0, 0, 5),
-        Token("brown", 1, 6, 11),
-        Token("fox", 2, 12, 15)
-    };
+    std::vector<Token> tokens{Token("quick", 0, 0, 5), Token("brown", 1, 6, 11),
+                              Token("fox", 2, 12, 15)};
 
     auto result = filter.filter(tokens);
 
@@ -96,12 +80,8 @@ TEST(StopFilterTest, NoStopWords) {
 TEST(StopFilterTest, AllStopWords) {
     StopFilter filter(StopFilter::StopWordSet::ENGLISH);
 
-    std::vector<Token> tokens{
-        Token("the", 0, 0, 3),
-        Token("a", 1, 4, 5),
-        Token("an", 2, 6, 8),
-        Token("and", 3, 9, 12)
-    };
+    std::vector<Token> tokens{Token("the", 0, 0, 3), Token("a", 1, 4, 5), Token("an", 2, 6, 8),
+                              Token("and", 3, 9, 12)};
 
     auto result = filter.filter(tokens);
 
@@ -111,10 +91,8 @@ TEST(StopFilterTest, AllStopWords) {
 TEST(StopFilterTest, CaseSensitive) {
     StopFilter filter(StopFilter::StopWordSet::ENGLISH);
 
-    std::vector<Token> tokens{
-        Token("The", 0, 0, 3),  // Uppercase "The"
-        Token("quick", 1, 4, 9)
-    };
+    std::vector<Token> tokens{Token("The", 0, 0, 3),  // Uppercase "The"
+                              Token("quick", 1, 4, 9)};
 
     auto result = filter.filter(tokens);
 
@@ -128,11 +106,8 @@ TEST(StopFilterTest, CaseSensitive) {
 TEST(StopFilterTest, PreservesOffsets) {
     StopFilter filter(StopFilter::StopWordSet::ENGLISH);
 
-    std::vector<Token> tokens{
-        Token("quick", 0, 10, 15),
-        Token("the", 1, 16, 19),
-        Token("fox", 2, 20, 23)
-    };
+    std::vector<Token> tokens{Token("quick", 0, 10, 15), Token("the", 1, 16, 19),
+                              Token("fox", 2, 20, 23)};
 
     auto result = filter.filter(tokens);
 
@@ -146,11 +121,8 @@ TEST(StopFilterTest, PreservesOffsets) {
 TEST(StopFilterTest, PreservesTokenType) {
     StopFilter filter(StopFilter::StopWordSet::ENGLISH);
 
-    std::vector<Token> tokens{
-        Token("quick", 0, 0, 5),
-        Token("123", 1, 6, 9),
-        Token("the", 2, 10, 13)
-    };
+    std::vector<Token> tokens{Token("quick", 0, 0, 5), Token("123", 1, 6, 9),
+                              Token("the", 2, 10, 13)};
 
     tokens[0].setType("word");
     tokens[1].setType("number");
@@ -166,10 +138,7 @@ TEST(StopFilterTest, EmptyStopSet) {
     std::unordered_set<std::string> empty_stops;
     StopFilter filter(empty_stops);
 
-    std::vector<Token> tokens{
-        Token("the", 0, 0, 3),
-        Token("quick", 1, 4, 9)
-    };
+    std::vector<Token> tokens{Token("the", 0, 0, 3), Token("quick", 1, 4, 9)};
 
     auto result = filter.filter(tokens);
 
@@ -180,16 +149,10 @@ TEST(StopFilterTest, EmptyStopSet) {
 TEST(StopFilterTest, CommonEnglishStopWords) {
     StopFilter filter(StopFilter::StopWordSet::ENGLISH);
 
-    std::vector<Token> tokens{
-        Token("is", 0, 0, 2),
-        Token("was", 1, 3, 6),
-        Token("are", 2, 7, 10),
-        Token("were", 3, 11, 15),
-        Token("been", 4, 16, 20),
-        Token("have", 5, 21, 25),
-        Token("has", 6, 26, 29),
-        Token("had", 7, 30, 33)
-    };
+    std::vector<Token> tokens{Token("is", 0, 0, 2),     Token("was", 1, 3, 6),
+                              Token("are", 2, 7, 10),   Token("were", 3, 11, 15),
+                              Token("been", 4, 16, 20), Token("have", 5, 21, 25),
+                              Token("has", 6, 26, 29),  Token("had", 7, 30, 33)};
 
     auto result = filter.filter(tokens);
 
@@ -201,12 +164,8 @@ TEST(StopFilterTest, MixedLanguage) {
     // Test with both English and non-English words
     StopFilter filter(StopFilter::StopWordSet::ENGLISH);
 
-    std::vector<Token> tokens{
-        Token("the", 0, 0, 3),
-        Token("café", 1, 4, 9),
-        Token("is", 2, 10, 12),
-        Token("résumé", 3, 13, 20)
-    };
+    std::vector<Token> tokens{Token("the", 0, 0, 3), Token("café", 1, 4, 9), Token("is", 2, 10, 12),
+                              Token("résumé", 3, 13, 20)};
 
     auto result = filter.filter(tokens);
 

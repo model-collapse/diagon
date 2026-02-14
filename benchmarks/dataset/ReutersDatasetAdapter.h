@@ -16,11 +16,12 @@
 
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <filesystem>
 
 namespace diagon::benchmarks {
 
@@ -53,7 +54,7 @@ public:
         while (currentFile_.is_open() || currentFileIndex_ < files_.size()) {
             if (!currentFile_.is_open()) {
                 if (!openNextFile()) {
-                    return false; // No more files
+                    return false;  // No more files
                 }
             }
 
@@ -73,9 +74,7 @@ public:
     /**
      * Get total document count processed so far
      */
-    int getDocumentCount() const {
-        return docCount_;
-    }
+    int getDocumentCount() const { return docCount_; }
 
     /**
      * Reset to beginning
@@ -128,7 +127,7 @@ private:
         while (std::getline(currentFile_, line) && line.empty()) {}
 
         if (line.empty() && currentFile_.eof()) {
-            return false; // End of file
+            return false;  // End of file
         }
 
         // Line 1: Date
@@ -139,7 +138,7 @@ private:
 
         // Line 3: Title
         if (!std::getline(currentFile_, line)) {
-            return false; // Malformed document
+            return false;  // Malformed document
         }
         std::string title = line;
 
@@ -171,7 +170,7 @@ private:
         // Total filtered: 2,535 files
         // This reduces index from 21,578 files to 19,043 docs
         if (body.empty()) {
-            return false; // Skip documents without body
+            return false;  // Skip documents without body
         }
 
         // Populate document
@@ -189,4 +188,4 @@ private:
     int docCount_;
 };
 
-} // namespace diagon::benchmarks
+}  // namespace diagon::benchmarks

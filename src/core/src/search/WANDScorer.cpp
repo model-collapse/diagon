@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/search/WANDScorer.h"
+
 #include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
 #include "diagon/util/ScalingUtils.h"
 #include "diagon/util/SearchProfiler.h"
@@ -25,20 +26,19 @@ WANDScorer::WANDScorer(std::vector<std::unique_ptr<Scorer>>& scorers,
     , doc_(-1)
     , leadScore_(0.0f)
     , freq_(0)
-    , tailMaxScore_(0)         // Scaled integer
+    , tailMaxScore_(0)  // Scaled integer
     , tailSize_(0)
     , cost_(0)
     , upTo_(-1)
-    , docsScored_(0)           // Instrumentation
+    , docsScored_(0)  // Instrumentation
     , tailPromotions_(0)
     , maxScoreUpdates_(0)
     , matchingDocs_(0)
-    , blockBoundaryHits_(0)    // Phase 2 instrumentation
-    , blockBoundaryMisses_(0)  // Phase 2 instrumentation
-    , blocksSkipped_(0)        // Phase 3 instrumentation
-    , moveToNextBlockCalls_(0) // Phase 3 instrumentation
+    , blockBoundaryHits_(0)     // Phase 2 instrumentation
+    , blockBoundaryMisses_(0)   // Phase 2 instrumentation
+    , blocksSkipped_(0)         // Phase 3 instrumentation
+    , moveToNextBlockCalls_(0)  // Phase 3 instrumentation
     , debugPrint_(false) {
-
     if (minShouldMatch >= static_cast<int>(scorers.size())) {
         throw std::invalid_argument("minShouldMatch should be < number of scorers");
     }
@@ -83,23 +83,19 @@ WANDScorer::WANDScorer(std::vector<std::unique_ptr<Scorer>>& scorers,
 WANDScorer::~WANDScorer() {
     if (debugPrint_) {
         std::cerr << "[WAND Stats] "
-                  << "Docs scored: " << docsScored_
-                  << ", Matching: " << matchingDocs_
+                  << "Docs scored: " << docsScored_ << ", Matching: " << matchingDocs_
                   << ", Tail promotions: " << tailPromotions_
                   << ", Max score updates: " << maxScoreUpdates_
                   << ", moveToNextBlock calls: " << moveToNextBlockCalls_
-                  << ", Blocks skipped: " << blocksSkipped_
-                  << std::endl;
+                  << ", Blocks skipped: " << blocksSkipped_ << std::endl;
     }
 }
 
 int WANDScorer::nextDoc() {
-
     return advance(doc_ + 1);
 }
 
 int WANDScorer::advanceApproximation(int target) {
-
     // Phase 1: Return next candidate without checking if it matches
 
     // Move lead scorers back to tail
@@ -125,7 +121,6 @@ int WANDScorer::advanceApproximation(int target) {
 }
 
 bool WANDScorer::doMatches() {
-
     // Phase 2: Check if current candidate satisfies constraints
 
     // Move scorers on doc from head to lead
@@ -173,7 +168,6 @@ bool WANDScorer::doMatches() {
 }
 
 int WANDScorer::advance(int target) {
-
     // Two-phase iteration: repeatedly call approximation then matches until we find a match
     while (true) {
         // Phase 1: Get next candidate
@@ -202,7 +196,6 @@ int WANDScorer::advance(int target) {
 }
 
 float WANDScorer::score() const {
-
     // Score is already computed in leadScore_
     return leadScore_;
 }
@@ -237,10 +230,9 @@ void WANDScorer::pushBackLeads(int target) {
 
             // Insert into head heap
             head_.push_back(evicted);
-            std::push_heap(head_.begin(), head_.end(),
-                          [](ScorerWrapper* a, ScorerWrapper* b) {
-                              return a->doc > b->doc;  // Min heap by doc ID
-                          });
+            std::push_heap(head_.begin(), head_.end(), [](ScorerWrapper* a, ScorerWrapper* b) {
+                return a->doc > b->doc;  // Min heap by doc ID
+            });
         }
     }
 
@@ -251,9 +243,7 @@ WANDScorer::ScorerWrapper* WANDScorer::advanceHead(int target) {
     while (!head_.empty() && head_[0]->doc < target) {
         // Pop from head
         std::pop_heap(head_.begin(), head_.end(),
-                     [](ScorerWrapper* a, ScorerWrapper* b) {
-                         return a->doc > b->doc;
-                     });
+                      [](ScorerWrapper* a, ScorerWrapper* b) { return a->doc > b->doc; });
         ScorerWrapper* wrapper = head_.back();
         head_.pop_back();
 
@@ -264,9 +254,7 @@ WANDScorer::ScorerWrapper* WANDScorer::advanceHead(int target) {
             evicted->doc = evicted->scorer->advance(target);
             head_.push_back(evicted);
             std::push_heap(head_.begin(), head_.end(),
-                          [](ScorerWrapper* a, ScorerWrapper* b) {
-                              return a->doc > b->doc;
-                          });
+                           [](ScorerWrapper* a, ScorerWrapper* b) { return a->doc > b->doc; });
         }
     }
 
@@ -291,9 +279,7 @@ void WANDScorer::advanceTail() {
         // Beyond current doc, add to head
         head_.push_back(wrapper);
         std::push_heap(head_.begin(), head_.end(),
-                      [](ScorerWrapper* a, ScorerWrapper* b) {
-                          return a->doc > b->doc;
-                      });
+                       [](ScorerWrapper* a, ScorerWrapper* b) { return a->doc > b->doc; });
     }
 }
 
@@ -301,9 +287,7 @@ void WANDScorer::moveToNextCandidate() {
     // Pop all scorers from head that match current doc
     while (!head_.empty() && head_[0]->doc == doc_) {
         std::pop_heap(head_.begin(), head_.end(),
-                     [](ScorerWrapper* a, ScorerWrapper* b) {
-                         return a->doc > b->doc;
-                     });
+                      [](ScorerWrapper* a, ScorerWrapper* b) { return a->doc > b->doc; });
         ScorerWrapper* wrapper = head_.back();
         head_.pop_back();
 
@@ -322,7 +306,6 @@ bool WANDScorer::matches() {
 }
 
 void WANDScorer::moveToNextBlock(int target) {
-
     moveToNextBlockCalls_++;  // Instrumentation
 
     // Phase 3: Skip blocks that cannot produce competitive scores
@@ -377,19 +360,18 @@ void WANDScorer::moveToNextBlock(int target) {
             return;
         }
 
-        target = upTo_ + 1;  // Start search from next doc
+        target = upTo_ + 1;    // Start search from next doc
         upTo_ = target + 128;  // Next window
     }
 }
 
 void WANDScorer::updateMaxScores(int target) {
-
     // Instrumentation: Count max score updates
     maxScoreUpdates_++;
 
     // Phase 1: Fixed 128-doc window
     upTo_ = (target < index::PostingsEnum::NO_MORE_DOCS - 128) ? target + 128
-                                                                : index::PostingsEnum::NO_MORE_DOCS;
+                                                               : index::PostingsEnum::NO_MORE_DOCS;
 
     // Phase 3: Skip non-competitive blocks
     // This may advance upTo_ to find a block where sum(maxScores) >= minCompetitiveScore
@@ -435,9 +417,7 @@ void WANDScorer::updateMaxScores(int target) {
         wrapper->doc = wrapper->scorer->advance(target);
         head_.push_back(wrapper);
         std::push_heap(head_.begin(), head_.end(),
-                      [](ScorerWrapper* a, ScorerWrapper* b) {
-                          return a->doc > b->doc;
-                      });
+                       [](ScorerWrapper* a, ScorerWrapper* b) { return a->doc > b->doc; });
     }
 }
 
@@ -463,7 +443,8 @@ WANDScorer::ScorerWrapper* WANDScorer::insertTailWithOverFlow(ScorerWrapper* wra
     // Evict min max score from tail
     ScorerWrapper* evicted = tail_[0];
     tail_[0] = wrapper;
-    tailMaxScore_ = tailMaxScore_ - evicted->scaledMaxScore + wrapper->scaledMaxScore;  // Integer arithmetic
+    tailMaxScore_ = tailMaxScore_ - evicted->scaledMaxScore +
+                    wrapper->scaledMaxScore;  // Integer arithmetic
     downHeapMaxScore(0);
 
     return evicted;
@@ -519,7 +500,8 @@ void WANDScorer::downHeapMaxScore(int index) {
 
         // Choose larger child
         // Phase 1: Use scaled integers
-        if (child + 1 < tailSize_ && tail_[child + 1]->scaledMaxScore > tail_[child]->scaledMaxScore) {
+        if (child + 1 < tailSize_ &&
+            tail_[child + 1]->scaledMaxScore > tail_[child]->scaledMaxScore) {
             child++;
         }
 

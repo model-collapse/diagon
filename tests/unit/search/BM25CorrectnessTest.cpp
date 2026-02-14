@@ -3,8 +3,8 @@
 
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
-#include "diagon/index/IndexWriter.h"
 #include "diagon/index/DirectoryReader.h"
+#include "diagon/index/IndexWriter.h"
 #include "diagon/search/IndexSearcher.h"
 #include "diagon/search/TermQuery.h"
 #include "diagon/store/FSDirectory.h"
@@ -68,9 +68,8 @@ protected:
      * @param k1 BM25 k1 parameter (default 1.2)
      * @param b BM25 b parameter (default 0.75)
      */
-    float calculateBM25(int termFreq, int docLength, float avgDocLength,
-                       int docFreq, int numDocs,
-                       float k1 = 1.2f, float b = 0.75f) {
+    float calculateBM25(int termFreq, int docLength, float avgDocLength, int docFreq, int numDocs,
+                        float k1 = 1.2f, float b = 0.75f) {
         // IDF calculation: log((N - df + 0.5) / (df + 0.5))
         float idf = std::log((numDocs - docFreq + 0.5f) / (docFreq + 0.5f));
 
@@ -78,8 +77,7 @@ protected:
         float lengthNorm = 1.0f - b + b * (docLength / avgDocLength);
 
         // TF component: (f * (k1 + 1)) / (f + k1 * lengthNorm)
-        float tfComponent = (termFreq * (k1 + 1.0f)) /
-                           (termFreq + k1 * lengthNorm);
+        float tfComponent = (termFreq * (k1 + 1.0f)) / (termFreq + k1 * lengthNorm);
 
         // Final score
         return idf * tfComponent;
@@ -93,10 +91,8 @@ protected:
         float score;
     };
 
-    std::vector<SearchResult> searchAndGetScores(
-        const std::vector<std::string>& docs,
-        const std::string& queryTerm) {
-
+    std::vector<SearchResult> searchAndGetScores(const std::vector<std::string>& docs,
+                                                 const std::string& queryTerm) {
         // Index documents
         {
             IndexWriterConfig config;
@@ -132,7 +128,7 @@ protected:
     std::unique_ptr<Directory> dir_;
 };
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== BM25 Formula Validation ====================
 
@@ -166,9 +162,9 @@ TEST_F(BM25CorrectnessTest, Score_TermFrequencyImpact) {
     // doesn't affect scores. This should be fixed.
 
     std::vector<std::string> docs = {
-        "apple",              // doc0: freq=1
-        "apple apple",        // doc1: freq=2
-        "apple apple apple"   // doc2: freq=3
+        "apple",             // doc0: freq=1
+        "apple apple",       // doc1: freq=2
+        "apple apple apple"  // doc2: freq=3
     };
 
     auto results = searchAndGetScores(docs, "apple");
@@ -187,9 +183,12 @@ TEST_F(BM25CorrectnessTest, Score_TermFrequencyImpact) {
     // Find scores for each doc
     float score0 = -1, score1 = -1, score2 = -1;
     for (const auto& result : results) {
-        if (result.doc == 0) score0 = result.score;
-        if (result.doc == 1) score1 = result.score;
-        if (result.doc == 2) score2 = result.score;
+        if (result.doc == 0)
+            score0 = result.score;
+        if (result.doc == 1)
+            score1 = result.score;
+        if (result.doc == 2)
+            score2 = result.score;
     }
 
     ASSERT_GT(score0, 0) << "All docs should have scores";
@@ -209,8 +208,8 @@ TEST_F(BM25CorrectnessTest, Score_DocumentLengthNormalization) {
     // Test that longer documents get penalized (with b=0.75)
 
     std::vector<std::string> docs = {
-        "apple",                                    // doc0: short (1 token)
-        "apple banana cherry date elderberry"      // doc1: long (5 tokens)
+        "apple",                               // doc0: short (1 token)
+        "apple banana cherry date elderberry"  // doc1: long (5 tokens)
     };
 
     auto results = searchAndGetScores(docs, "apple");
@@ -220,8 +219,10 @@ TEST_F(BM25CorrectnessTest, Score_DocumentLengthNormalization) {
     // Find scores
     float shortDocScore = -1, longDocScore = -1;
     for (const auto& result : results) {
-        if (result.doc == 0) shortDocScore = result.score;
-        if (result.doc == 1) longDocScore = result.score;
+        if (result.doc == 0)
+            shortDocScore = result.score;
+        if (result.doc == 1)
+            longDocScore = result.score;
     }
 
     std::cout << "Short doc (1 token): " << shortDocScore << std::endl;
@@ -237,10 +238,10 @@ TEST_F(BM25CorrectnessTest, Score_IDFCalculation_MultipleDocuments) {
     // Test IDF: rare terms should score higher than common terms
 
     std::vector<std::string> docs = {
-        "apple",      // doc0: contains "apple"
-        "apple",      // doc1: contains "apple"
-        "apple",      // doc2: contains "apple"
-        "banana"      // doc3: contains "banana"
+        "apple",  // doc0: contains "apple"
+        "apple",  // doc1: contains "apple"
+        "apple",  // doc2: contains "apple"
+        "banana"  // doc3: contains "banana"
     };
 
     // Search for common term (appears in 3/4 docs)
@@ -264,17 +265,13 @@ TEST_F(BM25CorrectnessTest, Score_IDFCalculation_MultipleDocuments) {
     // IDF(apple) = log((4-3+0.5)/(3+0.5)) = log(1.5/3.5) ≈ -0.847
     // IDF(banana) = log((4-1+0.5)/(1+0.5)) = log(3.5/1.5) ≈ 0.847
 
-    EXPECT_GT(bananaScore, appleScore)
-        << "Rare term should score higher than common term";
+    EXPECT_GT(bananaScore, appleScore) << "Rare term should score higher than common term";
 }
 
 TEST_F(BM25CorrectnessTest, Score_ZeroFrequency_ReturnsZero) {
     // Query for term not in index should return no results
 
-    std::vector<std::string> docs = {
-        "apple",
-        "banana"
-    };
+    std::vector<std::string> docs = {"apple", "banana"};
 
     auto results = searchAndGetScores(docs, "zebra");
 
@@ -287,16 +284,17 @@ TEST_F(BM25CorrectnessTest, Score_MultipleTerms_ScoresAdditive) {
     // This is a simplified test - full boolean scoring is more complex
 
     std::vector<std::string> docs = {
-        "apple",              // doc0: only "apple"
-        "banana",             // doc1: only "banana"
-        "apple banana"        // doc2: both terms
+        "apple",        // doc0: only "apple"
+        "banana",       // doc1: only "banana"
+        "apple banana"  // doc2: both terms
     };
 
     // Search for "apple"
     auto appleResults = searchAndGetScores(docs, "apple");
     float appleScore = 0;
     for (const auto& r : appleResults) {
-        if (r.doc == 0) appleScore = r.score;
+        if (r.doc == 0)
+            appleScore = r.score;
     }
 
     // Reset for new search
@@ -307,7 +305,8 @@ TEST_F(BM25CorrectnessTest, Score_MultipleTerms_ScoresAdditive) {
     auto bananaResults = searchAndGetScores(docs, "banana");
     float bananaScore = 0;
     for (const auto& r : bananaResults) {
-        if (r.doc == 1) bananaScore = r.score;
+        if (r.doc == 1)
+            bananaScore = r.score;
     }
 
     std::cout << "apple only: " << appleScore << std::endl;

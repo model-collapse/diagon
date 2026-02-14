@@ -20,6 +20,7 @@
 #include "diagon/store/FSDirectory.h"
 
 #include <benchmark/benchmark.h>
+
 #include <algorithm>
 #include <chrono>
 #include <random>
@@ -114,8 +115,7 @@ private:
 
 class ColumnarWriter {
 public:
-    ColumnarWriter(const std::string& path, size_t granule_size,
-                   CompressionCodecPtr codec)
+    ColumnarWriter(const std::string& path, size_t granule_size, CompressionCodecPtr codec)
         : granule_size_(granule_size)
         , codec_(codec)
         , granularity_(granule_size)
@@ -155,9 +155,9 @@ public:
     size_t getCompressedSize() const { return total_compressed_size_; }
 
     size_t getUncompressedSize() const {
-        return id_column_->byteSize() + title_column_->byteSize() +
-               content_column_->byteSize() + timestamp_column_->byteSize() +
-               score_column_->byteSize() + category_column_->byteSize();
+        return id_column_->byteSize() + title_column_->byteSize() + content_column_->byteSize() +
+               timestamp_column_->byteSize() + score_column_->byteSize() +
+               category_column_->byteSize();
     }
 
     double getCompressionRatio() const {
@@ -219,7 +219,7 @@ private:
         std::vector<char> compressed(max_compressed_size);
 
         size_t compressed_size = codec_->compress(data, data_size, compressed.data(),
-                                                   max_compressed_size);
+                                                  max_compressed_size);
 
         return compressed_size;
     }
@@ -246,15 +246,13 @@ static void BM_Ingestion_RowOriented(benchmark::State& state) {
         }
         auto end = std::chrono::high_resolution_clock::now();
 
-        auto duration =
-            std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
         state.SetIterationTime(duration.count() / 1000000.0);
 
         size_t bytes_written = writer.size();
         state.counters["bytes_written"] = bytes_written;
-        state.counters["MB_per_sec"] =
-            benchmark::Counter(bytes_written, benchmark::Counter::kIsRate,
-                               benchmark::Counter::OneK::kIs1024);
+        state.counters["MB_per_sec"] = benchmark::Counter(
+            bytes_written, benchmark::Counter::kIsRate, benchmark::Counter::OneK::kIs1024);
     }
 
     state.SetItemsProcessed(state.iterations() * num_docs);
@@ -286,8 +284,7 @@ static void BM_Ingestion_Columnar_LZ4(benchmark::State& state) {
         writer.finalize();
         auto end = std::chrono::high_resolution_clock::now();
 
-        auto duration =
-            std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
         state.SetIterationTime(duration.count() / 1000000.0);
 
         size_t compressed_size = writer.getCompressedSize();
@@ -297,9 +294,8 @@ static void BM_Ingestion_Columnar_LZ4(benchmark::State& state) {
         state.counters["compressed_bytes"] = compressed_size;
         state.counters["uncompressed_bytes"] = uncompressed_size;
         state.counters["compression_ratio"] = compression_ratio;
-        state.counters["MB_per_sec"] =
-            benchmark::Counter(compressed_size, benchmark::Counter::kIsRate,
-                               benchmark::Counter::OneK::kIs1024);
+        state.counters["MB_per_sec"] = benchmark::Counter(
+            compressed_size, benchmark::Counter::kIsRate, benchmark::Counter::OneK::kIs1024);
     }
 
     state.SetItemsProcessed(state.iterations() * num_docs);
@@ -331,8 +327,7 @@ static void BM_Ingestion_Columnar_ZSTD(benchmark::State& state) {
         writer.finalize();
         auto end = std::chrono::high_resolution_clock::now();
 
-        auto duration =
-            std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
         state.SetIterationTime(duration.count() / 1000000.0);
 
         size_t compressed_size = writer.getCompressedSize();
@@ -342,9 +337,8 @@ static void BM_Ingestion_Columnar_ZSTD(benchmark::State& state) {
         state.counters["compressed_bytes"] = compressed_size;
         state.counters["uncompressed_bytes"] = uncompressed_size;
         state.counters["compression_ratio"] = compression_ratio;
-        state.counters["MB_per_sec"] =
-            benchmark::Counter(compressed_size, benchmark::Counter::kIsRate,
-                               benchmark::Counter::OneK::kIs1024);
+        state.counters["MB_per_sec"] = benchmark::Counter(
+            compressed_size, benchmark::Counter::kIsRate, benchmark::Counter::OneK::kIs1024);
     }
 
     state.SetItemsProcessed(state.iterations() * num_docs);
@@ -376,15 +370,13 @@ static void BM_Ingestion_Columnar_NoCompression(benchmark::State& state) {
         writer.finalize();
         auto end = std::chrono::high_resolution_clock::now();
 
-        auto duration =
-            std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
         state.SetIterationTime(duration.count() / 1000000.0);
 
         size_t bytes_written = writer.getUncompressedSize();
         state.counters["bytes_written"] = bytes_written;
-        state.counters["MB_per_sec"] =
-            benchmark::Counter(bytes_written, benchmark::Counter::kIsRate,
-                               benchmark::Counter::OneK::kIs1024);
+        state.counters["MB_per_sec"] = benchmark::Counter(
+            bytes_written, benchmark::Counter::kIsRate, benchmark::Counter::OneK::kIs1024);
     }
 
     state.SetItemsProcessed(state.iterations() * num_docs);

@@ -20,9 +20,10 @@
 #include "diagon/util/FST.h"
 
 #include <gtest/gtest.h>
-#include <vector>
-#include <string>
+
 #include <set>
+#include <string>
+#include <vector>
 
 using namespace diagon::util;
 
@@ -67,18 +68,15 @@ void verifyIdenticalEntries(const FST& fst1, const FST& fst2) {
     const auto& entries1 = fst1.getAllEntries();
     const auto& entries2 = fst2.getAllEntries();
 
-    ASSERT_EQ(entries1.size(), entries2.size())
-        << "Entry count mismatch";
+    ASSERT_EQ(entries1.size(), entries2.size()) << "Entry count mismatch";
 
     for (size_t i = 0; i < entries1.size(); i++) {
-        EXPECT_EQ(entries1[i].first, entries2[i].first)
-            << "Term mismatch at index " << i;
-        EXPECT_EQ(entries1[i].second, entries2[i].second)
-            << "Output mismatch at index " << i;
+        EXPECT_EQ(entries1[i].first, entries2[i].first) << "Term mismatch at index " << i;
+        EXPECT_EQ(entries1[i].second, entries2[i].second) << "Output mismatch at index " << i;
     }
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== Task 5.1: Basic Roundtrip Tests ====================
 
@@ -131,23 +129,16 @@ TEST(FSTSerializationVerificationTest, SingleEntryRoundtrip) {
  * Lucene Behavior: All terms and outputs preserved
  */
 TEST(FSTSerializationVerificationTest, MultipleEntriesRoundtrip) {
-    auto original = buildTestFST({
-        {"apple", 1},
-        {"banana", 2},
-        {"cherry", 3},
-        {"date", 4},
-        {"elderberry", 5}
-    });
+    auto original = buildTestFST(
+        {{"apple", 1}, {"banana", 2}, {"cherry", 3}, {"date", 4}, {"elderberry", 5}});
 
     auto serialized = original->serialize();
     auto deserialized = FST::deserialize(serialized);
 
     // Verify all terms
-    std::vector<std::string> terms = {
-        "apple", "banana", "cherry", "date", "elderberry",
-        // Non-existent
-        "apricot", "app", "dates"
-    };
+    std::vector<std::string> terms = {"apple", "banana", "cherry", "date", "elderberry",
+                                      // Non-existent
+                                      "apricot", "app", "dates"};
     verifyIdenticalLookups(*original, *deserialized, terms);
 
     verifyIdenticalEntries(*original, *deserialized);
@@ -216,12 +207,7 @@ TEST(FSTSerializationVerificationTest, BinaryDataRoundtrip) {
  * Lucene Behavior: UTF-8 sequences preserved
  */
 TEST(FSTSerializationVerificationTest, UTF8DataRoundtrip) {
-    auto original = buildTestFST({
-        {"café", 1},
-        {"naïve", 2},
-        {"日本語", 3},
-        {"🚀", 4}
-    });
+    auto original = buildTestFST({{"café", 1}, {"naïve", 2}, {"日本語", 3}, {"🚀", 4}});
 
     auto serialized = original->serialize();
     auto deserialized = FST::deserialize(serialized);
@@ -239,14 +225,12 @@ TEST(FSTSerializationVerificationTest, UTF8DataRoundtrip) {
  */
 TEST(FSTSerializationVerificationTest, OutputValuesEdgeCases) {
     // Terms must be sorted: "large" < "max" < "medium" < "one" < "small" < "zero"
-    auto original = buildTestFST({
-        {"large", 2147483647LL},
-        {"max", 9223372036854775807LL},  // INT64_MAX
-        {"medium", 32767},
-        {"one", 1},
-        {"small", 127},
-        {"zero", 0}
-    });
+    auto original = buildTestFST({{"large", 2147483647LL},
+                                  {"max", 9223372036854775807LL},  // INT64_MAX
+                                  {"medium", 32767},
+                                  {"one", 1},
+                                  {"small", 127},
+                                  {"zero", 0}});
 
     auto serialized = original->serialize();
     auto deserialized = FST::deserialize(serialized);
@@ -271,10 +255,7 @@ TEST(FSTSerializationVerificationTest, VeryLongTermsRoundtrip) {
     std::string term1000(1000, 'a');
     std::string term500(500, 'b');
 
-    auto original = buildTestFST({
-        {term1000, 1000},
-        {term500, 500}
-    });
+    auto original = buildTestFST({{term1000, 1000}, {term500, 500}});
 
     auto serialized = original->serialize();
     auto deserialized = FST::deserialize(serialized);
@@ -329,10 +310,8 @@ TEST(FSTSerializationVerificationTest, AllArcEncodingTypesPreserved) {
     auto deserialized = FST::deserialize(serialized);
 
     // Verify all lookups match
-    std::vector<std::string> terms = {
-        "a1", "a2", "b0", "b4", "c0", "m0",
-        "densed", "densem", "a3", "nonexistent"
-    };
+    std::vector<std::string> terms = {"a1", "a2",     "b0",     "b4", "c0",
+                                      "m0", "densed", "densem", "a3", "nonexistent"};
     verifyIdenticalLookups(*original, *deserialized, terms);
 
     verifyIdenticalEntries(*original, *deserialized);
@@ -344,22 +323,14 @@ TEST(FSTSerializationVerificationTest, AllArcEncodingTypesPreserved) {
  * Lucene Behavior: FST structure with shared prefixes works after roundtrip
  */
 TEST(FSTSerializationVerificationTest, SharedPrefixesPreserved) {
-    auto original = buildTestFST({
-        {"cat", 1},
-        {"caterpillar", 2},
-        {"cats", 3},
-        {"dog", 4},
-        {"doghouse", 5},
-        {"dogs", 6}
-    });
+    auto original = buildTestFST(
+        {{"cat", 1}, {"caterpillar", 2}, {"cats", 3}, {"dog", 4}, {"doghouse", 5}, {"dogs", 6}});
 
     auto serialized = original->serialize();
     auto deserialized = FST::deserialize(serialized);
 
     std::vector<std::string> terms = {
-        "cat", "caterpillar", "cats",
-        "dog", "doghouse", "dogs",
-        "ca", "do"  // Partial prefixes
+        "cat", "caterpillar", "cats", "dog", "doghouse", "dogs", "ca", "do"  // Partial prefixes
     };
     verifyIdenticalLookups(*original, *deserialized, terms);
 
@@ -397,11 +368,7 @@ TEST(FSTSerializationVerificationTest, EmptyStringTermPreserved) {
  * Lucene Behavior: Serialize-deserialize-serialize-deserialize consistent
  */
 TEST(FSTSerializationVerificationTest, DoubleRoundtripConsistent) {
-    auto original = buildTestFST({
-        {"apple", 1},
-        {"banana", 2},
-        {"cherry", 3}
-    });
+    auto original = buildTestFST({{"apple", 1}, {"banana", 2}, {"cherry", 3}});
 
     // First roundtrip
     auto serialized1 = original->serialize();
@@ -448,17 +415,9 @@ TEST(FSTSerializationVerificationTest, TripleRoundtripConsistent) {
  * Lucene Behavior: Same FST produces same serialized bytes
  */
 TEST(FSTSerializationVerificationTest, SerializedFormatStable) {
-    auto fst1 = buildTestFST({
-        {"a", 1},
-        {"b", 2},
-        {"c", 3}
-    });
+    auto fst1 = buildTestFST({{"a", 1}, {"b", 2}, {"c", 3}});
 
-    auto fst2 = buildTestFST({
-        {"a", 1},
-        {"b", 2},
-        {"c", 3}
-    });
+    auto fst2 = buildTestFST({{"a", 1}, {"b", 2}, {"c", 3}});
 
     auto serialized1 = fst1->serialize();
     auto serialized2 = fst2->serialize();
@@ -493,8 +452,7 @@ TEST(FSTSerializationVerificationTest, SerializationIsCompact) {
 
     // 1000 terms, each ~10 bytes, should be reasonably compact
     // Actual size is ~30KB (without aggressive compression)
-    EXPECT_LT(largeSerialized.size(), 50000)
-        << "Large FST not compact enough";
+    EXPECT_LT(largeSerialized.size(), 50000) << "Large FST not compact enough";
 }
 
 /**
@@ -519,11 +477,7 @@ TEST(FSTSerializationVerificationTest, EmptyFSTMinimalSize) {
  * Lucene Behavior: Single-byte terms serialize correctly
  */
 TEST(FSTSerializationVerificationTest, SingleCharacterTerms) {
-    auto original = buildTestFST({
-        {"a", 1},
-        {"b", 2},
-        {"z", 26}
-    });
+    auto original = buildTestFST({{"a", 1}, {"b", 2}, {"z", 26}});
 
     auto serialized = original->serialize();
     auto deserialized = FST::deserialize(serialized);

@@ -3,10 +3,10 @@
 
 #pragma once
 
-#include "diagon/search/Query.h"
 #include "diagon/search/IndexSearcher.h"
-#include "diagon/search/Weight.h"
+#include "diagon/search/Query.h"
 #include "diagon/search/Scorer.h"
+#include "diagon/search/Weight.h"
 
 namespace diagon {
 namespace search {
@@ -19,13 +19,9 @@ class MatchAllQuery : public Query {
 public:
     MatchAllQuery() = default;
 
-    std::unique_ptr<Query> clone() const override {
-        return std::make_unique<MatchAllQuery>();
-    }
+    std::unique_ptr<Query> clone() const override { return std::make_unique<MatchAllQuery>(); }
 
-    std::string toString(const std::string& field) const override {
-        return "*:*";
-    }
+    std::string toString(const std::string& field) const override { return "*:*"; }
 
     std::unique_ptr<Weight> createWeight(IndexSearcher& searcher, ScoreMode scoreMode,
                                          float boost) const override;
@@ -51,13 +47,12 @@ private:
 
 public:
     MatchAllWeight(const Query* query, float boost)
-        : query_(query), boost_(boost) {}
+        : query_(query)
+        , boost_(boost) {}
 
     std::unique_ptr<Scorer> scorer(const index::LeafReaderContext& context) const override;
 
-    const Query& getQuery() const override {
-        return *query_;
-    }
+    const Query& getQuery() const override { return *query_; }
 };
 
 /**
@@ -73,11 +68,12 @@ private:
 
 public:
     MatchAllScorer(const Weight* weight, int32_t maxDoc, float score)
-        : weight_(weight), maxDoc_(maxDoc), currentDoc_(-1), score_(score) {}
+        : weight_(weight)
+        , maxDoc_(maxDoc)
+        , currentDoc_(-1)
+        , score_(score) {}
 
-    int32_t docID() const override {
-        return currentDoc_;
-    }
+    int32_t docID() const override { return currentDoc_; }
 
     int32_t nextDoc() override {
         currentDoc_++;
@@ -96,23 +92,14 @@ public:
         return currentDoc_;
     }
 
-    int64_t cost() const override {
-        return maxDoc_;
-    }
+    int64_t cost() const override { return maxDoc_; }
 
-    float score() const override {
-        return score_;
-    }
+    float score() const override { return score_; }
 
-    const Weight& getWeight() const override {
-        return *weight_;
-    }
+    const Weight& getWeight() const override { return *weight_; }
 
-    float getMaxScore(int upTo) const override {
-        return score_;
-    }
+    float getMaxScore(int upTo) const override { return score_; }
 };
 
-} // namespace search
-} // namespace diagon
-
+}  // namespace search
+}  // namespace diagon

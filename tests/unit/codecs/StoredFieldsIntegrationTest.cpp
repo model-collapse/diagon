@@ -55,8 +55,8 @@ TEST(StoredFieldsIntegrationTest, DWPTToSegmentReader) {
             // Add stored string field
             FieldType stringType;
             stringType.stored = true;
-            auto nameField =
-                std::make_unique<Field>("name", "Person " + std::to_string(i), stringType);
+            auto nameField = std::make_unique<Field>("name", "Person " + std::to_string(i),
+                                                     stringType);
             doc.add(std::move(nameField));
 
             // Add stored numeric fields
@@ -65,7 +65,8 @@ TEST(StoredFieldsIntegrationTest, DWPTToSegmentReader) {
             auto ageField = std::make_unique<Field>("age", int64_t(20 + i), numericType);
             doc.add(std::move(ageField));
 
-            auto scoreField = std::make_unique<Field>("score", int64_t(1000 + i * 100), numericType);
+            auto scoreField = std::make_unique<Field>("score", int64_t(1000 + i * 100),
+                                                      numericType);
             doc.add(std::move(scoreField));
 
             dwpt.addDocument(doc);
@@ -134,8 +135,8 @@ TEST(StoredFieldsIntegrationTest, OnlyIndexedFields) {
             // Add indexed field (not stored)
             FieldType indexedType;
             indexedType.indexOptions = IndexOptions::DOCS;
-            auto textField =
-                std::make_unique<Field>("text", "content " + std::to_string(i), indexedType);
+            auto textField = std::make_unique<Field>("text", "content " + std::to_string(i),
+                                                     indexedType);
             doc.add(std::move(textField));
 
             dwpt.addDocument(doc);
@@ -210,7 +211,8 @@ TEST(StoredFieldsIntegrationTest, MixedStoredAndIndexed) {
 
         auto fields = storedFieldsReader->document(0);
 
-        // Should have summary and title (both stored), but not text (not stored) or count (doc values, not stored)
+        // Should have summary and title (both stored), but not text (not stored) or count (doc
+        // values, not stored)
         EXPECT_EQ(fields.size(), 2);
         EXPECT_EQ(std::get<std::string>(fields["summary"]), "This is a summary");
         EXPECT_EQ(std::get<std::string>(fields["title"]), "Important Document");
@@ -242,8 +244,8 @@ TEST(StoredFieldsIntegrationTest, MultipleDocuments) {
             auto idField = std::make_unique<Field>("id", int64_t(i), storedType);
             doc.add(std::move(idField));
 
-            auto valueField =
-                std::make_unique<Field>("value", "Document " + std::to_string(i), storedType);
+            auto valueField = std::make_unique<Field>("value", "Document " + std::to_string(i),
+                                                      storedType);
             doc.add(std::move(valueField));
 
             dwpt.addDocument(doc);

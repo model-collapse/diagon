@@ -2,12 +2,14 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/skipindex/MergeTreeIndexBloomFilter.h"
-#include "diagon/store/ByteBuffersIndexOutput.h"
+
 #include "diagon/store/ByteBuffersIndexInput.h"
+#include "diagon/store/ByteBuffersIndexOutput.h"
 
 #include <gtest/gtest.h>
-#include <vector>
+
 #include <string>
+#include <vector>
 
 using namespace diagon::index::skipindex;
 using namespace diagon::store;
@@ -15,12 +17,10 @@ using namespace diagon::store;
 // ==================== Index Factory Tests ====================
 
 TEST(MergeTreeIndexBloomFilterTest, Construction) {
-    MergeTreeIndexBloomFilter index(
-        "test_idx",
-        {"col1", "col2"},
-        1,      // granularity
-        8,      // bits_per_row
-        3);     // hash_functions
+    MergeTreeIndexBloomFilter index("test_idx", {"col1", "col2"},
+                                    1,   // granularity
+                                    8,   // bits_per_row
+                                    3);  // hash_functions
 
     EXPECT_EQ("skp_idx_test_idx", index.getFileName());
     EXPECT_EQ(".idx", index.getFileExtension());
@@ -32,19 +32,13 @@ TEST(MergeTreeIndexBloomFilterTest, Construction) {
 
 TEST(MergeTreeIndexBloomFilterTest, ConstructionValidation) {
     // Empty columns
-    EXPECT_THROW(
-        MergeTreeIndexBloomFilter("test", {}, 1, 8, 3),
-        std::invalid_argument);
+    EXPECT_THROW(MergeTreeIndexBloomFilter("test", {}, 1, 8, 3), std::invalid_argument);
 
     // Zero bits per row
-    EXPECT_THROW(
-        MergeTreeIndexBloomFilter("test", {"col1"}, 1, 0, 3),
-        std::invalid_argument);
+    EXPECT_THROW(MergeTreeIndexBloomFilter("test", {"col1"}, 1, 0, 3), std::invalid_argument);
 
     // Zero hash functions
-    EXPECT_THROW(
-        MergeTreeIndexBloomFilter("test", {"col1"}, 1, 8, 0),
-        std::invalid_argument);
+    EXPECT_THROW(MergeTreeIndexBloomFilter("test", {"col1"}, 1, 8, 0), std::invalid_argument);
 }
 
 TEST(MergeTreeIndexBloomFilterTest, CreateGranule) {
@@ -191,11 +185,7 @@ TEST(MergeTreeIndexGranuleBloomFilterTest, SerializePreservesData) {
     // Create and populate
     MergeTreeIndexAggregatorBloomFilter agg(16, 5, {"col1"});
 
-    uint64_t test_hashes[] = {
-        0x1111111111111111ULL,
-        0x2222222222222222ULL,
-        0x3333333333333333ULL
-    };
+    uint64_t test_hashes[] = {0x1111111111111111ULL, 0x2222222222222222ULL, 0x3333333333333333ULL};
 
     for (uint64_t hash : test_hashes) {
         agg.addRow({hash});
@@ -264,11 +254,8 @@ TEST(MergeTreeIndexConditionBloomFilterTest, EqualsPredicate) {
 TEST(MergeTreeIndexConditionBloomFilterTest, InPredicate) {
     MergeTreeIndexConditionBloomFilter cond({"col1"}, 3);
 
-    std::vector<uint64_t> values = {
-        0x1111111111111111ULL,
-        0x2222222222222222ULL,
-        0x3333333333333333ULL
-    };
+    std::vector<uint64_t> values = {0x1111111111111111ULL, 0x2222222222222222ULL,
+                                    0x3333333333333333ULL};
     cond.addInPredicate("col1", values);
 
     EXPECT_FALSE(cond.alwaysUnknownOrTrue());
@@ -331,9 +318,8 @@ TEST(MergeTreeIndexConditionBloomFilterTest, EmptyGranule) {
     cond.addEqualsPredicate("col1", 0x1111111111111111ULL);
 
     // Empty granule - cannot skip (conservative)
-    EXPECT_TRUE(cond.mayBeTrueOnGranule(
-        std::static_pointer_cast<IMergeTreeIndexGranule>(
-            std::make_shared<MergeTreeIndexGranuleBloomFilter>(granule))));
+    EXPECT_TRUE(cond.mayBeTrueOnGranule(std::static_pointer_cast<IMergeTreeIndexGranule>(
+        std::make_shared<MergeTreeIndexGranuleBloomFilter>(granule))));
 }
 
 // ==================== Integration Test ====================

@@ -1,12 +1,13 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/index/IndexWriter.h"
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/IndexWriter.h"
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 #include <memory>
 
@@ -51,8 +52,8 @@ TEST_F(ForceMergeTest, ForceMergeToOneSegment) {
     for (int batch = 0; batch < 3; batch++) {
         for (int i = 0; i < 10; i++) {
             Document doc;
-            doc.add(std::make_unique<TextField>(
-                "content", "batch" + std::to_string(batch) + "_doc" + std::to_string(i)));
+            doc.add(std::make_unique<TextField>("content", "batch" + std::to_string(batch) +
+                                                               "_doc" + std::to_string(i)));
             writer.addDocument(doc);
         }
         writer.flush();  // Force segment creation
@@ -88,8 +89,8 @@ TEST_F(ForceMergeTest, ForceMergeToNSegments) {
     for (int batch = 0; batch < 6; batch++) {
         for (int i = 0; i < 10; i++) {
             Document doc;
-            doc.add(std::make_unique<TextField>(
-                "content", "batch" + std::to_string(batch) + "_doc" + std::to_string(i)));
+            doc.add(std::make_unique<TextField>("content", "batch" + std::to_string(batch) +
+                                                               "_doc" + std::to_string(i)));
             writer.addDocument(doc);
         }
         writer.flush();
@@ -138,8 +139,7 @@ TEST_F(ForceMergeTest, ForceMergeWithPendingDocs) {
     // Add pending docs in RAM
     for (int i = 0; i < 20; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>(
-            "content", "pending_doc" + std::to_string(i)));
+        doc.add(std::make_unique<TextField>("content", "pending_doc" + std::to_string(i)));
         writer.addDocument(doc);
     }
 
@@ -176,8 +176,8 @@ TEST_F(ForceMergeTest, ForceMergeCommitsChanges) {
         for (int batch = 0; batch < 4; batch++) {
             for (int i = 0; i < 10; i++) {
                 Document doc;
-                doc.add(std::make_unique<TextField>(
-                    "content", "batch" + std::to_string(batch) + "_doc" + std::to_string(i)));
+                doc.add(std::make_unique<TextField>("content", "batch" + std::to_string(batch) +
+                                                                   "_doc" + std::to_string(i)));
                 writer.addDocument(doc);
             }
             writer.flush();

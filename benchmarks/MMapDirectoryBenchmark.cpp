@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/store/FSDirectory.h"
-#include "diagon/store/MMapDirectory.h"
 #include "diagon/store/IOContext.h"
+#include "diagon/store/MMapDirectory.h"
 
 #include <benchmark/benchmark.h>
 
@@ -20,9 +20,9 @@ namespace {
 std::filesystem::path test_dir;
 
 // Test file sizes
-constexpr size_t SMALL_FILE = 1 * 1024 * 1024;      // 1MB
-constexpr size_t MEDIUM_FILE = 10 * 1024 * 1024;    // 10MB
-constexpr size_t LARGE_FILE = 100 * 1024 * 1024;    // 100MB
+constexpr size_t SMALL_FILE = 1 * 1024 * 1024;    // 1MB
+constexpr size_t MEDIUM_FILE = 10 * 1024 * 1024;  // 10MB
+constexpr size_t LARGE_FILE = 100 * 1024 * 1024;  // 100MB
 
 // Initialize test environment
 void SetupBenchmarkEnvironment() {

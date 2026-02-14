@@ -15,24 +15,19 @@ static constexpr int ALIGNMENT = 64;
 
 // ==================== Factory Methods ====================
 
-std::unique_ptr<index::PostingsEnum> Lucene105PostingsReader::open(
-    store::IndexInput* input,
-    const TermState& termMeta) {
-
+std::unique_ptr<index::PostingsEnum> Lucene105PostingsReader::open(store::IndexInput* input,
+                                                                   const TermState& termMeta) {
     return std::make_unique<Lucene105PostingsEnum>(input, termMeta);
 }
 
-std::unique_ptr<index::BatchPostingsEnum> Lucene105PostingsReader::openBatch(
-    store::IndexInput* input,
-    const TermState& termMeta) {
-
+std::unique_ptr<index::BatchPostingsEnum>
+Lucene105PostingsReader::openBatch(store::IndexInput* input, const TermState& termMeta) {
     return std::make_unique<Lucene105PostingsEnum>(input, termMeta);
 }
 
 // ==================== Lucene105PostingsEnum ====================
 
-Lucene105PostingsEnum::Lucene105PostingsEnum(store::IndexInput* input,
-                                             const TermState& termMeta)
+Lucene105PostingsEnum::Lucene105PostingsEnum(store::IndexInput* input, const TermState& termMeta)
     : input_(input)
     , termMeta_(termMeta)
     , currentDoc_(-1)
@@ -41,7 +36,6 @@ Lucene105PostingsEnum::Lucene105PostingsEnum(store::IndexInput* input,
     , currentBlockIndex_(-1)
     , blockDocCount_(0)
     , bufferPos_(0) {
-
     // Seek to start of postings
     input_->seek(termMeta_.docStartFP);
 
@@ -77,13 +71,9 @@ int Lucene105PostingsEnum::nextBatch(index::PostingsBatch& batch) {
 
         // KEY OPTIMIZATION: Direct memcpy (no delta decoding!)
         // Doc IDs are already absolute, just copy
-        std::memcpy(&batch.docs[count],
-                   &docBuffer_[bufferPos_],
-                   toTake * sizeof(int32_t));
+        std::memcpy(&batch.docs[count], &docBuffer_[bufferPos_], toTake * sizeof(int32_t));
 
-        std::memcpy(&batch.freqs[count],
-                   &freqBuffer_[bufferPos_],
-                   toTake * sizeof(int32_t));
+        std::memcpy(&batch.freqs[count], &freqBuffer_[bufferPos_], toTake * sizeof(int32_t));
 
         bufferPos_ += toTake;
         count += toTake;

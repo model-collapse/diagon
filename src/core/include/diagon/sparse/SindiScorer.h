@@ -87,13 +87,9 @@ public:
      *
      * Performance: ~2-4× faster than scalar on modern x86-64
      */
-    static void accumulateScoresAVX2(
-        const uint32_t* doc_ids,
-        const float* doc_weights,
-        size_t count,
-        float query_weight,
-        std::vector<float>& scores,
-        bool use_prefetch = true);
+    static void accumulateScoresAVX2(const uint32_t* doc_ids, const float* doc_weights,
+                                     size_t count, float query_weight, std::vector<float>& scores,
+                                     bool use_prefetch = true);
 
     // ==================== Scalar Fallback ====================
 
@@ -110,12 +106,9 @@ public:
      * @param query_weight Weight of query term
      * @param scores Output score array (indexed by doc_id)
      */
-    static void accumulateScoresScalar(
-        const uint32_t* doc_ids,
-        const float* doc_weights,
-        size_t count,
-        float query_weight,
-        std::vector<float>& scores);
+    static void accumulateScoresScalar(const uint32_t* doc_ids, const float* doc_weights,
+                                       size_t count, float query_weight,
+                                       std::vector<float>& scores);
 
     // ==================== Dispatch ====================
 
@@ -136,14 +129,9 @@ public:
      *
      * Note: use_prefetch is ignored if use_simd=false or AVX2 unavailable
      */
-    static void accumulateScores(
-        const uint32_t* doc_ids,
-        const float* doc_weights,
-        size_t count,
-        float query_weight,
-        std::vector<float>& scores,
-        bool use_simd = true,
-        bool use_prefetch = true);
+    static void accumulateScores(const uint32_t* doc_ids, const float* doc_weights, size_t count,
+                                 float query_weight, std::vector<float>& scores,
+                                 bool use_simd = true, bool use_prefetch = true);
 
     // ==================== Utilities ====================
 

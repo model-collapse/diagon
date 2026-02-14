@@ -5,10 +5,10 @@
 
 #ifdef _WIN32
 
-#include "diagon/util/Exceptions.h"
+#    include "diagon/util/Exceptions.h"
 
-#include <sstream>
-#include <vector>
+#    include <sstream>
+#    include <vector>
 
 namespace diagon::store {
 
@@ -23,10 +23,12 @@ std::string WindowsMMapIndexInput::getWindowsErrorMessage(DWORD error_code) {
             oss << "File not found";
             break;
         case ERROR_ACCESS_DENIED:
-            oss << "Access denied. File may be locked by another process or insufficient permissions.";
+            oss << "Access denied. File may be locked by another process or insufficient "
+                   "permissions.";
             break;
         case ERROR_NOT_ENOUGH_MEMORY:
-            oss << "Insufficient virtual address space. Try using smaller chunk size or close other applications.";
+            oss << "Insufficient virtual address space. Try using smaller chunk size or close "
+                   "other applications.";
             break;
         case ERROR_INVALID_PARAMETER:
             oss << "Invalid parameters (internal error)";
@@ -41,12 +43,9 @@ std::string WindowsMMapIndexInput::getWindowsErrorMessage(DWORD error_code) {
             // Use FormatMessage to get system error description
             LPVOID msgBuf = nullptr;
             DWORD size = FormatMessageA(
-                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                nullptr,
-                error_code,
-                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                (LPSTR)&msgBuf,
-                0,
+                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+                    FORMAT_MESSAGE_IGNORE_INSERTS,
+                nullptr, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&msgBuf, 0,
                 nullptr);
 
             if (size > 0 && msgBuf != nullptr) {
@@ -64,14 +63,11 @@ std::string WindowsMMapIndexInput::getWindowsErrorMessage(DWORD error_code) {
 
 // ==================== Constructor ====================
 
-WindowsMMapIndexInput::WindowsMMapIndexInput(const std::filesystem::path& path,
-                                             int chunk_power,
-                                             bool preload,
-                                             IOContext::ReadAdvice advice)
-    : MMapIndexInput(path, chunk_power, preload),
-      file_handle_(INVALID_HANDLE_VALUE),
-      mapping_handle_(nullptr) {
-
+WindowsMMapIndexInput::WindowsMMapIndexInput(const std::filesystem::path& path, int chunk_power,
+                                             bool preload, IOContext::ReadAdvice advice)
+    : MMapIndexInput(path, chunk_power, preload)
+    , file_handle_(INVALID_HANDLE_VALUE)
+    , mapping_handle_(nullptr) {
     // Base constructor sets up metadata
     // Now perform actual Windows memory mapping
 
@@ -90,18 +86,18 @@ WindowsMMapIndexInput::WindowsMMapIndexInput(const std::filesystem::path& path,
     // Open file with CreateFile
     file_handle_ = CreateFileW(
         path.c_str(),
-        GENERIC_READ,                             // Desired access
+        GENERIC_READ,                                            // Desired access
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,  // Share mode
-        nullptr,                                   // Security attributes
-        OPEN_EXISTING,                            // Creation disposition
-        file_flags,                               // Flags and attributes
-        nullptr                                    // Template file
+        nullptr,                                                 // Security attributes
+        OPEN_EXISTING,                                           // Creation disposition
+        file_flags,                                              // Flags and attributes
+        nullptr                                                  // Template file
     );
 
     if (file_handle_ == INVALID_HANDLE_VALUE) {
         DWORD error = GetLastError();
-        throw IOException("Failed to open file for mapping: " + path.string() +
-                          " - " + getWindowsErrorMessage(error));
+        throw IOException("Failed to open file for mapping: " + path.string() + " - " +
+                          getWindowsErrorMessage(error));
     }
 
     try {
@@ -110,20 +106,19 @@ WindowsMMapIndexInput::WindowsMMapIndexInput(const std::filesystem::path& path,
         DWORD size_high = static_cast<DWORD>(file_length_ >> 32);
         DWORD size_low = static_cast<DWORD>(file_length_ & 0xFFFFFFFF);
 
-        mapping_handle_ = CreateFileMappingW(
-            file_handle_,
-            nullptr,                // Security attributes
-            PAGE_READONLY,          // Protection
-            size_high,              // Maximum size high
-            size_low,               // Maximum size low
-            nullptr                 // Name (anonymous)
+        mapping_handle_ = CreateFileMappingW(file_handle_,
+                                             nullptr,        // Security attributes
+                                             PAGE_READONLY,  // Protection
+                                             size_high,      // Maximum size high
+                                             size_low,       // Maximum size low
+                                             nullptr         // Name (anonymous)
         );
 
         if (mapping_handle_ == nullptr) {
             DWORD error = GetLastError();
             CloseHandle(file_handle_);
-            throw IOException("Failed to create file mapping: " + path.string() +
-                              " - " + getWindowsErrorMessage(error));
+            throw IOException("Failed to create file mapping: " + path.string() + " - " +
+                              getWindowsErrorMessage(error));
         }
 
         // Map chunks
@@ -151,9 +146,9 @@ WindowsMMapIndexInput::WindowsMMapIndexInput(const std::filesystem::path& path,
 // ==================== Copy Constructor ====================
 
 WindowsMMapIndexInput::WindowsMMapIndexInput(const WindowsMMapIndexInput& other)
-    : MMapIndexInput(other),
-      file_handle_(other.file_handle_),
-      mapping_handle_(other.mapping_handle_) {
+    : MMapIndexInput(other)
+    , file_handle_(other.file_handle_)
+    , mapping_handle_(other.mapping_handle_) {
     // Base copy constructor handles chunk sharing
     // Handles are reference-counted via shared_ptr, so safe to copy
 }
@@ -165,8 +160,7 @@ std::unique_ptr<IndexInput> WindowsMMapIndexInput::clone() const {
 }
 
 std::unique_ptr<IndexInput> WindowsMMapIndexInput::slice(const std::string& sliceDescription,
-                                                          int64_t offset,
-                                                          int64_t length) const {
+                                                         int64_t offset, int64_t length) const {
     // Validate slice bounds
     int64_t max_length = is_slice_ ? slice_length_ : file_length_;
     if (offset < 0 || length < 0 || offset + length > max_length) {
@@ -212,12 +206,11 @@ void WindowsMMapIndexInput::mapChunks(int fd_placeholder, int64_t file_length) {
         DWORD offset_low = static_cast<DWORD>(offset & 0xFFFFFFFF);
 
         // Map view of file
-        void* mapped = MapViewOfFile(
-            mapping_handle_,
-            FILE_MAP_READ,          // Desired access
-            offset_high,            // File offset high
-            offset_low,             // File offset low
-            static_cast<SIZE_T>(this_chunk_size)  // Number of bytes to map
+        void* mapped = MapViewOfFile(mapping_handle_,
+                                     FILE_MAP_READ,                        // Desired access
+                                     offset_high,                          // File offset high
+                                     offset_low,                           // File offset low
+                                     static_cast<SIZE_T>(this_chunk_size)  // Number of bytes to map
         );
 
         if (mapped == nullptr) {

@@ -1,9 +1,9 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/store/MMapDirectory.h"
 #include "diagon/store/FSDirectory.h"
 #include "diagon/store/IOContext.h"
+#include "diagon/store/MMapDirectory.h"
 #include "diagon/util/Exceptions.h"
 
 #include <gtest/gtest.h>
@@ -24,9 +24,7 @@ protected:
         std::filesystem::create_directories(test_dir);
     }
 
-    void TearDown() override {
-        std::filesystem::remove_all(test_dir);
-    }
+    void TearDown() override { std::filesystem::remove_all(test_dir); }
 
     // Helper: Create a test file using FSDirectory
     void createTestFile(const std::string& name, size_t size) {
@@ -105,10 +103,7 @@ TEST_F(MMapDirectoryFallbackTest, FileNotFoundAlwaysThrows) {
     dir->setUseFallback(true);  // Even with fallback enabled
 
     // File-not-found should always throw, never fall back
-    EXPECT_THROW(
-        dir->openInput("nonexistent.bin", IOContext::DEFAULT),
-        FileNotFoundException
-    );
+    EXPECT_THROW(dir->openInput("nonexistent.bin", IOContext::DEFAULT), FileNotFoundException);
 }
 
 TEST_F(MMapDirectoryFallbackTest, NotAFileAlwaysThrows) {
@@ -119,10 +114,7 @@ TEST_F(MMapDirectoryFallbackTest, NotAFileAlwaysThrows) {
     dir->setUseFallback(true);  // Even with fallback enabled
 
     // Not-a-file should always throw, never fall back
-    EXPECT_THROW(
-        dir->openInput("subdir", IOContext::DEFAULT),
-        IOException
-    );
+    EXPECT_THROW(dir->openInput("subdir", IOContext::DEFAULT), IOException);
 }
 
 // ==================== Platform-Specific Fallback ====================

@@ -28,19 +28,20 @@
  * - AND-2: < 90 µs
  */
 
-#include <gtest/gtest.h>
-#include "diagon/index/IndexWriter.h"
-#include "diagon/index/IndexReader.h"
-#include "diagon/index/DirectoryReader.h"
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/DirectoryReader.h"
+#include "diagon/index/IndexReader.h"
+#include "diagon/index/IndexWriter.h"
+#include "diagon/search/BM25Similarity.h"
+#include "diagon/search/BooleanQuery.h"
 #include "diagon/search/IndexSearcher.h"
 #include "diagon/search/TermQuery.h"
-#include "diagon/search/BooleanQuery.h"
-#include "diagon/search/BM25Similarity.h"
 #include "diagon/store/MMapDirectory.h"
 
 #include "../../../benchmarks/dataset/ReutersDatasetAdapter.h"
+
+#include <gtest/gtest.h>
 
 #include <algorithm>
 #include <chrono>
@@ -59,7 +60,8 @@ namespace {
 constexpr const char* TEST_INDEX_PATH = "/tmp/diagon_bm25_perf_guard_reuters_index";
 
 // Reuters dataset path
-constexpr const char* REUTERS_DATASET_PATH = "/home/ubuntu/opensearch_warmroom/lucene/lucene/benchmark/work/reuters-out";
+constexpr const char* REUTERS_DATASET_PATH =
+    "/home/ubuntu/opensearch_warmroom/lucene/lucene/benchmark/work/reuters-out";
 
 // Measurement parameters (reduced for faster test execution)
 constexpr int WARMUP_ITERATIONS = 20;
@@ -109,7 +111,8 @@ struct LatencyStats {
     double mean_us;
 };
 
-[[maybe_unused]] static LatencyStats measureQueryLatency(search::IndexSearcher& searcher, search::Query& query, int topK) {
+[[maybe_unused]] static LatencyStats measureQueryLatency(search::IndexSearcher& searcher,
+                                                         search::Query& query, int topK) {
     // Warmup
     for (int i = 0; i < WARMUP_ITERATIONS; i++) {
         searcher.search(query, topK);
@@ -125,7 +128,7 @@ struct LatencyStats {
         auto end = std::chrono::high_resolution_clock::now();
 
         auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
-        latencies.push_back(duration.count() / 1000.0); // Convert to microseconds
+        latencies.push_back(duration.count() / 1000.0);  // Convert to microseconds
     }
 
     // Calculate percentiles
@@ -151,8 +154,10 @@ protected:
     static void SetUpTestSuite() {
         // Check if Reuters dataset exists
         if (!std::filesystem::exists(REUTERS_DATASET_PATH)) {
-            GTEST_SKIP() << "Reuters dataset not found at: " << REUTERS_DATASET_PATH
-                         << "\nPlease run: cd /home/ubuntu/opensearch_warmroom/lucene/lucene/benchmark && ./gradlew getReuters";
+            GTEST_SKIP()
+                << "Reuters dataset not found at: " << REUTERS_DATASET_PATH
+                << "\nPlease run: cd /home/ubuntu/opensearch_warmroom/lucene/lucene/benchmark && "
+                   "./gradlew getReuters";
         }
 
         createTestIndex();
@@ -184,14 +189,13 @@ TEST_F(BM25PerformanceGuardTest, SingleTerm_P50_Baseline) {
     search::TermQuery query(search::Term("body", "market"));
     auto stats = measureQueryLatency(*searcher_, query, 10);
 
-    EXPECT_LE(stats.p50_us, 65.0)
-        << "Single-term query P50 exceeded baseline: "
-        << stats.p50_us << " µs (target: ≤65 µs, Lucene: 46.8 µs)";
+    EXPECT_LE(stats.p50_us, 65.0) << "Single-term query P50 exceeded baseline: " << stats.p50_us
+                                  << " µs (target: ≤65 µs, Lucene: 46.8 µs)";
 
     // Critical failure: > 2x slower than Lucene
     EXPECT_LE(stats.p50_us, 100.0)
-        << "CRITICAL: Single-term query > 2x slower than Lucene: "
-        << stats.p50_us << " µs (Lucene: 46.8 µs)";
+        << "CRITICAL: Single-term query > 2x slower than Lucene: " << stats.p50_us
+        << " µs (Lucene: 46.8 µs)";
 }
 
 TEST_F(BM25PerformanceGuardTest, SingleTerm_P99_Baseline) {
@@ -201,9 +205,8 @@ TEST_F(BM25PerformanceGuardTest, SingleTerm_P99_Baseline) {
     search::TermQuery query(search::Term("body", "market"));
     auto stats = measureQueryLatency(*searcher_, query, 10);
 
-    EXPECT_LE(stats.p99_us, 350.0)
-        << "Single-term query P99 exceeded baseline: "
-        << stats.p99_us << " µs (target: ≤350 µs, Lucene: 297.7 µs)";
+    EXPECT_LE(stats.p99_us, 350.0) << "Single-term query P99 exceeded baseline: " << stats.p99_us
+                                   << " µs (target: ≤350 µs, Lucene: 297.7 µs)";
 }
 
 // ==================== OR Query Guards (WAND) ====================
@@ -213,23 +216,27 @@ TEST_F(BM25PerformanceGuardTest, OR5Query_P50_Baseline) {
     // Diagon target: ≤ 126 µs (15% margin)
 
     auto query = search::BooleanQuery::Builder()
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "oil")), search::Occur::SHOULD)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "trade")), search::Occur::SHOULD)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "market")), search::Occur::SHOULD)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "price")), search::Occur::SHOULD)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "dollar")), search::Occur::SHOULD)
-        .build();
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "oil")),
+                          search::Occur::SHOULD)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "trade")),
+                          search::Occur::SHOULD)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "market")),
+                          search::Occur::SHOULD)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "price")),
+                          search::Occur::SHOULD)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "dollar")),
+                          search::Occur::SHOULD)
+                     .build();
 
     auto stats = measureQueryLatency(*searcher_, *query, 10);
 
-    EXPECT_LE(stats.p50_us, 126.0)
-        << "OR-5 query P50 exceeded baseline: "
-        << stats.p50_us << " µs (target: ≤126 µs, Lucene: 109.6 µs)";
+    EXPECT_LE(stats.p50_us, 126.0) << "OR-5 query P50 exceeded baseline: " << stats.p50_us
+                                   << " µs (target: ≤126 µs, Lucene: 109.6 µs)";
 
     // Critical failure: > 2x slower than Lucene
     EXPECT_LE(stats.p50_us, 220.0)
-        << "CRITICAL: OR-5 query > 2x slower than Lucene: "
-        << stats.p50_us << " µs (Lucene: 109.6 µs)";
+        << "CRITICAL: OR-5 query > 2x slower than Lucene: " << stats.p50_us
+        << " µs (Lucene: 109.6 µs)";
 }
 
 TEST_F(BM25PerformanceGuardTest, OR5Query_P99_Baseline) {
@@ -237,18 +244,22 @@ TEST_F(BM25PerformanceGuardTest, OR5Query_P99_Baseline) {
     // Diagon target: ≤ 250 µs (18% margin)
 
     auto query = search::BooleanQuery::Builder()
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "oil")), search::Occur::SHOULD)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "trade")), search::Occur::SHOULD)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "market")), search::Occur::SHOULD)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "price")), search::Occur::SHOULD)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "dollar")), search::Occur::SHOULD)
-        .build();
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "oil")),
+                          search::Occur::SHOULD)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "trade")),
+                          search::Occur::SHOULD)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "market")),
+                          search::Occur::SHOULD)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "price")),
+                          search::Occur::SHOULD)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "dollar")),
+                          search::Occur::SHOULD)
+                     .build();
 
     auto stats = measureQueryLatency(*searcher_, *query, 10);
 
-    EXPECT_LE(stats.p99_us, 250.0)
-        << "OR-5 query P99 exceeded baseline: "
-        << stats.p99_us << " µs (target: ≤250 µs, Lucene: 211.1 µs)";
+    EXPECT_LE(stats.p99_us, 250.0) << "OR-5 query P99 exceeded baseline: " << stats.p99_us
+                                   << " µs (target: ≤250 µs, Lucene: 211.1 µs)";
 }
 
 // ==================== AND Query Guards ====================
@@ -258,20 +269,20 @@ TEST_F(BM25PerformanceGuardTest, AND2Query_P50_Baseline) {
     // Diagon target: ≤ 51 µs (18% margin)
 
     auto query = search::BooleanQuery::Builder()
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "oil")), search::Occur::MUST)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "price")), search::Occur::MUST)
-        .build();
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "oil")),
+                          search::Occur::MUST)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "price")),
+                          search::Occur::MUST)
+                     .build();
 
     auto stats = measureQueryLatency(*searcher_, *query, 10);
 
-    EXPECT_LE(stats.p50_us, 51.0)
-        << "AND-2 query P50 exceeded baseline: "
-        << stats.p50_us << " µs (target: ≤51 µs, Lucene: 43.1 µs)";
+    EXPECT_LE(stats.p50_us, 51.0) << "AND-2 query P50 exceeded baseline: " << stats.p50_us
+                                  << " µs (target: ≤51 µs, Lucene: 43.1 µs)";
 
     // Critical failure: > 2x slower than Lucene
-    EXPECT_LE(stats.p50_us, 90.0)
-        << "CRITICAL: AND-2 query > 2x slower than Lucene: "
-        << stats.p50_us << " µs (Lucene: 43.1 µs)";
+    EXPECT_LE(stats.p50_us, 90.0) << "CRITICAL: AND-2 query > 2x slower than Lucene: "
+                                  << stats.p50_us << " µs (Lucene: 43.1 µs)";
 }
 
 TEST_F(BM25PerformanceGuardTest, AND2Query_P99_Baseline) {
@@ -279,15 +290,16 @@ TEST_F(BM25PerformanceGuardTest, AND2Query_P99_Baseline) {
     // Diagon target: ≤ 165 µs (19% margin)
 
     auto query = search::BooleanQuery::Builder()
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "oil")), search::Occur::MUST)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "price")), search::Occur::MUST)
-        .build();
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "oil")),
+                          search::Occur::MUST)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "price")),
+                          search::Occur::MUST)
+                     .build();
 
     auto stats = measureQueryLatency(*searcher_, *query, 10);
 
-    EXPECT_LE(stats.p99_us, 165.0)
-        << "AND-2 query P99 exceeded baseline: "
-        << stats.p99_us << " µs (target: ≤165 µs, Lucene: 138.1 µs)";
+    EXPECT_LE(stats.p99_us, 165.0) << "AND-2 query P99 exceeded baseline: " << stats.p99_us
+                                   << " µs (target: ≤165 µs, Lucene: 138.1 µs)";
 }
 
 // ==================== TopK Scaling Guard ====================
@@ -297,21 +309,25 @@ TEST_F(BM25PerformanceGuardTest, TopKScaling_OR5) {
     // Diagon should have similar scaling (≤ 3x difference)
 
     auto query = search::BooleanQuery::Builder()
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "oil")), search::Occur::SHOULD)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "trade")), search::Occur::SHOULD)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "market")), search::Occur::SHOULD)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "price")), search::Occur::SHOULD)
-        .add(std::make_shared<search::TermQuery>(search::Term("body", "dollar")), search::Occur::SHOULD)
-        .build();
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "oil")),
+                          search::Occur::SHOULD)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "trade")),
+                          search::Occur::SHOULD)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "market")),
+                          search::Occur::SHOULD)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "price")),
+                          search::Occur::SHOULD)
+                     .add(std::make_shared<search::TermQuery>(search::Term("body", "dollar")),
+                          search::Occur::SHOULD)
+                     .build();
 
     auto stats_k50 = measureQueryLatency(*searcher_, *query, 50);
     auto stats_k1000 = measureQueryLatency(*searcher_, *query, 1000);
 
     double scaling_factor = stats_k1000.p50_us / stats_k50.p50_us;
 
-    EXPECT_LE(scaling_factor, 3.0)
-        << "TopK scaling exceeded limit: K=1000 is " << scaling_factor
-        << "x slower than K=50 (limit: ≤3x, Lucene: 2.3x)";
+    EXPECT_LE(scaling_factor, 3.0) << "TopK scaling exceeded limit: K=1000 is " << scaling_factor
+                                   << "x slower than K=50 (limit: ≤3x, Lucene: 2.3x)";
 }
 
 // ==================== Rare Term Performance ====================
@@ -333,4 +349,4 @@ TEST_F(BM25PerformanceGuardTest, RareTerm_Faster) {
         << " µs (common term: " << common_stats.p50_us << " µs)";
 }
 
-} // namespace
+}  // namespace

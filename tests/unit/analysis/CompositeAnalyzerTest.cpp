@@ -1,21 +1,19 @@
-#include <gtest/gtest.h>
+#include "analysis/ASCIIFoldingFilter.h"
 #include "analysis/Analyzer.h"
-#include "analysis/WhitespaceTokenizer.h"
 #include "analysis/KeywordTokenizer.h"
 #include "analysis/LowercaseFilter.h"
 #include "analysis/StopFilter.h"
-#include "analysis/ASCIIFoldingFilter.h"
+#include "analysis/WhitespaceTokenizer.h"
+
+#include <gtest/gtest.h>
 
 using namespace diagon::analysis;
 
 TEST(CompositeAnalyzerTest, NoFilters) {
     auto tokenizer = std::make_unique<WhitespaceTokenizer>();
 
-    CompositeAnalyzer analyzer(
-        "test",
-        std::move(tokenizer),
-        std::vector<std::unique_ptr<TokenFilter>>()
-    );
+    CompositeAnalyzer analyzer("test", std::move(tokenizer),
+                               std::vector<std::unique_ptr<TokenFilter>>());
 
     auto tokens = analyzer.analyze("HELLO WORLD");
 
@@ -51,7 +49,7 @@ TEST(CompositeAnalyzerTest, MultipleFilters) {
     auto tokens = analyzer.analyze("CAFÉ RÉSUMÉ");
 
     ASSERT_EQ(tokens.size(), 2);
-    EXPECT_EQ(tokens[0].getText(), "cafe");    // Lowercased + ASCII folded
+    EXPECT_EQ(tokens[0].getText(), "cafe");  // Lowercased + ASCII folded
     EXPECT_EQ(tokens[1].getText(), "resume");
 }
 
@@ -93,11 +91,8 @@ TEST(CompositeAnalyzerTest, WithStopFilter) {
 TEST(CompositeAnalyzerTest, EmptyText) {
     auto tokenizer = std::make_unique<WhitespaceTokenizer>();
 
-    CompositeAnalyzer analyzer(
-        "test",
-        std::move(tokenizer),
-        std::vector<std::unique_ptr<TokenFilter>>()
-    );
+    CompositeAnalyzer analyzer("test", std::move(tokenizer),
+                               std::vector<std::unique_ptr<TokenFilter>>());
 
     auto tokens = analyzer.analyze("");
 
@@ -122,11 +117,8 @@ TEST(CompositeAnalyzerTest, KeywordTokenizer) {
 TEST(CompositeAnalyzerTest, Name) {
     auto tokenizer = std::make_unique<WhitespaceTokenizer>();
 
-    CompositeAnalyzer analyzer(
-        "custom_analyzer",
-        std::move(tokenizer),
-        std::vector<std::unique_ptr<TokenFilter>>()
-    );
+    CompositeAnalyzer analyzer("custom_analyzer", std::move(tokenizer),
+                               std::vector<std::unique_ptr<TokenFilter>>());
 
     EXPECT_EQ(analyzer.name(), "custom_analyzer");
 }
@@ -134,11 +126,8 @@ TEST(CompositeAnalyzerTest, Name) {
 TEST(CompositeAnalyzerTest, GetTokenizerName) {
     auto tokenizer = std::make_unique<WhitespaceTokenizer>();
 
-    CompositeAnalyzer analyzer(
-        "test",
-        std::move(tokenizer),
-        std::vector<std::unique_ptr<TokenFilter>>()
-    );
+    CompositeAnalyzer analyzer("test", std::move(tokenizer),
+                               std::vector<std::unique_ptr<TokenFilter>>());
 
     EXPECT_EQ(analyzer.getTokenizerName(), "whitespace");
 }
@@ -208,7 +197,8 @@ TEST(CompositeAnalyzerTest, LargeText) {
     // Generate large text with 10000 words
     std::string text;
     for (int i = 0; i < 10000; ++i) {
-        if (i > 0) text += " ";
+        if (i > 0)
+            text += " ";
         text += "WORD" + std::to_string(i);
     }
 

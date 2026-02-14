@@ -99,8 +99,8 @@ TEST_F(Lucene104ReadWriteTest, BasicRoundTrip) {
     // ==================== READ PHASE ====================
 
     // Create segment read state
-    SegmentReadState readState(*directory_, segmentInfo->name(), "",
-                               IOContext::READ, segmentInfo->fieldInfos());
+    SegmentReadState readState(*directory_, segmentInfo->name(), "", IOContext::READ,
+                               segmentInfo->fieldInfos());
 
     // Create fields producer
     Lucene104FieldsProducer fieldsProducer(readState);
@@ -124,10 +124,8 @@ TEST_F(Lucene104ReadWriteTest, BasicRoundTrip) {
         int docFreq = termsEnum->docFreq();
         int64_t totalTermFreq = termsEnum->totalTermFreq();
 
-        std::cout << "  Term: " << termStr
-                  << ", docFreq=" << docFreq
-                  << ", totalTermFreq=" << totalTermFreq
-                  << std::endl;
+        std::cout << "  Term: " << termStr << ", docFreq=" << docFreq
+                  << ", totalTermFreq=" << totalTermFreq << std::endl;
 
         // Verify it's one of our terms
         ASSERT_TRUE(termStr == "apple" || termStr == "banana" || termStr == "cherry");
@@ -200,8 +198,8 @@ TEST_F(Lucene104ReadWriteTest, NonExistentField) {
     ASSERT_NE(segmentInfo, nullptr);
 
     // Create reader
-    SegmentReadState readState(*directory_, segmentInfo->name(), "",
-                               IOContext::READ, segmentInfo->fieldInfos());
+    SegmentReadState readState(*directory_, segmentInfo->name(), "", IOContext::READ,
+                               segmentInfo->fieldInfos());
     Lucene104FieldsProducer fieldsProducer(readState);
 
     // Try to get non-existent field
@@ -222,8 +220,8 @@ TEST_F(Lucene104ReadWriteTest, EmptySegment) {
     }
 
     // If it does create a segment, reading should work
-    SegmentReadState readState(*directory_, segmentInfo->name(), "",
-                               IOContext::READ, segmentInfo->fieldInfos());
+    SegmentReadState readState(*directory_, segmentInfo->name(), "", IOContext::READ,
+                               segmentInfo->fieldInfos());
     Lucene104FieldsProducer fieldsProducer(readState);
 
     auto terms = fieldsProducer.terms("_all");

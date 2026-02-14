@@ -1,14 +1,16 @@
 #include "analysis/JiebaTokenizer.h"
+
 #include "cppjieba/Jieba.hpp"
-#include <stdexcept>
+
 #include <algorithm>
+#include <stdexcept>
 
 namespace diagon {
 namespace analysis {
 
 // Default dictionary paths (set at compile time via CMake)
 #ifndef CPPJIEBA_DICT_DIR
-#define CPPJIEBA_DICT_DIR ""
+#    define CPPJIEBA_DICT_DIR ""
 #endif
 
 std::string JiebaTokenizer::getDefaultDictDir() {
@@ -40,33 +42,25 @@ std::string JiebaTokenizer::getDefaultDictDir() {
 
     throw std::runtime_error(
         "Failed to locate cppjieba dictionaries. "
-        "Please set CPPJIEBA_DICT_DIR environment variable or pass dict path explicitly."
-    );
+        "Please set CPPJIEBA_DICT_DIR environment variable or pass dict path explicitly.");
 }
 
-JiebaTokenizer::JiebaTokenizer(
-    JiebaMode mode,
-    const std::string& dictPath,
-    const std::string& hmmPath,
-    const std::string& userDictPath,
-    const std::string& stopWordPath)
+JiebaTokenizer::JiebaTokenizer(JiebaMode mode, const std::string& dictPath,
+                               const std::string& hmmPath, const std::string& userDictPath,
+                               const std::string& stopWordPath)
     : mode_(mode)
     , dictPath_(dictPath)
     , hmmPath_(hmmPath)
     , userDictPath_(userDictPath)
     , stopWordPath_(stopWordPath) {
-
     initializeJieba(dictPath, hmmPath, userDictPath, stopWordPath);
 }
 
 JiebaTokenizer::~JiebaTokenizer() = default;
 
-void JiebaTokenizer::initializeJieba(
-    const std::string& dictPath,
-    const std::string& hmmPath,
-    const std::string& userDictPath,
-    const std::string& stopWordPath) {
-
+void JiebaTokenizer::initializeJieba(const std::string& dictPath, const std::string& hmmPath,
+                                     const std::string& userDictPath,
+                                     const std::string& stopWordPath) {
     // Get dictionary directory
     std::string dictDir;
     if (!dictPath.empty()) {
@@ -76,13 +70,11 @@ void JiebaTokenizer::initializeJieba(
     }
 
     // Build full paths to dictionary files
-    std::string mainDict = dictPath.empty() ?
-        dictDir + "/jieba.dict.utf8" : dictPath;
-    std::string hmmModel = hmmPath.empty() ?
-        dictDir + "/hmm_model.utf8" : hmmPath;
-    std::string userDict = userDictPath; // Optional, can be empty
+    std::string mainDict = dictPath.empty() ? dictDir + "/jieba.dict.utf8" : dictPath;
+    std::string hmmModel = hmmPath.empty() ? dictDir + "/hmm_model.utf8" : hmmPath;
+    std::string userDict = userDictPath;  // Optional, can be empty
     std::string idfPath = dictDir + "/idf.utf8";
-    std::string stopWordFile = stopWordPath; // Optional, can be empty
+    std::string stopWordFile = stopWordPath;  // Optional, can be empty
 
     // Store actual paths used
     dictPath_ = mainDict;
@@ -92,19 +84,11 @@ void JiebaTokenizer::initializeJieba(
 
     // Create Jieba instance
     try {
-        jieba_ = std::make_unique<cppjieba::Jieba>(
-            mainDict,
-            hmmModel,
-            userDict,
-            idfPath,
-            stopWordFile
-        );
+        jieba_ = std::make_unique<cppjieba::Jieba>(mainDict, hmmModel, userDict, idfPath,
+                                                   stopWordFile);
     } catch (const std::exception& e) {
-        throw std::runtime_error(
-            std::string("Failed to initialize Jieba: ") + e.what() +
-            "\nMain dict: " + mainDict +
-            "\nHMM model: " + hmmModel
-        );
+        throw std::runtime_error(std::string("Failed to initialize Jieba: ") + e.what() +
+                                 "\nMain dict: " + mainDict + "\nHMM model: " + hmmModel);
     }
 }
 
@@ -114,12 +98,18 @@ void JiebaTokenizer::reset() {
 
 std::string JiebaTokenizer::getModeString() const {
     switch (mode_) {
-        case JiebaMode::MP:     return "MP";
-        case JiebaMode::HMM:    return "HMM";
-        case JiebaMode::MIX:    return "MIX";
-        case JiebaMode::FULL:   return "FULL";
-        case JiebaMode::SEARCH: return "SEARCH";
-        default:                return "UNKNOWN";
+        case JiebaMode::MP:
+            return "MP";
+        case JiebaMode::HMM:
+            return "HMM";
+        case JiebaMode::MIX:
+            return "MIX";
+        case JiebaMode::FULL:
+            return "FULL";
+        case JiebaMode::SEARCH:
+            return "SEARCH";
+        default:
+            return "UNKNOWN";
     }
 }
 
@@ -186,12 +176,8 @@ std::vector<Token> JiebaTokenizer::tokenize(const std::string& text) {
         }
 
         // Create token
-        Token token(
-            word,
-            position,
-            static_cast<int>(wordPos),
-            static_cast<int>(wordPos + word.length())
-        );
+        Token token(word, position, static_cast<int>(wordPos),
+                    static_cast<int>(wordPos + word.length()));
 
         // Set token type (can be used for POS tagging in future)
         token.setType("word");
@@ -221,5 +207,5 @@ void JiebaTokenizer::addUserWord(const std::string& word, int weight) {
     }
 }
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

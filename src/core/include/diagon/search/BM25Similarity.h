@@ -130,8 +130,7 @@ public:
          * - Removed freq==0 branch (branchless: 0*anything=0 anyway)
          * - Added branch hints for rare norm values
          */
-        __attribute__((always_inline))
-        inline float score(float freq, long norm) const {
+        __attribute__((always_inline)) inline float score(float freq, long norm) const {
             // Optimization #3: Remove freq==0 branch
             // If freq==0, the result will be 0 anyway (0 * idf_ = 0)
             // No need for explicit check - let it compute naturally
@@ -149,9 +148,9 @@ public:
                 fieldLength = invNorm * invNorm;
             }
 
-            // Optimization #2: Use precomputed reciprocal (multiplication is 5× faster than division)
-            // Before: b_ * fieldLength / avgFieldLength
-            // After:  b_ * fieldLength * inv_avgFieldLength_
+            // Optimization #2: Use precomputed reciprocal (multiplication is 5× faster than
+            // division) Before: b_ * fieldLength / avgFieldLength After:  b_ * fieldLength *
+            // inv_avgFieldLength_
             float k = k1_ * (1.0f - b_ + b_ * fieldLength * inv_avgFieldLength_);
             // BM25 formula (Lucene 8+ simplified without (k1+1) term)
             return idf_ * freq / (freq + k);
@@ -198,7 +197,7 @@ public:
         float avgFieldLength = 50.0f;  // Default fallback
         if (collectionStats.docCount > 0 && collectionStats.sumTotalTermFreq > 0) {
             avgFieldLength = static_cast<float>(collectionStats.sumTotalTermFreq) /
-                           static_cast<float>(collectionStats.docCount);
+                             static_cast<float>(collectionStats.docCount);
         }
 
         return SimScorer(idfValue * boost, k1_, b_, avgFieldLength);

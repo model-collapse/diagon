@@ -1,4 +1,5 @@
 #include "analysis/Analyzer.h"
+
 #include <sstream>
 
 namespace diagon {
@@ -14,7 +15,8 @@ std::string Analyzer::description() const {
     if (!filters.empty()) {
         oss << ", filters=[";
         for (size_t i = 0; i < filters.size(); i++) {
-            if (i > 0) oss << ", ";
+            if (i > 0)
+                oss << ", ";
             oss << filters[i];
         }
         oss << "]";
@@ -26,13 +28,11 @@ std::string Analyzer::description() const {
 
 // CompositeAnalyzer implementation
 
-CompositeAnalyzer::CompositeAnalyzer(const std::string& name,
-                                     std::unique_ptr<Tokenizer> tokenizer,
+CompositeAnalyzer::CompositeAnalyzer(const std::string& name, std::unique_ptr<Tokenizer> tokenizer,
                                      std::vector<std::unique_ptr<TokenFilter>> filters)
     : name_(name)
     , tokenizer_(std::move(tokenizer))
-    , filters_(std::move(filters)) {
-}
+    , filters_(std::move(filters)) {}
 
 std::vector<Token> CompositeAnalyzer::analyze(const std::string& text) {
     // Step 1: Tokenize
@@ -59,5 +59,5 @@ std::vector<std::string> CompositeAnalyzer::getFilterNames() const {
     return names;
 }
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

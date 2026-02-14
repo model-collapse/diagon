@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/FreqProxFields.h"
+
 #include "diagon/index/FieldInfo.h"
 
 #include <algorithm>
@@ -14,23 +15,18 @@ namespace index {
 
 // ==================== FreqProxFields Implementation ====================
 
-FreqProxFields::FreqProxFields(const FreqProxTermsWriter& termsWriter,
-                               const FieldInfos& fieldInfos)
+FreqProxFields::FreqProxFields(const FreqProxTermsWriter& termsWriter, const FieldInfos& fieldInfos)
     : termsWriter_(termsWriter) {
-
     // Iterate over actual fields from FieldInfos
     for (const auto& fieldInfo : fieldInfos) {
-
         // Only include indexed fields
         if (fieldInfo.indexOptions != IndexOptions::NONE) {
             fields_.push_back(fieldInfo.name);
         }
     }
-
 }
 
 std::unique_ptr<Terms> FreqProxFields::terms(const std::string& field) {
-
     // Check if field exists
     auto it = std::find(fields_.begin(), fields_.end(), field);
     if (it == fields_.end()) {
@@ -50,14 +46,12 @@ std::unique_ptr<Fields::Iterator> FreqProxFields::iterator() {
 
 // ==================== FreqProxTerms Implementation ====================
 
-FreqProxTerms::FreqProxTerms(const std::string& fieldName,
-                             const FreqProxTermsWriter& termsWriter)
+FreqProxTerms::FreqProxTerms(const std::string& fieldName, const FreqProxTermsWriter& termsWriter)
     : fieldName_(fieldName)
     , termsWriter_(termsWriter)
     , sumTotalTermFreq_(0)
     , sumDocFreq_(0)
     , docCount_(0) {
-
     // Get terms for this specific field only
     sortedTerms_ = termsWriter_.getTermsForField(fieldName);
 
@@ -99,8 +93,7 @@ FreqProxTermsEnum::FreqProxTermsEnum(const std::string& fieldName,
     , termsWriter_(termsWriter)
     , termOrd_(-1)  // Before first term
     , currentDocFreq_(0)
-    , currentTotalTermFreq_(0) {
-}
+    , currentTotalTermFreq_(0) {}
 
 bool FreqProxTermsEnum::next() {
     termOrd_++;
@@ -147,7 +140,7 @@ util::BytesRef FreqProxTermsEnum::term() const {
         throw std::runtime_error("No current term (call next() first)");
     }
     return util::BytesRef(reinterpret_cast<const uint8_t*>(currentTerm_.data()),
-                         currentTerm_.size());
+                          currentTerm_.size());
 }
 
 int FreqProxTermsEnum::docFreq() const {

@@ -102,8 +102,7 @@ public:
      * @param normsProducer Producer of norms values (doc → norm byte)
      * @throws IOException if write fails
      */
-    virtual void addNormsField(const index::FieldInfo& field,
-                               NormsProducer& normsProducer) = 0;
+    virtual void addNormsField(const index::FieldInfo& field, NormsProducer& normsProducer) = 0;
 
     /**
      * Close and flush any pending data

@@ -1,10 +1,12 @@
 #include "diagon/analysis_c.h"
+
 #include "analysis/Analyzer.h"
 #include "analysis/Token.h"
+
+#include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
-#include <cstring>
 
 using namespace diagon::analysis;
 
@@ -24,8 +26,8 @@ static void clear_error() {
 
 struct diagon_analyzer_t {
     std::unique_ptr<Analyzer> analyzer;
-    std::string name;        // Cached for C API
-    std::string description; // Cached for C API
+    std::string name;         // Cached for C API
+    std::string description;  // Cached for C API
 };
 
 struct diagon_token_t {
@@ -205,11 +207,8 @@ void diagon_destroy_analyzer(diagon_analyzer_t* analyzer) {
 
 // ==================== Text Analysis ====================
 
-diagon_token_array_t* diagon_analyze_text(
-    diagon_analyzer_t* analyzer,
-    const char* text,
-    size_t text_len) {
-
+diagon_token_array_t* diagon_analyze_text(diagon_analyzer_t* analyzer, const char* text,
+                                          size_t text_len) {
     if (!analyzer || !text) {
         set_error("Invalid analyzer or text");
         return nullptr;
@@ -329,4 +328,4 @@ const char* diagon_get_last_error(void) {
 //     clear_error();
 // }
 
-} // extern "C"
+}  // extern "C"

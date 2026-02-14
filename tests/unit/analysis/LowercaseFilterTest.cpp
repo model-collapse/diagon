@@ -1,15 +1,13 @@
-#include <gtest/gtest.h>
 #include "analysis/LowercaseFilter.h"
+
+#include <gtest/gtest.h>
 
 using namespace diagon::analysis;
 
 TEST(LowercaseFilterTest, BasicLowercase) {
     LowercaseFilter filter;
 
-    std::vector<Token> tokens{
-        Token("HELLO", 0, 0, 5),
-        Token("World", 1, 6, 11)
-    };
+    std::vector<Token> tokens{Token("HELLO", 0, 0, 5), Token("World", 1, 6, 11)};
 
     auto result = filter.filter(tokens);
 
@@ -31,10 +29,7 @@ TEST(LowercaseFilterTest, EmptyTokens) {
 TEST(LowercaseFilterTest, AlreadyLowercase) {
     LowercaseFilter filter;
 
-    std::vector<Token> tokens{
-        Token("hello", 0, 0, 5),
-        Token("world", 1, 6, 11)
-    };
+    std::vector<Token> tokens{Token("hello", 0, 0, 5), Token("world", 1, 6, 11)};
 
     auto result = filter.filter(tokens);
 
@@ -46,10 +41,7 @@ TEST(LowercaseFilterTest, AlreadyLowercase) {
 TEST(LowercaseFilterTest, MixedCase) {
     LowercaseFilter filter;
 
-    std::vector<Token> tokens{
-        Token("HeLLo", 0, 0, 5),
-        Token("WoRLd", 1, 6, 11)
-    };
+    std::vector<Token> tokens{Token("HeLLo", 0, 0, 5), Token("WoRLd", 1, 6, 11)};
 
     auto result = filter.filter(tokens);
 
@@ -61,10 +53,7 @@ TEST(LowercaseFilterTest, MixedCase) {
 TEST(LowercaseFilterTest, UnicodeUppercase) {
     LowercaseFilter filter;
 
-    std::vector<Token> tokens{
-        Token("CAFÉ", 0, 0, 5),
-        Token("RÉSUMÉ", 1, 6, 13)
-    };
+    std::vector<Token> tokens{Token("CAFÉ", 0, 0, 5), Token("RÉSUMÉ", 1, 6, 13)};
 
     auto result = filter.filter(tokens);
 
@@ -76,10 +65,7 @@ TEST(LowercaseFilterTest, UnicodeUppercase) {
 TEST(LowercaseFilterTest, PreservesOffsets) {
     LowercaseFilter filter;
 
-    std::vector<Token> tokens{
-        Token("HELLO", 0, 10, 15),
-        Token("WORLD", 1, 20, 25)
-    };
+    std::vector<Token> tokens{Token("HELLO", 0, 10, 15), Token("WORLD", 1, 20, 25)};
 
     auto result = filter.filter(tokens);
 
@@ -95,11 +81,8 @@ TEST(LowercaseFilterTest, PreservesOffsets) {
 TEST(LowercaseFilterTest, PreservesTokenType) {
     LowercaseFilter filter;
 
-    std::vector<Token> tokens{
-        Token("HELLO", 0, 0, 5),
-        Token("123", 1, 6, 9),
-        Token("ABC123", 2, 10, 16)
-    };
+    std::vector<Token> tokens{Token("HELLO", 0, 0, 5), Token("123", 1, 6, 9),
+                              Token("ABC123", 2, 10, 16)};
 
     // Set types
     tokens[0].setType("word");
@@ -117,10 +100,7 @@ TEST(LowercaseFilterTest, PreservesTokenType) {
 TEST(LowercaseFilterTest, PreservesPosition) {
     LowercaseFilter filter;
 
-    std::vector<Token> tokens{
-        Token("HELLO", 1, 0, 5),
-        Token("WORLD", 2, 6, 11)
-    };
+    std::vector<Token> tokens{Token("HELLO", 1, 0, 5), Token("WORLD", 2, 6, 11)};
 
     auto result = filter.filter(tokens);
 
@@ -132,9 +112,7 @@ TEST(LowercaseFilterTest, PreservesPosition) {
 TEST(LowercaseFilterTest, EmptyTokenText) {
     LowercaseFilter filter;
 
-    std::vector<Token> tokens{
-        Token("", 0, 0, 0)
-    };
+    std::vector<Token> tokens{Token("", 0, 0, 0)};
 
     auto result = filter.filter(tokens);
 
@@ -145,10 +123,7 @@ TEST(LowercaseFilterTest, EmptyTokenText) {
 TEST(LowercaseFilterTest, NumbersUnchanged) {
     LowercaseFilter filter;
 
-    std::vector<Token> tokens{
-        Token("123", 0, 0, 3),
-        Token("456", 1, 4, 7)
-    };
+    std::vector<Token> tokens{Token("123", 0, 0, 3), Token("456", 1, 4, 7)};
 
     auto result = filter.filter(tokens);
 
@@ -160,10 +135,7 @@ TEST(LowercaseFilterTest, NumbersUnchanged) {
 TEST(LowercaseFilterTest, PunctuationUnchanged) {
     LowercaseFilter filter;
 
-    std::vector<Token> tokens{
-        Token("HELLO!", 0, 0, 6),
-        Token("WORLD?", 1, 7, 13)
-    };
+    std::vector<Token> tokens{Token("HELLO!", 0, 0, 6), Token("WORLD?", 1, 7, 13)};
 
     auto result = filter.filter(tokens);
 
@@ -175,10 +147,7 @@ TEST(LowercaseFilterTest, PunctuationUnchanged) {
 TEST(LowercaseFilterTest, GermanUmlaut) {
     LowercaseFilter filter;
 
-    std::vector<Token> tokens{
-        Token("ÜBER", 0, 0, 5),
-        Token("SCHÖN", 1, 6, 12)
-    };
+    std::vector<Token> tokens{Token("ÜBER", 0, 0, 5), Token("SCHÖN", 1, 6, 12)};
 
     auto result = filter.filter(tokens);
 
@@ -190,9 +159,7 @@ TEST(LowercaseFilterTest, GermanUmlaut) {
 TEST(LowercaseFilterTest, GreekLetters) {
     LowercaseFilter filter;
 
-    std::vector<Token> tokens{
-        Token("ΑΒΓΔ", 0, 0, 8)
-    };
+    std::vector<Token> tokens{Token("ΑΒΓΔ", 0, 0, 8)};
 
     auto result = filter.filter(tokens);
 

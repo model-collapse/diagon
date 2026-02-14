@@ -19,8 +19,9 @@
 #include "diagon/util/FST.h"
 
 #include <gtest/gtest.h>
-#include <vector>
+
 #include <string>
+#include <vector>
 
 using namespace diagon::util;
 
@@ -47,7 +48,7 @@ std::unique_ptr<FST> buildTestFST(const std::vector<std::pair<std::string, int64
     return builder.finish();
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== Task 4.1: Linear Scan Encoding Tests ====================
 
@@ -58,9 +59,7 @@ std::unique_ptr<FST> buildTestFST(const std::vector<std::pair<std::string, int64
  * Lucene Behavior: Single arc uses linear scan
  */
 TEST(FSTArcEncodingTest, LinearScanSingleArc) {
-    auto fst = buildTestFST({
-        {"a", 1}
-    });
+    auto fst = buildTestFST({{"a", 1}});
 
     // Verify lookup works
     EXPECT_EQ(1, fst->get(toBytes("a")));
@@ -76,11 +75,7 @@ TEST(FSTArcEncodingTest, LinearScanSingleArc) {
  */
 TEST(FSTArcEncodingTest, LinearScanFewArcs) {
     // 3 arcs from root
-    auto fst = buildTestFST({
-        {"a", 1},
-        {"b", 2},
-        {"c", 3}
-    });
+    auto fst = buildTestFST({{"a", 1}, {"b", 2}, {"c", 3}});
 
     // Verify all lookups work
     EXPECT_EQ(1, fst->get(toBytes("a")));
@@ -100,9 +95,9 @@ TEST(FSTArcEncodingTest, LinearScanFewArcs) {
  */
 TEST(FSTArcEncodingTest, LinearScanSparseLabels) {
     auto fst = buildTestFST({
-        {"a", 1},   // 0x61
-        {"d", 4},   // 0x64 (gap of 3)
-        {"x", 24}   // 0x78 (gap of 20)
+        {"a", 1},  // 0x61
+        {"d", 4},  // 0x64 (gap of 3)
+        {"x", 24}  // 0x78 (gap of 20)
     });
 
     EXPECT_EQ(1, fst->get(toBytes("a")));
@@ -121,12 +116,7 @@ TEST(FSTArcEncodingTest, LinearScanSparseLabels) {
  * Pattern: Multiple nodes each using linear scan
  */
 TEST(FSTArcEncodingTest, LinearScanMultiLevel) {
-    auto fst = buildTestFST({
-        {"ab", 1},
-        {"ac", 2},
-        {"ba", 3},
-        {"bb", 4}
-    });
+    auto fst = buildTestFST({{"ab", 1}, {"ac", 2}, {"ba", 3}, {"bb", 4}});
 
     // Root has 2 arcs (a, b) → LINEAR_SCAN
     // 'a' node has 2 arcs (b, c) → LINEAR_SCAN
@@ -152,13 +142,7 @@ TEST(FSTArcEncodingTest, LinearScanMultiLevel) {
  * Lucene Behavior: Optimal encoding for sequential labels (O(1), minimal space)
  */
 TEST(FSTArcEncodingTest, ContinuousSequentialLabels) {
-    auto fst = buildTestFST({
-        {"a", 1},
-        {"b", 2},
-        {"c", 3},
-        {"d", 4},
-        {"e", 5}
-    });
+    auto fst = buildTestFST({{"a", 1}, {"b", 2}, {"c", 3}, {"d", 4}, {"e", 5}});
 
     // All present
     EXPECT_EQ(1, fst->get(toBytes("a")));
@@ -227,17 +211,15 @@ TEST(FSTArcEncodingTest, ContinuousNumericSequence) {
 TEST(FSTArcEncodingTest, ContinuousMultiLevel) {
     // Root: a-c (continuous)
     // Each child: 0-2 (continuous)
-    auto fst = buildTestFST({
-        {"a0", 1},
-        {"a1", 2},
-        {"a2", 3},
-        {"b0", 4},
-        {"b1", 5},
-        {"b2", 6},
-        {"c0", 7},
-        {"c1", 8},
-        {"c2", 9}
-    });
+    auto fst = buildTestFST({{"a0", 1},
+                             {"a1", 2},
+                             {"a2", 3},
+                             {"b0", 4},
+                             {"b1", 5},
+                             {"b2", 6},
+                             {"c0", 7},
+                             {"c1", 8},
+                             {"c2", 9}});
 
     // All combinations present
     EXPECT_EQ(1, fst->get(toBytes("a0")));
@@ -259,16 +241,8 @@ TEST(FSTArcEncodingTest, ContinuousMultiLevel) {
  */
 TEST(FSTArcEncodingTest, BinarySearchModerateArcs) {
     // 8 arcs with gaps (not continuous)
-    auto fst = buildTestFST({
-        {"a", 1},
-        {"c", 3},
-        {"e", 5},
-        {"g", 7},
-        {"i", 9},
-        {"k", 11},
-        {"m", 13},
-        {"o", 15}
-    });
+    auto fst = buildTestFST(
+        {{"a", 1}, {"c", 3}, {"e", 5}, {"g", 7}, {"i", 9}, {"k", 11}, {"m", 13}, {"o", 15}});
 
     // All terms present
     EXPECT_EQ(1, fst->get(toBytes("a")));
@@ -287,18 +261,16 @@ TEST(FSTArcEncodingTest, BinarySearchModerateArcs) {
  */
 TEST(FSTArcEncodingTest, BinarySearchManySparseArcs) {
     // 10 arcs spanning large range (a-z)
-    auto fst = buildTestFST({
-        {"a", 1},
-        {"c", 2},
-        {"f", 3},
-        {"h", 4},
-        {"k", 5},
-        {"m", 6},
-        {"p", 7},
-        {"r", 8},
-        {"u", 9},
-        {"z", 10}
-    });
+    auto fst = buildTestFST({{"a", 1},
+                             {"c", 2},
+                             {"f", 3},
+                             {"h", 4},
+                             {"k", 5},
+                             {"m", 6},
+                             {"p", 7},
+                             {"r", 8},
+                             {"u", 9},
+                             {"z", 10}});
 
     // Spot checks
     EXPECT_EQ(1, fst->get(toBytes("a")));
@@ -316,14 +288,7 @@ TEST(FSTArcEncodingTest, BinarySearchManySparseArcs) {
  * Pattern: Exactly 6 arcs (threshold for binary search)
  */
 TEST(FSTArcEncodingTest, BinarySearchExactly6Arcs) {
-    auto fst = buildTestFST({
-        {"a", 1},
-        {"d", 4},
-        {"g", 7},
-        {"j", 10},
-        {"m", 13},
-        {"p", 16}
-    });
+    auto fst = buildTestFST({{"a", 1}, {"d", 4}, {"g", 7}, {"j", 10}, {"m", 13}, {"p", 16}});
 
     EXPECT_EQ(1, fst->get(toBytes("a")));
     EXPECT_EQ(7, fst->get(toBytes("g")));
@@ -371,18 +336,16 @@ TEST(FSTArcEncodingTest, BinarySearchMultiLevel) {
  */
 TEST(FSTArcEncodingTest, DirectAddressingDenseNode) {
     // Range: a-t (20 chars), 10 arcs present (50% density)
-    auto fst = buildTestFST({
-        {"a", 1},
-        {"c", 3},
-        {"e", 5},
-        {"g", 7},
-        {"i", 9},
-        {"k", 11},
-        {"m", 13},
-        {"o", 15},
-        {"q", 17},
-        {"s", 19}
-    });
+    auto fst = buildTestFST({{"a", 1},
+                             {"c", 3},
+                             {"e", 5},
+                             {"g", 7},
+                             {"i", 9},
+                             {"k", 11},
+                             {"m", 13},
+                             {"o", 15},
+                             {"q", 17},
+                             {"s", 19}});
 
     // All arcs work
     EXPECT_EQ(1, fst->get(toBytes("a")));
@@ -489,14 +452,14 @@ TEST(FSTArcEncodingTest, DirectAddressingMultiLevel) {
 TEST(FSTArcEncodingTest, MixedEncodingsInSameFST) {
     auto fst = buildTestFST({
         // Root has 6 arcs → BINARY_SEARCH
-        {"a1", 1},   // 'a' node has 2 arcs (1,2) → LINEAR_SCAN
+        {"a1", 1},  // 'a' node has 2 arcs (1,2) → LINEAR_SCAN
         {"a2", 2},
-        {"b0", 3},   // 'b' node has 3 arcs (0,1,2) → CONTINUOUS
+        {"b0", 3},  // 'b' node has 3 arcs (0,1,2) → CONTINUOUS
         {"b1", 4},
         {"b2", 5},
-        {"c5", 6},   // 'c' node has 2 arcs → LINEAR_SCAN
+        {"c5", 6},  // 'c' node has 2 arcs → LINEAR_SCAN
         {"c9", 7},
-        {"d0", 8},   // 'd' node has 10 arcs (0-9) → CONTINUOUS
+        {"d0", 8},  // 'd' node has 10 arcs (0-9) → CONTINUOUS
         {"d1", 9},
         {"d2", 10},
         {"d3", 11},
@@ -532,18 +495,10 @@ TEST(FSTArcEncodingTest, MixedEncodingsInSameFST) {
  */
 TEST(FSTArcEncodingTest, SameInputDifferentEncodingsProduceSameResults) {
     // First FST
-    auto fst1 = buildTestFST({
-        {"apple", 1},
-        {"banana", 2},
-        {"cherry", 3}
-    });
+    auto fst1 = buildTestFST({{"apple", 1}, {"banana", 2}, {"cherry", 3}});
 
     // Second FST (same data, different internal structure possible)
-    auto fst2 = buildTestFST({
-        {"apple", 1},
-        {"banana", 2},
-        {"cherry", 3}
-    });
+    auto fst2 = buildTestFST({{"apple", 1}, {"banana", 2}, {"cherry", 3}});
 
     // Both should produce same results
     EXPECT_EQ(fst1->get(toBytes("apple")), fst2->get(toBytes("apple")));
@@ -560,10 +515,7 @@ TEST(FSTArcEncodingTest, SameInputDifferentEncodingsProduceSameResults) {
  * Pattern: Final node with no outgoing arcs
  */
 TEST(FSTArcEncodingTest, EmptyNodeNoArcs) {
-    auto fst = buildTestFST({
-        {"a", 1},
-        {"b", 2}
-    });
+    auto fst = buildTestFST({{"a", 1}, {"b", 2}});
 
     // Nodes 'a' and 'b' have no arcs (final nodes)
     EXPECT_EQ(1, fst->get(toBytes("a")));

@@ -2,23 +2,22 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104PostingsReaderOptimized.h"
-#include "diagon/util/SearchProfiler.h"
 
 #include "diagon/util/Exceptions.h"
+#include "diagon/util/SearchProfiler.h"
 
 #if defined(__AVX2__)
-#include <immintrin.h>
+#    include <immintrin.h>
 #elif defined(__SSE4_2__)
-#include <nmmintrin.h>
+#    include <nmmintrin.h>
 #endif
 
 namespace diagon {
 namespace codecs {
 namespace lucene104 {
 
-Lucene104PostingsEnumOptimized::Lucene104PostingsEnumOptimized(std::unique_ptr<store::IndexInput> docIn,
-                                                               const TermState& termState,
-                                                               bool writeFreqs)
+Lucene104PostingsEnumOptimized::Lucene104PostingsEnumOptimized(
+    std::unique_ptr<store::IndexInput> docIn, const TermState& termState, bool writeFreqs)
     : docIn_(std::move(docIn))
     , docFreq_(termState.docFreq)
     , totalTermFreq_(termState.totalTermFreq)
@@ -33,7 +32,6 @@ Lucene104PostingsEnumOptimized::Lucene104PostingsEnumOptimized(std::unique_ptr<s
     , ioBatch_{}  // Zero-initialize
     , ioBatchPos_(0)
     , ioBatchLimit_(0) {
-
     // Seek to start of this term's postings
     docIn_->seek(termState.docStartFP);
 
@@ -42,7 +40,6 @@ Lucene104PostingsEnumOptimized::Lucene104PostingsEnumOptimized(std::unique_ptr<s
 }
 
 int Lucene104PostingsEnumOptimized::nextDoc() {
-
     if (docsRead_ >= docFreq_) {
         currentDoc_ = NO_MORE_DOCS;
         return NO_MORE_DOCS;
@@ -72,7 +69,6 @@ int Lucene104PostingsEnumOptimized::nextDoc() {
 }
 
 void Lucene104PostingsEnumOptimized::refillBuffer() {
-
     bufferPos_ = 0;
     int remaining = docFreq_ - docsRead_;
     int bufferIdx = 0;
@@ -102,7 +98,8 @@ void Lucene104PostingsEnumOptimized::refillBuffer() {
 #endif
 
     // SSE/Scalar path: Decode 4 docs at a time
-    while (remaining >= STREAMVBYTE_GROUP_SIZE && bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
+    while (remaining >= STREAMVBYTE_GROUP_SIZE &&
+           bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
         // Decode doc deltas (stores deltas, not absolute docIDs)
         decodeStreamVByte4(&docDeltaBuffer_[bufferIdx]);
 
@@ -146,7 +143,6 @@ void Lucene104PostingsEnumOptimized::refillBuffer() {
 }
 
 int Lucene104PostingsEnumOptimized::advance(int target) {
-
     // Simple implementation: just call nextDoc() until we reach target
     // TODO: Use skip lists for efficient advance()
     while (currentDoc_ < target) {

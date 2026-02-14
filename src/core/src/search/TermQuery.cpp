@@ -30,15 +30,15 @@ namespace search {
 class TermScorer : public Scorer {
 public:
     TermScorer(const Weight& weight, std::unique_ptr<index::PostingsEnum> postings,
-               const BM25Similarity::SimScorer& simScorer,
-               index::NumericDocValues* norms)
+               const BM25Similarity::SimScorer& simScorer, index::NumericDocValues* norms)
         : weight_(weight)
         , postings_(std::move(postings))
         , simScorer_(simScorer)
         , norms_(norms)
         , doc_(-1)
         , freq_(0)
-        , impactsEnum_(dynamic_cast<codecs::lucene104::Lucene104PostingsEnumWithImpacts*>(postings_.get()))
+        , impactsEnum_(
+              dynamic_cast<codecs::lucene104::Lucene104PostingsEnumWithImpacts*>(postings_.get()))
         , normsSize_(0)
         , normsData_(norms ? norms->normsData(&normsSize_) : nullptr) {}
 
@@ -62,9 +62,7 @@ public:
         return doc_;
     }
 
-    int64_t cost() const override {
-        return postings_->cost();
-    }
+    int64_t cost() const override { return postings_->cost(); }
 
     int advanceShallow(int target) override {
         if (impactsEnum_) {
@@ -131,8 +129,8 @@ public:
         if (normsData_) {
             // Fast path: direct array access (no virtual dispatch)
             for (int i = 0; i < count; i++) {
-                long norm = (outDocs[i] < normsSize_)
-                    ? static_cast<long>(normsData_[outDocs[i]]) : 1L;
+                long norm = (outDocs[i] < normsSize_) ? static_cast<long>(normsData_[outDocs[i]])
+                                                      : 1L;
                 outScores[i] = simScorer_.score(static_cast<float>(freqsBuf[i]), norm);
             }
         } else {
@@ -160,9 +158,11 @@ private:
     index::NumericDocValues* norms_;  // Non-owning pointer to norms
     int doc_;
     int freq_;
-    codecs::lucene104::Lucene104PostingsEnumWithImpacts* impactsEnum_;  // Cached typed pointer (non-owning)
-    int normsSize_;            // Size of normsData_ array (must be declared before normsData_ for init order)
-    const int8_t* normsData_;  // Direct norms array pointer (from any NumericDocValues with normsData())
+    codecs::lucene104::Lucene104PostingsEnumWithImpacts*
+        impactsEnum_;  // Cached typed pointer (non-owning)
+    int normsSize_;  // Size of normsData_ array (must be declared before normsData_ for init order)
+    const int8_t*
+        normsData_;  // Direct norms array pointer (from any NumericDocValues with normsData())
 };
 
 // ==================== TermWeight ====================
@@ -195,7 +195,8 @@ private:
         // Aggregate statistics across all segments
         for (const auto& ctx : reader.leaves()) {
             auto terms = ctx.reader->terms(field);
-            if (!terms) continue;
+            if (!terms)
+                continue;
 
             int64_t segmentSumTotalTermFreq = terms->getSumTotalTermFreq();
             int64_t segmentSumDocFreq = terms->getSumDocFreq();
@@ -222,13 +223,7 @@ private:
         // Do NOT use terms.getDocCount() which only counts documents with terms
         int64_t docCount = maxDoc;
 
-        CollectionStatistics collectionStats(
-            field,
-            maxDoc,
-            docCount,
-            sumTotalTermFreq,
-            sumDocFreq
-        );
+        CollectionStatistics collectionStats(field, maxDoc, docCount, sumTotalTermFreq, sumDocFreq);
 
         // Get actual term statistics by seeking to the term
         int64_t termDocFreq = 0;
@@ -236,10 +231,12 @@ private:
 
         for (const auto& ctx : reader.leaves()) {
             auto terms = ctx.reader->terms(field);
-            if (!terms) continue;
+            if (!terms)
+                continue;
 
             auto termsEnum = terms->iterator();
-            if (!termsEnum) continue;
+            if (!termsEnum)
+                continue;
 
             if (termsEnum->seekExact(query.getTerm().bytes())) {
                 termDocFreq += termsEnum->docFreq();
@@ -256,9 +253,7 @@ private:
             termTotalTermFreq = maxDoc;
         }
 
-        TermStatistics termStats(query.getTerm().bytes(),
-                                 termDocFreq,
-                                 termTotalTermFreq);
+        TermStatistics termStats(query.getTerm().bytes(), termDocFreq, termTotalTermFreq);
 
         // Create similarity scorer
         BM25Similarity similarity;
@@ -292,7 +287,8 @@ public:
 
         if (useWAND) {
             // Try to get impacts-aware postings for WAND optimization
-            auto* segmentTermsEnum = dynamic_cast<codecs::blocktree::SegmentTermsEnum*>(termsEnum.get());
+            auto* segmentTermsEnum = dynamic_cast<codecs::blocktree::SegmentTermsEnum*>(
+                termsEnum.get());
             if (segmentTermsEnum) {
                 postings = segmentTermsEnum->impactsPostings();
             }
@@ -311,18 +307,19 @@ public:
         auto* norms = context.reader->getNormValues(query_.getTerm().field());
 
         // TermScorer has built-in batch capability via scoreBatch()
-        return std::make_unique<TermScorer>(
-            *this, std::move(postings), simScorer_, norms);
+        return std::make_unique<TermScorer>(*this, std::move(postings), simScorer_, norms);
     }
 
     int count(const index::LeafReaderContext& context) const override {
         // Fast path: no deletions → docFreq() is exact (O(1))
         if (!context.reader->hasDeletions()) {
             auto terms = context.reader->terms(query_.getTerm().field());
-            if (!terms) return 0;
+            if (!terms)
+                return 0;
 
             auto termsEnum = terms->iterator();
-            if (!termsEnum) return 0;
+            if (!termsEnum)
+                return 0;
 
             if (termsEnum->seekExact(query_.getTerm().bytes())) {
                 return termsEnum->docFreq();

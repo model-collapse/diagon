@@ -1,6 +1,8 @@
 #include "analysis/LowercaseFilter.h"
+
 #include <unicode/unistr.h>
 #include <unicode/ustring.h>
+
 #include <algorithm>
 #include <cctype>
 
@@ -30,5 +32,5 @@ std::vector<Token> LowercaseFilter::filter(const std::vector<Token>& tokens) {
     return result;
 }
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

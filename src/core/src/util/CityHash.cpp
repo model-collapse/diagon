@@ -53,14 +53,27 @@ uint64_t simpleHash64(const char* data, size_t len, uint64_t seed) {
     // Handle remaining bytes
     const uint8_t* remaining = data8;
     switch (len & 7) {
-        case 7: h ^= uint64_t(remaining[6]) << 48; [[fallthrough]];
-        case 6: h ^= uint64_t(remaining[5]) << 40; [[fallthrough]];
-        case 5: h ^= uint64_t(remaining[4]) << 32; [[fallthrough]];
-        case 4: h ^= uint64_t(remaining[3]) << 24; [[fallthrough]];
-        case 3: h ^= uint64_t(remaining[2]) << 16; [[fallthrough]];
-        case 2: h ^= uint64_t(remaining[1]) << 8;  [[fallthrough]];
-        case 1: h ^= uint64_t(remaining[0]);
-                h *= m;
+        case 7:
+            h ^= uint64_t(remaining[6]) << 48;
+            [[fallthrough]];
+        case 6:
+            h ^= uint64_t(remaining[5]) << 40;
+            [[fallthrough]];
+        case 5:
+            h ^= uint64_t(remaining[4]) << 32;
+            [[fallthrough]];
+        case 4:
+            h ^= uint64_t(remaining[3]) << 24;
+            [[fallthrough]];
+        case 3:
+            h ^= uint64_t(remaining[2]) << 16;
+            [[fallthrough]];
+        case 2:
+            h ^= uint64_t(remaining[1]) << 8;
+            [[fallthrough]];
+        case 1:
+            h ^= uint64_t(remaining[0]);
+            h *= m;
     }
 
     h ^= h >> r;
@@ -70,7 +83,7 @@ uint64_t simpleHash64(const char* data, size_t len, uint64_t seed) {
     return h;
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== Public API ====================
 
@@ -90,5 +103,5 @@ std::pair<uint64_t, uint64_t> CityHash128(const char* data, size_t len) {
     return {h1, h2};
 }
 
-} // namespace util
-} // namespace diagon
+}  // namespace util
+}  // namespace diagon

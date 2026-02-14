@@ -87,9 +87,12 @@ public:
      * @return Number of bytes needed (1-4)
      */
     static inline int encodedSize(uint32_t value) {
-        if (value < (1U << 8)) return 1;
-        if (value < (1U << 16)) return 2;
-        if (value < (1U << 24)) return 3;
+        if (value < (1U << 8))
+            return 1;
+        if (value < (1U << 16))
+            return 2;
+        if (value < (1U << 24))
+            return 3;
         return 4;
     }
 
@@ -128,12 +131,8 @@ private:
 
     // Helper: Build control byte from lengths
     static inline uint8_t buildControl(int len0, int len1, int len2, int len3) {
-        return static_cast<uint8_t>(
-            ((len0 - 1) << 0) |
-            ((len1 - 1) << 2) |
-            ((len2 - 1) << 4) |
-            ((len3 - 1) << 6)
-        );
+        return static_cast<uint8_t>(((len0 - 1) << 0) | ((len1 - 1) << 2) | ((len2 - 1) << 4) |
+                                    ((len3 - 1) << 6));
     }
 };
 

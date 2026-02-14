@@ -114,8 +114,8 @@ int64_t NumericDocValuesWriter::ramBytesUsed() const {
 
 // ==================== Private Methods ====================
 
-NumericDocValuesWriter::FieldBuffer* NumericDocValuesWriter::getOrCreateBuffer(
-    const index::FieldInfo& fieldInfo) {
+NumericDocValuesWriter::FieldBuffer*
+NumericDocValuesWriter::getOrCreateBuffer(const index::FieldInfo& fieldInfo) {
     auto it = fieldBuffers_.find(fieldInfo.number);
     if (it != fieldBuffers_.end()) {
         return it->second.get();
@@ -130,8 +130,8 @@ NumericDocValuesWriter::FieldBuffer* NumericDocValuesWriter::getOrCreateBuffer(
     return ptr;
 }
 
-NumericDocValuesWriter::FieldMetadata NumericDocValuesWriter::writeFieldData(
-    store::IndexOutput& dataOut, const FieldBuffer& buffer) {
+NumericDocValuesWriter::FieldMetadata
+NumericDocValuesWriter::writeFieldData(store::IndexOutput& dataOut, const FieldBuffer& buffer) {
     FieldMetadata meta;
     meta.fieldName = buffer.fieldName;
     meta.fieldNumber = buffer.fieldNumber;

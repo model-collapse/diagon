@@ -90,7 +90,8 @@ public:
             auto subLeaves = subReader->leaves();
             for (const auto& leafCtx : subLeaves) {
                 // Adjust docBase and add to result with correct ordinal
-                result.emplace_back(leafCtx.reader, docBase + leafCtx.docBase, static_cast<int>(result.size()));
+                result.emplace_back(leafCtx.reader, docBase + leafCtx.docBase,
+                                    static_cast<int>(result.size()));
             }
             docBase += subReader->maxDoc();
         }
@@ -100,9 +101,12 @@ public:
         // Return a simple context wrapper for MockCompositeReader
         class MockCompositeContext : public IndexReaderContext {
         public:
-            explicit MockCompositeContext(const MockCompositeReader* reader) : reader_(reader) {}
+            explicit MockCompositeContext(const MockCompositeReader* reader)
+                : reader_(reader) {}
 
-            IndexReader* reader() const override { return const_cast<MockCompositeReader*>(reader_); }
+            IndexReader* reader() const override {
+                return const_cast<MockCompositeReader*>(reader_);
+            }
             std::vector<LeafReaderContext> leaves() const override { return reader_->leaves(); }
             bool isTopLevel() const override { return true; }
 

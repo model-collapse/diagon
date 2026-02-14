@@ -2,8 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/skipindex/MergeTreeIndexBloomFilter.h"
-#include "diagon/store/IndexOutput.h"
+
 #include "diagon/store/IndexInput.h"
+#include "diagon/store/IndexOutput.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -14,13 +15,11 @@ namespace skipindex {
 
 // ==================== GRANULE ====================
 
-MergeTreeIndexGranuleBloomFilter::MergeTreeIndexGranuleBloomFilter(
-    size_t bits_per_row,
-    size_t hash_functions,
-    size_t num_columns)
+MergeTreeIndexGranuleBloomFilter::MergeTreeIndexGranuleBloomFilter(size_t bits_per_row,
+                                                                   size_t hash_functions,
+                                                                   size_t num_columns)
     : bits_per_row_(bits_per_row)
     , hash_functions_(hash_functions) {
-
     bloom_filters_.reserve(num_columns);
     for (size_t i = 0; i < num_columns; ++i) {
         bloom_filters_.push_back(nullptr);  // Will be created when data is available
@@ -50,10 +49,8 @@ void MergeTreeIndexGranuleBloomFilter::serialize(store::IndexOutput* output) con
     }
 }
 
-void MergeTreeIndexGranuleBloomFilter::deserialize(
-    store::IndexInput* input,
-    MergeTreeIndexVersion version) {
-
+void MergeTreeIndexGranuleBloomFilter::deserialize(store::IndexInput* input,
+                                                   MergeTreeIndexVersion version) {
     (void)version;  // Version not used yet
 
     // Read total rows
@@ -66,8 +63,7 @@ void MergeTreeIndexGranuleBloomFilter::deserialize(
             size_t filter_bytes = input->readVLong();
 
             // Create bloom filter
-            auto filter = std::make_shared<util::BloomFilter>(
-                filter_bytes, hash_functions_, 0);
+            auto filter = std::make_shared<util::BloomFilter>(filter_bytes, hash_functions_, 0);
 
             // Read filter data
             auto& data = filter->data();
@@ -96,13 +92,10 @@ size_t MergeTreeIndexGranuleBloomFilter::memoryUsageBytes() const {
 // ==================== AGGREGATOR ====================
 
 MergeTreeIndexAggregatorBloomFilter::MergeTreeIndexAggregatorBloomFilter(
-    size_t bits_per_row,
-    size_t hash_functions,
-    const std::vector<std::string>& column_names)
+    size_t bits_per_row, size_t hash_functions, const std::vector<std::string>& column_names)
     : bits_per_row_(bits_per_row)
     , hash_functions_(hash_functions)
     , column_names_(column_names) {
-
     column_hashes_.resize(column_names.size());
 }
 
@@ -120,8 +113,7 @@ MergeTreeIndexGranulePtr MergeTreeIndexAggregatorBloomFilter::getGranuleAndReset
             size_t filter_bytes = (filter_bits + 7) / 8;  // Round up to bytes
 
             // Create bloom filter
-            auto filter = std::make_shared<util::BloomFilter>(
-                filter_bytes, hash_functions_, 0);
+            auto filter = std::make_shared<util::BloomFilter>(filter_bytes, hash_functions_, 0);
 
             // Add all accumulated hashes
             for (uint64_t hash : column_hashes_[col]) {
@@ -143,12 +135,10 @@ MergeTreeIndexGranulePtr MergeTreeIndexAggregatorBloomFilter::getGranuleAndReset
 
 void MergeTreeIndexAggregatorBloomFilter::update(
     const std::vector<std::vector<uint64_t>>& column_hashes) {
-
     if (column_hashes.size() != column_names_.size()) {
-        throw std::invalid_argument(
-            "Column hash count mismatch: expected " +
-            std::to_string(column_names_.size()) +
-            " got " + std::to_string(column_hashes.size()));
+        throw std::invalid_argument("Column hash count mismatch: expected " +
+                                    std::to_string(column_names_.size()) + " got " +
+                                    std::to_string(column_hashes.size()));
     }
 
     // Accumulate hashes for each column
@@ -161,14 +151,11 @@ void MergeTreeIndexAggregatorBloomFilter::update(
     }
 }
 
-void MergeTreeIndexAggregatorBloomFilter::addRow(
-    const std::vector<uint64_t>& row_hashes) {
-
+void MergeTreeIndexAggregatorBloomFilter::addRow(const std::vector<uint64_t>& row_hashes) {
     if (row_hashes.size() != column_names_.size()) {
-        throw std::invalid_argument(
-            "Row hash count mismatch: expected " +
-            std::to_string(column_names_.size()) +
-            " got " + std::to_string(row_hashes.size()));
+        throw std::invalid_argument("Row hash count mismatch: expected " +
+                                    std::to_string(column_names_.size()) + " got " +
+                                    std::to_string(row_hashes.size()));
     }
 
     for (size_t col = 0; col < column_names_.size(); ++col) {
@@ -180,15 +167,12 @@ void MergeTreeIndexAggregatorBloomFilter::addRow(
 // ==================== CONDITION ====================
 
 MergeTreeIndexConditionBloomFilter::MergeTreeIndexConditionBloomFilter(
-    const std::vector<std::string>& index_columns,
-    size_t hash_functions)
+    const std::vector<std::string>& index_columns, size_t hash_functions)
     : index_columns_(index_columns)
-    , hash_functions_(hash_functions) {
-}
+    , hash_functions_(hash_functions) {}
 
 bool MergeTreeIndexConditionBloomFilter::mayBeTrueOnGranule(
     MergeTreeIndexGranulePtr granule) const {
-
     auto* bf_granule = dynamic_cast<MergeTreeIndexGranuleBloomFilter*>(granule.get());
     if (!bf_granule || bf_granule->empty()) {
         // Empty granule or wrong type - cannot skip
@@ -207,10 +191,8 @@ bool MergeTreeIndexConditionBloomFilter::mayBeTrueOnGranule(
     return true;
 }
 
-void MergeTreeIndexConditionBloomFilter::addEqualsPredicate(
-    const std::string& column_name,
-    uint64_t value_hash) {
-
+void MergeTreeIndexConditionBloomFilter::addEqualsPredicate(const std::string& column_name,
+                                                            uint64_t value_hash) {
     int col_idx = findColumnIndex(column_name);
     if (col_idx < 0) {
         // Column not indexed - cannot filter
@@ -225,10 +207,8 @@ void MergeTreeIndexConditionBloomFilter::addEqualsPredicate(
     predicates_.push_back(pred);
 }
 
-void MergeTreeIndexConditionBloomFilter::addInPredicate(
-    const std::string& column_name,
-    const std::vector<uint64_t>& value_hashes) {
-
+void MergeTreeIndexConditionBloomFilter::addInPredicate(const std::string& column_name,
+                                                        const std::vector<uint64_t>& value_hashes) {
     int col_idx = findColumnIndex(column_name);
     if (col_idx < 0) {
         // Column not indexed - cannot filter
@@ -243,9 +223,7 @@ void MergeTreeIndexConditionBloomFilter::addInPredicate(
     predicates_.push_back(pred);
 }
 
-int MergeTreeIndexConditionBloomFilter::findColumnIndex(
-    const std::string& column_name) const {
-
+int MergeTreeIndexConditionBloomFilter::findColumnIndex(const std::string& column_name) const {
     for (size_t i = 0; i < index_columns_.size(); ++i) {
         if (index_columns_[i] == column_name) {
             return static_cast<int>(i);
@@ -255,9 +233,7 @@ int MergeTreeIndexConditionBloomFilter::findColumnIndex(
 }
 
 bool MergeTreeIndexConditionBloomFilter::checkPredicate(
-    const Predicate& pred,
-    const MergeTreeIndexGranuleBloomFilter* granule) const {
-
+    const Predicate& pred, const MergeTreeIndexGranuleBloomFilter* granule) const {
     const auto& filters = granule->getFilters();
     if (pred.column_idx >= filters.size() || !filters[pred.column_idx]) {
         // Invalid column or null filter - cannot skip
@@ -289,19 +265,16 @@ bool MergeTreeIndexConditionBloomFilter::checkPredicate(
 
 // ==================== INDEX ====================
 
-MergeTreeIndexBloomFilter::MergeTreeIndexBloomFilter(
-    const std::string& index_name,
-    const std::vector<std::string>& columns,
-    size_t granularity,
-    size_t bits_per_row,
-    size_t hash_functions)
+MergeTreeIndexBloomFilter::MergeTreeIndexBloomFilter(const std::string& index_name,
+                                                     const std::vector<std::string>& columns,
+                                                     size_t granularity, size_t bits_per_row,
+                                                     size_t hash_functions)
     : IMergeTreeIndex(IndexDescription(index_name, IndexType::BLOOM_FILTER, granularity))
     , index_name_(index_name)
     , columns_(columns)
     , granularity_(granularity)
     , bits_per_row_(bits_per_row)
     , hash_functions_(hash_functions) {
-
     if (columns.empty()) {
         throw std::invalid_argument("BloomFilter index requires at least one column");
     }
@@ -314,18 +287,17 @@ MergeTreeIndexBloomFilter::MergeTreeIndexBloomFilter(
 }
 
 MergeTreeIndexGranulePtr MergeTreeIndexBloomFilter::createIndexGranule() const {
-    return std::make_shared<MergeTreeIndexGranuleBloomFilter>(
-        bits_per_row_, hash_functions_, columns_.size());
+    return std::make_shared<MergeTreeIndexGranuleBloomFilter>(bits_per_row_, hash_functions_,
+                                                              columns_.size());
 }
 
 MergeTreeIndexAggregatorPtr MergeTreeIndexBloomFilter::createIndexAggregator() const {
-    return std::make_shared<MergeTreeIndexAggregatorBloomFilter>(
-        bits_per_row_, hash_functions_, columns_);
+    return std::make_shared<MergeTreeIndexAggregatorBloomFilter>(bits_per_row_, hash_functions_,
+                                                                 columns_);
 }
 
 MergeTreeIndexConditionPtr MergeTreeIndexBloomFilter::createIndexCondition() const {
-    return std::make_shared<MergeTreeIndexConditionBloomFilter>(
-        columns_, hash_functions_);
+    return std::make_shared<MergeTreeIndexConditionBloomFilter>(columns_, hash_functions_);
 }
 
 }  // namespace skipindex

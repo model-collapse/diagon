@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/sparse/SindiScorer.h"
+
 #include "diagon/util/SIMDUtils.h"
 
 #include <algorithm>
@@ -9,7 +10,7 @@
 
 // AVX2 intrinsics (conditional compilation)
 #if defined(__AVX2__)
-#include <immintrin.h>
+#    include <immintrin.h>
 #endif
 
 namespace diagon {
@@ -19,15 +20,11 @@ namespace sparse {
 
 #if defined(__AVX2__)
 
-void SindiScorer::accumulateScoresAVX2(
-    const uint32_t* doc_ids,
-    const float* doc_weights,
-    size_t count,
-    float query_weight,
-    std::vector<float>& scores,
-    bool use_prefetch)
-{
-    if (count == 0) return;
+void SindiScorer::accumulateScoresAVX2(const uint32_t* doc_ids, const float* doc_weights,
+                                       size_t count, float query_weight, std::vector<float>& scores,
+                                       bool use_prefetch) {
+    if (count == 0)
+        return;
 
     // Broadcast query weight to all 8 lanes
     __m256 query_weight_vec = _mm256_set1_ps(query_weight);
@@ -45,8 +42,7 @@ void SindiScorer::accumulateScoresAVX2(
         }
 
         // Load 8 document IDs
-        __m256i doc_id_vec = _mm256_loadu_si256(
-            reinterpret_cast<const __m256i*>(&doc_ids[i]));
+        __m256i doc_id_vec = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&doc_ids[i]));
 
         // Load 8 document weights
         __m256 doc_weight_vec = _mm256_loadu_ps(&doc_weights[i]);
@@ -82,14 +78,9 @@ void SindiScorer::accumulateScoresAVX2(
 
 #else  // No AVX2 support
 
-void SindiScorer::accumulateScoresAVX2(
-    const uint32_t* doc_ids,
-    const float* doc_weights,
-    size_t count,
-    float query_weight,
-    std::vector<float>& scores,
-    bool use_prefetch)
-{
+void SindiScorer::accumulateScoresAVX2(const uint32_t* doc_ids, const float* doc_weights,
+                                       size_t count, float query_weight, std::vector<float>& scores,
+                                       bool use_prefetch) {
     // Fall back to scalar implementation
     (void)use_prefetch;  // Unused without AVX2
     accumulateScoresScalar(doc_ids, doc_weights, count, query_weight, scores);
@@ -99,13 +90,9 @@ void SindiScorer::accumulateScoresAVX2(
 
 // ==================== Scalar Implementation ====================
 
-void SindiScorer::accumulateScoresScalar(
-    const uint32_t* doc_ids,
-    const float* doc_weights,
-    size_t count,
-    float query_weight,
-    std::vector<float>& scores)
-{
+void SindiScorer::accumulateScoresScalar(const uint32_t* doc_ids, const float* doc_weights,
+                                         size_t count, float query_weight,
+                                         std::vector<float>& scores) {
     for (size_t i = 0; i < count; ++i) {
         uint32_t doc_id = doc_ids[i];
         if (doc_id < scores.size()) {
@@ -116,21 +103,13 @@ void SindiScorer::accumulateScoresScalar(
 
 // ==================== Dispatch ====================
 
-void SindiScorer::accumulateScores(
-    const uint32_t* doc_ids,
-    const float* doc_weights,
-    size_t count,
-    float query_weight,
-    std::vector<float>& scores,
-    bool use_simd,
-    bool use_prefetch)
-{
+void SindiScorer::accumulateScores(const uint32_t* doc_ids, const float* doc_weights, size_t count,
+                                   float query_weight, std::vector<float>& scores, bool use_simd,
+                                   bool use_prefetch) {
     if (use_simd && hasAVX2()) {
-        accumulateScoresAVX2(doc_ids, doc_weights, count, query_weight,
-                           scores, use_prefetch);
+        accumulateScoresAVX2(doc_ids, doc_weights, count, query_weight, scores, use_prefetch);
     } else {
-        accumulateScoresScalar(doc_ids, doc_weights, count, query_weight,
-                              scores);
+        accumulateScoresScalar(doc_ids, doc_weights, count, query_weight, scores);
     }
 }
 

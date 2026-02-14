@@ -149,8 +149,8 @@ TEST_F(MMapDirectoryTest, ReadBytes) {
 
 TEST_F(MMapDirectoryTest, ReadMultiByte) {
     std::vector<uint8_t> data = {
-        0x00, 0x2A,  // short: 42
-        0x00, 0x00, 0x01, 0x00,  // int: 256
+        0x00, 0x2A,                                     // short: 42
+        0x00, 0x00, 0x01, 0x00,                         // int: 256
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00  // long: 256
     };
     createTestFile("test.bin", data);

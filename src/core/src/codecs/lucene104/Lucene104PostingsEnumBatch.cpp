@@ -2,8 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/lucene104/Lucene104PostingsEnumBatch.h"
-#include "diagon/util/StreamVByte.h"
+
 #include "diagon/util/SIMDPrefixSum.h"
+#include "diagon/util/StreamVByte.h"
 
 #include <algorithm>
 #include <cstring>
@@ -13,8 +14,7 @@ namespace codecs {
 namespace lucene104 {
 
 Lucene104PostingsEnumBatch::Lucene104PostingsEnumBatch(std::unique_ptr<store::IndexInput> docIn,
-                                                       const TermState& termState,
-                                                       bool writeFreqs)
+                                                       const TermState& termState, bool writeFreqs)
     : docIn_(std::move(docIn))
     , docFreq_(termState.docFreq)
     , totalTermFreq_(termState.totalTermFreq)
@@ -70,7 +70,8 @@ int Lucene104PostingsEnumBatch::nextBatch(index::PostingsBatch& batch) {
 
             // Copy frequencies
             if (writeFreqs_) {
-                std::memcpy(&batch.freqs[count], &freqBuffer_[bufferPos_], toTake * sizeof(int32_t));
+                std::memcpy(&batch.freqs[count], &freqBuffer_[bufferPos_],
+                            toTake * sizeof(int32_t));
             } else {
                 // Fill with 1s
                 for (int i = 0; i < toTake; i++) {
@@ -97,9 +98,7 @@ int Lucene104PostingsEnumBatch::nextBatch(index::PostingsBatch& batch) {
                 }
 
                 batch.docs[count] = baseDoc;
-                batch.freqs[count] = writeFreqs_
-                    ? static_cast<int>(freqBuffer_[bufferPos_])
-                    : 1;
+                batch.freqs[count] = writeFreqs_ ? static_cast<int>(freqBuffer_[bufferPos_]) : 1;
 
                 bufferPos_++;
                 count++;

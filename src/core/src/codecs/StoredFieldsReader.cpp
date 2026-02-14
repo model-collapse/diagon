@@ -52,8 +52,8 @@ void StoredFieldsReader::verifyHeader(store::IndexInput& input, const std::strin
     // Read version
     int version = input.readVInt();
     if (version != VERSION) {
-        throw std::runtime_error("Invalid version: expected " + std::to_string(VERSION) +
-                                 ", got " + std::to_string(version));
+        throw std::runtime_error("Invalid version: expected " + std::to_string(VERSION) + ", got " +
+                                 std::to_string(version));
     }
 }
 

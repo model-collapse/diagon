@@ -52,22 +52,19 @@ public:
     /**
      * Create unbounded lower range: field <= upperValue
      */
-    static std::unique_ptr<DoubleRangeQuery> newUpperBoundQuery(const std::string& field,
-                                                                 double upperValue,
-                                                                 bool includeUpper);
+    static std::unique_ptr<DoubleRangeQuery>
+    newUpperBoundQuery(const std::string& field, double upperValue, bool includeUpper);
 
     /**
      * Create unbounded upper range: field >= lowerValue
      */
-    static std::unique_ptr<DoubleRangeQuery> newLowerBoundQuery(const std::string& field,
-                                                                 double lowerValue,
-                                                                 bool includeLower);
+    static std::unique_ptr<DoubleRangeQuery>
+    newLowerBoundQuery(const std::string& field, double lowerValue, bool includeLower);
 
     /**
      * Create exact value query: field == value
      */
-    static std::unique_ptr<DoubleRangeQuery> newExactQuery(const std::string& field,
-                                                            double value);
+    static std::unique_ptr<DoubleRangeQuery> newExactQuery(const std::string& field, double value);
 
     // ==================== Accessors ====================
 

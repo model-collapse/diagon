@@ -10,6 +10,7 @@
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 
 using namespace diagon;
@@ -36,9 +37,7 @@ protected:
         fs::create_directories(testDir_);
     }
 
-    void TearDown() override {
-        fs::remove_all(testDir_);
-    }
+    void TearDown() override { fs::remove_all(testDir_); }
 
     fs::path testDir_;
 };
@@ -70,12 +69,15 @@ TEST_F(BM25NormsIntegrationTest, ShorterDocsGetHigherScores) {
 
         // Document 2: Medium (9 words)
         Document doc2;
-        doc2.add(std::make_unique<TextField>("content", "target one two three four five six seven eight"));
+        doc2.add(std::make_unique<TextField>("content",
+                                             "target one two three four five six seven eight"));
         writer.addDocument(doc2);
 
         // Document 3: Long (16 words)
         Document doc3;
-        doc3.add(std::make_unique<TextField>("content", "target one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen"));
+        doc3.add(std::make_unique<TextField>("content",
+                                             "target one two three four five six seven eight nine "
+                                             "ten eleven twelve thirteen fourteen fifteen"));
         writer.addDocument(doc3);
 
         writer.commit();
@@ -98,7 +100,8 @@ TEST_F(BM25NormsIntegrationTest, ShorterDocsGetHigherScores) {
 
         // Verify scores are positive
         for (const auto& scoreDoc : results.scoreDocs) {
-            EXPECT_GT(scoreDoc.score, 0.0f) << "Doc " << scoreDoc.doc << " should have positive score";
+            EXPECT_GT(scoreDoc.score, 0.0f)
+                << "Doc " << scoreDoc.doc << " should have positive score";
         }
 
         // Verify score ordering: shorter docs should have higher scores
@@ -118,7 +121,8 @@ TEST_F(BM25NormsIntegrationTest, ShorterDocsGetHigherScores) {
 
         // Verify the score difference is significant (not just rounding)
         float scoreDrop = results.scoreDocs[0].score - results.scoreDocs[3].score;
-        EXPECT_GT(scoreDrop, 0.1f) << "Score difference between shortest and longest should be significant";
+        EXPECT_GT(scoreDrop, 0.1f)
+            << "Score difference between shortest and longest should be significant";
     }
 }
 
@@ -150,7 +154,8 @@ TEST_F(BM25NormsIntegrationTest, TermFrequencyAndLengthNormalization) {
 
         // Document 2: Term appears once in long doc
         Document doc2;
-        doc2.add(std::make_unique<TextField>("content", "apple orange banana kiwi mango grape peach plum"));
+        doc2.add(std::make_unique<TextField>("content",
+                                             "apple orange banana kiwi mango grape peach plum"));
         writer.addDocument(doc2);
 
         writer.commit();
@@ -171,22 +176,24 @@ TEST_F(BM25NormsIntegrationTest, TermFrequencyAndLengthNormalization) {
 
         // All documents should have positive scores
         for (const auto& scoreDoc : results.scoreDocs) {
-            EXPECT_GT(scoreDoc.score, 0.0f) << "Doc " << scoreDoc.doc << " should have positive score";
+            EXPECT_GT(scoreDoc.score, 0.0f)
+                << "Doc " << scoreDoc.doc << " should have positive score";
         }
 
         // Verify that the short doc (2 terms) ranks higher than the long doc (8 terms)
         // Both have tf=1, so length normalization should favor the short doc
         int shortDocRank = -1, longDocRank = -1;
         for (size_t i = 0; i < results.scoreDocs.size(); i++) {
-            if (results.scoreDocs[i].doc == 0) shortDocRank = i;
-            if (results.scoreDocs[i].doc == 2) longDocRank = i;
+            if (results.scoreDocs[i].doc == 0)
+                shortDocRank = i;
+            if (results.scoreDocs[i].doc == 2)
+                longDocRank = i;
         }
         EXPECT_LT(shortDocRank, longDocRank)
             << "Short doc (2 terms, tf=1) should rank higher than long doc (8 terms, tf=1)";
 
         // The long doc should rank lowest
-        EXPECT_EQ(2, results.scoreDocs[2].doc)
-            << "Long doc with tf=1 should rank lowest";
+        EXPECT_EQ(2, results.scoreDocs[2].doc) << "Long doc with tf=1 should rank lowest";
     }
 }
 

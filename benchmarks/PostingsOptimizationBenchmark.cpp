@@ -15,8 +15,9 @@
 #include "diagon/util/StreamVByte.h"
 
 #include <benchmark/benchmark.h>
-#include <vector>
+
 #include <random>
+#include <vector>
 
 using namespace diagon::codecs::lucene104;
 using namespace diagon::index;

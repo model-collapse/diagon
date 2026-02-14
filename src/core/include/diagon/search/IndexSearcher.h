@@ -98,11 +98,11 @@ struct IndexSearcherConfig {
 #if defined(DIAGON_HAVE_AVX512)
         16;  // AVX512: 16-wide SIMD
 #elif defined(DIAGON_HAVE_AVX2)
-        8;   // AVX2: 8-wide SIMD
+        8;  // AVX2: 8-wide SIMD
 #elif defined(DIAGON_HAVE_NEON)
-        4;   // NEON: 4-wide SIMD
+        4;  // NEON: 4-wide SIMD
 #else
-        1;   // Scalar fallback
+        1;  // Scalar fallback
 #endif
 
     /**
@@ -214,10 +214,12 @@ struct BatchBuffers {
 class IndexSearcher {
 public:
     explicit IndexSearcher(index::IndexReader& reader)
-        : reader_(reader), config_() {}
+        : reader_(reader)
+        , config_() {}
 
     explicit IndexSearcher(index::IndexReader& reader, const IndexSearcherConfig& config)
-        : reader_(reader), config_(config) {}
+        : reader_(reader)
+        , config_(config) {}
 
     // ==================== Search Methods ====================
 

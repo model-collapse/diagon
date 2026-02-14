@@ -5,22 +5,23 @@
  * Enables direct comparison with Lucene's published results.
  */
 
-#include "diagon/index/IndexWriter.h"
+#include "diagon/document/Document.h"
 #include "diagon/index/DirectoryReader.h"
+#include "diagon/index/IndexWriter.h"
+#include "diagon/search/BooleanQuery.h"
 #include "diagon/search/IndexSearcher.h"
 #include "diagon/search/TermQuery.h"
-#include "diagon/search/BooleanQuery.h"
-#include "diagon/document/Document.h"
 #include "diagon/store/FSDirectory.h"
 #include "diagon/store/MMapDirectory.h"
+
 #include "dataset/SimpleReutersAdapter.h"
 
-#include <iostream>
-#include <fstream>
-#include <chrono>
-#include <vector>
 #include <algorithm>
+#include <chrono>
+#include <fstream>
 #include <iomanip>
+#include <iostream>
+#include <vector>
 
 using namespace diagon;
 using namespace std::chrono;
@@ -51,25 +52,22 @@ void printResults(const BenchmarkResult& result) {
     std::cout << "Indexing Performance:\n";
     std::cout << "  Documents: " << result.docsIndexed << "\n";
     std::cout << "  Time: " << (result.indexTimeMs / 1000.0) << " seconds\n";
-    std::cout << "  Throughput: " << std::fixed << std::setprecision(0)
-              << result.throughput << " docs/sec\n";
+    std::cout << "  Throughput: " << std::fixed << std::setprecision(0) << result.throughput
+              << " docs/sec\n";
     std::cout << "  Index size: " << (result.indexSizeBytes / (1024 * 1024)) << " MB\n";
-    std::cout << "  Storage: " << (result.indexSizeBytes / result.docsIndexed)
-              << " bytes/doc\n\n";
+    std::cout << "  Storage: " << (result.indexSizeBytes / result.docsIndexed) << " bytes/doc\n\n";
 
     std::cout << "Search Performance (P50 / P90 / P99 latency):\n";
-    std::cout << std::setw(50) << std::left << "  Query"
-              << std::setw(12) << std::right << "P50 (ms)"
-              << std::setw(12) << "P90 (ms)"
-              << std::setw(12) << "P99 (ms)"
-              << std::setw(10) << "Hits" << "\n";
+    std::cout << std::setw(50) << std::left << "  Query" << std::setw(12) << std::right
+              << "P50 (ms)" << std::setw(12) << "P90 (ms)" << std::setw(12) << "P99 (ms)"
+              << std::setw(10) << "Hits"
+              << "\n";
     std::cout << "  " << std::string(92, '-') << "\n";
     for (const auto& qm : result.queryResults) {
-        std::cout << "  " << std::setw(48) << std::left << qm.name
-                  << std::setw(12) << std::right << std::fixed << std::setprecision(3) << (qm.p50_us / 1000.0)
-                  << std::setw(12) << (qm.p90_us / 1000.0)
-                  << std::setw(12) << (qm.p99_us / 1000.0)
-                  << std::setw(10) << qm.hits << "\n";
+        std::cout << "  " << std::setw(48) << std::left << qm.name << std::setw(12) << std::right
+                  << std::fixed << std::setprecision(3) << (qm.p50_us / 1000.0) << std::setw(12)
+                  << (qm.p90_us / 1000.0) << std::setw(12) << (qm.p99_us / 1000.0) << std::setw(10)
+                  << qm.hits << "\n";
     }
 
     std::cout << "\n=========================================\n";
@@ -78,7 +76,8 @@ void printResults(const BenchmarkResult& result) {
 int64_t getDirectorySize(const std::string& path) {
     std::string cmd = "du -sb " + path + " 2>/dev/null | cut -f1";
     FILE* pipe = popen(cmd.c_str(), "r");
-    if (!pipe) return 0;
+    if (!pipe)
+        return 0;
 
     char buffer[128];
     std::string result;
@@ -96,7 +95,8 @@ int main(int argc, char* argv[]) {
     std::cout << "=========================================\n\n";
 
     // Default Reuters dataset path (Lucene format)
-    std::string reutersPath = "/home/ubuntu/opensearch_warmroom/lucene/lucene/benchmark/work/reuters-out";
+    std::string reutersPath =
+        "/home/ubuntu/opensearch_warmroom/lucene/lucene/benchmark/work/reuters-out";
 
     if (argc > 1) {
         reutersPath = argv[1];
@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
     try {
         auto dir = store::FSDirectory::open(indexPath);
         index::IndexWriterConfig config;
-        config.setMaxBufferedDocs(50000); // Single segment for Reuters
+        config.setMaxBufferedDocs(50000);  // Single segment for Reuters
 
         auto writer = std::make_unique<index::IndexWriter>(*dir, config);
 
@@ -162,8 +162,8 @@ int main(int argc, char* argv[]) {
     result.indexSizeBytes = getDirectorySize(indexPath);
 
     std::cout << "✓ Indexing complete in " << (result.indexTimeMs / 1000.0) << " seconds\n";
-    std::cout << "✓ Throughput: " << std::fixed << std::setprecision(0)
-              << result.throughput << " docs/sec\n\n";
+    std::cout << "✓ Throughput: " << std::fixed << std::setprecision(0) << result.throughput
+              << " docs/sec\n\n";
 
     // ========================================
     // Phase 2: Search Queries
@@ -185,83 +185,91 @@ int main(int argc, char* argv[]) {
         };
 
         std::vector<TestQuery> queries = {
-            {"Single term: 'dollar'", []() {
-                return std::make_unique<search::TermQuery>(search::Term("body", "dollar"));
-            }},
-            {"Single term: 'oil'", []() {
-                return std::make_unique<search::TermQuery>(search::Term("body", "oil"));
-            }},
-            {"Single term: 'trade'", []() {
-                return std::make_unique<search::TermQuery>(search::Term("body", "trade"));
-            }},
-            {"Boolean AND: 'oil AND price'", []() {
-                search::BooleanQuery::Builder builder;
-                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "oil")),
-                           search::Occur::MUST);
-                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "price")),
-                           search::Occur::MUST);
-                return builder.build();
-            }},
-            {"Boolean OR 2-term: 'trade OR export'", []() {
-                search::BooleanQuery::Builder builder;
-                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "trade")),
-                           search::Occur::SHOULD);
-                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "export")),
-                           search::Occur::SHOULD);
-                return builder.build();
-            }},
-            {"Boolean OR 5-term: 'oil OR trade OR market OR price OR dollar'", []() {
-                search::BooleanQuery::Builder builder;
-                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "oil")),
-                           search::Occur::SHOULD);
-                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "trade")),
-                           search::Occur::SHOULD);
-                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "market")),
-                           search::Occur::SHOULD);
-                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "price")),
-                           search::Occur::SHOULD);
-                builder.add(std::make_shared<search::TermQuery>(search::Term("body", "dollar")),
-                           search::Occur::SHOULD);
-                return builder.build();
-            }},
-            {"Boolean OR 10-term", []() {
-                search::BooleanQuery::Builder builder;
-                for (const auto& t : {"oil", "trade", "market", "price", "dollar",
-                                       "export", "bank", "government", "company", "president"}) {
-                    builder.add(std::make_shared<search::TermQuery>(search::Term("body", t)),
-                               search::Occur::SHOULD);
-                }
-                return builder.build();
-            }},
-            {"Boolean OR 20-term", []() {
-                search::BooleanQuery::Builder builder;
-                for (const auto& t : {"market", "company", "stock", "trade", "price",
-                                       "bank", "dollar", "oil", "export", "government",
-                                       "share", "billion", "profit", "exchange", "interest",
-                                       "economic", "report", "industry", "investment", "revenue"}) {
-                    builder.add(std::make_shared<search::TermQuery>(search::Term("body", t)),
-                               search::Occur::SHOULD);
-                }
-                return builder.build();
-            }},
+            {"Single term: 'dollar'",
+             []() {
+                 return std::make_unique<search::TermQuery>(search::Term("body", "dollar"));
+             }},
+            {"Single term: 'oil'",
+             []() {
+                 return std::make_unique<search::TermQuery>(search::Term("body", "oil"));
+             }},
+            {"Single term: 'trade'",
+             []() {
+                 return std::make_unique<search::TermQuery>(search::Term("body", "trade"));
+             }},
+            {"Boolean AND: 'oil AND price'",
+             []() {
+                 search::BooleanQuery::Builder builder;
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("body", "oil")),
+                             search::Occur::MUST);
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("body", "price")),
+                             search::Occur::MUST);
+                 return builder.build();
+             }},
+            {"Boolean OR 2-term: 'trade OR export'",
+             []() {
+                 search::BooleanQuery::Builder builder;
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("body", "trade")),
+                             search::Occur::SHOULD);
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("body", "export")),
+                             search::Occur::SHOULD);
+                 return builder.build();
+             }},
+            {"Boolean OR 5-term: 'oil OR trade OR market OR price OR dollar'",
+             []() {
+                 search::BooleanQuery::Builder builder;
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("body", "oil")),
+                             search::Occur::SHOULD);
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("body", "trade")),
+                             search::Occur::SHOULD);
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("body", "market")),
+                             search::Occur::SHOULD);
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("body", "price")),
+                             search::Occur::SHOULD);
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("body", "dollar")),
+                             search::Occur::SHOULD);
+                 return builder.build();
+             }},
+            {"Boolean OR 10-term",
+             []() {
+                 search::BooleanQuery::Builder builder;
+                 for (const auto& t : {"oil", "trade", "market", "price", "dollar", "export",
+                                       "bank", "government", "company", "president"}) {
+                     builder.add(std::make_shared<search::TermQuery>(search::Term("body", t)),
+                                 search::Occur::SHOULD);
+                 }
+                 return builder.build();
+             }},
+            {"Boolean OR 20-term",
+             []() {
+                 search::BooleanQuery::Builder builder;
+                 for (const auto& t :
+                      {"market",   "company", "stock",    "trade",      "price",
+                       "bank",     "dollar",  "oil",      "export",     "government",
+                       "share",    "billion", "profit",   "exchange",   "interest",
+                       "economic", "report",  "industry", "investment", "revenue"}) {
+                     builder.add(std::make_shared<search::TermQuery>(search::Term("body", t)),
+                                 search::Occur::SHOULD);
+                 }
+                 return builder.build();
+             }},
             {"Boolean OR 50-term", []() {
-                search::BooleanQuery::Builder builder;
-                for (const auto& t : {"market", "company", "stock", "trade", "price",
-                                       "bank", "dollar", "oil", "export", "government",
-                                       "share", "billion", "profit", "exchange", "interest",
-                                       "economic", "report", "industry", "investment", "revenue",
-                                       "million", "percent", "year", "said", "would",
-                                       "new", "also", "last", "first", "group",
-                                       "accord", "tax", "rate", "growth", "debt",
-                                       "loss", "quarter", "month", "net", "income",
-                                       "sales", "earnings", "bond", "foreign", "loan",
-                                       "budget", "deficit", "surplus", "inflation", "central"}) {
-                    builder.add(std::make_shared<search::TermQuery>(search::Term("body", t)),
-                               search::Occur::SHOULD);
-                }
-                return builder.build();
-            }}
-        };
+                 search::BooleanQuery::Builder builder;
+                 for (const auto& t :
+                      {"market",     "company",  "stock",    "trade",      "price",   "bank",
+                       "dollar",     "oil",      "export",   "government", "share",   "billion",
+                       "profit",     "exchange", "interest", "economic",   "report",  "industry",
+                       "investment", "revenue",  "million",  "percent",    "year",    "said",
+                       "would",      "new",      "also",     "last",       "first",   "group",
+                       "accord",     "tax",      "rate",     "growth",     "debt",    "loss",
+                       "quarter",    "month",    "net",      "income",     "sales",   "earnings",
+                       "bond",       "foreign",  "loan",     "budget",     "deficit", "surplus",
+                       "inflation",  "central"}) {
+                     builder.add(std::make_shared<search::TermQuery>(search::Term("body", t)),
+                                 search::Occur::SHOULD);
+                 }
+                 return builder.build();
+             }}};
 
         const int NUM_ITERATIONS = 100;
         const int WARMUP_ITERATIONS = 10;
@@ -303,9 +311,8 @@ int main(int argc, char* argv[]) {
             result.queryResults.push_back({testQuery.name, hits, p50, p90, p99});
 
             std::cout << "  P50: " << std::fixed << std::setprecision(3) << (p50 / 1000.0)
-                     << " ms  P90: " << (p90 / 1000.0)
-                     << " ms  P99: " << (p99 / 1000.0) << " ms"
-                     << "  (" << hits << " hits)\n";
+                      << " ms  P90: " << (p90 / 1000.0) << " ms  P99: " << (p99 / 1000.0) << " ms"
+                      << "  (" << hits << " hits)\n";
         }
 
         reader.reset();
@@ -326,11 +333,9 @@ int main(int argc, char* argv[]) {
         outFile << "Throughput (docs/sec): " << result.throughput << "\n";
         outFile << "Index size (bytes): " << result.indexSizeBytes << "\n";
         for (const auto& qm : result.queryResults) {
-            outFile << "Query: " << qm.name
-                   << " | P50 (us): " << qm.p50_us
-                   << " | P90 (us): " << qm.p90_us
-                   << " | P99 (us): " << qm.p99_us
-                   << " | Hits: " << qm.hits << "\n";
+            outFile << "Query: " << qm.name << " | P50 (us): " << qm.p50_us
+                    << " | P90 (us): " << qm.p90_us << " | P99 (us): " << qm.p99_us
+                    << " | Hits: " << qm.hits << "\n";
         }
         outFile.close();
         std::cout << "\n✓ Results saved to reuters_benchmark_results.txt\n";

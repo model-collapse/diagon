@@ -29,9 +29,7 @@ public:
     // TokenFilter interface
     std::vector<Token> filter(const std::vector<Token>& tokens) override;
     std::string name() const override { return "lowercase"; }
-    std::string description() const override {
-        return "Converts tokens to lowercase";
-    }
+    std::string description() const override { return "Converts tokens to lowercase"; }
 
 private:
     /**
@@ -40,5 +38,5 @@ private:
     static std::string toLowercase(const std::string& str);
 };
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

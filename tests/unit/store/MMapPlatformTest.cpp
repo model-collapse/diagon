@@ -1,9 +1,9 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/store/MMapDirectory.h"
 #include "diagon/store/FSDirectory.h"
 #include "diagon/store/IOContext.h"
+#include "diagon/store/MMapDirectory.h"
 #include "diagon/util/Exceptions.h"
 
 #include <gtest/gtest.h>
@@ -335,13 +335,8 @@ TEST_F(MMapPlatformTest, RandomReadWithHint) {
     auto input = dir->openInput("random.bin", IOContext(IOContext::Type::READ));
 
     // Random seeks
-    std::vector<int64_t> positions = {
-        0,
-        1024 * 1024,
-        5 * 1024 * 1024,
-        2 * 1024 * 1024,
-        9 * 1024 * 1024
-    };
+    std::vector<int64_t> positions = {0, 1024 * 1024, 5 * 1024 * 1024, 2 * 1024 * 1024,
+                                      9 * 1024 * 1024};
 
     for (auto pos : positions) {
         input->seek(pos);

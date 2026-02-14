@@ -70,9 +70,8 @@ protected:
     /**
      * Helper: Write documents and flush segment
      */
-    std::shared_ptr<SegmentInfo> writeAndFlushDocuments(
-        const std::vector<std::string>& docs, const std::string& fieldName = "content") {
-
+    std::shared_ptr<SegmentInfo> writeAndFlushDocuments(const std::vector<std::string>& docs,
+                                                        const std::string& fieldName = "content") {
         // Create DocumentsWriterPerThread config
         DocumentsWriterPerThread::Config config;
 
@@ -124,9 +123,9 @@ protected:
 TEST_F(Lucene104QueryTest, BasicEndToEndFlow) {
     // Write 3 documents
     std::vector<std::string> docs = {
-        "apple banana",      // doc 0
-        "banana cherry",     // doc 1
-        "cherry apple"       // doc 2
+        "apple banana",   // doc 0
+        "banana cherry",  // doc 1
+        "cherry apple"    // doc 2
     };
 
     auto segmentInfo = writeAndFlushDocuments(docs);
@@ -172,10 +171,10 @@ TEST_F(Lucene104QueryTest, BasicEndToEndFlow) {
 TEST_F(Lucene104QueryTest, BM25ScoringCorrectness) {
     // Write documents with known term frequencies
     std::vector<std::string> docs = {
-        "apple",                    // doc 0: 1 term
-        "apple apple",              // doc 1: 2 terms (same)
-        "apple apple apple",        // doc 2: 3 terms (same)
-        "banana"                    // doc 3: different term
+        "apple",              // doc 0: 1 term
+        "apple apple",        // doc 1: 2 terms (same)
+        "apple apple apple",  // doc 2: 3 terms (same)
+        "banana"              // doc 3: different term
     };
 
     auto segmentInfo = writeAndFlushDocuments(docs);
@@ -295,10 +294,10 @@ TEST_F(Lucene104QueryTest, MultipleFieldsSupport) {
 TEST_F(Lucene104QueryTest, BooleanQueryAND) {
     // Write documents
     std::vector<std::string> docs = {
-        "apple banana",          // doc 0: matches both
-        "apple cherry",          // doc 1: only "apple"
-        "banana cherry",         // doc 2: only "banana"
-        "apple banana cherry"    // doc 3: matches both
+        "apple banana",        // doc 0: matches both
+        "apple cherry",        // doc 1: only "apple"
+        "banana cherry",       // doc 2: only "banana"
+        "apple banana cherry"  // doc 3: matches both
     };
 
     auto segmentInfo = writeAndFlushDocuments(docs);
@@ -341,10 +340,10 @@ TEST_F(Lucene104QueryTest, BooleanQueryAND) {
 TEST_F(Lucene104QueryTest, BooleanQueryOR) {
     // Write documents
     std::vector<std::string> docs = {
-        "apple",           // doc 0: "apple"
-        "banana",          // doc 1: "banana"
-        "cherry",          // doc 2: neither
-        "apple banana"     // doc 3: both
+        "apple",        // doc 0: "apple"
+        "banana",       // doc 1: "banana"
+        "cherry",       // doc 2: neither
+        "apple banana"  // doc 3: both
     };
 
     auto segmentInfo = writeAndFlushDocuments(docs);
@@ -375,10 +374,10 @@ TEST_F(Lucene104QueryTest, BooleanQueryOR) {
         matchedDocs.insert(scoreDoc.doc);
     }
 
-    EXPECT_TRUE(matchedDocs.count(0) > 0);  // "apple"
-    EXPECT_TRUE(matchedDocs.count(1) > 0);  // "banana"
-    EXPECT_TRUE(matchedDocs.count(3) > 0);  // "apple banana"
-    EXPECT_FALSE(matchedDocs.count(2) > 0); // "cherry" - doesn't match
+    EXPECT_TRUE(matchedDocs.count(0) > 0);   // "apple"
+    EXPECT_TRUE(matchedDocs.count(1) > 0);   // "banana"
+    EXPECT_TRUE(matchedDocs.count(3) > 0);   // "apple banana"
+    EXPECT_FALSE(matchedDocs.count(2) > 0);  // "cherry" - doesn't match
 }
 
 /**
@@ -483,4 +482,3 @@ TEST_F(Lucene104QueryTest, CodecDetection) {
     ASSERT_NE(nullptr, postingsEnum);
     EXPECT_NE(PostingsEnum::NO_MORE_DOCS, postingsEnum->nextDoc());
 }
-

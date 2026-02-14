@@ -4,8 +4,8 @@
 #pragma once
 
 #include "diagon/codecs/NormsFormat.h"
-#include "diagon/index/SegmentWriteState.h"
 #include "diagon/index/DocValues.h"
+#include "diagon/index/SegmentWriteState.h"
 #include "diagon/store/IndexInput.h"
 
 #include <memory>
@@ -136,7 +136,8 @@ private:
 
         /** Direct access to norm array (eliminates virtual dispatch for batch norms lookup) */
         const int8_t* normsData(int* outSize) const override {
-            if (outSize) *outSize = static_cast<int>(norms_.size());
+            if (outSize)
+                *outSize = static_cast<int>(norms_.size());
             return norms_.data();
         }
 

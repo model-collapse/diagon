@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/index/BlockMaxQuantizedIndex.h"
+
 #include "diagon/index/TopKHolderOptimized.h"
 
 #include <algorithm>
@@ -19,8 +20,7 @@ namespace diagon {
 namespace index {
 
 BlockMaxQuantizedIndex::BlockMaxQuantizedIndex()
-    : BlockMaxQuantizedIndex(Config()) {
-}
+    : BlockMaxQuantizedIndex(Config()) {}
 
 BlockMaxQuantizedIndex::BlockMaxQuantizedIndex(const Config& config)
     : config_(config) {
@@ -89,11 +89,10 @@ void BlockMaxQuantizedIndex::loadCustomQuantization() {
     for (size_t i = 0; i < quant_map_.size(); ++i) {
         if (quant_map_[i] >= actual_bins) {
             throw std::runtime_error("Invalid mapping: value " + std::to_string(quant_map_[i]) +
-                                     " at index " + std::to_string(i) +
-                                     " exceeds bin count " + std::to_string(actual_bins));
+                                     " at index " + std::to_string(i) + " exceeds bin count " +
+                                     std::to_string(actual_bins));
         }
     }
-
 
     // Initialize quant_values_ for compatibility (use LUT values)
     quant_values_ = quant_lut_;
@@ -129,7 +128,6 @@ void BlockMaxQuantizedIndex::build(const std::vector<SparseDoc>& documents) {
     num_documents_ = documents.size();
     num_windows_ = (num_documents_ + config_.window_size - 1) / config_.window_size;
     num_window_groups_ = (num_windows_ + config_.window_group_size - 1) / config_.window_group_size;
-
 
     // Find max term ID
     num_terms_ = 0;
@@ -190,7 +188,8 @@ void BlockMaxQuantizedIndex::build(const std::vector<SparseDoc>& documents) {
                     for (int g = 0; g <= max_grp; ++g) {
                         // Determine how many windows this group should have
                         int start_window = g * config_.window_group_size;
-                        int end_window = std::min(start_window + (int)config_.window_group_size, (int)num_windows_);
+                        int end_window = std::min(start_window + (int)config_.window_group_size,
+                                                  (int)num_windows_);
                         int num_win_in_group = end_window - start_window;
                         quantized_index_[term][block][g].windows.resize(num_win_in_group);
                     }
@@ -216,7 +215,8 @@ void BlockMaxQuantizedIndex::build(const std::vector<SparseDoc>& documents) {
                 // Initialize windows within each group
                 for (size_t g = 0; g < num_window_groups_; ++g) {
                     int start_window = g * config_.window_group_size;
-                    int end_window = std::min(start_window + (int)config_.window_group_size, (int)num_windows_);
+                    int end_window = std::min(start_window + (int)config_.window_group_size,
+                                              (int)num_windows_);
                     int num_win_in_group = end_window - start_window;
                     quantized_index_[term][block][g].windows.resize(num_win_in_group);
                 }
@@ -253,24 +253,24 @@ void BlockMaxQuantizedIndex::build(const std::vector<SparseDoc>& documents) {
             }
 
             // Add to inverted index
-            quantized_index_[term][block_id][group_id].windows[sub_win].documents.push_back(local_doc_id);
+            quantized_index_[term][block_id][group_id].windows[sub_win].documents.push_back(
+                local_doc_id);
             block_sizes_[term][block_id]++;
         }
     }
 
     // Store forward index for reranking
     forward_index_ = documents;
-
 }
 
 std::vector<doc_id_t> BlockMaxQuantizedIndex::query(const SparseDoc& query,
-                                                      const QueryParams& params,
-                                                      QueryStats* stats) {
+                                                    const QueryParams& params, QueryStats* stats) {
     auto start = std::chrono::high_resolution_clock::now();
 
     // Statistics
     QueryStats local_stats;
-    if (!stats) stats = &local_stats;
+    if (!stats)
+        stats = &local_stats;
 
     // Phase 1: Block Selection
     auto block_sel_start = std::chrono::high_resolution_clock::now();
@@ -282,7 +282,8 @@ std::vector<doc_id_t> BlockMaxQuantizedIndex::query(const SparseDoc& query,
         term_t term = q_elem.term;
         float q_weight = q_elem.score;
 
-        if (term >= num_terms_) continue;
+        if (term >= num_terms_)
+            continue;
 
         // For each quantization block (use size_t to avoid uint8_t overflow at 256)
         for (size_t block_id = 0; block_id < config_.num_quantization_bins; ++block_id) {
@@ -294,9 +295,8 @@ std::vector<doc_id_t> BlockMaxQuantizedIndex::query(const SparseDoc& query,
                 uint32_t gain = static_cast<uint32_t>(block_max_score * q_weight);  // Integer gain
                 float weight = static_cast<float>(gain);  // Float weight for mass accumulation
 
-                blocks_with_score.emplace_back(
-                    term, static_cast<uint8_t>(block_id), gain, weight, &quantized_index_[term][block_id]
-                );
+                blocks_with_score.emplace_back(term, static_cast<uint8_t>(block_id), gain, weight,
+                                               &quantized_index_[term][block_id]);
             }
         }
     }
@@ -314,7 +314,8 @@ std::vector<doc_id_t> BlockMaxQuantizedIndex::query(const SparseDoc& query,
     stats->selected_blocks = selected_count;
 
     auto block_sel_end = std::chrono::high_resolution_clock::now();
-    stats->block_selection_ms = std::chrono::duration<double, std::milli>(block_sel_end - block_sel_start).count();
+    stats->block_selection_ms =
+        std::chrono::duration<double, std::milli>(block_sel_end - block_sel_start).count();
 
     // Phase 2: ScatterAdd (Score Accumulation)
     auto scatter_start = std::chrono::high_resolution_clock::now();
@@ -326,7 +327,8 @@ std::vector<doc_id_t> BlockMaxQuantizedIndex::query(const SparseDoc& query,
     scatterAdd(blocks_with_score, selected_count, score_buf, candidates, params.top_k_prime, stats);
 
     auto scatter_end = std::chrono::high_resolution_clock::now();
-    stats->scatter_add_ms = std::chrono::duration<double, std::milli>(scatter_end - scatter_start).count();
+    stats->scatter_add_ms =
+        std::chrono::duration<double, std::milli>(scatter_end - scatter_start).count();
 
     // Phase 3: Reranking
     auto rerank_start = std::chrono::high_resolution_clock::now();
@@ -335,7 +337,8 @@ std::vector<doc_id_t> BlockMaxQuantizedIndex::query(const SparseDoc& query,
     rerank(candidates, query, results, params.top_k, stats);
 
     auto rerank_end = std::chrono::high_resolution_clock::now();
-    stats->reranking_ms = std::chrono::duration<double, std::milli>(rerank_end - rerank_start).count();
+    stats->reranking_ms =
+        std::chrono::duration<double, std::milli>(rerank_end - rerank_start).count();
 
     auto end = std::chrono::high_resolution_clock::now();
     stats->total_ms = std::chrono::duration<double, std::milli>(end - start).count();
@@ -343,9 +346,8 @@ std::vector<doc_id_t> BlockMaxQuantizedIndex::query(const SparseDoc& query,
     return results;
 }
 
-void BlockMaxQuantizedIndex::selectBlocksAlphaMass(std::vector<BlockWithScore>& blocks,
-                                                    float alpha,
-                                                    size_t& selected_count) {
+void BlockMaxQuantizedIndex::selectBlocksAlphaMass(std::vector<BlockWithScore>& blocks, float alpha,
+                                                   size_t& selected_count) {
     // Calculate total mass using weights (matches QBlock)
     float total_mass = 0.0f;
     for (const auto& block : blocks) {
@@ -356,9 +358,7 @@ void BlockMaxQuantizedIndex::selectBlocksAlphaMass(std::vector<BlockWithScore>& 
 
     // Sort by gain (integer, for consistency with QBlock)
     std::sort(blocks.begin(), blocks.end(),
-              [](const BlockWithScore& a, const BlockWithScore& b) {
-                  return a.gain > b.gain;
-              });
+              [](const BlockWithScore& a, const BlockWithScore& b) { return a.gain > b.gain; });
 
     // Select blocks until we reach target mass (using weights)
     float current_mass = 0.0f;
@@ -374,9 +374,8 @@ void BlockMaxQuantizedIndex::selectBlocksAlphaMass(std::vector<BlockWithScore>& 
     }
 }
 
-void BlockMaxQuantizedIndex::selectBlocksMaxRatio(std::vector<BlockWithScore>& blocks,
-                                                   float alpha,
-                                                   size_t& selected_count) {
+void BlockMaxQuantizedIndex::selectBlocksMaxRatio(std::vector<BlockWithScore>& blocks, float alpha,
+                                                  size_t& selected_count) {
     // Find max weight (matches QBlock)
     float max_weight = 0.0f;
     for (const auto& block : blocks) {
@@ -386,26 +385,21 @@ void BlockMaxQuantizedIndex::selectBlocksMaxRatio(std::vector<BlockWithScore>& b
     float threshold = max_weight * alpha;
 
     // Partition blocks by threshold (using weight)
-    auto partition_point = std::partition(blocks.begin(), blocks.end(),
-                                          [threshold](const BlockWithScore& block) {
-                                              return block.weight >= threshold;
-                                          });
+    auto partition_point = std::partition(
+        blocks.begin(), blocks.end(),
+        [threshold](const BlockWithScore& block) { return block.weight >= threshold; });
 
     selected_count = std::distance(blocks.begin(), partition_point);
 
     // Sort selected blocks by weight (matches QBlock)
     std::sort(blocks.begin(), partition_point,
-              [](const BlockWithScore& a, const BlockWithScore& b) {
-                  return a.weight > b.weight;
-              });
+              [](const BlockWithScore& a, const BlockWithScore& b) { return a.weight > b.weight; });
 }
 
 void BlockMaxQuantizedIndex::scatterAdd(const std::vector<BlockWithScore>& blocks,
-                                       size_t selected_count,
-                                       std::vector<int32_t>& score_buf,
-                                       std::vector<std::pair<int32_t, doc_id_t>>& candidates,
-                                       size_t top_k_prime,
-                                       QueryStats* stats) {
+                                        size_t selected_count, std::vector<int32_t>& score_buf,
+                                        std::vector<std::pair<int32_t, doc_id_t>>& candidates,
+                                        size_t top_k_prime, QueryStats* stats) {
     // Use TopKHolderOptimized for efficient batch processing
     TopKHolderOptimized<doc_id_t, int32_t> topk_holder(top_k_prime);
 
@@ -478,7 +472,8 @@ void BlockMaxQuantizedIndex::scatterAdd(const std::vector<BlockWithScore>& block
         }
 
         for (size_t i = 0; i < selected_count; ++i) {
-            if (block_cache[i].docs == nullptr) continue;
+            if (block_cache[i].docs == nullptr)
+                continue;
 
             const auto& docs = *block_cache[i].docs;
             const int32_t gain = block_cache[i].gain;
@@ -532,7 +527,8 @@ void BlockMaxQuantizedIndex::scatterAdd(const std::vector<BlockWithScore>& block
 
         // Scan remaining blocks for any missed documents (rare)
         for (size_t i = 1; i < selected_count; ++i) {
-            if (block_cache[i].docs == nullptr || block_cache[i].docs == first_block_docs) continue;
+            if (block_cache[i].docs == nullptr || block_cache[i].docs == first_block_docs)
+                continue;
 
             const auto& docs = *block_cache[i].docs;
             const size_t n = docs.size();
@@ -567,15 +563,14 @@ void BlockMaxQuantizedIndex::scatterAdd(const std::vector<BlockWithScore>& block
 }
 
 void BlockMaxQuantizedIndex::rerank(const std::vector<std::pair<int32_t, doc_id_t>>& candidates,
-                                   const SparseDoc& query,
-                                   std::vector<doc_id_t>& results,
-                                   size_t top_k,
-                                   QueryStats* stats) {
+                                    const SparseDoc& query, std::vector<doc_id_t>& results,
+                                    size_t top_k, QueryStats* stats) {
     // Use TopKHolderOptimized for exact scoring
     TopKHolderOptimized<doc_id_t, float> topk_holder(top_k);
 
     for (const auto& [approx_score, doc_id] : candidates) {
-        if (doc_id >= forward_index_.size()) continue;
+        if (doc_id >= forward_index_.size())
+            continue;
 
         float exact_score = dotProduct(query, forward_index_[doc_id]);
         topk_holder.add(exact_score, doc_id);
@@ -638,13 +633,15 @@ size_t BlockMaxQuantizedIndex::memoryUsageBytes() const {
 
 const SparseDoc& BlockMaxQuantizedIndex::getDocument(doc_id_t doc_id) const {
     if (doc_id >= forward_index_.size()) {
-        throw std::out_of_range("Document ID " + std::to_string(doc_id) +
-                                " is out of range (max: " + std::to_string(forward_index_.size() - 1) + ")");
+        throw std::out_of_range(
+            "Document ID " + std::to_string(doc_id) +
+            " is out of range (max: " + std::to_string(forward_index_.size() - 1) + ")");
     }
     return forward_index_[doc_id];
 }
 
-std::vector<SparseDoc> BlockMaxQuantizedIndex::getDocuments(const std::vector<doc_id_t>& doc_ids) const {
+std::vector<SparseDoc>
+BlockMaxQuantizedIndex::getDocuments(const std::vector<doc_id_t>& doc_ids) const {
     std::vector<SparseDoc> result;
     result.reserve(doc_ids.size());
 
@@ -660,5 +657,5 @@ std::vector<SparseDoc> BlockMaxQuantizedIndex::getDocuments(const std::vector<do
     return result;
 }
 
-} // namespace index
-} // namespace diagon
+}  // namespace index
+}  // namespace diagon

@@ -3,8 +3,9 @@
 
 #pragma once
 
-#include "diagon/index/DocValues.h"
 #include "diagon/columns/ColumnVector.h"
+#include "diagon/index/DocValues.h"
+
 #include <memory>
 
 namespace diagon {
@@ -82,9 +83,7 @@ public:
         return true;
     }
 
-    long longValue() const override {
-        return cached_value_;
-    }
+    long longValue() const override { return cached_value_; }
 
 protected:
     long cached_value_ = 0;
@@ -124,8 +123,7 @@ public:
      *
      * @param column Column containing int64 values
      */
-    explicit ColumnVectorNumericDocValues(
-        std::shared_ptr<columns::ColumnVector<int64_t>> column)
+    explicit ColumnVectorNumericDocValues(std::shared_ptr<columns::ColumnVector<int64_t>> column)
         : column_(column) {
         // Cache raw pointer for fast access
         data_ = reinterpret_cast<const int64_t*>(column_->getRawData());
@@ -142,9 +140,8 @@ public:
         for (int i = 0; i < count; i++) {
             int doc = docs[i];
             // Bounds check (will be optimized out if docs are known valid)
-            values[i] = (doc >= 0 && doc < static_cast<int>(size_))
-                ? data_[doc]
-                : 1L;  // Default norm
+            values[i] = (doc >= 0 && doc < static_cast<int>(size_)) ? data_[doc]
+                                                                    : 1L;  // Default norm
         }
     }
 
@@ -160,9 +157,7 @@ public:
         return false;
     }
 
-    long longValue() const override {
-        return cached_value_;
-    }
+    long longValue() const override { return cached_value_; }
 
 private:
     std::shared_ptr<columns::ColumnVector<int64_t>> column_;

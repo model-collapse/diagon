@@ -146,13 +146,18 @@ public:
      * Stored separately from posting data for efficient WAND pruning.
      */
     struct BlockMetadata {
-        uint32_t offset;      // Offset in doc_ids/weights arrays
-        uint32_t count;       // Number of documents in block
-        float max_weight;     // Maximum weight in block (for WAND)
+        uint32_t offset;   // Offset in doc_ids/weights arrays
+        uint32_t count;    // Number of documents in block
+        float max_weight;  // Maximum weight in block (for WAND)
 
-        BlockMetadata() : offset(0), count(0), max_weight(0.0f) {}
+        BlockMetadata()
+            : offset(0)
+            , count(0)
+            , max_weight(0.0f) {}
         BlockMetadata(uint32_t off, uint32_t cnt, float max_w)
-            : offset(off), count(cnt), max_weight(max_w) {}
+            : offset(off)
+            , count(cnt)
+            , max_weight(max_w) {}
     };
 
     // ==================== Construction ====================
@@ -376,9 +381,7 @@ private:
      * @param k Number of results
      * @return Top-k results
      */
-    std::vector<SearchResult> searchWithWand(
-        const SparseVector& query,
-        int k) const;
+    std::vector<SearchResult> searchWithWand(const SparseVector& query, int k) const;
 
     /**
      * Compute WAND upper bound score
@@ -391,10 +394,8 @@ private:
      * @param skip_term Term to exclude from upper bound
      * @return Upper bound score
      */
-    float computeUpperBound(
-        const std::vector<uint32_t>& query_terms,
-        const std::vector<float>& query_weights,
-        size_t skip_term) const;
+    float computeUpperBound(const std::vector<uint32_t>& query_terms,
+                            const std::vector<float>& query_weights, size_t skip_term) const;
 };
 
 }  // namespace sparse

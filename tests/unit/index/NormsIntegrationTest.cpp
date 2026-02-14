@@ -9,6 +9,7 @@
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <cmath>
 #include <filesystem>
 
@@ -43,8 +44,10 @@ protected:
         }
         double sqrtLength = std::sqrt(static_cast<double>(length));
         double encoded = 127.0 / sqrtLength;
-        if (encoded > 127.0) return 127;
-        if (encoded < -128.0) return -128;
+        if (encoded > 127.0)
+            return 127;
+        if (encoded < -128.0)
+            return -128;
         return static_cast<int64_t>(encoded);
     }
 
@@ -72,7 +75,8 @@ TEST_F(NormsIntegrationTest, WriteAndReadNorms) {
 
         // Document 2: 9 terms
         Document doc2;
-        doc2.add(std::make_unique<TextField>("content", "one two three four five six seven eight nine"));
+        doc2.add(
+            std::make_unique<TextField>("content", "one two three four five six seven eight nine"));
         writer.addDocument(doc2);
 
         writer.commit();
@@ -146,8 +150,10 @@ TEST_F(NormsIntegrationTest, NormsFilesCreated) {
     bool hasNvm = false;
 
     for (const auto& file : files) {
-        if (file.find(".nvd") != std::string::npos) hasNvd = true;
-        if (file.find(".nvm") != std::string::npos) hasNvm = true;
+        if (file.find(".nvd") != std::string::npos)
+            hasNvd = true;
+        if (file.find(".nvm") != std::string::npos)
+            hasNvm = true;
     }
 
     EXPECT_TRUE(hasNvd) << "Norms data file (.nvd) should be created";
@@ -191,8 +197,6 @@ TEST_F(NormsIntegrationTest, EmptyFieldNorms) {
         // Non-empty field should get lower norm
         ASSERT_TRUE(norms->advanceExact(1));
         EXPECT_LT(norms->longValue(), 127) << "Non-empty field should get lower norm";
-
-        
     }
 }
 
@@ -225,8 +229,6 @@ TEST_F(NormsIntegrationTest, NoNormsForNonExistentField) {
         // Indexed field should have norms
         auto* normsIndexed = leafReader->getNormValues("indexed");
         EXPECT_NE(nullptr, normsIndexed) << "Indexed field should have norms";
-
-
     }
 }
 
@@ -265,7 +267,5 @@ TEST_F(NormsIntegrationTest, NormsAcrossMultipleSegments) {
             auto* norms = leafReader->getNormValues("content");
             ASSERT_NE(nullptr, norms) << "Each segment should have norms";
         }
-
-
     }
 }

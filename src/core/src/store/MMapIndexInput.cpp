@@ -6,12 +6,13 @@
 #include "diagon/util/Exceptions.h"
 #include "diagon/util/SIMDUtils.h"
 
+#include <sys/stat.h>
+
 #include <algorithm>
 #include <cstring>
 #include <sstream>
 
 #include <fcntl.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
 namespace diagon::store {
@@ -19,17 +20,16 @@ namespace diagon::store {
 // ==================== Constructor ====================
 
 MMapIndexInput::MMapIndexInput(const std::filesystem::path& path, int chunk_power, bool preload)
-    : path_(path),
-      chunk_power_(chunk_power),
-      chunk_mask_((1LL << chunk_power) - 1),
-      file_length_(0),
-      num_chunks_(0),
-      chunks_(nullptr),
-      pos_(0),
-      is_slice_(false),
-      slice_offset_(0),
-      slice_length_(0) {
-
+    : path_(path)
+    , chunk_power_(chunk_power)
+    , chunk_mask_((1LL << chunk_power) - 1)
+    , file_length_(0)
+    , num_chunks_(0)
+    , chunks_(nullptr)
+    , pos_(0)
+    , is_slice_(false)
+    , slice_offset_(0)
+    , slice_length_(0) {
     // Open file descriptor
     int fd = ::open(path.c_str(), O_RDONLY);
     if (fd == -1) {
@@ -65,23 +65,24 @@ MMapIndexInput::MMapIndexInput(const std::filesystem::path& path, int chunk_powe
 // ==================== Copy Constructor (for cloning) ====================
 
 MMapIndexInput::MMapIndexInput(const MMapIndexInput& other)
-    : path_(other.path_),
-      chunk_power_(other.chunk_power_),
-      chunk_mask_(other.chunk_mask_),
-      file_length_(other.file_length_),
-      num_chunks_(other.num_chunks_),
-      chunks_(other.chunks_),  // Share chunks (zero-copy)
-      pos_(0),                 // Reset position
-      is_slice_(other.is_slice_),
-      slice_offset_(other.slice_offset_),
-      slice_length_(other.slice_length_) {
+    : path_(other.path_)
+    , chunk_power_(other.chunk_power_)
+    , chunk_mask_(other.chunk_mask_)
+    , file_length_(other.file_length_)
+    , num_chunks_(other.num_chunks_)
+    , chunks_(other.chunks_)
+    ,  // Share chunks (zero-copy)
+    pos_(0)
+    ,  // Reset position
+    is_slice_(other.is_slice_)
+    , slice_offset_(other.slice_offset_)
+    , slice_length_(other.slice_length_) {
     // Clones share the underlying memory mapping but have independent positions
 }
 
 // ==================== Reading ====================
 
 uint8_t MMapIndexInput::readByte() {
-    
     // Check bounds
     int64_t absolute_pos;
     if (is_slice_) {
@@ -114,7 +115,6 @@ uint8_t MMapIndexInput::readByte() {
 }
 
 void MMapIndexInput::readBytes(uint8_t* buffer, size_t length) {
-    
     if (length == 0) {
         return;
     }
@@ -157,7 +157,8 @@ void MMapIndexInput::readBytes(uint8_t* buffer, size_t length) {
 
         // Prefetch next chunk if we're about to cross boundary
         // This reduces cache miss penalty for sequential reads spanning chunks
-        if (chunk_offset + to_copy >= chunk.length && chunk_idx + 1 < static_cast<int>(num_chunks_)) {
+        if (chunk_offset + to_copy >= chunk.length &&
+            chunk_idx + 1 < static_cast<int>(num_chunks_)) {
             // Prefetch first cache line of next chunk into L1 cache
             util::simd::Prefetch::read(chunks_[chunk_idx + 1].data,
                                        util::simd::Prefetch::Locality::HIGH);
@@ -176,11 +177,10 @@ void MMapIndexInput::readBytes(uint8_t* buffer, size_t length) {
 // ==================== Positioning ====================
 
 int64_t MMapIndexInput::getFilePointer() const {
-        return pos_;
+    return pos_;
 }
 
 void MMapIndexInput::seek(int64_t pos) {
-    
     if (pos < 0) {
         throw IOException("Negative position: " + std::to_string(pos));
     }
@@ -288,8 +288,7 @@ int32_t MMapIndexInput::readInt() {
     if (getDirectPointer(4, ptr, remaining)) {
         int32_t result = (static_cast<int32_t>(ptr[0]) << 24) |
                          (static_cast<int32_t>(ptr[1]) << 16) |
-                         (static_cast<int32_t>(ptr[2]) << 8) |
-                         static_cast<int32_t>(ptr[3]);
+                         (static_cast<int32_t>(ptr[2]) << 8) | static_cast<int32_t>(ptr[3]);
         pos_ += 4;
         return result;
     }
@@ -308,8 +307,7 @@ int64_t MMapIndexInput::readLong() {
                          (static_cast<int64_t>(ptr[3]) << 32) |
                          (static_cast<int64_t>(ptr[4]) << 24) |
                          (static_cast<int64_t>(ptr[5]) << 16) |
-                         (static_cast<int64_t>(ptr[6]) << 8) |
-                         static_cast<int64_t>(ptr[7]);
+                         (static_cast<int64_t>(ptr[6]) << 8) | static_cast<int64_t>(ptr[7]);
         pos_ += 8;
         return result;
     }

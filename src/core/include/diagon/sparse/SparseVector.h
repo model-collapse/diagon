@@ -21,8 +21,12 @@ struct SparseElement {
     uint32_t index;  // Dimension index
     float value;     // Weight/score
 
-    SparseElement() : index(0), value(0.0f) {}
-    SparseElement(uint32_t idx, float val) : index(idx), value(val) {}
+    SparseElement()
+        : index(0)
+        , value(0.0f) {}
+    SparseElement(uint32_t idx, float val)
+        : index(idx)
+        , value(val) {}
 
     bool operator<(const SparseElement& other) const { return index < other.index; }
 
@@ -57,8 +61,7 @@ public:
     /**
      * Construct from arrays (common input format)
      */
-    SparseVector(const std::vector<uint32_t>& indices,
-                 const std::vector<float>& values);
+    SparseVector(const std::vector<uint32_t>& indices, const std::vector<float>& values);
 
     /**
      * Construct from element list
@@ -236,8 +239,7 @@ public:
      * @param dense Dense vector
      * @param threshold Minimum absolute value to include (default: >0)
      */
-    static SparseVector fromDense(const std::vector<float>& dense,
-                                  float threshold = 0.0f);
+    static SparseVector fromDense(const std::vector<float>& dense, float threshold = 0.0f);
 
 private:
     std::vector<SparseElement> elements_;  // Sorted by index

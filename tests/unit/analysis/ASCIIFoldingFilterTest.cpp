@@ -1,15 +1,13 @@
-#include <gtest/gtest.h>
 #include "analysis/ASCIIFoldingFilter.h"
+
+#include <gtest/gtest.h>
 
 using namespace diagon::analysis;
 
 TEST(ASCIIFoldingFilterTest, BasicAccents) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("café", 0, 0, 5),
-        Token("résumé", 1, 6, 13)
-    };
+    std::vector<Token> tokens{Token("café", 0, 0, 5), Token("résumé", 1, 6, 13)};
 
     auto result = filter.filter(tokens);
 
@@ -31,10 +29,7 @@ TEST(ASCIIFoldingFilterTest, EmptyTokens) {
 TEST(ASCIIFoldingFilterTest, AlreadyASCII) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("hello", 0, 0, 5),
-        Token("world", 1, 6, 11)
-    };
+    std::vector<Token> tokens{Token("hello", 0, 0, 5), Token("world", 1, 6, 11)};
 
     auto result = filter.filter(tokens);
 
@@ -46,11 +41,8 @@ TEST(ASCIIFoldingFilterTest, AlreadyASCII) {
 TEST(ASCIIFoldingFilterTest, FrenchAccents) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("français", 0, 0, 9),
-        Token("école", 1, 10, 16),
-        Token("éléphant", 2, 17, 26)
-    };
+    std::vector<Token> tokens{Token("français", 0, 0, 9), Token("école", 1, 10, 16),
+                              Token("éléphant", 2, 17, 26)};
 
     auto result = filter.filter(tokens);
 
@@ -63,11 +55,8 @@ TEST(ASCIIFoldingFilterTest, FrenchAccents) {
 TEST(ASCIIFoldingFilterTest, GermanUmlauts) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("über", 0, 0, 5),
-        Token("schön", 1, 6, 12),
-        Token("Müller", 2, 13, 20)
-    };
+    std::vector<Token> tokens{Token("über", 0, 0, 5), Token("schön", 1, 6, 12),
+                              Token("Müller", 2, 13, 20)};
 
     auto result = filter.filter(tokens);
 
@@ -80,11 +69,8 @@ TEST(ASCIIFoldingFilterTest, GermanUmlauts) {
 TEST(ASCIIFoldingFilterTest, SpanishAccents) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("español", 0, 0, 8),
-        Token("niño", 1, 9, 14),
-        Token("años", 2, 15, 20)
-    };
+    std::vector<Token> tokens{Token("español", 0, 0, 8), Token("niño", 1, 9, 14),
+                              Token("años", 2, 15, 20)};
 
     auto result = filter.filter(tokens);
 
@@ -97,10 +83,7 @@ TEST(ASCIIFoldingFilterTest, SpanishAccents) {
 TEST(ASCIIFoldingFilterTest, PortugueseAccents) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("português", 0, 0, 10),
-        Token("ação", 1, 11, 16)
-    };
+    std::vector<Token> tokens{Token("português", 0, 0, 10), Token("ação", 1, 11, 16)};
 
     auto result = filter.filter(tokens);
 
@@ -112,10 +95,7 @@ TEST(ASCIIFoldingFilterTest, PortugueseAccents) {
 TEST(ASCIIFoldingFilterTest, ItalianAccents) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("città", 0, 0, 6),
-        Token("perché", 1, 7, 14)
-    };
+    std::vector<Token> tokens{Token("città", 0, 0, 6), Token("perché", 1, 7, 14)};
 
     auto result = filter.filter(tokens);
 
@@ -127,11 +107,8 @@ TEST(ASCIIFoldingFilterTest, ItalianAccents) {
 TEST(ASCIIFoldingFilterTest, NordicCharacters) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("Ångström", 0, 0, 9),
-        Token("Øyvind", 1, 10, 17),
-        Token("Åse", 2, 18, 22)
-    };
+    std::vector<Token> tokens{Token("Ångström", 0, 0, 9), Token("Øyvind", 1, 10, 17),
+                              Token("Åse", 2, 18, 22)};
 
     auto result = filter.filter(tokens);
 
@@ -144,10 +121,7 @@ TEST(ASCIIFoldingFilterTest, NordicCharacters) {
 TEST(ASCIIFoldingFilterTest, PreservesOffsets) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("café", 0, 10, 15),
-        Token("résumé", 1, 20, 27)
-    };
+    std::vector<Token> tokens{Token("café", 0, 10, 15), Token("résumé", 1, 20, 27)};
 
     auto result = filter.filter(tokens);
 
@@ -162,10 +136,7 @@ TEST(ASCIIFoldingFilterTest, PreservesOffsets) {
 TEST(ASCIIFoldingFilterTest, PreservesTokenType) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("café", 0, 0, 5),
-        Token("123", 1, 6, 9)
-    };
+    std::vector<Token> tokens{Token("café", 0, 0, 5), Token("123", 1, 6, 9)};
 
     tokens[0].setType("word");
     tokens[1].setType("number");
@@ -180,9 +151,7 @@ TEST(ASCIIFoldingFilterTest, PreservesTokenType) {
 TEST(ASCIIFoldingFilterTest, EmptyTokenText) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("", 0, 0, 0)
-    };
+    std::vector<Token> tokens{Token("", 0, 0, 0)};
 
     auto result = filter.filter(tokens);
 
@@ -193,10 +162,7 @@ TEST(ASCIIFoldingFilterTest, EmptyTokenText) {
 TEST(ASCIIFoldingFilterTest, NumbersUnchanged) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("123", 0, 0, 3),
-        Token("456", 1, 4, 7)
-    };
+    std::vector<Token> tokens{Token("123", 0, 0, 3), Token("456", 1, 4, 7)};
 
     auto result = filter.filter(tokens);
 
@@ -208,10 +174,7 @@ TEST(ASCIIFoldingFilterTest, NumbersUnchanged) {
 TEST(ASCIIFoldingFilterTest, PunctuationUnchanged) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("café!", 0, 0, 6),
-        Token("résumé?", 1, 7, 15)
-    };
+    std::vector<Token> tokens{Token("café!", 0, 0, 6), Token("résumé?", 1, 7, 15)};
 
     auto result = filter.filter(tokens);
 
@@ -223,11 +186,8 @@ TEST(ASCIIFoldingFilterTest, PunctuationUnchanged) {
 TEST(ASCIIFoldingFilterTest, MixedAccents) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("naïve", 0, 0, 6),
-        Token("façade", 1, 7, 14),
-        Token("crème", 2, 15, 21)
-    };
+    std::vector<Token> tokens{Token("naïve", 0, 0, 6), Token("façade", 1, 7, 14),
+                              Token("crème", 2, 15, 21)};
 
     auto result = filter.filter(tokens);
 
@@ -256,9 +216,7 @@ TEST(ASCIIFoldingFilterTest, LargeTokenList) {
 TEST(ASCIIFoldingFilterTest, ChineseUnchanged) {
     ASCIIFoldingFilter filter;
 
-    std::vector<Token> tokens{
-        Token("北京", 0, 0, 6)
-    };
+    std::vector<Token> tokens{Token("北京", 0, 0, 6)};
 
     auto result = filter.filter(tokens);
 

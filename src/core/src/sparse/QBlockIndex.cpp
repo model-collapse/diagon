@@ -7,8 +7,8 @@
 #include <cmath>
 #include <cstring>
 #include <map>
-#include <stdexcept>
 #include <queue>
+#include <stdexcept>
 
 namespace diagon {
 namespace sparse {
@@ -20,7 +20,6 @@ QBlockIndex::QBlockIndex(const Config& config)
     , num_documents_(0)
     , num_windows_(0)
     , num_postings_(0) {
-
     if (config_.num_bins == 0 || config_.num_bins > 256) {
         throw std::invalid_argument("num_bins must be in [1, 256]");
     }
@@ -63,7 +62,8 @@ void QBlockIndex::buildQuantization(const std::vector<SparseVector>& documents) 
     // Step 3: Divide into equal-frequency bins
     // Each bin should contain ~equal number of weights
     size_t weights_per_bin = all_weights.size() / config_.num_bins;
-    if (weights_per_bin == 0) weights_per_bin = 1;
+    if (weights_per_bin == 0)
+        weights_per_bin = 1;
 
     quant_val_.resize(config_.num_bins);
     std::vector<float> bin_boundaries(config_.num_bins + 1);
@@ -72,8 +72,8 @@ void QBlockIndex::buildQuantization(const std::vector<SparseVector>& documents) 
     for (uint32_t bin = 0; bin < config_.num_bins; ++bin) {
         size_t start_idx = bin * weights_per_bin;
         size_t end_idx = (bin == config_.num_bins - 1)
-            ? all_weights.size()
-            : std::min((bin + 1) * weights_per_bin, all_weights.size());
+                             ? all_weights.size()
+                             : std::min((bin + 1) * weights_per_bin, all_weights.size());
 
         // Representative value = mean of weights in bin
         float sum = 0.0f;
@@ -115,8 +115,7 @@ uint8_t QBlockIndex::quantizeWeight(float weight) const {
     // Clamp and scale to [0, 255]
     float max_weight = 3.0f;  // Same as BitQ
     uint8_t quantized = static_cast<uint8_t>(
-        std::min(255.0f, std::max(0.0f, (weight / max_weight) * 255.0f))
-    );
+        std::min(255.0f, std::max(0.0f, (weight / max_weight) * 255.0f)));
 
     // Map to bin
     return quant_map_[quantized];
@@ -176,8 +175,10 @@ void QBlockIndex::build(const std::vector<SparseVector>& documents) {
             uint32_t term = elem.index;
             float weight = elem.value;
 
-            if (term >= max_dimension) continue;
-            if (weight <= 0.0f) continue;
+            if (term >= max_dimension)
+                continue;
+            if (weight <= 0.0f)
+                continue;
 
             // Quantize weight to bin
             uint8_t bin = quantizeWeight(weight);
@@ -251,11 +252,8 @@ void QBlockIndex::load(store::Directory* directory, const std::string& segment) 
 
 // ==================== Search ====================
 
-void QBlockIndex::computeBlockGains(
-    float query_weight,
-    uint32_t term,
-    std::vector<float>& gains) const
-{
+void QBlockIndex::computeBlockGains(float query_weight, uint32_t term,
+                                    std::vector<float>& gains) const {
     gains.resize(config_.num_bins);
 
     for (uint32_t bin = 0; bin < config_.num_bins; ++bin) {
@@ -271,15 +269,20 @@ std::vector<SearchResult> QBlockIndex::search(const SparseVector& query, int k) 
 
     // Step 1: Collect all candidate blocks with gains
     struct BlockCandidate {
-        const std::vector<std::shared_ptr<columns::ColumnVector<uint32_t>>>* windows;  // Pointer to all windows
+        const std::vector<std::shared_ptr<columns::ColumnVector<uint32_t>>>*
+            windows;  // Pointer to all windows
         uint32_t term;
         uint32_t bin;
         int32_t gain;  // Use int32 like reference code
         float weight;
 
         BlockCandidate(const std::vector<std::shared_ptr<columns::ColumnVector<uint32_t>>>* w,
-                      uint32_t t, uint32_t b, int32_t g, float wt)
-            : windows(w), term(t), bin(b), gain(g), weight(wt) {}
+                       uint32_t t, uint32_t b, int32_t g, float wt)
+            : windows(w)
+            , term(t)
+            , bin(b)
+            , gain(g)
+            , weight(wt) {}
 
         bool operator<(const BlockCandidate& other) const {
             return gain < other.gain;  // Min-heap (invert for max)
@@ -296,14 +299,16 @@ std::vector<SearchResult> QBlockIndex::search(const SparseVector& query, int k) 
         uint32_t term = query_elem.index;
         float query_weight = query_elem.value;
 
-        if (term >= blocks_.size()) continue;
+        if (term >= blocks_.size())
+            continue;
 
         const auto& term_blocks = blocks_[term];
         const auto& term_block_sizes = block_sizes_[term];
 
         for (uint32_t bin = 0; bin < config_.num_bins; ++bin) {
             // Skip empty blocks
-            if (term_block_sizes[bin] == 0) continue;
+            if (term_block_sizes[bin] == 0)
+                continue;
 
             // Gain calculation (int32 like reference, scaled by 1000 for precision)
             constexpr float GAIN_SCALE = 1000.0f;
@@ -325,11 +330,12 @@ std::vector<SearchResult> QBlockIndex::search(const SparseVector& query, int k) 
     if (config_.selection_mode == Config::TOP_K) {
         // Select fixed top-k blocks by gain
         int num_select = std::min(config_.fixed_top_k, static_cast<int>(candidates.size()));
-        auto cmp = [](const auto& a, const auto& b) { return a.gain > b.gain; };
+        auto cmp = [](const auto& a, const auto& b) {
+            return a.gain > b.gain;
+        };
         if (num_select > 0) {
-            std::partial_sort(candidates.begin(),
-                            candidates.begin() + num_select,
-                            candidates.end(), cmp);
+            std::partial_sort(candidates.begin(), candidates.begin() + num_select, candidates.end(),
+                              cmp);
             end_it = candidates.begin() + num_select;
         }
 
@@ -343,7 +349,7 @@ std::vector<SearchResult> QBlockIndex::search(const SparseVector& query, int k) 
 
         // Partition: selected blocks at front
         end_it = std::partition(candidates.begin(), candidates.end(),
-                               [threshold](const auto& c) { return c.weight >= threshold; });
+                                [threshold](const auto& c) { return c.weight >= threshold; });
 
     } else {  // ALPHA_MASS (default)
         // Select blocks until reaching alpha% of total mass (like reference)
@@ -351,7 +357,7 @@ std::vector<SearchResult> QBlockIndex::search(const SparseVector& query, int k) 
 
         // Sort by gain descending
         std::sort(candidates.begin(), candidates.end(),
-                 [](const auto& a, const auto& b) { return a.gain > b.gain; });
+                  [](const auto& a, const auto& b) { return a.gain > b.gain; });
 
         // Select until reaching target mass
         float current_mass = 0.0f;
@@ -359,13 +365,14 @@ std::vector<SearchResult> QBlockIndex::search(const SparseVector& query, int k) 
         for (auto it = candidates.begin(); it != candidates.end(); ++it) {
             current_mass += it->weight;
             end_it = it + 1;
-            if (current_mass >= target_mass) break;
+            if (current_mass >= target_mass)
+                break;
         }
     }
 
     // Step 3: ScatterAdd - window by window processing (like reference)
     std::vector<int32_t> score_buf(num_documents_, 0);  // Use int32 like reference
-    int32_t* __restrict buf = score_buf.data();  // Restrict pointer
+    int32_t* __restrict buf = score_buf.data();         // Restrict pointer
 
     // Result collection
     std::vector<SearchResult> results;
@@ -385,7 +392,8 @@ std::vector<SearchResult> QBlockIndex::search(const SparseVector& query, int k) 
             const auto& block_col = (*block_it->windows)[window_id];
             const auto& docs = block_col->getData();
 
-            if (docs.empty()) continue;
+            if (docs.empty())
+                continue;
 
             touched_blocks.push_back(block_col.get());
 
@@ -444,8 +452,8 @@ std::vector<SearchResult> QBlockIndex::search(const SparseVector& query, int k) 
 
     // Sort by score descending and take top-k
     std::partial_sort(results.begin(),
-                     results.begin() + std::min(k, static_cast<int>(results.size())),
-                     results.end());
+                      results.begin() + std::min(k, static_cast<int>(results.size())),
+                      results.end());
 
     if (results.size() > static_cast<size_t>(k)) {
         results.resize(k);
@@ -458,8 +466,8 @@ std::vector<SearchResult> QBlockIndex::search(const SparseVector& query, int k) 
 
 SparseVector QBlockIndex::getDocument(uint32_t doc_id) const {
     if (doc_id >= num_documents_) {
-        throw std::out_of_range("Document ID " + std::to_string(doc_id) +
-                               " out of range [0, " + std::to_string(num_documents_) + ")");
+        throw std::out_of_range("Document ID " + std::to_string(doc_id) + " out of range [0, " +
+                                std::to_string(num_documents_) + ")");
     }
 
     if (!hasForwardIndex()) {

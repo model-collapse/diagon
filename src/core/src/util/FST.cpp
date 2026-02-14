@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/util/FST.h"
+
 #include "diagon/util/PackedFST.h"
 
 namespace diagon {
@@ -55,8 +56,7 @@ std::unique_ptr<FST> FST::Builder::finish() {
 const std::vector<FST::Builder::Entry>& FST::Builder::getEntries() const {
     // Need to convert PackedFST entries to FST entries
     // Both have the same structure, so we can safely cast
-    return reinterpret_cast<const std::vector<FST::Builder::Entry>&>(
-        packedBuilder_->getEntries());
+    return reinterpret_cast<const std::vector<FST::Builder::Entry>&>(packedBuilder_->getEntries());
 }
 
 }  // namespace util

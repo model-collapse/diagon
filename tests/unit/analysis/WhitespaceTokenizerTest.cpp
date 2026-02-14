@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
 #include "analysis/WhitespaceTokenizer.h"
+
+#include <gtest/gtest.h>
 
 using namespace diagon::analysis;
 
@@ -156,7 +157,8 @@ TEST(WhitespaceTokenizerTest, LongText) {
     // Create text with 1000 words
     std::string text;
     for (int i = 0; i < 1000; ++i) {
-        if (i > 0) text += " ";
+        if (i > 0)
+            text += " ";
         text += "word" + std::to_string(i);
     }
 

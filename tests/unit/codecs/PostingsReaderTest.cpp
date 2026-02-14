@@ -44,7 +44,7 @@ FieldInfo createField(const std::string& name, IndexOptions options) {
 // Helper: Write posting list in StreamVByte format (Phase 2a)
 // Uses StreamVByte for groups of 4, VInt for remainder
 void writePostingsStreamVByte(ByteBuffersIndexOutput& out, const std::vector<int>& docDeltas,
-                               const std::vector<int>& freqs, bool writeFreqs) {
+                              const std::vector<int>& freqs, bool writeFreqs) {
     size_t numDocs = docDeltas.size();
     size_t pos = 0;
 
@@ -136,7 +136,7 @@ TEST(PostingsReaderTest, DocsOnlyMode) {
     // Doc deltas: 0, 5, 5 (for docs 0, 5, 10)
     // No freqs for DOCS_ONLY mode
     std::vector<int> docDeltas = {0, 5, 5};
-    std::vector<int> freqs = {1, 1, 1};  // Dummy values, won't be written
+    std::vector<int> freqs = {1, 1, 1};                      // Dummy values, won't be written
     writePostingsStreamVByte(out, docDeltas, freqs, false);  // writeFreqs=false
 
     // Create reader

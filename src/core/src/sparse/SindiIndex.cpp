@@ -6,8 +6,8 @@
 #include <algorithm>
 #include <cstring>
 #include <map>
-#include <stdexcept>
 #include <queue>
+#include <stdexcept>
 
 namespace diagon {
 namespace sparse {
@@ -18,7 +18,6 @@ SindiIndex::SindiIndex(const Config& config)
     : config_(config)
     , num_documents_(0)
     , num_postings_(0) {
-
     if (config_.block_size <= 0) {
         throw std::invalid_argument("block_size must be positive");
     }
@@ -76,7 +75,7 @@ void SindiIndex::build(const std::vector<SparseVector>& documents) {
 
         // Sort by document ID
         std::sort(postings.begin(), postings.end(),
-                 [](const auto& a, const auto& b) { return a.first < b.first; });
+                  [](const auto& a, const auto& b) { return a.first < b.first; });
 
         // Create ColumnVectors
         auto doc_ids_col = columns::ColumnUInt32::create();
@@ -90,8 +89,7 @@ void SindiIndex::build(const std::vector<SparseVector>& documents) {
         size_t block_start = 0;
 
         while (block_start < postings.size()) {
-            size_t block_end = std::min(block_start + config_.block_size,
-                                       postings.size());
+            size_t block_end = std::min(block_start + config_.block_size, postings.size());
 
             // Find max weight in this block
             float max_weight = 0.0f;
@@ -100,11 +98,8 @@ void SindiIndex::build(const std::vector<SparseVector>& documents) {
             }
 
             // Store block metadata
-            blocks.emplace_back(
-                static_cast<uint32_t>(block_start),
-                static_cast<uint32_t>(block_end - block_start),
-                max_weight
-            );
+            blocks.emplace_back(static_cast<uint32_t>(block_start),
+                                static_cast<uint32_t>(block_end - block_start), max_weight);
 
             // Track maximum weight for this term
             max_term_weights_[term] = std::max(max_term_weights_[term], max_weight);
@@ -177,10 +172,7 @@ void SindiIndex::load(store::Directory* directory, const std::string& segment) {
 
 // ==================== Search ====================
 
-std::vector<SearchResult> SindiIndex::search(
-    const SparseVector& query,
-    int k) const
-{
+std::vector<SearchResult> SindiIndex::search(const SparseVector& query, int k) const {
     if (k <= 0 || query.empty()) {
         return {};
     }
@@ -208,15 +200,8 @@ std::vector<SearchResult> SindiIndex::search(
             size_t posting_count = doc_ids_col->size();
 
             // Accumulate scores with SIMD
-            SindiScorer::accumulateScores(
-                doc_ids,
-                weights,
-                posting_count,
-                query_weight,
-                scores,
-                config_.use_simd,
-                config_.use_prefetch
-            );
+            SindiScorer::accumulateScores(doc_ids, weights, posting_count, query_weight, scores,
+                                          config_.use_simd, config_.use_prefetch);
         }
 
         // Extract top-k
@@ -231,8 +216,8 @@ std::vector<SearchResult> SindiIndex::search(
 
         // Sort by score descending and take top k
         std::partial_sort(results.begin(),
-                         results.begin() + std::min(k, static_cast<int>(results.size())),
-                         results.end());
+                          results.begin() + std::min(k, static_cast<int>(results.size())),
+                          results.end());
 
         if (results.size() > static_cast<size_t>(k)) {
             results.resize(k);
@@ -242,10 +227,7 @@ std::vector<SearchResult> SindiIndex::search(
     }
 }
 
-std::vector<SearchResult> SindiIndex::searchWithWand(
-    const SparseVector& query,
-    int k) const
-{
+std::vector<SearchResult> SindiIndex::searchWithWand(const SparseVector& query, int k) const {
     // Extract query terms and weights
     std::vector<uint32_t> query_terms;
     std::vector<float> query_weights;
@@ -295,15 +277,9 @@ std::vector<SearchResult> SindiIndex::searchWithWand(
             }
 
             // Process block with SIMD
-            SindiScorer::accumulateScores(
-                &doc_ids[block.offset],
-                &weights[block.offset],
-                block.count,
-                query_weight,
-                scores,
-                config_.use_simd,
-                config_.use_prefetch
-            );
+            SindiScorer::accumulateScores(&doc_ids[block.offset], &weights[block.offset],
+                                          block.count, query_weight, scores, config_.use_simd,
+                                          config_.use_prefetch);
         }
     }
 
@@ -319,8 +295,8 @@ std::vector<SearchResult> SindiIndex::searchWithWand(
 
     // Sort and take top-k
     std::partial_sort(results.begin(),
-                     results.begin() + std::min(k, static_cast<int>(results.size())),
-                     results.end());
+                      results.begin() + std::min(k, static_cast<int>(results.size())),
+                      results.end());
 
     if (results.size() > static_cast<size_t>(k)) {
         results.resize(k);
@@ -331,11 +307,9 @@ std::vector<SearchResult> SindiIndex::searchWithWand(
 
 // ==================== Helpers ====================
 
-float SindiIndex::computeUpperBound(
-    const std::vector<uint32_t>& query_terms,
-    const std::vector<float>& query_weights,
-    size_t skip_term) const
-{
+float SindiIndex::computeUpperBound(const std::vector<uint32_t>& query_terms,
+                                    const std::vector<float>& query_weights,
+                                    size_t skip_term) const {
     float upper_bound = 0.0f;
 
     for (size_t i = 0; i < query_terms.size(); ++i) {
@@ -358,8 +332,8 @@ float SindiIndex::computeUpperBound(
 
 SparseVector SindiIndex::getDocument(uint32_t doc_id) const {
     if (doc_id >= num_documents_) {
-        throw std::out_of_range("Document ID " + std::to_string(doc_id) +
-                               " out of range [0, " + std::to_string(num_documents_) + ")");
+        throw std::out_of_range("Document ID " + std::to_string(doc_id) + " out of range [0, " +
+                                std::to_string(num_documents_) + ")");
     }
 
     if (!hasForwardIndex()) {

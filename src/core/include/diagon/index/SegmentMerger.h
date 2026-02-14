@@ -90,7 +90,7 @@ private:
 
     // Doc ID mapping
     struct DocIDMapping {
-        int newMaxDoc;                 // Number of docs after merge
+        int newMaxDoc;                  // Number of docs after merge
         std::vector<int> segmentBases;  // Starting doc ID for each source segment
     };
 

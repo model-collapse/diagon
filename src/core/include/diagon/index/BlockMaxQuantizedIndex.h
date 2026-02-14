@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include <vector>
-#include <memory>
 #include <cstdint>
+#include <memory>
+#include <vector>
 
 namespace diagon {
 namespace index {
@@ -31,8 +31,12 @@ struct SparseElement {
     term_t term;
     score_t score;
 
-    SparseElement() : term(0), score(0.0f) {}
-    SparseElement(term_t t, score_t s) : term(t), score(s) {}
+    SparseElement()
+        : term(0)
+        , score(0.0f) {}
+    SparseElement(term_t t, score_t s)
+        : term(t)
+        , score(s) {}
 };
 
 using SparseDoc = std::vector<SparseElement>;
@@ -55,16 +59,16 @@ public:
      * Configuration parameters
      */
     struct Config {
-        size_t num_quantization_bins = 256;  // Number of quantization bins
-        size_t window_size = 500000;          // Documents per window (0.5M for normal CPU)
-        size_t window_group_size = 15;        // Windows per group (QBlock default: 15)
-        float max_score = 3.0f;               // Maximum score for quantization
+        size_t num_quantization_bins = 256;       // Number of quantization bins
+        size_t window_size = 500000;              // Documents per window (0.5M for normal CPU)
+        size_t window_group_size = 15;            // Windows per group (QBlock default: 15)
+        float max_score = 3.0f;                   // Maximum score for quantization
         bool enable_on_demand_allocation = true;  // Enable memory-efficient allocation
 
         // Custom quantization (optional, for performance)
-        bool use_custom_quantization = false;     // Enable custom quantization via LUT
-        std::string lut_file;                      // Path to LUT file (e.g., quant_one_lut.csv)
-        std::string map_file;                      // Path to mapping file (e.g., quant_one_map.csv)
+        bool use_custom_quantization = false;  // Enable custom quantization via LUT
+        std::string lut_file;                  // Path to LUT file (e.g., quant_one_lut.csv)
+        std::string map_file;                  // Path to mapping file (e.g., quant_one_map.csv)
 
         Config() = default;
     };
@@ -73,10 +77,10 @@ public:
      * Query parameters
      */
     struct QueryParams {
-        size_t top_k = 10;           // Number of results to return
-        size_t top_k_prime = 50;     // Candidates for reranking
-        float alpha = 0.3f;          // Block selection parameter (0.0-1.0, 0.3 recommended)
-        bool alpha_mass = true;      // Use alpha-mass (true) or max-ratio (false)
+        size_t top_k = 10;        // Number of results to return
+        size_t top_k_prime = 50;  // Candidates for reranking
+        float alpha = 0.3f;       // Block selection parameter (0.0-1.0, 0.3 recommended)
+        bool alpha_mass = true;   // Use alpha-mass (true) or max-ratio (false)
 
         QueryParams() = default;
     };
@@ -101,9 +105,8 @@ public:
      * Query the index
      * Returns top-k document IDs sorted by score (descending)
      */
-    std::vector<doc_id_t> query(const SparseDoc& query,
-                                 const QueryParams& params,
-                                 QueryStats* stats = nullptr);
+    std::vector<doc_id_t> query(const SparseDoc& query, const QueryParams& params,
+                                QueryStats* stats = nullptr);
 
     /**
      * Get index statistics
@@ -158,8 +161,8 @@ private:
     std::vector<float> quant_values_;
 
     // Custom quantization (optional)
-    std::vector<uint8_t> quant_map_;   // 256 -> N bins mapping
-    std::vector<float> quant_lut_;     // N bins -> float values
+    std::vector<uint8_t> quant_map_;  // 256 -> N bins mapping
+    std::vector<float> quant_lut_;    // N bins -> float values
 
     // Helper methods
     uint8_t quantizeScore(float score) const;
@@ -169,38 +172,36 @@ private:
     struct BlockWithScore {
         term_t term;
         uint8_t block_id;
-        uint32_t gain;   // Integer gain for sorting (matches QBlock)
-        float weight;    // Float weight for mass accumulation (matches QBlock)
+        uint32_t gain;  // Integer gain for sorting (matches QBlock)
+        float weight;   // Float weight for mass accumulation (matches QBlock)
         const std::vector<WindowGroup>* groups;  // Pointer to window groups for this term-block
 
-        BlockWithScore(term_t t, uint8_t bid, uint32_t g, float w, const std::vector<WindowGroup>* g_ptr)
-            : term(t), block_id(bid), gain(g), weight(w), groups(g_ptr) {}
+        BlockWithScore(term_t t, uint8_t bid, uint32_t g, float w,
+                       const std::vector<WindowGroup>* g_ptr)
+            : term(t)
+            , block_id(bid)
+            , gain(g)
+            , weight(w)
+            , groups(g_ptr) {}
     };
 
     // Query helper methods
-    void selectBlocksAlphaMass(std::vector<BlockWithScore>& blocks,
-                               float alpha,
+    void selectBlocksAlphaMass(std::vector<BlockWithScore>& blocks, float alpha,
                                size_t& selected_count);
 
-    void selectBlocksMaxRatio(std::vector<BlockWithScore>& blocks,
-                              float alpha,
+    void selectBlocksMaxRatio(std::vector<BlockWithScore>& blocks, float alpha,
                               size_t& selected_count);
 
-    void scatterAdd(const std::vector<BlockWithScore>& blocks,
-                   size_t selected_count,
-                   std::vector<int32_t>& score_buf,
-                   std::vector<std::pair<int32_t, doc_id_t>>& candidates,
-                   size_t top_k_prime,
-                   QueryStats* stats);
+    void scatterAdd(const std::vector<BlockWithScore>& blocks, size_t selected_count,
+                    std::vector<int32_t>& score_buf,
+                    std::vector<std::pair<int32_t, doc_id_t>>& candidates, size_t top_k_prime,
+                    QueryStats* stats);
 
-    void rerank(const std::vector<std::pair<int32_t, doc_id_t>>& candidates,
-               const SparseDoc& query,
-               std::vector<doc_id_t>& results,
-               size_t top_k,
-               QueryStats* stats);
+    void rerank(const std::vector<std::pair<int32_t, doc_id_t>>& candidates, const SparseDoc& query,
+                std::vector<doc_id_t>& results, size_t top_k, QueryStats* stats);
 
     float dotProduct(const SparseDoc& query, const SparseDoc& doc) const;
 };
 
-} // namespace index
-} // namespace diagon
+}  // namespace index
+}  // namespace diagon

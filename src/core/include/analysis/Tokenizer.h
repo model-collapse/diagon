@@ -1,9 +1,10 @@
 #pragma once
 
 #include "Token.h"
-#include <vector>
-#include <string>
+
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace diagon {
 namespace analysis {
@@ -48,10 +49,8 @@ public:
      *
      * @return Human-readable description
      */
-    virtual std::string description() const {
-        return name() + " tokenizer";
-    }
+    virtual std::string description() const { return name() + " tokenizer"; }
 };
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

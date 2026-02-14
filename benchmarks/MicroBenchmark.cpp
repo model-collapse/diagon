@@ -1,14 +1,14 @@
 // Micro-benchmark for scatter-add components
-#include <iostream>
-#include <vector>
 #include <chrono>
-#include <random>
 #include <cstdint>
+#include <iostream>
+#include <random>
+#include <vector>
 
 // RDTSC for cycle-accurate timing
 static inline uint64_t rdtsc() {
     uint32_t lo, hi;
-    __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+    __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
     return ((uint64_t)hi << 32) | lo;
 }
 
@@ -25,7 +25,7 @@ int main() {
     const double CPU_FREQ_GHZ = 2.6;  // AMD EPYC 9R14
     const size_t WINDOW_SIZE = 500000;
     const size_t GROUP_SIZE = 15;
-    const size_t NUM_BLOCKS = 25;  // Average at α=0.3
+    const size_t NUM_BLOCKS = 25;         // Average at α=0.3
     const size_t AVG_POSTING_LEN = 5000;  // Average posting list length
     const size_t ITERATIONS = 1000;
 
@@ -248,7 +248,8 @@ int main() {
         std::cout << "Test 4: Part 2 Deduplication" << std::endl;
         std::cout << "  Total touches: " << TOTAL_TOUCHES << std::endl;
         std::cout << "  Unique docs: " << NUM_UNIQUE << std::endl;
-        std::cout << "  Duplication factor: " << (double)TOTAL_TOUCHES / NUM_UNIQUE << "×" << std::endl;
+        std::cout << "  Duplication factor: " << (double)TOTAL_TOUCHES / NUM_UNIQUE << "×"
+                  << std::endl;
         std::cout << "  Total cycles: " << avg_cycles << std::endl;
         std::cout << "  Cycles per touch: " << cycles_per_touch << std::endl;
         std::cout << "  Time per touch: " << ns_per_touch << " ns" << std::endl;

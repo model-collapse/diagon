@@ -1,16 +1,16 @@
 // Regression test for multi-block term dictionary traversal
 // Verifies that BlockTreeTermsReader correctly handles multiple blocks
 
-#include "diagon/index/IndexWriter.h"
-#include "diagon/index/DirectoryReader.h"
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/DirectoryReader.h"
+#include "diagon/index/IndexWriter.h"
 #include "diagon/store/FSDirectory.h"
 
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <vector>
-#include <algorithm>
 
 using namespace diagon;
 
@@ -44,7 +44,8 @@ int main() {
 
         std::ostringstream content;
         for (int i = docId * 40; i < (docId + 1) * 40 && i < 200; i++) {
-            if (i > docId * 40) content << " ";
+            if (i > docId * 40)
+                content << " ";
             content << allTerms[i];
         }
 
@@ -162,7 +163,8 @@ int main() {
 
     // Seek to exact term in first block
     auto ceilIter1 = terms->iterator();
-    auto status1 = ceilIter1->seekCeil(util::BytesRef(reinterpret_cast<const uint8_t*>("term0"), 5));
+    auto status1 = ceilIter1->seekCeil(
+        util::BytesRef(reinterpret_cast<const uint8_t*>("term0"), 5));
     if (status1 != index::TermsEnum::SeekStatus::FOUND) {
         std::cerr << "✗ seekCeil('term0') didn't return FOUND" << std::endl;
         return 1;
@@ -171,7 +173,8 @@ int main() {
 
     // Seek to existing term in middle (term100 exists)
     auto ceilIter2 = terms->iterator();
-    auto status2 = ceilIter2->seekCeil(util::BytesRef(reinterpret_cast<const uint8_t*>("term100"), 7));
+    auto status2 = ceilIter2->seekCeil(
+        util::BytesRef(reinterpret_cast<const uint8_t*>("term100"), 7));
     if (status2 != index::TermsEnum::SeekStatus::FOUND) {
         std::cerr << "✗ seekCeil('term100') didn't return FOUND" << std::endl;
         return 1;
@@ -186,7 +189,8 @@ int main() {
 
     // Seek to non-existent term (should return next term)
     auto ceilIter3 = terms->iterator();
-    auto status3 = ceilIter3->seekCeil(util::BytesRef(reinterpret_cast<const uint8_t*>("term0999"), 8));
+    auto status3 = ceilIter3->seekCeil(
+        util::BytesRef(reinterpret_cast<const uint8_t*>("term0999"), 8));
     if (status3 != index::TermsEnum::SeekStatus::NOT_FOUND) {
         std::cerr << "✗ seekCeil('term0999') should return NOT_FOUND" << std::endl;
         return 1;
@@ -195,14 +199,16 @@ int main() {
     std::string ceiledStr(reinterpret_cast<const char*>(ceiledTerm.data()), ceiledTerm.length());
     // 'term0999' sorts between 'term099' and 'term1', so should return 'term1'
     if (ceiledStr != "term1") {
-        std::cerr << "✗ seekCeil('term0999') returned wrong ceiling: '" << ceiledStr << "'" << std::endl;
+        std::cerr << "✗ seekCeil('term0999') returned wrong ceiling: '" << ceiledStr << "'"
+                  << std::endl;
         return 1;
     }
     std::cout << "  ✓ seekCeil('term0999') = NOT_FOUND, ceiling = 'term1'" << std::endl;
 
     // Seek past all terms
     auto ceilIter4 = terms->iterator();
-    auto status4 = ceilIter4->seekCeil(util::BytesRef(reinterpret_cast<const uint8_t*>("term999"), 7));
+    auto status4 = ceilIter4->seekCeil(
+        util::BytesRef(reinterpret_cast<const uint8_t*>("term999"), 7));
     if (status4 != index::TermsEnum::SeekStatus::END) {
         std::cerr << "✗ seekCeil('term999') should return END" << std::endl;
         return 1;

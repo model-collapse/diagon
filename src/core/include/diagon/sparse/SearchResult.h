@@ -17,13 +17,15 @@ struct SearchResult {
     uint32_t doc_id;  // Document ID
     float score;      // Similarity score
 
-    SearchResult() : doc_id(0), score(0.0f) {}  // Default constructor
-    SearchResult(uint32_t id, float s) : doc_id(id), score(s) {}
+    SearchResult()
+        : doc_id(0)
+        , score(0.0f) {}  // Default constructor
+    SearchResult(uint32_t id, float s)
+        : doc_id(id)
+        , score(s) {}
 
     // Sort by score descending (higher score first)
-    bool operator<(const SearchResult& other) const {
-        return score > other.score;
-    }
+    bool operator<(const SearchResult& other) const { return score > other.score; }
 };
 
 }  // namespace sparse

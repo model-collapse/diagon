@@ -8,24 +8,20 @@ Token::Token(const std::string& text, int position, int startOffset, int endOffs
     , position_(position)
     , startOffset_(startOffset)
     , endOffset_(endOffset)
-    , type_("word") {
-}
+    , type_("word") {}
 
 Token::Token()
     : text_()
     , position_(0)
     , startOffset_(0)
     , endOffset_(0)
-    , type_() {
-}
+    , type_() {}
 
 bool Token::operator==(const Token& other) const {
-    return text_ == other.text_ &&
-           position_ == other.position_ &&
-           startOffset_ == other.startOffset_ &&
-           endOffset_ == other.endOffset_ &&
+    return text_ == other.text_ && position_ == other.position_ &&
+           startOffset_ == other.startOffset_ && endOffset_ == other.endOffset_ &&
            type_ == other.type_;
 }
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

@@ -49,5 +49,5 @@ uint64_t CityHash64WithSeed(const char* data, size_t len, uint64_t seed);
  */
 std::pair<uint64_t, uint64_t> CityHash128(const char* data, size_t len);
 
-} // namespace util
-} // namespace diagon
+}  // namespace util
+}  // namespace diagon

@@ -1,8 +1,10 @@
 #pragma once
 
 #include "Tokenizer.h"
+
 #include <unicode/brkiter.h>
 #include <unicode/unistr.h>
+
 #include <memory>
 
 namespace diagon {
@@ -65,5 +67,5 @@ private:
     std::string unicodeToUtf8(const icu::UnicodeString& ustr) const;
 };
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/NumericDocValuesReader.h"
-#include "diagon/codecs/NumericDocValuesWriter.h"
 
+#include "diagon/codecs/NumericDocValuesWriter.h"
 #include "diagon/index/FieldInfo.h"
 #include "diagon/store/ByteBuffersIndexInput.h"
 #include "diagon/store/ByteBuffersIndexOutput.h"

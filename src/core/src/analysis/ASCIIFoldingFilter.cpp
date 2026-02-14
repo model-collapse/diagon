@@ -1,27 +1,35 @@
 #include "analysis/ASCIIFoldingFilter.h"
+
+#include <unicode/normalizer2.h>
 #include <unicode/translit.h>
 #include <unicode/unistr.h>
-#include <unicode/normalizer2.h>
 
 namespace diagon {
 namespace analysis {
 
 ASCIIFoldingFilter::ASCIIFoldingFilter(bool preserveOriginal)
-    : preserveOriginal_(preserveOriginal) {
-}
+    : preserveOriginal_(preserveOriginal) {}
 
 char ASCIIFoldingFilter::foldCharSimple(unsigned char c) {
     // Simple ASCII folding table for Latin-1 supplement (0x80-0xFF)
     // Maps accented characters to their ASCII equivalents
     static const char foldingTable[128] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // 0x80-0x8F
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // 0x90-0x9F
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // 0xA0-0xAF
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // 0xB0-0xBF
-        'A','A','A','A','A','A','A','C','E','E','E','E','I','I','I','I', // 0xC0-0xCF ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏ
-        'D','N','O','O','O','O','O', 0, 'O','U','U','U','U','Y', 0,'s',  // 0xD0-0xDF ÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß
-        'a','a','a','a','a','a','a','c','e','e','e','e','i','i','i','i', // 0xE0-0xEF àáâãäåæçèéêëìíîï
-        0, 'n','o','o','o','o','o', 0, 'o','u','u','u','u','y', 0, 'y'   // 0xF0-0xFF ðñòóôõö÷øùúûüýþÿ
+        0,   0,   0,   0,   0,   0,   0,   0,
+        0,   0,   0,   0,   0,   0,   0,   0,  // 0x80-0x8F
+        0,   0,   0,   0,   0,   0,   0,   0,
+        0,   0,   0,   0,   0,   0,   0,   0,  // 0x90-0x9F
+        0,   0,   0,   0,   0,   0,   0,   0,
+        0,   0,   0,   0,   0,   0,   0,   0,  // 0xA0-0xAF
+        0,   0,   0,   0,   0,   0,   0,   0,
+        0,   0,   0,   0,   0,   0,   0,   0,  // 0xB0-0xBF
+        'A', 'A', 'A', 'A', 'A', 'A', 'A', 'C',
+        'E', 'E', 'E', 'E', 'I', 'I', 'I', 'I',  // 0xC0-0xCF ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏ
+        'D', 'N', 'O', 'O', 'O', 'O', 'O', 0,
+        'O', 'U', 'U', 'U', 'U', 'Y', 0,   's',  // 0xD0-0xDF ÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß
+        'a', 'a', 'a', 'a', 'a', 'a', 'a', 'c',
+        'e', 'e', 'e', 'e', 'i', 'i', 'i', 'i',  // 0xE0-0xEF àáâãäåæçèéêëìíîï
+        0,   'n', 'o', 'o', 'o', 'o', 'o', 0,
+        'o', 'u', 'u', 'u', 'u', 'y', 0,   'y'  // 0xF0-0xFF ðñòóôõö÷øùúûüýþÿ
     };
 
     if (c < 128) {
@@ -52,13 +60,8 @@ std::string ASCIIFoldingFilter::foldToASCII(const std::string& text) {
     // Create a transliterator to remove diacritics and convert to Latin
     // "NFD; [:Nonspacing Mark:] Remove; NFC" removes combining diacritics
     // "Latin-ASCII" converts Latin characters to ASCII
-    std::unique_ptr<icu::Transliterator> trans(
-        icu::Transliterator::createInstance(
-            "NFD; [:Nonspacing Mark:] Remove; NFC; Latin-ASCII",
-            UTRANS_FORWARD,
-            status
-        )
-    );
+    std::unique_ptr<icu::Transliterator> trans(icu::Transliterator::createInstance(
+        "NFD; [:Nonspacing Mark:] Remove; NFC; Latin-ASCII", UTRANS_FORWARD, status));
 
     if (U_SUCCESS(status) && trans) {
         trans->transliterate(ustr);
@@ -95,5 +98,5 @@ std::vector<Token> ASCIIFoldingFilter::filter(const std::vector<Token>& tokens) 
     return result;
 }
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

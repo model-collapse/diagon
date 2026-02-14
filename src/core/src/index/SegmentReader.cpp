@@ -201,7 +201,6 @@ void SegmentReader::loadFieldsProducer() const {
         return;
     }
 
-
     // Phase 4.3: Get codec and create appropriate FieldsProducer
     std::string segmentName = segmentInfo_->name();
     try {
@@ -235,8 +234,8 @@ void SegmentReader::loadDocValuesReader() const {
         auto dataInput = directory_.openInput(segmentName + ".dvd", IOContext::READ);
         auto metaInput = directory_.openInput(segmentName + ".dvm", IOContext::READ);
 
-        docValuesReader_ =
-            std::make_unique<NumericDocValuesReader>(std::move(dataInput), std::move(metaInput));
+        docValuesReader_ = std::make_unique<NumericDocValuesReader>(std::move(dataInput),
+                                                                    std::move(metaInput));
     } catch (const std::exception& e) {
         // Doc values files don't exist - that's OK
         // Leave docValuesReader_ as nullptr

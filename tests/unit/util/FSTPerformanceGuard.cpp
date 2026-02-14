@@ -17,11 +17,12 @@
 #include "diagon/util/FST.h"
 
 #include <gtest/gtest.h>
-#include <chrono>
-#include <vector>
-#include <string>
-#include <fstream>
+
 #include <algorithm>
+#include <chrono>
+#include <fstream>
+#include <string>
+#include <vector>
 
 using namespace diagon::util;
 
@@ -87,7 +88,7 @@ std::unique_ptr<FST> buildMinimalFST() {
     return builder.finish();
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== Construction Guard ====================
 
@@ -117,12 +118,11 @@ TEST(FSTPerformanceGuard, ConstructionTime_Scaled) {
 
     // Scaled target: 400 ms * (10000/73447) ≈ 55 ms
     EXPECT_LE(duration.count(), 55)
-        << "FST construction exceeded Lucene baseline (scaled): "
-        << duration.count() << " ms (target: ≤55 ms for 10k terms)";
+        << "FST construction exceeded Lucene baseline (scaled): " << duration.count()
+        << " ms (target: ≤55 ms for 10k terms)";
 
     // Verify FST correctness
-    EXPECT_EQ(fst->getAllEntries().size(), 10000u)
-        << "FST should contain exactly 10,000 terms";
+    EXPECT_EQ(fst->getAllEntries().size(), 10000u) << "FST should contain exactly 10,000 terms";
 }
 
 // ==================== Lookup Guards ====================
@@ -136,10 +136,9 @@ TEST(FSTPerformanceGuard, ConstructionTime_Scaled) {
 TEST(FSTPerformanceGuard, LookupTime_AverageCase) {
     auto fst = buildReutersTextFST();
 
-    std::vector<std::string> testTerms = {
-        "zz_market", "zz_trade", "zz_oil", "zz_price", "zz_dollar",
-        "zz_cocoa", "zz_coffee", "zz_zinc", "zz_aluminium"
-    };
+    std::vector<std::string> testTerms = {"zz_market", "zz_trade",  "zz_oil",
+                                          "zz_price",  "zz_dollar", "zz_cocoa",
+                                          "zz_coffee", "zz_zinc",   "zz_aluminium"};
 
     // Warmup
     for (int i = 0; i < 10; i++) {
@@ -155,7 +154,7 @@ TEST(FSTPerformanceGuard, LookupTime_AverageCase) {
     for (int i = 0; i < 100; i++) {
         for (const auto& term : testTerms) {
             auto output = fst->get(toBytes(term));
-            (void)output; // Prevent optimization
+            (void)output;  // Prevent optimization
         }
     }
 
@@ -164,17 +163,16 @@ TEST(FSTPerformanceGuard, LookupTime_AverageCase) {
 
     long avgNs = totalNs / (100 * testTerms.size());
 
-    EXPECT_LE(avgNs, 10000)
-        << "FST lookup exceeded Lucene baseline: "
-        << avgNs << " ns (Lucene: 8048 ns)";
+    EXPECT_LE(avgNs, 10000) << "FST lookup exceeded Lucene baseline: " << avgNs
+                            << " ns (Lucene: 8048 ns)";
 
     // Also report actual performance
     if (avgNs <= 8048) {
-        std::cout << "✅ FST lookup FASTER than Lucene: "
-                  << avgNs << " ns vs 8048 ns (Lucene)" << std::endl;
+        std::cout << "✅ FST lookup FASTER than Lucene: " << avgNs << " ns vs 8048 ns (Lucene)"
+                  << std::endl;
     } else if (avgNs <= 10000) {
-        std::cout << "✅ FST lookup within acceptable range: "
-                  << avgNs << " ns vs 8048 ns (Lucene)" << std::endl;
+        std::cout << "✅ FST lookup within acceptable range: " << avgNs << " ns vs 8048 ns (Lucene)"
+                  << std::endl;
     }
 }
 
@@ -212,9 +210,8 @@ TEST(FSTPerformanceGuard, LookupTime_RareTerms) {
 
     long avgNs = totalNs / (100 * rareTerms.size());
 
-    EXPECT_LE(avgNs, 5000)
-        << "FST lookup for rare terms exceeded Lucene baseline: "
-        << avgNs << " ns (Lucene: ~4000 ns)";
+    EXPECT_LE(avgNs, 5000) << "FST lookup for rare terms exceeded Lucene baseline: " << avgNs
+                           << " ns (Lucene: ~4000 ns)";
 }
 
 /**
@@ -226,9 +223,7 @@ TEST(FSTPerformanceGuard, LookupTime_RareTerms) {
 TEST(FSTPerformanceGuard, LookupTime_CacheMiss) {
     auto fst = buildReutersTextFST();
 
-    std::vector<std::string> missingTerms = {
-        "nonexistent", "zzzzzzz", "aaaaaa", "missing"
-    };
+    std::vector<std::string> missingTerms = {"nonexistent", "zzzzzzz", "aaaaaa", "missing"};
 
     // Warmup
     for (int i = 0; i < 10; i++) {
@@ -253,9 +248,8 @@ TEST(FSTPerformanceGuard, LookupTime_CacheMiss) {
 
     long avgNs = totalNs / (100 * missingTerms.size());
 
-    EXPECT_LE(avgNs, 4000)
-        << "FST cache miss lookup exceeded Lucene baseline: "
-        << avgNs << " ns (Lucene: 3263 ns)";
+    EXPECT_LE(avgNs, 4000) << "FST cache miss lookup exceeded Lucene baseline: " << avgNs
+                           << " ns (Lucene: 3263 ns)";
 }
 
 // ==================== Iteration Guards ====================
@@ -285,21 +279,19 @@ TEST(FSTPerformanceGuard, IterationTime_FullScan) {
 
     long nsPerTerm = totalNs / entries.size();
 
-    EXPECT_LE(nsPerTerm, 30)
-        << "FST iteration exceeded Lucene baseline: "
-        << nsPerTerm << " ns/term (Lucene: 23.83 ns/term)";
+    EXPECT_LE(nsPerTerm, 30) << "FST iteration exceeded Lucene baseline: " << nsPerTerm
+                             << " ns/term (Lucene: 23.83 ns/term)";
 
-    EXPECT_EQ(entries.size(), 10000u)
-        << "FST should have 10,000 terms";
+    EXPECT_EQ(entries.size(), 10000u) << "FST should have 10,000 terms";
 
     // Report throughput
     double mTermsPerSec = 1000.0 / nsPerTerm;
     if (nsPerTerm <= 23) {
-        std::cout << "✅ FST iteration FASTER than Lucene: "
-                  << nsPerTerm << " ns/term vs 23.83 ns/term (Lucene)" << std::endl;
+        std::cout << "✅ FST iteration FASTER than Lucene: " << nsPerTerm
+                  << " ns/term vs 23.83 ns/term (Lucene)" << std::endl;
     } else if (nsPerTerm <= 30) {
-        std::cout << "✅ FST iteration within acceptable range: "
-                  << nsPerTerm << " ns/term vs 23.83 ns/term (Lucene)" << std::endl;
+        std::cout << "✅ FST iteration within acceptable range: " << nsPerTerm
+                  << " ns/term vs 23.83 ns/term (Lucene)" << std::endl;
     }
     std::cout << "   Throughput: " << mTermsPerSec << " M terms/sec" << std::endl;
 }
@@ -328,7 +320,7 @@ TEST(FSTPerformanceGuard, IterationTime_PartialScan) {
     auto entries = fst->getAllEntries();
     size_t count = std::min(entries.size(), size_t(1000));
     for (size_t i = 0; i < count; i++) {
-        (void)entries[i]; // Access first 1000 terms
+        (void)entries[i];  // Access first 1000 terms
     }
 
     auto end = std::chrono::high_resolution_clock::now();
@@ -336,9 +328,8 @@ TEST(FSTPerformanceGuard, IterationTime_PartialScan) {
 
     long nsPerTerm = totalNs / count;
 
-    EXPECT_LE(nsPerTerm, 35)
-        << "FST partial iteration exceeded Lucene baseline: "
-        << nsPerTerm << " ns/term (Lucene: 33.02 ns/term)";
+    EXPECT_LE(nsPerTerm, 35) << "FST partial iteration exceeded Lucene baseline: " << nsPerTerm
+                             << " ns/term (Lucene: 33.02 ns/term)";
 }
 
 // ==================== Summary Statistics ====================
@@ -367,10 +358,9 @@ TEST(FSTPerformanceGuard, SummaryReport) {
     std::cout << "  Status:  " << (constructMs <= 55 ? "✅ PASS" : "❌ FAIL") << "\n\n";
 
     // Lookup average
-    std::vector<std::string> testTerms = {
-        "zz_market", "zz_trade", "zz_oil", "zz_price", "zz_dollar",
-        "zz_cocoa", "zz_coffee", "zz_zinc", "zz_aluminium"
-    };
+    std::vector<std::string> testTerms = {"zz_market", "zz_trade",  "zz_oil",
+                                          "zz_price",  "zz_dollar", "zz_cocoa",
+                                          "zz_coffee", "zz_zinc",   "zz_aluminium"};
 
     fst = buildReutersTextFST();
 
@@ -382,7 +372,8 @@ TEST(FSTPerformanceGuard, SummaryReport) {
         }
     }
     end = std::chrono::high_resolution_clock::now();
-    auto lookupNs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / (100 * testTerms.size());
+    auto lookupNs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() /
+                    (100 * testTerms.size());
 
     std::cout << "Lookup (average):\n";
     std::cout << "  Diagon:  " << lookupNs << " ns\n";
@@ -396,7 +387,8 @@ TEST(FSTPerformanceGuard, SummaryReport) {
     start = std::chrono::high_resolution_clock::now();
     auto entries = fst->getAllEntries();
     end = std::chrono::high_resolution_clock::now();
-    auto iterNs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / entries.size();
+    auto iterNs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() /
+                  entries.size();
 
     std::cout << "Iteration (full scan):\n";
     std::cout << "  Diagon:  " << iterNs << " ns/term\n";

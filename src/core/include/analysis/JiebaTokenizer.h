@@ -1,12 +1,13 @@
 #pragma once
 
 #include "Tokenizer.h"
+
 #include <memory>
 #include <string>
 
 // Forward declare cppjieba classes to avoid including in header
 namespace cppjieba {
-    class Jieba;
+class Jieba;
 }
 
 namespace diagon {
@@ -36,11 +37,11 @@ namespace analysis {
  * Example: "南京市长江大桥" -> ["南京", "市", "长江", "大桥"]
  */
 enum class JiebaMode {
-    MP,      // Maximum Probability (most accurate)
-    HMM,     // Hidden Markov Model (new words)
-    MIX,     // MP + HMM combined (default, recommended)
-    FULL,    // Full mode (all possible words)
-    SEARCH   // Search engine mode (splits long words)
+    MP,     // Maximum Probability (most accurate)
+    HMM,    // Hidden Markov Model (new words)
+    MIX,    // MP + HMM combined (default, recommended)
+    FULL,   // Full mode (all possible words)
+    SEARCH  // Search engine mode (splits long words)
 };
 
 /**
@@ -76,13 +77,9 @@ public:
      * @param userDictPath Path to user dictionary (optional)
      * @param stopWordPath Path to stop word list (optional)
      */
-    explicit JiebaTokenizer(
-        JiebaMode mode = JiebaMode::MIX,
-        const std::string& dictPath = "",
-        const std::string& hmmPath = "",
-        const std::string& userDictPath = "",
-        const std::string& stopWordPath = ""
-    );
+    explicit JiebaTokenizer(JiebaMode mode = JiebaMode::MIX, const std::string& dictPath = "",
+                            const std::string& hmmPath = "", const std::string& userDictPath = "",
+                            const std::string& stopWordPath = "");
 
     virtual ~JiebaTokenizer();
 
@@ -132,12 +129,8 @@ private:
     /**
      * Initialize Jieba with dictionary files.
      */
-    void initializeJieba(
-        const std::string& dictPath,
-        const std::string& hmmPath,
-        const std::string& userDictPath,
-        const std::string& stopWordPath
-    );
+    void initializeJieba(const std::string& dictPath, const std::string& hmmPath,
+                         const std::string& userDictPath, const std::string& stopWordPath);
 
     /**
      * Get mode as string for debugging.
@@ -150,5 +143,5 @@ private:
     bool isStopWord(const std::string& word) const;
 };
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

@@ -47,8 +47,7 @@ public:
      * @param termState Term state with file pointers
      * @param writeFreqs Whether frequencies are encoded
      */
-    Lucene104PostingsEnumBatch(std::unique_ptr<store::IndexInput> docIn,
-                               const TermState& termState,
+    Lucene104PostingsEnumBatch(std::unique_ptr<store::IndexInput> docIn, const TermState& termState,
                                bool writeFreqs);
 
     // ==================== DocIdSetIterator ====================

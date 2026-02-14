@@ -4,10 +4,10 @@
 #pragma once
 
 #include "diagon/index/Fields.h"
+#include "diagon/index/FreqProxTermsWriter.h"
+#include "diagon/index/PostingsEnum.h"
 #include "diagon/index/Terms.h"
 #include "diagon/index/TermsEnum.h"
-#include "diagon/index/PostingsEnum.h"
-#include "diagon/index/FreqProxTermsWriter.h"
 
 #include <map>
 #include <memory>
@@ -39,8 +39,7 @@ public:
      * @param termsWriter In-memory terms writer to wrap
      * @param fieldInfos Field metadata to determine which fields to expose
      */
-    explicit FreqProxFields(const FreqProxTermsWriter& termsWriter,
-                           const FieldInfos& fieldInfos);
+    explicit FreqProxFields(const FreqProxTermsWriter& termsWriter, const FieldInfos& fieldInfos);
 
     // ==================== Fields Interface ====================
 
@@ -60,11 +59,10 @@ private:
     class FieldsIterator : public Fields::Iterator {
     public:
         explicit FieldsIterator(const std::vector<std::string>& fields)
-            : fields_(fields), position_(0) {}
+            : fields_(fields)
+            , position_(0) {}
 
-        bool hasNext() const override {
-            return position_ < fields_.size();
-        }
+        bool hasNext() const override { return position_ < fields_.size(); }
 
         std::string next() override {
             if (!hasNext()) {
@@ -92,8 +90,7 @@ public:
      * @param fieldName Field name
      * @param termsWriter Terms writer containing postings
      */
-    FreqProxTerms(const std::string& fieldName,
-                  const FreqProxTermsWriter& termsWriter);
+    FreqProxTerms(const std::string& fieldName, const FreqProxTermsWriter& termsWriter);
 
     // ==================== Terms Interface ====================
 
@@ -134,8 +131,7 @@ public:
      * @param sortedTerms List of terms in sorted order
      * @param termsWriter Terms writer containing postings
      */
-    FreqProxTermsEnum(const std::string& fieldName,
-                      const std::vector<std::string>& sortedTerms,
+    FreqProxTermsEnum(const std::string& fieldName, const std::vector<std::string>& sortedTerms,
                       const FreqProxTermsWriter& termsWriter);
 
     // ==================== TermsEnum Interface ====================
@@ -177,7 +173,10 @@ private:
     class FreqProxPostingsEnum : public PostingsEnum {
     public:
         FreqProxPostingsEnum(const std::vector<int>& postings)
-            : postings_(postings), position_(-1), currentDoc_(-1), currentFreq_(1) {}
+            : postings_(postings)
+            , position_(-1)
+            , currentDoc_(-1)
+            , currentFreq_(1) {}
 
         // DocIdSetIterator
         int docID() const override { return currentDoc_; }
@@ -191,8 +190,8 @@ private:
 
             currentDoc_ = postings_[position_];
             currentFreq_ = (position_ + 1 < static_cast<int>(postings_.size()))
-                ? postings_[position_ + 1]
-                : 1;
+                               ? postings_[position_ + 1]
+                               : 1;
             position_++;  // Skip freq
 
             return currentDoc_;

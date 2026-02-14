@@ -19,16 +19,18 @@
 #include "diagon/util/BloomFilter.h"
 #include "diagon/util/CityHash.h"
 
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <chrono>
-#include <cstring>
-#include <memory>
-#include <algorithm>
-#include <numeric>
 #include <sys/mman.h>
 #include <sys/stat.h>
+
+#include <algorithm>
+#include <chrono>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <numeric>
+#include <vector>
+
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -44,8 +46,12 @@ struct SparseVectorElement {
     term_t index;
     float value;
 
-    SparseVectorElement() : index(0), value(0.0f) {}
-    SparseVectorElement(term_t idx, float val) : index(idx), value(val) {}
+    SparseVectorElement()
+        : index(0)
+        , value(0.0f) {}
+    SparseVectorElement(term_t idx, float val)
+        : index(idx)
+        , value(val) {}
 };
 
 using SparseVector = std::vector<SparseVectorElement>;
@@ -55,13 +61,16 @@ struct CsrMetaData {
     metadata_t n_row;
     metadata_t n_value;
 
-    CsrMetaData() : n_col(0), n_row(0), n_value(0) {}
+    CsrMetaData()
+        : n_col(0)
+        , n_row(0)
+        , n_value(0) {}
 };
 
 struct CsrMatrix {
     CsrMetaData metadata;
-    std::vector<indptr_t> indptr;    // uint64_t
-    std::vector<term_t> indices;      // uint16_t (will read uint32_t from file and convert)
+    std::vector<indptr_t> indptr;  // uint64_t
+    std::vector<term_t> indices;   // uint16_t (will read uint32_t from file and convert)
     std::vector<float> values;
 
     SparseVector getVector(size_t i) const {
@@ -125,12 +134,12 @@ CsrMatrix loadCsrMatrix(const std::string& file_path) {
     result.metadata.n_value = *reinterpret_cast<const metadata_t*>(data + offset);
     offset += sizeof(metadata_t);
 
-    std::cout << "  Rows: " << result.metadata.n_row
-              << " (0x" << std::hex << result.metadata.n_row << std::dec << ")" << std::endl;
-    std::cout << "  Cols: " << result.metadata.n_col
-              << " (0x" << std::hex << result.metadata.n_col << std::dec << ")" << std::endl;
-    std::cout << "  Values: " << result.metadata.n_value
-              << " (0x" << std::hex << result.metadata.n_value << std::dec << ")" << std::endl;
+    std::cout << "  Rows: " << result.metadata.n_row << " (0x" << std::hex << result.metadata.n_row
+              << std::dec << ")" << std::endl;
+    std::cout << "  Cols: " << result.metadata.n_col << " (0x" << std::hex << result.metadata.n_col
+              << std::dec << ")" << std::endl;
+    std::cout << "  Values: " << result.metadata.n_value << " (0x" << std::hex
+              << result.metadata.n_value << std::dec << ")" << std::endl;
     std::cout << "  Offset after header: " << offset << " bytes" << std::endl;
 
     // Read indptr
@@ -165,7 +174,7 @@ struct BenchmarkConfig {
     size_t num_hash_functions = 7;
 
     // Dataset parameters
-    size_t max_docs = 0;  // 0 = all documents
+    size_t max_docs = 0;       // 0 = all documents
     size_t max_queries = 100;  // Test queries
 
     // Sampling for FPR measurement
@@ -178,7 +187,8 @@ struct BenchmarkConfig {
 class BloomFilterIndex {
 public:
     BloomFilterIndex(size_t bits_per_elem, size_t num_hashes)
-        : bits_per_elem_(bits_per_elem), num_hashes_(num_hashes) {}
+        : bits_per_elem_(bits_per_elem)
+        , num_hashes_(num_hashes) {}
 
     void build(const CsrMatrix& docs, size_t max_docs = 0) {
         auto start = std::chrono::high_resolution_clock::now();
@@ -219,11 +229,13 @@ public:
         build_time_ms_ = std::chrono::duration<double, std::milli>(end - start).count();
 
         std::cout << "Build complete in " << build_time_ms_ << " ms" << std::endl;
-        std::cout << "  Throughput: " << (num_docs / (build_time_ms_ / 1000.0)) << " docs/sec" << std::endl;
+        std::cout << "  Throughput: " << (num_docs / (build_time_ms_ / 1000.0)) << " docs/sec"
+                  << std::endl;
     }
 
     bool mightContain(size_t doc_id, term_t term) const {
-        if (doc_id >= filters_.size()) return false;
+        if (doc_id >= filters_.size())
+            return false;
         return filters_[doc_id]->containsHash(term);
     }
 
@@ -238,7 +250,8 @@ public:
     }
 
     double avgBitsPerDocument() const {
-        if (filters_.empty()) return 0.0;
+        if (filters_.empty())
+            return 0.0;
         return (memoryUsageBytes() * 8.0) / filters_.size();
     }
 
@@ -371,7 +384,8 @@ void printConfig(const BenchmarkConfig& config) {
     std::cout << "========================================" << std::endl;
     std::cout << "Bits per element: " << config.bits_per_element << std::endl;
     std::cout << "Hash functions: " << config.num_hash_functions << std::endl;
-    std::cout << "Max documents: " << (config.max_docs == 0 ? "all" : std::to_string(config.max_docs)) << std::endl;
+    std::cout << "Max documents: "
+              << (config.max_docs == 0 ? "all" : std::to_string(config.max_docs)) << std::endl;
     std::cout << "Max queries: " << config.max_queries << std::endl;
     std::cout << "FPR sample docs: " << config.fpr_sample_docs << std::endl;
     std::cout << "FPR test terms: " << config.fpr_test_terms << std::endl;
@@ -387,18 +401,22 @@ void printResults(const BloomFilterIndex& index, const QueryStats& query_stats,
     std::cout << "\n--- Build Statistics ---" << std::endl;
     std::cout << "Number of documents: " << index.numDocuments() << std::endl;
     std::cout << "Build time: " << index.buildTimeMs() << " ms" << std::endl;
-    std::cout << "Throughput: " << (index.numDocuments() / (index.buildTimeMs() / 1000.0)) << " docs/sec" << std::endl;
+    std::cout << "Throughput: " << (index.numDocuments() / (index.buildTimeMs() / 1000.0))
+              << " docs/sec" << std::endl;
 
     std::cout << "\n--- Memory Statistics ---" << std::endl;
-    std::cout << "Total memory: " << (index.memoryUsageBytes() / (1024.0 * 1024.0)) << " MB" << std::endl;
+    std::cout << "Total memory: " << (index.memoryUsageBytes() / (1024.0 * 1024.0)) << " MB"
+              << std::endl;
     std::cout << "Avg bits per doc: " << index.avgBitsPerDocument() << " bits" << std::endl;
-    std::cout << "Avg bytes per doc: " << (index.avgBitsPerDocument() / 8.0) << " bytes" << std::endl;
+    std::cout << "Avg bytes per doc: " << (index.avgBitsPerDocument() / 8.0) << " bytes"
+              << std::endl;
 
     std::cout << "\n--- Query Statistics ---" << std::endl;
     std::cout << "Total time: " << query_stats.total_time_ms << " ms" << std::endl;
     std::cout << "Avg time per query: " << query_stats.avg_time_per_query_ms << " ms" << std::endl;
     std::cout << "Total checks: " << query_stats.total_checks << std::endl;
-    std::cout << "Throughput: " << (query_stats.throughput_checks_per_sec / 1e6) << " M checks/sec" << std::endl;
+    std::cout << "Throughput: " << (query_stats.throughput_checks_per_sec / 1e6) << " M checks/sec"
+              << std::endl;
 
     std::cout << "\n--- False Positive Rate ---" << std::endl;
     std::cout << "True positives: " << fpr_stats.true_positives << std::endl;
@@ -415,8 +433,10 @@ int main(int argc, char** argv) {
     BenchmarkConfig config;
 
     // Parse command line arguments
-    std::string docs_path = "/home/ubuntu/bitq-code/cpp-sparse-ann/Datasets/msmarco_v1_splade/docs.csr";
-    std::string queries_path = "/home/ubuntu/bitq-code/cpp-sparse-ann/Datasets/msmarco_v1_splade/queries.csr";
+    std::string docs_path =
+        "/home/ubuntu/bitq-code/cpp-sparse-ann/Datasets/msmarco_v1_splade/docs.csr";
+    std::string queries_path =
+        "/home/ubuntu/bitq-code/cpp-sparse-ann/Datasets/msmarco_v1_splade/queries.csr";
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -464,7 +484,8 @@ int main(int argc, char** argv) {
     auto query_stats = runQueryBenchmark(index, queries, docs, config.max_queries);
 
     // Measure false positive rate
-    auto fpr_stats = measureFalsePositiveRate(index, docs, config.fpr_sample_docs, config.fpr_test_terms);
+    auto fpr_stats = measureFalsePositiveRate(index, docs, config.fpr_sample_docs,
+                                              config.fpr_test_terms);
 
     // Print results
     printResults(index, query_stats, fpr_stats);

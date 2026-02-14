@@ -16,7 +16,7 @@ namespace diagon {
 namespace index {
 class Fields;
 class Terms;
-}
+}  // namespace index
 
 namespace codecs {
 

@@ -14,17 +14,19 @@
 
 #include "diagon/index/BlockMaxQuantizedIndex.h"
 
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <chrono>
-#include <cstring>
-#include <memory>
-#include <algorithm>
-#include <numeric>
-#include <unordered_set>
 #include <sys/mman.h>
 #include <sys/stat.h>
+
+#include <algorithm>
+#include <chrono>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <numeric>
+#include <unordered_set>
+#include <vector>
+
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -150,7 +152,8 @@ std::vector<std::vector<uint32_t>> loadGroundTruth(const std::string& file_path)
 
         while (pos < line.size()) {
             size_t comma = line.find(',', pos);
-            if (comma == std::string::npos) comma = line.size();
+            if (comma == std::string::npos)
+                comma = line.size();
 
             std::string token = line.substr(pos, comma - pos);
             if (!token.empty()) {
@@ -170,10 +173,10 @@ std::vector<std::vector<uint32_t>> loadGroundTruth(const std::string& file_path)
 // ==================== Benchmark ====================
 
 struct BenchmarkConfig {
-    size_t max_docs = 0;           // 0 = all
+    size_t max_docs = 0;  // 0 = all
     size_t max_queries = 100;
     size_t top_k = 10;
-    size_t top_k_prime = 500;      // QBlock uses 500 for 12-bin configuration
+    size_t top_k_prime = 500;  // QBlock uses 500 for 12-bin configuration
     std::vector<float> alphas = {0.3f, 0.5f, 0.7f, 1.0f};
     bool alpha_mass = true;
 
@@ -206,8 +209,7 @@ struct BenchmarkResults {
 };
 
 double calculateRecall(const std::vector<doc_id_t>& results,
-                      const std::vector<uint32_t>& ground_truth,
-                      size_t k) {
+                       const std::vector<uint32_t>& ground_truth, size_t k) {
     std::unordered_set<uint32_t> gt_set(ground_truth.begin(), ground_truth.end());
     size_t hits = 0;
 
@@ -222,16 +224,18 @@ double calculateRecall(const std::vector<doc_id_t>& results,
 
 // Forward declaration
 void testDocumentRetrieval(const BlockMaxQuantizedIndex& index,
-                           const std::vector<SparseDoc>& queries,
-                           const BenchmarkConfig& config);
+                           const std::vector<SparseDoc>& queries, const BenchmarkConfig& config);
 
 BenchmarkResults runBenchmark(const BenchmarkConfig& config) {
     BenchmarkResults results;
 
     // Load dataset
-    std::string docs_path = "/home/ubuntu/bitq-code/cpp-sparse-ann/Datasets/msmarco_v1_splade/docs.csr";
-    std::string queries_path = "/home/ubuntu/bitq-code/cpp-sparse-ann/Datasets/msmarco_v1_splade/queries.csr";
-    std::string truth_path = "/home/ubuntu/bitq-code/cpp-sparse-ann/Datasets/msmarco_v1_splade/cocondense_ground_truth_int.txt";
+    std::string docs_path =
+        "/home/ubuntu/bitq-code/cpp-sparse-ann/Datasets/msmarco_v1_splade/docs.csr";
+    std::string queries_path =
+        "/home/ubuntu/bitq-code/cpp-sparse-ann/Datasets/msmarco_v1_splade/queries.csr";
+    std::string truth_path = "/home/ubuntu/bitq-code/cpp-sparse-ann/Datasets/msmarco_v1_splade/"
+                             "cocondense_ground_truth_int.txt";
 
     auto docs_matrix = loadCsrMatrix(docs_path);
     auto queries_matrix = loadCsrMatrix(queries_path);
@@ -269,12 +273,15 @@ BenchmarkResults runBenchmark(const BenchmarkConfig& config) {
     index.build(docs);
     auto build_end = std::chrono::high_resolution_clock::now();
 
-    results.build_time_ms = std::chrono::duration<double, std::milli>(build_end - build_start).count();
+    results.build_time_ms =
+        std::chrono::duration<double, std::milli>(build_end - build_start).count();
     results.index_memory_bytes = index.memoryUsageBytes();
 
     std::cout << "  Build time: " << results.build_time_ms << " ms" << std::endl;
-    std::cout << "  Throughput: " << (docs.size() / (results.build_time_ms / 1000.0)) << " docs/sec" << std::endl;
-    std::cout << "  Memory usage: " << (results.index_memory_bytes / (1024.0 * 1024.0)) << " MB" << std::endl;
+    std::cout << "  Throughput: " << (docs.size() / (results.build_time_ms / 1000.0)) << " docs/sec"
+              << std::endl;
+    std::cout << "  Memory usage: " << (results.index_memory_bytes / (1024.0 * 1024.0)) << " MB"
+              << std::endl;
     std::cout << "  Windows: " << index.numWindows() << std::endl;
 
     // Query with different alpha values
@@ -345,7 +352,8 @@ BenchmarkResults runBenchmark(const BenchmarkConfig& config) {
         std::cout << "  QPS: " << qr.qps << std::endl;
         std::cout << "  Avg blocks selected: " << qr.avg_blocks_selected << std::endl;
         std::cout << "  Avg score ops: " << qr.avg_score_ops << std::endl;
-        std::cout << "  Recall@" << config.top_k << ": " << (qr.recall_at_k * 100.0) << "%" << std::endl;
+        std::cout << "  Recall@" << config.top_k << ": " << (qr.recall_at_k * 100.0) << "%"
+                  << std::endl;
         std::cout << "\n  Timing Breakdown:" << std::endl;
         std::cout << "    Block selection:   " << qr.avg_block_selection_ms << " ms" << std::endl;
         std::cout << "    Scatter-add total: " << qr.avg_scatter_add_ms << " ms" << std::endl;
@@ -361,8 +369,7 @@ BenchmarkResults runBenchmark(const BenchmarkConfig& config) {
 }
 
 void testDocumentRetrieval(const BlockMaxQuantizedIndex& index,
-                           const std::vector<SparseDoc>& queries,
-                           const BenchmarkConfig& config) {
+                           const std::vector<SparseDoc>& queries, const BenchmarkConfig& config) {
     std::cout << "\n========================================" << std::endl;
     std::cout << "Testing Direct Document Retrieval" << std::endl;
     std::cout << "========================================" << std::endl;
@@ -444,17 +451,18 @@ void printResults(const BenchmarkResults& results, const BenchmarkConfig& config
 
     std::cout << "\n--- Build Performance ---" << std::endl;
     std::cout << "Build time: " << results.build_time_ms << " ms" << std::endl;
-    std::cout << "Memory usage: " << (results.index_memory_bytes / (1024.0 * 1024.0)) << " MB" << std::endl;
+    std::cout << "Memory usage: " << (results.index_memory_bytes / (1024.0 * 1024.0)) << " MB"
+              << std::endl;
 
     std::cout << "\n--- Query Performance ---" << std::endl;
-    std::cout << "Alpha | QPS    | Latency(ms) | Recall@" << config.top_k
-              << " | Blocks | Score Ops" << std::endl;
+    std::cout << "Alpha | QPS    | Latency(ms) | Recall@" << config.top_k << " | Blocks | Score Ops"
+              << std::endl;
     std::cout << "------|--------|-------------|---------|--------|----------" << std::endl;
 
     for (const auto& qr : results.query_results) {
-        printf("%.1f   | %6.2f | %11.2f | %6.2f%% | %6.0f | %10.0f\n",
-               qr.alpha, qr.qps, qr.avg_query_time_ms,
-               qr.recall_at_k * 100.0, qr.avg_blocks_selected, qr.avg_score_ops);
+        printf("%.1f   | %6.2f | %11.2f | %6.2f%% | %6.0f | %10.0f\n", qr.alpha, qr.qps,
+               qr.avg_query_time_ms, qr.recall_at_k * 100.0, qr.avg_blocks_selected,
+               qr.avg_score_ops);
     }
 
     std::cout << "\n========================================" << std::endl;
@@ -492,14 +500,15 @@ int main(int argc, char** argv) {
                 config.alphas.push_back(std::stof(argv[i]));
                 ++i;
             }
-            --i; // Back up one since the outer loop will increment
+            --i;  // Back up one since the outer loop will increment
         }
     }
 
     std::cout << "========================================" << std::endl;
     std::cout << "Block-Max Quantized Index Benchmark" << std::endl;
     std::cout << "========================================" << std::endl;
-    std::cout << "Max docs: " << (config.max_docs == 0 ? "all" : std::to_string(config.max_docs)) << std::endl;
+    std::cout << "Max docs: " << (config.max_docs == 0 ? "all" : std::to_string(config.max_docs))
+              << std::endl;
     std::cout << "Max queries: " << config.max_queries << std::endl;
     std::cout << "Top-k: " << config.top_k << std::endl;
     std::cout << "Top-k': " << config.top_k_prime << std::endl;

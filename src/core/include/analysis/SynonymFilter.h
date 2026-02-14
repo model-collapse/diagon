@@ -1,9 +1,10 @@
 #pragma once
 
 #include "TokenFilter.h"
+
+#include <string>
 #include <unordered_map>
 #include <vector>
-#include <string>
 
 namespace diagon {
 namespace analysis {
@@ -47,20 +48,14 @@ public:
      * @param ignoreCase Whether to ignore case when matching (default: true)
      * @param expand If true, add synonyms as separate tokens; if false, replace (default: true)
      */
-    explicit SynonymFilter(
-        const SynonymMap& synonyms,
-        bool ignoreCase = true,
-        bool expand = true
-    );
+    explicit SynonymFilter(const SynonymMap& synonyms, bool ignoreCase = true, bool expand = true);
 
     virtual ~SynonymFilter() = default;
 
     // TokenFilter interface
     std::vector<Token> filter(const std::vector<Token>& tokens) override;
     std::string name() const override { return "synonym"; }
-    std::string description() const override {
-        return "Expands tokens with synonyms";
-    }
+    std::string description() const override { return "Expands tokens with synonyms"; }
 
     /**
      * Add a synonym mapping at runtime.
@@ -106,5 +101,5 @@ private:
     std::vector<std::string> splitMultiWord(const std::string& synonym) const;
 };
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

@@ -2,9 +2,11 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/sparse/SindiIndex.h"
+
 #include "diagon/sparse/SparseVector.h"
 
 #include <gtest/gtest.h>
+
 #include <algorithm>
 
 using namespace diagon::sparse;
@@ -68,7 +70,7 @@ TEST(SindiIndexTest, BuildSimpleIndex) {
     index.build(documents);
 
     EXPECT_EQ(3, index.numDocuments());
-    EXPECT_EQ(5, index.numTerms());  // Terms 0-4
+    EXPECT_EQ(5, index.numTerms());     // Terms 0-4
     EXPECT_EQ(9, index.numPostings());  // Total 9 postings
 }
 

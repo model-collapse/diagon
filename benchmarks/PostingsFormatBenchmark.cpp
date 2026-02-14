@@ -12,8 +12,9 @@
 #include "diagon/util/StreamVByte.h"
 
 #include <benchmark/benchmark.h>
-#include <vector>
+
 #include <random>
+#include <vector>
 
 using namespace diagon::codecs::lucene104;
 using namespace diagon::index;
@@ -49,7 +50,7 @@ FieldInfo createField(const std::string& name, IndexOptions options) {
 
 // Write postings in StreamVByte format (current)
 void writeStreamVByteFormat(ByteBuffersIndexOutput& out, const std::vector<int>& docDeltas,
-                             const std::vector<int>& freqs) {
+                            const std::vector<int>& freqs) {
     size_t numDocs = docDeltas.size();
     size_t pos = 0;
 
@@ -291,10 +292,10 @@ static void BM_VInt_Decode_Raw(benchmark::State& state) {
 
 // Posting list decode benchmarks (with reader overhead)
 BENCHMARK(BM_PostingsDecode_StreamVByte)
-    ->Arg(100)       // 100 docs (25 StreamVByte groups)
-    ->Arg(1000)      // 1K docs
-    ->Arg(10000)     // 10K docs
-    ->Arg(100000)    // 100K docs
+    ->Arg(100)     // 100 docs (25 StreamVByte groups)
+    ->Arg(1000)    // 1K docs
+    ->Arg(10000)   // 10K docs
+    ->Arg(100000)  // 100K docs
     ->Unit(benchmark::kMicrosecond);
 
 BENCHMARK(BM_PostingsDecode_VInt_Baseline)
@@ -321,10 +322,10 @@ BENCHMARK(BM_PostingsEncode_VInt_Baseline)
 
 // Raw decode benchmarks (no reader overhead)
 BENCHMARK(BM_StreamVByte_Decode_Raw)
-    ->Arg(25)        // 100 integers
-    ->Arg(250)       // 1K integers
-    ->Arg(2500)      // 10K integers
-    ->Arg(25000)     // 100K integers
+    ->Arg(25)     // 100 integers
+    ->Arg(250)    // 1K integers
+    ->Arg(2500)   // 10K integers
+    ->Arg(25000)  // 100K integers
     ->Unit(benchmark::kMicrosecond);
 
 BENCHMARK(BM_VInt_Decode_Raw)

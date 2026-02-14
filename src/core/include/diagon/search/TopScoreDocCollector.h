@@ -89,9 +89,8 @@ public:
     LeafCollector* getLeafCollector(const index::LeafReaderContext& context) override;
 
     ScoreMode scoreMode() const override {
-        return totalHitsThreshold_ == std::numeric_limits<int>::max()
-            ? ScoreMode::COMPLETE
-            : ScoreMode::TOP_SCORES;
+        return totalHitsThreshold_ == std::numeric_limits<int>::max() ? ScoreMode::COMPLETE
+                                                                      : ScoreMode::TOP_SCORES;
     }
 
 private:
@@ -142,7 +141,7 @@ private:
         int docBase_;
         Scorable* scorer_;
         const ScoreDoc* after_;
-        int segmentHitsFromCollect_;  // Hits counted via collect() for this segment
+        int segmentHitsFromCollect_;     // Hits counted via collect() for this segment
         bool scorerTracksTotalMatches_;  // Whether scorer provides getTotalMatches()
     };
 

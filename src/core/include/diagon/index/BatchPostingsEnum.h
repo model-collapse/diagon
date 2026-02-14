@@ -4,6 +4,7 @@
 #pragma once
 
 #include "diagon/index/PostingsEnum.h"
+
 #include <cstdint>
 #include <vector>
 
@@ -17,13 +18,14 @@ namespace index {
  * for efficient batch processing with SIMD.
  */
 struct PostingsBatch {
-    int* docs;      // Document IDs [capacity]
-    int* freqs;     // Term frequencies [capacity]
-    int count;      // Actual number of documents in batch
-    int capacity;   // Maximum batch size
+    int* docs;     // Document IDs [capacity]
+    int* freqs;    // Term frequencies [capacity]
+    int count;     // Actual number of documents in batch
+    int capacity;  // Maximum batch size
 
     PostingsBatch(int cap)
-        : count(0), capacity(cap) {
+        : count(0)
+        , capacity(cap) {
         docs = new int[capacity];
         freqs = new int[capacity];
     }
@@ -130,9 +132,7 @@ public:
         return doc_;
     }
 
-    int freq() const override {
-        return freq_;
-    }
+    int freq() const override { return freq_; }
 
 protected:
     // Internal batch buffer for one-at-a-time compatibility

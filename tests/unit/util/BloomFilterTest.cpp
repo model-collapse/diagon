@@ -4,6 +4,7 @@
 #include "diagon/util/BloomFilter.h"
 
 #include <gtest/gtest.h>
+
 #include <cstring>
 #include <random>
 
@@ -339,13 +340,7 @@ TEST(BloomFilterTest, IntegerValues) {
 TEST(BloomFilterTest, StringValues) {
     BloomFilter bf(1024, 3, 0);
 
-    const char* strings[] = {
-        "hello",
-        "world",
-        "bloom",
-        "filter",
-        "test"
-    };
+    const char* strings[] = {"hello", "world", "bloom", "filter", "test"};
 
     for (const char* str : strings) {
         bf.add(str, std::strlen(str));

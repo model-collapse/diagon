@@ -1,13 +1,13 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
+#include "diagon/codecs/SegmentState.h"
 #include "diagon/codecs/lucene104/Lucene104NormsReader.h"
 #include "diagon/codecs/lucene104/Lucene104NormsWriter.h"
-#include "diagon/codecs/SegmentState.h"
 #include "diagon/index/FieldInfo.h"
 #include "diagon/index/SegmentInfo.h"
-#include "diagon/store/FSDirectory.h"
 #include "diagon/search/DocIdSetIterator.h"
+#include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
 
@@ -151,8 +151,7 @@ TEST_F(NormsTest, WriteAndReadNorms) {
         for (int doc = 0; doc < 100; doc++) {
             ASSERT_TRUE(normsIter->advanceExact(doc));
             int64_t value = normsIter->longValue();
-            EXPECT_EQ(expectedNorms[doc], static_cast<int8_t>(value))
-                << "Mismatch at doc " << doc;
+            EXPECT_EQ(expectedNorms[doc], static_cast<int8_t>(value)) << "Mismatch at doc " << doc;
         }
 
         reader.close();

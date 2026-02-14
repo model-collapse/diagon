@@ -5,7 +5,7 @@
 
 #include "diagon/store/PosixMMapIndexInput.h"
 #ifdef _WIN32
-#include "diagon/store/WindowsMMapIndexInput.h"
+#    include "diagon/store/WindowsMMapIndexInput.h"
 #endif
 #include "diagon/util/Exceptions.h"
 
@@ -24,25 +24,25 @@ std::unique_ptr<MMapDirectory> MMapDirectory::open(const std::filesystem::path& 
 }
 
 std::unique_ptr<MMapDirectory> MMapDirectory::open(const std::filesystem::path& path,
-                                                    int chunk_power) {
+                                                   int chunk_power) {
     return std::make_unique<MMapDirectory>(path, chunk_power);
 }
 
 // ==================== Constructors ====================
 
 MMapDirectory::MMapDirectory(const std::filesystem::path& path)
-    : FSDirectory(path),
-      chunk_power_(getDefaultChunkPower()),
-      preload_(false),
-      use_fallback_(false) {
+    : FSDirectory(path)
+    , chunk_power_(getDefaultChunkPower())
+    , preload_(false)
+    , use_fallback_(false) {
     // FSDirectory constructor validates that path exists and is a directory
 }
 
 MMapDirectory::MMapDirectory(const std::filesystem::path& path, int chunk_power)
-    : FSDirectory(path),
-      chunk_power_(chunk_power),
-      preload_(false),
-      use_fallback_(false) {
+    : FSDirectory(path)
+    , chunk_power_(chunk_power)
+    , preload_(false)
+    , use_fallback_(false) {
     // Validate chunk power
     validateChunkPower(chunk_power);
 }
@@ -50,7 +50,7 @@ MMapDirectory::MMapDirectory(const std::filesystem::path& path, int chunk_power)
 // ==================== Stream Creation ====================
 
 std::unique_ptr<IndexInput> MMapDirectory::openInput(const std::string& name,
-                                                      const IOContext& context) const {
+                                                     const IOContext& context) const {
     ensureOpen();
 
     auto file_path = getPath().value() / name;
@@ -85,8 +85,8 @@ std::unique_ptr<IndexInput> MMapDirectory::openInput(const std::string& name,
         // Memory mapping failed - check if fallback is enabled
         if (use_fallback_) {
             // Log warning to stderr
-            std::cerr << "WARNING: MMapDirectory failed to map file '" << name << "': "
-                      << e.what() << "\n";
+            std::cerr << "WARNING: MMapDirectory failed to map file '" << name << "': " << e.what()
+                      << "\n";
             std::cerr << "         Falling back to buffered I/O (FSDirectory). "
                       << "Performance will be reduced.\n";
             std::cerr << "         To avoid this warning, use FSDirectory directly "

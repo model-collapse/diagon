@@ -4,12 +4,12 @@
 #pragma once
 
 #include <unicode/brkiter.h>
-#include <unicode/unistr.h>
 #include <unicode/uchar.h>
+#include <unicode/unistr.h>
 
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
 namespace diagon {
 namespace util {
@@ -78,7 +78,6 @@ public:
         int32_t start = bi->first();
         for (int32_t end = bi->next(); end != icu::BreakIterator::DONE;
              start = end, end = bi->next()) {
-
             // Extract token between boundaries
             icu::UnicodeString token;
             utext.extractBetween(start, end, token);

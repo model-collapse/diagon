@@ -29,14 +29,16 @@ namespace index {
  * Based on: QBlock's TopKHolderOptimized
  * Reference: /home/ubuntu/bitq-code/QBlock/QBlock/src/topk_optimized.h
  */
-template <typename T, typename V = float>
+template<typename T, typename V = float>
 class TopKHolderOptimized {
 public:
     /**
      * Constructor
      * @param k Number of top items to maintain
      */
-    explicit TopKHolderOptimized(int k) : k_(k), threshold_(0) {
+    explicit TopKHolderOptimized(int k)
+        : k_(k)
+        , threshold_(0) {
         candidates_.reserve(k * 3);
     }
 
@@ -59,9 +61,7 @@ public:
      * @param score Score of the item
      * @param item Item identifier
      */
-    void addSimple(V score, const T& item) {
-        candidates_.emplace_back(score, item);
-    }
+    void addSimple(V score, const T& item) { candidates_.emplace_back(score, item); }
 
     /**
      * Add item with threshold comparison only (no auto-fitting)
@@ -145,11 +145,8 @@ private:
 
         // Partial sort: top k elements using nth_element
         // This is O(N) average case, much faster than full sort O(N log N)
-        std::nth_element(
-            candidates_.begin(),
-            candidates_.begin() + k_,
-            candidates_.end(),
-            [](const auto& a, const auto& b) { return a.first > b.first; });
+        std::nth_element(candidates_.begin(), candidates_.begin() + k_, candidates_.end(),
+                         [](const auto& a, const auto& b) { return a.first > b.first; });
 
         // Keep only top k and update threshold
         candidates_.resize(k_);
@@ -157,8 +154,8 @@ private:
     }
 
     std::vector<std::pair<V, T>> candidates_;  // (score, item) pairs
-    int k_;                                     // Target number of items
-    V threshold_;                               // Minimum score for inclusion
+    int k_;                                    // Target number of items
+    V threshold_;                              // Minimum score for inclusion
 };
 
 }  // namespace index

@@ -9,6 +9,7 @@
 #include "diagon/util/StreamVByte.h"
 
 #include <gtest/gtest.h>
+
 #include <iostream>
 
 using namespace diagon::codecs::lucene104;
@@ -47,10 +48,10 @@ TEST(StreamVBytePostingsDebugTest, FourDocsRoundTrip) {
     uint32_t docDeltas[4] = {0, 5, 5, 5};
     uint32_t freqs[4] = {10, 20, 30, 40};
 
-    std::cout << "Input doc deltas: [" << docDeltas[0] << ", " << docDeltas[1]
-              << ", " << docDeltas[2] << ", " << docDeltas[3] << "]" << std::endl;
-    std::cout << "Input frequencies: [" << freqs[0] << ", " << freqs[1]
-              << ", " << freqs[2] << ", " << freqs[3] << "]" << std::endl;
+    std::cout << "Input doc deltas: [" << docDeltas[0] << ", " << docDeltas[1] << ", "
+              << docDeltas[2] << ", " << docDeltas[3] << "]" << std::endl;
+    std::cout << "Input frequencies: [" << freqs[0] << ", " << freqs[1] << ", " << freqs[2] << ", "
+              << freqs[3] << "]" << std::endl;
 
     // Manually encode using StreamVByte
     uint8_t docDeltaEncoded[17];  // Max: 1 control + 4*4 data bytes
@@ -77,8 +78,9 @@ TEST(StreamVBytePostingsDebugTest, FourDocsRoundTrip) {
     StreamVByte::decode4(docDeltaEncoded, decodedDocDeltas);
     StreamVByte::decode4(freqEncoded, decodedFreqs);
 
-    std::cout << "\nManual decode doc deltas: [" << decodedDocDeltas[0] << ", " << decodedDocDeltas[1]
-              << ", " << decodedDocDeltas[2] << ", " << decodedDocDeltas[3] << "]" << std::endl;
+    std::cout << "\nManual decode doc deltas: [" << decodedDocDeltas[0] << ", "
+              << decodedDocDeltas[1] << ", " << decodedDocDeltas[2] << ", " << decodedDocDeltas[3]
+              << "]" << std::endl;
     std::cout << "Manual decode frequencies: [" << decodedFreqs[0] << ", " << decodedFreqs[1]
               << ", " << decodedFreqs[2] << ", " << decodedFreqs[3] << "]" << std::endl;
 
@@ -108,7 +110,7 @@ TEST(StreamVBytePostingsDebugTest, FourDocsRoundTrip) {
     // Setup term state
     TermState termState;
     termState.docStartFP = 0;
-    termState.docFreq = 4;  // 4 documents
+    termState.docFreq = 4;          // 4 documents
     termState.totalTermFreq = 100;  // 10+20+30+40
     termState.skipOffset = -1;
 

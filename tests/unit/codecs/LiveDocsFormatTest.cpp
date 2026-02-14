@@ -68,8 +68,7 @@ TEST(LiveDocsFormatTest, WriteAndReadBasic) {
     // Verify all bits match
     EXPECT_EQ(readLiveDocs->length(), maxDoc);
     for (int i = 0; i < maxDoc; i++) {
-        EXPECT_EQ(readLiveDocs->get(i), liveDocs.get(i))
-            << "Bit mismatch at index " << i;
+        EXPECT_EQ(readLiveDocs->get(i), liveDocs.get(i)) << "Bit mismatch at index " << i;
     }
 
     directory->close();

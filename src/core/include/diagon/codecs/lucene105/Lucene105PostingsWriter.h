@@ -21,12 +21,16 @@ namespace lucene105 {
  * Stored every 128 documents to enable early termination in top-k queries.
  */
 struct SkipEntry {
-    int32_t doc;           // Doc ID at start of block
-    int64_t docFP;         // File pointer to doc block start
-    int32_t maxFreq;       // Maximum frequency in block (128 docs)
-    int8_t maxNorm;        // Maximum norm in block (0-127)
+    int32_t doc;      // Doc ID at start of block
+    int64_t docFP;    // File pointer to doc block start
+    int32_t maxFreq;  // Maximum frequency in block (128 docs)
+    int8_t maxNorm;   // Maximum norm in block (0-127)
 
-    SkipEntry() : doc(0), docFP(0), maxFreq(0), maxNorm(0) {}
+    SkipEntry()
+        : doc(0)
+        , docFP(0)
+        , maxFreq(0)
+        , maxNorm(0) {}
 };
 
 /**
@@ -139,8 +143,8 @@ public:
 
 private:
     // Output files
-    std::unique_ptr<store::IndexOutput> docOut_;  // Doc IDs and frequencies
-    std::unique_ptr<store::IndexOutput> skipOut_; // Skip entries with impacts
+    std::unique_ptr<store::IndexOutput> docOut_;   // Doc IDs and frequencies
+    std::unique_ptr<store::IndexOutput> skipOut_;  // Skip entries with impacts
 
     // Current field being written
     index::IndexOptions indexOptions_;

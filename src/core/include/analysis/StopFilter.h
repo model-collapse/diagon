@@ -1,8 +1,9 @@
 #pragma once
 
 #include "TokenFilter.h"
-#include <unordered_set>
+
 #include <string>
+#include <unordered_set>
 
 namespace diagon {
 namespace analysis {
@@ -39,10 +40,10 @@ public:
      * Predefined stop word sets.
      */
     enum class StopWordSet {
-        NONE,      // No stop words
-        ENGLISH,   // English stop words (case-insensitive)
-        CHINESE,   // Chinese stop words
-        CUSTOM     // User-provided stop words
+        NONE,     // No stop words
+        ENGLISH,  // English stop words (case-insensitive)
+        CHINESE,  // Chinese stop words
+        CUSTOM    // User-provided stop words
     };
 
     /**
@@ -51,10 +52,7 @@ public:
      * @param stopWordSet Predefined stop word set to use
      * @param caseSensitive Whether matching is case-sensitive (default: false for English)
      */
-    explicit StopFilter(
-        StopWordSet stopWordSet = StopWordSet::ENGLISH,
-        bool caseSensitive = false
-    );
+    explicit StopFilter(StopWordSet stopWordSet = StopWordSet::ENGLISH, bool caseSensitive = false);
 
     /**
      * Create a StopFilter with custom stop words.
@@ -62,19 +60,15 @@ public:
      * @param customStopWords Set of stop words
      * @param caseSensitive Whether matching is case-sensitive
      */
-    explicit StopFilter(
-        const std::unordered_set<std::string>& customStopWords,
-        bool caseSensitive = false
-    );
+    explicit StopFilter(const std::unordered_set<std::string>& customStopWords,
+                        bool caseSensitive = false);
 
     virtual ~StopFilter() = default;
 
     // TokenFilter interface
     std::vector<Token> filter(const std::vector<Token>& tokens) override;
     std::string name() const override { return "stop"; }
-    std::string description() const override {
-        return "Removes stop words from token stream";
-    }
+    std::string description() const override { return "Removes stop words from token stream"; }
 
     /**
      * Add a stop word at runtime.
@@ -122,5 +116,5 @@ private:
     std::string normalizeWord(const std::string& word) const;
 };
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

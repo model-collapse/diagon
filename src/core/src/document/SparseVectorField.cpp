@@ -13,7 +13,7 @@ namespace document {
 
 FieldType SparseVectorField::TYPE_NOT_STORED = []() {
     FieldType ft;
-    ft.indexOptions = index::IndexOptions::NONE;  // Not in inverted index
+    ft.indexOptions = index::IndexOptions::NONE;    // Not in inverted index
     ft.docValuesType = index::DocValuesType::NONE;  // Special sparse vector index
     ft.stored = false;
     ft.tokenized = false;  // Already in term space
@@ -25,7 +25,7 @@ FieldType SparseVectorField::TYPE_STORED = []() {
     FieldType ft;
     ft.indexOptions = index::IndexOptions::NONE;
     ft.docValuesType = index::DocValuesType::NONE;
-    ft.stored = true;      // Store for retrieval
+    ft.stored = true;  // Store for retrieval
     ft.tokenized = false;
     ft.omitNorms = true;
     return ft;
@@ -33,15 +33,13 @@ FieldType SparseVectorField::TYPE_STORED = []() {
 
 // ==================== Construction ====================
 
-SparseVectorField::SparseVectorField(std::string name,
-                                     const sparse::SparseVector& vector,
+SparseVectorField::SparseVectorField(std::string name, const sparse::SparseVector& vector,
                                      bool stored)
     : name_(std::move(name))
     , type_(stored ? TYPE_STORED : TYPE_NOT_STORED)
     , vector_(vector) {}
 
-SparseVectorField::SparseVectorField(std::string name,
-                                     const sparse::SparseVector& vector,
+SparseVectorField::SparseVectorField(std::string name, const sparse::SparseVector& vector,
                                      FieldType type)
     : name_(std::move(name))
     , type_(type)
@@ -63,7 +61,7 @@ std::optional<util::BytesRef> SparseVectorField::binaryValue() const {
     // - Compression (LZ4/ZSTD)
 
     size_t num_elements = vector_.size();
-    size_t data_size = sizeof(uint32_t) +  // num_elements
+    size_t data_size = sizeof(uint32_t) +                                  // num_elements
                        num_elements * (sizeof(uint32_t) + sizeof(float));  // (index, value) pairs
 
     // Allocate buffer

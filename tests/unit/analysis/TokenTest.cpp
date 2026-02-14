@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
 #include "analysis/Token.h"
+
+#include <gtest/gtest.h>
 
 using namespace diagon::analysis;
 

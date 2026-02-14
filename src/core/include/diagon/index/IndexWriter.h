@@ -292,7 +292,7 @@ private:
     void writeSegmentsFile();
     void applyDeletes(const Term& term);
     void deleteSegmentFiles(std::shared_ptr<SegmentInfo> segment);
-    int64_t commitInternal();  // Internal commit (caller must hold commitLock_)
+    int64_t commitInternal();                      // Internal commit (caller must hold commitLock_)
     void executeMerges(MergeSpecification* spec);  // Execute a set of merges
 };
 

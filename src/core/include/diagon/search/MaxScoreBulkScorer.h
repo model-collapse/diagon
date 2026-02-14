@@ -52,15 +52,24 @@ private:
      * Tracks current doc and window-level max score.
      */
     struct DisiWrapper {
-        Scorer* scorer;           // Non-owning
-        int doc;                  // Current doc ID
-        int64_t cost;             // Estimated cost
-        float maxWindowScore;     // Max score in current outer window
-        float efficiencyRatio;    // maxWindowScore / max(1, cost), updated per outer window
+        Scorer* scorer;         // Non-owning
+        int doc;                // Current doc ID
+        int64_t cost;           // Estimated cost
+        float maxWindowScore;   // Max score in current outer window
+        float efficiencyRatio;  // maxWindowScore / max(1, cost), updated per outer window
 
-        DisiWrapper() : scorer(nullptr), doc(-1), cost(0), maxWindowScore(0.0f), efficiencyRatio(0.0f) {}
+        DisiWrapper()
+            : scorer(nullptr)
+            , doc(-1)
+            , cost(0)
+            , maxWindowScore(0.0f)
+            , efficiencyRatio(0.0f) {}
         explicit DisiWrapper(Scorer* s)
-            : scorer(s), doc(s->docID()), cost(s->cost()), maxWindowScore(0.0f), efficiencyRatio(0.0f) {}
+            : scorer(s)
+            , doc(s->docID())
+            , cost(s->cost())
+            , maxWindowScore(0.0f)
+            , efficiencyRatio(0.0f) {}
     };
 
     /**
@@ -75,9 +84,7 @@ private:
 
         float score() override { return score_; }
         int docID() override { return docID_; }
-        void setMinCompetitiveScore(float minScore) override {
-            minCompetitiveScore = minScore;
-        }
+        void setMinCompetitiveScore(float minScore) override { minCompetitiveScore = minScore; }
     };
 
     // Document/score buffer for batch passing to non-essential scoring + collection
@@ -197,7 +204,8 @@ private:
     void scoreNonEssentialClauses(LeafCollector* collector, int numNonEssentialClauses);
 
     /**
-     * Filter out docs from buffer where accumulated score + maxRemainingScore < minCompetitiveScore.
+     * Filter out docs from buffer where accumulated score + maxRemainingScore <
+     * minCompetitiveScore.
      */
     void filterCompetitiveHits(float maxRemainingScore);
 
@@ -217,7 +225,8 @@ private:
     void essentialQueuePush(DisiWrapper* w);
 
     inline DisiWrapper* essentialQueueTop() {
-        if (essentialQueueSize_ == 0) return nullptr;
+        if (essentialQueueSize_ == 0)
+            return nullptr;
         return essentialQueue_[0];
     }
 
@@ -234,9 +243,7 @@ private:
 
     // ==================== Bitset Helpers (inlined for hot path) ====================
 
-    inline void windowSetBit(int index) {
-        windowMatches_[index >> 6] |= (1ULL << (index & 63));
-    }
+    inline void windowSetBit(int index) { windowMatches_[index >> 6] |= (1ULL << (index & 63)); }
 
     inline void windowClearAll(int size) {
         int words = (size + 63) >> 6;
@@ -249,7 +256,8 @@ private:
         int wordIndex = from >> 6;
         int maxWord = (limit + 63) >> 6;
 
-        if (wordIndex >= maxWord) return limit;
+        if (wordIndex >= maxWord)
+            return limit;
 
         uint64_t word = windowMatches_[wordIndex] >> (from & 63);
         if (word != 0) {

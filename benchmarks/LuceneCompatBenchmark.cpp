@@ -9,25 +9,25 @@
  * Output: JSON results compatible with comparison scripts
  */
 
-#include <benchmark/benchmark.h>
-
-#include "diagon/index/IndexWriter.h"
-#include "diagon/index/DirectoryReader.h"
-#include "diagon/search/IndexSearcher.h"
-#include "diagon/search/TermQuery.h"
-#include "diagon/search/BooleanQuery.h"
-#include "diagon/store/FSDirectory.h"
-#include "diagon/store/MMapDirectory.h"
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/DirectoryReader.h"
+#include "diagon/index/IndexWriter.h"
+#include "diagon/search/BooleanQuery.h"
+#include "diagon/search/IndexSearcher.h"
+#include "diagon/search/TermQuery.h"
+#include "diagon/store/FSDirectory.h"
+#include "diagon/store/MMapDirectory.h"
 
 #include "dataset/LuceneDatasetAdapter.h"
 #include "dataset/SyntheticGenerator.h"
 
+#include <benchmark/benchmark.h>
+
 #include <filesystem>
 #include <memory>
-#include <vector>
 #include <string>
+#include <vector>
 
 using namespace diagon;
 using namespace diagon::benchmarks;
@@ -96,10 +96,8 @@ static void BM_Diagon_IndexReuters(benchmark::State& state) {
 
     // Report metrics
     state.SetItemsProcessed(state.iterations() * NUM_DOCS);
-    state.counters["docs_per_sec"] = benchmark::Counter(
-        NUM_DOCS * state.iterations(),
-        benchmark::Counter::kIsRate
-    );
+    state.counters["docs_per_sec"] = benchmark::Counter(NUM_DOCS * state.iterations(),
+                                                        benchmark::Counter::kIsRate);
 }
 BENCHMARK(BM_Diagon_IndexReuters)->Unit(benchmark::kSecond);
 
@@ -154,7 +152,7 @@ static void BM_Diagon_IndexSynthetic_VaryingSizes(benchmark::State& state) {
 
         for (int i = 0; i < NUM_DOCS; i++) {
             // 25% small, 50% medium, 25% large
-            int category = (i < NUM_DOCS/4) ? 0 : (i < 3*NUM_DOCS/4) ? 1 : 2;
+            int category = (i < NUM_DOCS / 4) ? 0 : (i < 3 * NUM_DOCS / 4) ? 1 : 2;
             auto doc = gen.generateDocumentWithSize(i, category);
             writer->addDocument(doc);
         }

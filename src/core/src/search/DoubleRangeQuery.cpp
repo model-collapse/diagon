@@ -192,9 +192,8 @@ public:
 
         // Create scorer (passes non-owning pointer)
         return std::make_unique<DoubleRangeScorer>(*this, values, maxDoc, query_.getLowerValue(),
-                                                    query_.getUpperValue(),
-                                                    query_.getIncludeLower(),
-                                                    query_.getIncludeUpper(), constantScore_);
+                                                   query_.getUpperValue(), query_.getIncludeLower(),
+                                                   query_.getIncludeUpper(), constantScore_);
     }
 
     const Query& getQuery() const override { return query_; }
@@ -213,8 +212,8 @@ private:
 
 // ==================== DoubleRangeQuery ====================
 
-DoubleRangeQuery::DoubleRangeQuery(const std::string& field, double lowerValue,
-                                   double upperValue, bool includeLower, bool includeUpper)
+DoubleRangeQuery::DoubleRangeQuery(const std::string& field, double lowerValue, double upperValue,
+                                   bool includeLower, bool includeUpper)
     : field_(field)
     , lowerValue_(lowerValue)
     , upperValue_(upperValue)
@@ -231,26 +230,26 @@ DoubleRangeQuery::DoubleRangeQuery(const std::string& field, double lowerValue,
 }
 
 std::unique_ptr<DoubleRangeQuery> DoubleRangeQuery::newUpperBoundQuery(const std::string& field,
-                                                                        double upperValue,
-                                                                        bool includeUpper) {
-    return std::make_unique<DoubleRangeQuery>(
-        field, std::numeric_limits<double>::lowest(), upperValue, true, includeUpper);
+                                                                       double upperValue,
+                                                                       bool includeUpper) {
+    return std::make_unique<DoubleRangeQuery>(field, std::numeric_limits<double>::lowest(),
+                                              upperValue, true, includeUpper);
 }
 
 std::unique_ptr<DoubleRangeQuery> DoubleRangeQuery::newLowerBoundQuery(const std::string& field,
-                                                                        double lowerValue,
-                                                                        bool includeLower) {
-    return std::make_unique<DoubleRangeQuery>(
-        field, lowerValue, std::numeric_limits<double>::max(), includeLower, true);
+                                                                       double lowerValue,
+                                                                       bool includeLower) {
+    return std::make_unique<DoubleRangeQuery>(field, lowerValue, std::numeric_limits<double>::max(),
+                                              includeLower, true);
 }
 
 std::unique_ptr<DoubleRangeQuery> DoubleRangeQuery::newExactQuery(const std::string& field,
-                                                                   double value) {
+                                                                  double value) {
     return std::make_unique<DoubleRangeQuery>(field, value, value, true, true);
 }
 
-std::unique_ptr<Weight> DoubleRangeQuery::createWeight(IndexSearcher& searcher,
-                                                        ScoreMode scoreMode, float boost) const {
+std::unique_ptr<Weight> DoubleRangeQuery::createWeight(IndexSearcher& searcher, ScoreMode scoreMode,
+                                                       float boost) const {
     return std::make_unique<DoubleRangeWeight>(*this, searcher, boost);
 }
 
@@ -302,7 +301,7 @@ size_t DoubleRangeQuery::hashCode() const {
 
 std::unique_ptr<Query> DoubleRangeQuery::clone() const {
     return std::make_unique<DoubleRangeQuery>(field_, lowerValue_, upperValue_, includeLower_,
-                                               includeUpper_);
+                                              includeUpper_);
 }
 
 }  // namespace search

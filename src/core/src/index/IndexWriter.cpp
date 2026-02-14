@@ -6,13 +6,13 @@
 #include "diagon/codecs/LiveDocsFormat.h"
 #include "diagon/index/MergeSpecification.h"
 #include "diagon/index/OneMerge.h"
+#include "diagon/index/PostingsEnum.h"
 #include "diagon/index/SegmentMerger.h"
 #include "diagon/index/SegmentReader.h"
 #include "diagon/index/Term.h"
 #include "diagon/index/Terms.h"
 #include "diagon/index/TermsEnum.h"
 #include "diagon/index/TieredMergePolicy.h"
-#include "diagon/index/PostingsEnum.h"
 #include "diagon/store/IndexOutput.h"
 #include "diagon/util/BitSet.h"
 
@@ -51,7 +51,8 @@ IndexWriter::IndexWriter(Directory& dir, const IndexWriterConfig& config)
     // Initialize merge policy (use provided or create default TieredMergePolicy)
     if (config.getMergePolicy()) {
         // Use user-provided policy (clone it)
-        mergePolicy_ = std::make_unique<TieredMergePolicy>(*static_cast<TieredMergePolicy*>(config.getMergePolicy()));
+        mergePolicy_ = std::make_unique<TieredMergePolicy>(
+            *static_cast<TieredMergePolicy*>(config.getMergePolicy()));
     } else {
         // Use default TieredMergePolicy
         mergePolicy_ = std::make_unique<TieredMergePolicy>();

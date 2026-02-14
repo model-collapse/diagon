@@ -10,6 +10,7 @@
 #include "diagon/store/FSDirectory.h"
 
 #include <gtest/gtest.h>
+
 #include <chrono>
 #include <filesystem>
 #include <iostream>
@@ -41,9 +42,7 @@ protected:
         fs::create_directories(testDir_);
     }
 
-    void TearDown() override {
-        fs::remove_all(testDir_);
-    }
+    void TearDown() override { fs::remove_all(testDir_); }
 
     fs::path testDir_;
 };
@@ -74,7 +73,8 @@ TEST_F(EndToEndIndexingSearchTest, BasicIndexingAndSearch) {
             }
 
             doc.add(std::make_unique<TextField>("title", content));
-            doc.add(std::make_unique<TextField>("body", "This is the body of document " + std::to_string(i)));
+            doc.add(std::make_unique<TextField>("body", "This is the body of document " +
+                                                            std::to_string(i)));
 
             writer.addDocument(doc);
         }
@@ -100,7 +100,8 @@ TEST_F(EndToEndIndexingSearchTest, BasicIndexingAndSearch) {
 
             // All results should have positive scores
             for (const auto& scoreDoc : results.scoreDocs) {
-                EXPECT_GT(scoreDoc.score, 0.0f) << "Doc " << scoreDoc.doc << " should have positive score";
+                EXPECT_GT(scoreDoc.score, 0.0f)
+                    << "Doc " << scoreDoc.doc << " should have positive score";
             }
         }
 
@@ -126,7 +127,7 @@ TEST_F(EndToEndIndexingSearchTest, BasicIndexingAndSearch) {
 
             // Results should be sorted by score
             for (size_t i = 1; i < results.scoreDocs.size(); i++) {
-                EXPECT_GE(results.scoreDocs[i-1].score, results.scoreDocs[i].score)
+                EXPECT_GE(results.scoreDocs[i - 1].score, results.scoreDocs[i].score)
                     << "Results should be sorted by score descending";
             }
         }
@@ -163,7 +164,7 @@ TEST_F(EndToEndIndexingSearchTest, IndexingPerformance) {
 
             std::string title = "Document " + std::to_string(i);
             std::string body = "This is the content of document number " + std::to_string(i) +
-                             " with some additional text to make it more realistic";
+                               " with some additional text to make it more realistic";
 
             doc.add(std::make_unique<TextField>("title", title));
             doc.add(std::make_unique<TextField>("body", body));
@@ -180,7 +181,8 @@ TEST_F(EndToEndIndexingSearchTest, IndexingPerformance) {
 
     double docsPerSecond = (NUM_DOCS * 1000.0) / duration.count();
 
-    std::cout << "Indexed " << NUM_DOCS << " documents in " << duration.count() << " ms" << std::endl;
+    std::cout << "Indexed " << NUM_DOCS << " documents in " << duration.count() << " ms"
+              << std::endl;
     std::cout << "Throughput: " << static_cast<int>(docsPerSecond) << " docs/sec" << std::endl;
 
     // Verify we can search the index
@@ -196,7 +198,8 @@ TEST_F(EndToEndIndexingSearchTest, IndexingPerformance) {
         auto results = searcher.search(query, 10);
         auto searchEnd = std::chrono::high_resolution_clock::now();
 
-        auto searchDuration = std::chrono::duration_cast<std::chrono::microseconds>(searchEnd - searchStart);
+        auto searchDuration = std::chrono::duration_cast<std::chrono::microseconds>(searchEnd -
+                                                                                    searchStart);
 
         std::cout << "Search latency: " << searchDuration.count() << " μs" << std::endl;
 
@@ -278,7 +281,8 @@ TEST_F(EndToEndIndexingSearchTest, UpdatesAndDeletions) {
             search::Term term("id", std::to_string(i));
             Document newDoc;
             newDoc.add(std::make_unique<TextField>("id", std::to_string(i)));
-            newDoc.add(std::make_unique<TextField>("content", "updated version " + std::to_string(i)));
+            newDoc.add(
+                std::make_unique<TextField>("content", "updated version " + std::to_string(i)));
             writer.updateDocument(term, newDoc);
         }
 
@@ -384,7 +388,8 @@ TEST_F(EndToEndIndexingSearchTest, MultipleSegments) {
         // Add 50 documents - will create 5 segments
         for (int i = 0; i < 50; i++) {
             Document doc;
-            doc.add(std::make_unique<TextField>("content", "segment test document " + std::to_string(i)));
+            doc.add(std::make_unique<TextField>("content",
+                                                "segment test document " + std::to_string(i)));
             writer.addDocument(doc);
         }
 
@@ -446,7 +451,8 @@ TEST_F(EndToEndIndexingSearchTest, StoredFieldsRetrieval) {
         auto& leafContext = leaves[0];
 
         // Get stored fields reader
-        auto* storedFieldsReader = dynamic_cast<SegmentReader*>(leafContext.reader)->storedFieldsReader();
+        auto* storedFieldsReader =
+            dynamic_cast<SegmentReader*>(leafContext.reader)->storedFieldsReader();
         ASSERT_TRUE(storedFieldsReader != nullptr) << "Should have stored fields reader";
 
         // Read stored fields for document 5

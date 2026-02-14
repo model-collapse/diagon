@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/codecs/StoredFieldsReader.h"
-#include "diagon/codecs/StoredFieldsWriter.h"
 
+#include "diagon/codecs/StoredFieldsWriter.h"
 #include "diagon/index/FieldInfo.h"
 #include "diagon/store/FSDirectory.h"
 

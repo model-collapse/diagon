@@ -4,8 +4,8 @@
 #pragma once
 
 #include "diagon/store/FSDirectory.h"
-#include "diagon/store/IndexInput.h"
 #include "diagon/store/IOContext.h"
+#include "diagon/store/IndexInput.h"
 
 #include <filesystem>
 #include <memory>

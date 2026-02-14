@@ -79,17 +79,15 @@ public:
     /**
      * Inequality comparison.
      */
-    bool operator!=(const Token& other) const {
-        return !(*this == other);
-    }
+    bool operator!=(const Token& other) const { return !(*this == other); }
 
 private:
-    std::string text_;      // The token text
-    int position_;          // Position in token stream
-    int startOffset_;       // Start offset in original text
-    int endOffset_;         // End offset in original text
-    std::string type_;      // Token type (optional)
+    std::string text_;  // The token text
+    int position_;      // Position in token stream
+    int startOffset_;   // Start offset in original text
+    int endOffset_;     // End offset in original text
+    std::string type_;  // Token type (optional)
 };
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

@@ -84,8 +84,8 @@ private:
     void writeNormsData(const index::FieldInfo& field, const std::vector<int8_t>& norms);
 
     index::SegmentWriteState& state_;
-    std::unique_ptr<store::IndexOutput> data_;    // .nvd file
-    std::unique_ptr<store::IndexOutput> meta_;    // .nvm file
+    std::unique_ptr<store::IndexOutput> data_;  // .nvd file
+    std::unique_ptr<store::IndexOutput> meta_;  // .nvm file
     bool closed_{false};
 };
 

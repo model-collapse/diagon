@@ -4,9 +4,9 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 // ==================== Opaque Types ====================
 
@@ -95,11 +95,8 @@ void diagon_destroy_analyzer(diagon_analyzer_t* analyzer);
  * @param text_len Length of text in bytes
  * @return Token array (must be freed with diagon_free_tokens)
  */
-diagon_token_array_t* diagon_analyze_text(
-    diagon_analyzer_t* analyzer,
-    const char* text,
-    size_t text_len
-);
+diagon_token_array_t* diagon_analyze_text(diagon_analyzer_t* analyzer, const char* text,
+                                          size_t text_len);
 
 /**
  * Free token array returned by diagon_analyze_text.

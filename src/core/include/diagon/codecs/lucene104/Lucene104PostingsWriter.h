@@ -21,12 +21,16 @@ namespace lucene104 {
  * Stored every 128 documents to enable early termination in top-k queries.
  */
 struct SkipEntry {
-    int32_t doc;           // Doc ID at start of block
-    int64_t docFP;         // File pointer to doc block start
-    int32_t maxFreq;       // Maximum frequency in block (128 docs)
-    int8_t maxNorm;        // Maximum norm in block (0-127)
+    int32_t doc;      // Doc ID at start of block
+    int64_t docFP;    // File pointer to doc block start
+    int32_t maxFreq;  // Maximum frequency in block (128 docs)
+    int8_t maxNorm;   // Maximum norm in block (0-127)
 
-    SkipEntry() : doc(0), docFP(0), maxFreq(0), maxNorm(0) {}
+    SkipEntry()
+        : doc(0)
+        , docFP(0)
+        , maxFreq(0)
+        , maxNorm(0) {}
 };
 
 /**
@@ -149,8 +153,8 @@ public:
 
 private:
     // Output files
-    std::unique_ptr<store::IndexOutput> docOut_;  // Doc IDs and frequencies
-    std::unique_ptr<store::IndexOutput> skipOut_; // Skip entries with impacts (optional)
+    std::unique_ptr<store::IndexOutput> docOut_;   // Doc IDs and frequencies
+    std::unique_ptr<store::IndexOutput> skipOut_;  // Skip entries with impacts (optional)
 
     // Current field being written
     index::IndexOptions indexOptions_;
@@ -178,7 +182,8 @@ private:
 
     // Block-Max WAND support
     // Lowered from 256 to 64 to create more skip entries for tighter max score bounds
-    static constexpr int SKIP_INTERVAL = 64;  // Create skip entry every 64 docs (denser than Lucene)
+    static constexpr int SKIP_INTERVAL =
+        64;  // Create skip entry every 64 docs (denser than Lucene)
 
     // Block-level impact tracking (for next skip entry)
     int32_t blockMaxFreq_;       // Max frequency in current block

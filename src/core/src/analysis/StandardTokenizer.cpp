@@ -1,8 +1,9 @@
 #include "analysis/StandardTokenizer.h"
-#include <unicode/uchar.h>
-#include <unicode/unistr.h>
+
 #include <unicode/brkiter.h>
 #include <unicode/locid.h>
+#include <unicode/uchar.h>
+#include <unicode/unistr.h>
 
 namespace diagon {
 namespace analysis {
@@ -25,7 +26,8 @@ StandardTokenizer::StandardTokenizer(const std::string& locale)
     if (U_FAILURE(status)) {
         // Fallback to default locale if specified locale fails
         status = U_ZERO_ERROR;
-        breakIterator_.reset(icu::BreakIterator::createWordInstance(icu::Locale::getDefault(), status));
+        breakIterator_.reset(
+            icu::BreakIterator::createWordInstance(icu::Locale::getDefault(), status));
     }
 }
 
@@ -125,5 +127,5 @@ std::vector<Token> StandardTokenizer::tokenize(const std::string& text) {
     return tokens;
 }
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

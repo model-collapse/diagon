@@ -313,16 +313,16 @@ TEST(FSTSerializationTest, Deserialize_InvalidNodeID_Throws) {
     data.push_back(2);
 
     // Node 0: Final node with output 100
-    data.push_back(1);       // isFinal = true
-    data.push_back(100);     // output = 100
-    data.push_back(1);       // numArcs = 1
-    data.push_back('a');     // label = 'a'
-    data.push_back(0);       // arcOutput = 0
-    data.push_back(5);       // targetNodeId = 5 (INVALID! only 2 nodes exist)
+    data.push_back(1);    // isFinal = true
+    data.push_back(100);  // output = 100
+    data.push_back(1);    // numArcs = 1
+    data.push_back('a');  // label = 'a'
+    data.push_back(0);    // arcOutput = 0
+    data.push_back(5);    // targetNodeId = 5 (INVALID! only 2 nodes exist)
 
     // Node 1: Non-final
-    data.push_back(0);       // isFinal = false
-    data.push_back(0);       // numArcs = 0
+    data.push_back(0);  // isFinal = false
+    data.push_back(0);  // numArcs = 0
 
     // Should throw runtime_error for invalid node ID
     EXPECT_THROW(FST::deserialize(data), std::runtime_error);

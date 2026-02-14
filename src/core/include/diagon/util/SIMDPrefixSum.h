@@ -4,7 +4,10 @@
 #pragma once
 
 #include <cstdint>
-#include <immintrin.h>
+
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__SSE2__)
+#    include <immintrin.h>
+#endif
 
 namespace diagon {
 namespace util {
@@ -43,7 +46,7 @@ namespace util {
  */
 class SIMDPrefixSum {
 public:
-#if defined(DIAGON_HAVE_AVX512)
+#if defined(__AVX512F__)
     /**
      * Compute prefix sum of 16 int32 values using AVX512
      *
@@ -87,9 +90,9 @@ public:
 
         return result;
     }
-#endif  // DIAGON_HAVE_AVX512
+#endif  // __AVX512F__
 
-#if defined(DIAGON_HAVE_AVX2)
+#if defined(__AVX2__)
     /**
      * Compute prefix sum of 8 int32 values using AVX2
      *
@@ -104,24 +107,21 @@ public:
         // Shift: move element i to position i+1 (shift left by 1 int32 = 4 bytes)
         // Use permute + blend
         __m256i shifted = _mm256_permutevar8x32_epi32(
-            result,
-            _mm256_setr_epi32(7, 0, 1, 2, 3, 4, 5, 6)  // Rotate right
+            result, _mm256_setr_epi32(7, 0, 1, 2, 3, 4, 5, 6)  // Rotate right
         );
         shifted = _mm256_blend_epi32(shifted, _mm256_setzero_si256(), 0x01);  // Zero first
         result = _mm256_add_epi32(result, shifted);
 
         // Step 2: Add neighbor 2 away
         shifted = _mm256_permutevar8x32_epi32(
-            result,
-            _mm256_setr_epi32(6, 7, 0, 1, 2, 3, 4, 5)  // Rotate right by 2
+            result, _mm256_setr_epi32(6, 7, 0, 1, 2, 3, 4, 5)  // Rotate right by 2
         );
         shifted = _mm256_blend_epi32(shifted, _mm256_setzero_si256(), 0x03);  // Zero first 2
         result = _mm256_add_epi32(result, shifted);
 
         // Step 3: Add neighbor 4 away
         shifted = _mm256_permutevar8x32_epi32(
-            result,
-            _mm256_setr_epi32(4, 5, 6, 7, 0, 1, 2, 3)  // Rotate right by 4
+            result, _mm256_setr_epi32(4, 5, 6, 7, 0, 1, 2, 3)  // Rotate right by 4
         );
         shifted = _mm256_blend_epi32(shifted, _mm256_setzero_si256(), 0x0F);  // Zero first 4
         result = _mm256_add_epi32(result, shifted);
@@ -132,7 +132,7 @@ public:
 
         return result;
     }
-#endif  // DIAGON_HAVE_AVX2
+#endif  // __AVX2__
 
     /**
      * Scalar prefix sum fallback
@@ -157,7 +157,7 @@ public:
      * @param base Starting value
      */
     static inline void prefixSum(int32_t* deltas, int count, int32_t base) {
-#if defined(DIAGON_HAVE_AVX512)
+#if defined(__AVX512F__)
         if (count == 16) {
             __m512i vec = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(deltas));
             __m512i result = prefixSum16(vec, base);
@@ -165,7 +165,7 @@ public:
             return;
         }
 #endif
-#if defined(DIAGON_HAVE_AVX2)
+#if defined(__AVX2__)
         if (count == 8) {
             __m256i vec = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(deltas));
             __m256i result = prefixSum8(vec, base);

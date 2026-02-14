@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "diagon/util/StreamVByte.h"
+
 #include "diagon/util/StreamVByteTables.h"  // Precomputed lookup tables
 
 #include <algorithm>
@@ -32,12 +33,8 @@ int StreamVByte::encode(const uint32_t* values, int count, uint8_t* output) {
         control = buildControl(lengths[0], lengths[1], lengths[2], lengths[3]);
     } else {
         // Pad with 1-byte lengths for remainder
-        control = buildControl(
-            count > 0 ? lengths[0] : 1,
-            count > 1 ? lengths[1] : 1,
-            count > 2 ? lengths[2] : 1,
-            count > 3 ? lengths[3] : 1
-        );
+        control = buildControl(count > 0 ? lengths[0] : 1, count > 1 ? lengths[1] : 1,
+                               count > 2 ? lengths[2] : 1, count > 3 ? lengths[3] : 1);
     }
 
     output[0] = control;
@@ -113,8 +110,7 @@ int StreamVByte::decode4_SSE(const uint8_t* input, uint32_t* output) {
 
     // ✅ FAST: Load precomputed shuffle mask (1 cycle, not 20-30 cycles!)
     __m128i mask_vec = _mm_load_si128(
-        reinterpret_cast<const __m128i*>(StreamVByteTables::SSE_MASKS[control])
-    );
+        reinterpret_cast<const __m128i*>(StreamVByteTables::SSE_MASKS[control]));
 
     // Load data bytes (up to 16 bytes)
     __m128i data_vec = _mm_loadu_si128(reinterpret_cast<const __m128i*>(data));
@@ -153,15 +149,13 @@ int StreamVByte::decode8_AVX2(const uint8_t* input, uint32_t* output) {
 
     // Decode first group of 4 (lower 128 bits)
     __m128i mask0_vec = _mm_load_si128(
-        reinterpret_cast<const __m128i*>(StreamVByteTables::SSE_MASKS[control0])
-    );
+        reinterpret_cast<const __m128i*>(StreamVByteTables::SSE_MASKS[control0]));
     __m128i data0_vec = _mm_loadu_si128(reinterpret_cast<const __m128i*>(input + 1));
     __m128i result0 = _mm_shuffle_epi8(data0_vec, mask0_vec);
 
     // Decode second group of 4 (upper 128 bits)
     __m128i mask1_vec = _mm_load_si128(
-        reinterpret_cast<const __m128i*>(StreamVByteTables::SSE_MASKS[control1])
-    );
+        reinterpret_cast<const __m128i*>(StreamVByteTables::SSE_MASKS[control1]));
     __m128i data1_vec = _mm_loadu_si128(reinterpret_cast<const __m128i*>(input + 1 + dataLen0 + 1));
     __m128i result1 = _mm_shuffle_epi8(data1_vec, mask1_vec);
 

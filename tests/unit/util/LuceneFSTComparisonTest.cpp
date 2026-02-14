@@ -16,8 +16,9 @@
 #include "diagon/util/FST.h"
 
 #include <gtest/gtest.h>
-#include <vector>
+
 #include <string>
+#include <vector>
 
 using namespace diagon::util;
 
@@ -44,7 +45,7 @@ std::unique_ptr<FST> buildTestFST(const std::vector<std::pair<std::string, int64
     return builder.finish();
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== RB-1: Empty String Handling ====================
 
@@ -281,10 +282,10 @@ TEST(LuceneFSTComparisonTest, RB6_All256ByteValues) {
  */
 TEST(LuceneFSTComparisonTest, RB7_UTF8Multibyte) {
     auto fst = buildTestFST({
-        {"café", 1},        // 2-byte sequence: é = 0xC3 0xA9
-        {"naïve", 2},       // 2-byte sequence: ï = 0xC3 0xAF
-        {"日本語", 3},      // 3-byte sequences
-        {"🚀", 4}           // 4-byte sequence
+        {"café", 1},    // 2-byte sequence: é = 0xC3 0xA9
+        {"naïve", 2},   // 2-byte sequence: ï = 0xC3 0xAF
+        {"日本語", 3},  // 3-byte sequences
+        {"🚀", 4}        // 4-byte sequence
     });
 
     // All UTF-8 terms findable
@@ -304,13 +305,7 @@ TEST(LuceneFSTComparisonTest, RB7_UTF8Multibyte) {
  * Validation: Phase 3
  */
 TEST(LuceneFSTComparisonTest, RB8_IterationOrder) {
-    auto fst = buildTestFST({
-        {"a", 1},
-        {"aa", 2},
-        {"ab", 3},
-        {"b", 4},
-        {"ba", 5}
-    });
+    auto fst = buildTestFST({{"a", 1}, {"aa", 2}, {"ab", 3}, {"b", 4}, {"ba", 5}});
 
     auto entries = fst->getAllEntries();
     ASSERT_EQ(5, entries.size());
@@ -419,11 +414,7 @@ TEST(LuceneFSTComparisonTest, RB9_ArcEncodingCorrectness) {
  * Validation: Phase 5
  */
 TEST(LuceneFSTComparisonTest, RB10_SerializationRoundtrip) {
-    auto original = buildTestFST({
-        {"apple", 1},
-        {"banana", 2},
-        {"cherry", 3}
-    });
+    auto original = buildTestFST({{"apple", 1}, {"banana", 2}, {"cherry", 3}});
 
     // Serialize and deserialize
     auto serialized = original->serialize();
@@ -432,8 +423,7 @@ TEST(LuceneFSTComparisonTest, RB10_SerializationRoundtrip) {
     // All lookups identical
     std::vector<std::string> terms = {"apple", "banana", "cherry", "date"};
     for (const auto& term : terms) {
-        EXPECT_EQ(original->get(toBytes(term)),
-                  deserialized->get(toBytes(term)))
+        EXPECT_EQ(original->get(toBytes(term)), deserialized->get(toBytes(term)))
             << "Mismatch for term: " << term;
     }
 
@@ -581,10 +571,7 @@ TEST(LuceneFSTComparisonTest, RB12_VeryLongTerms) {
     std::string term1000(1000, 'a');
     std::string term500(500, 'b');
 
-    auto fst = buildTestFST({
-        {term1000, 1000},
-        {term500, 500}
-    });
+    auto fst = buildTestFST({{term1000, 1000}, {term500, 500}});
 
     EXPECT_EQ(1000, fst->get(toBytes(term1000)));
     EXPECT_EQ(500, fst->get(toBytes(term500)));
@@ -597,14 +584,8 @@ TEST(LuceneFSTComparisonTest, RB12_VeryLongTerms) {
  * Validation: Phases 1, 5
  */
 TEST(LuceneFSTComparisonTest, RB12_SharedPrefixes) {
-    auto fst = buildTestFST({
-        {"cat", 1},
-        {"caterpillar", 2},
-        {"cats", 3},
-        {"dog", 4},
-        {"doghouse", 5},
-        {"dogs", 6}
-    });
+    auto fst = buildTestFST(
+        {{"cat", 1}, {"caterpillar", 2}, {"cats", 3}, {"dog", 4}, {"doghouse", 5}, {"dogs", 6}});
 
     // All terms findable
     EXPECT_EQ(1, fst->get(toBytes("cat")));

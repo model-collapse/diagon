@@ -3,24 +3,24 @@
  * Tests Diagon with incrementally larger datasets to identify scalability limits
  */
 
-#include "diagon/index/IndexWriter.h"
-#include "diagon/index/DirectoryReader.h"
-#include "diagon/index/Term.h"
-#include "diagon/search/IndexSearcher.h"
-#include "diagon/search/TermQuery.h"
-#include "diagon/search/BooleanQuery.h"
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/DirectoryReader.h"
+#include "diagon/index/IndexWriter.h"
+#include "diagon/index/Term.h"
+#include "diagon/search/BooleanQuery.h"
+#include "diagon/search/IndexSearcher.h"
+#include "diagon/search/TermQuery.h"
 #include "diagon/store/FSDirectory.h"
 
-#include <iostream>
-#include <fstream>
-#include <chrono>
-#include <vector>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
-#include <sstream>
+#include <fstream>
 #include <iomanip>
+#include <iostream>
+#include <sstream>
+#include <vector>
 
 using namespace diagon;
 using namespace std::chrono;
@@ -50,7 +50,8 @@ int64_t getCurrentMemoryMB() {
 int64_t getDirectorySize(const std::string& path) {
     std::string cmd = "du -sb " + path + " 2>/dev/null | cut -f1";
     FILE* pipe = popen(cmd.c_str(), "r");
-    if (!pipe) return 0;
+    if (!pipe)
+        return 0;
 
     char buffer[128];
     std::string result;
@@ -89,11 +90,9 @@ ScalabilityResult runScalabilityTest(int numDocs) {
 
     // Generate documents with realistic variety
     const std::vector<std::string> terms = {
-        "error", "warning", "info", "critical", "debug",
-        "success", "failure", "timeout", "connection", "database",
-        "user", "system", "network", "security", "performance",
-        "cache", "query", "response", "request", "latency"
-    };
+        "error",       "warning",    "info",     "critical", "debug",   "success", "failure",
+        "timeout",     "connection", "database", "user",     "system",  "network", "security",
+        "performance", "cache",      "query",    "response", "request", "latency"};
 
     const int MEMORY_CHECK_INTERVAL = 1000;
 
@@ -124,8 +123,8 @@ ScalabilityResult runScalabilityTest(int numDocs) {
             // Progress indicator
             if (numDocs >= 100000 && i % (numDocs / 10) == 0) {
                 double progress = 100.0 * i / numDocs;
-                std::cout << "  Progress: " << std::fixed << std::setprecision(1)
-                         << progress << "% (" << i << "/" << numDocs << " docs)" << std::endl;
+                std::cout << "  Progress: " << std::fixed << std::setprecision(1) << progress
+                          << "% (" << i << "/" << numDocs << " docs)" << std::endl;
             }
         }
     }
@@ -141,8 +140,8 @@ ScalabilityResult runScalabilityTest(int numDocs) {
     result.indexSizeBytes = getDirectorySize(indexPath);
 
     std::cout << "✓ Indexing complete in " << result.indexTimeMs << " ms" << std::endl;
-    std::cout << "✓ Throughput: " << std::fixed << std::setprecision(0)
-             << result.throughput << " docs/sec" << std::endl;
+    std::cout << "✓ Throughput: " << std::fixed << std::setprecision(0) << result.throughput
+              << " docs/sec" << std::endl;
     std::cout << "✓ Index size: " << (result.indexSizeBytes / (1024 * 1024)) << " MB" << std::endl;
     std::cout << "✓ Peak memory: " << result.peakMemoryMB << " MB" << std::endl;
 
@@ -167,9 +166,9 @@ ScalabilityResult runScalabilityTest(int numDocs) {
         // Create query using Builder pattern
         search::BooleanQuery::Builder queryBuilder;
         queryBuilder.add(std::make_shared<search::TermQuery>(search::Term("message", "error")),
-                        search::Occur::MUST);
+                         search::Occur::MUST);
         queryBuilder.add(std::make_shared<search::TermQuery>(search::Term("message", "warning")),
-                        search::Occur::MUST);
+                         search::Occur::MUST);
         auto query = queryBuilder.build();
 
         auto start = high_resolution_clock::now();
@@ -200,16 +199,20 @@ void printSummaryTable(const std::vector<ScalabilityResult>& results) {
     std::cout << "Scalability Test Summary" << std::endl;
     std::cout << "=========================================" << std::endl << std::endl;
 
-    std::cout << "| Documents | Index Time | Throughput | Index Size | Peak Mem | Search P99 |" << std::endl;
-    std::cout << "|-----------|------------|------------|------------|----------|------------|" << std::endl;
+    std::cout << "| Documents | Index Time | Throughput | Index Size | Peak Mem | Search P99 |"
+              << std::endl;
+    std::cout << "|-----------|------------|------------|------------|----------|------------|"
+              << std::endl;
 
     for (const auto& r : results) {
         std::cout << "| " << std::setw(9) << r.numDocs << " | ";
         std::cout << std::setw(8) << (r.indexTimeMs / 1000.0) << "s | ";
-        std::cout << std::setw(8) << std::fixed << std::setprecision(0) << r.throughput << " d/s | ";
+        std::cout << std::setw(8) << std::fixed << std::setprecision(0) << r.throughput
+                  << " d/s | ";
         std::cout << std::setw(8) << (r.indexSizeBytes / (1024 * 1024)) << " MB | ";
         std::cout << std::setw(6) << r.peakMemoryMB << " MB | ";
-        std::cout << std::setw(8) << std::fixed << std::setprecision(3) << (r.searchP99Us / 1000.0) << " ms |" << std::endl;
+        std::cout << std::setw(8) << std::fixed << std::setprecision(3) << (r.searchP99Us / 1000.0)
+                  << " ms |" << std::endl;
     }
 
     std::cout << "\n=========================================" << std::endl;
@@ -227,10 +230,10 @@ void printSummaryTable(const std::vector<ScalabilityResult>& results) {
             std::cout << "✅ LINEAR (within 10%)" << std::endl;
         } else if (throughputChange < -20.0) {
             std::cout << "⚠️  DEGRADED (" << std::fixed << std::setprecision(1)
-                     << throughputChange << "%)" << std::endl;
+                      << throughputChange << "%)" << std::endl;
         } else {
-            std::cout << "Change: " << std::fixed << std::setprecision(1)
-                     << throughputChange << "%" << std::endl;
+            std::cout << "Change: " << std::fixed << std::setprecision(1) << throughputChange << "%"
+                      << std::endl;
         }
 
         // Check search latency scaling
@@ -249,9 +252,10 @@ void printSummaryTable(const std::vector<ScalabilityResult>& results) {
         std::cout << std::fixed << std::setprecision(1) << searchChange << "%)" << std::endl;
 
         // Memory efficiency
-        double memoryPerDoc = static_cast<double>(results.back().peakMemoryMB) / (results.back().numDocs / 1000.0);
-        std::cout << "Memory efficiency: " << std::fixed << std::setprecision(2)
-                 << memoryPerDoc << " MB per 1K docs" << std::endl;
+        double memoryPerDoc = static_cast<double>(results.back().peakMemoryMB) /
+                              (results.back().numDocs / 1000.0);
+        std::cout << "Memory efficiency: " << std::fixed << std::setprecision(2) << memoryPerDoc
+                  << " MB per 1K docs" << std::endl;
     }
 }
 

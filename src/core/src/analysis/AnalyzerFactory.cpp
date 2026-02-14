@@ -1,12 +1,12 @@
-#include "analysis/Analyzer.h"
-#include "analysis/WhitespaceTokenizer.h"
-#include "analysis/KeywordTokenizer.h"
-#include "analysis/StandardTokenizer.h"
-#include "analysis/JiebaTokenizer.h"
-#include "analysis/LowercaseFilter.h"
-#include "analysis/StopFilter.h"
 #include "analysis/ASCIIFoldingFilter.h"
+#include "analysis/Analyzer.h"
+#include "analysis/JiebaTokenizer.h"
+#include "analysis/KeywordTokenizer.h"
+#include "analysis/LowercaseFilter.h"
+#include "analysis/StandardTokenizer.h"
+#include "analysis/StopFilter.h"
 #include "analysis/SynonymFilter.h"
+#include "analysis/WhitespaceTokenizer.h"
 
 namespace diagon {
 namespace analysis {
@@ -16,11 +16,8 @@ std::unique_ptr<Analyzer> AnalyzerFactory::createWhitespace() {
     auto tokenizer = std::make_unique<WhitespaceTokenizer>();
     std::vector<std::unique_ptr<TokenFilter>> filters;
 
-    return std::make_unique<CompositeAnalyzer>(
-        "whitespace",
-        std::move(tokenizer),
-        std::move(filters)
-    );
+    return std::make_unique<CompositeAnalyzer>("whitespace", std::move(tokenizer),
+                                               std::move(filters));
 }
 
 std::unique_ptr<Analyzer> AnalyzerFactory::createKeyword() {
@@ -28,11 +25,7 @@ std::unique_ptr<Analyzer> AnalyzerFactory::createKeyword() {
     auto tokenizer = std::make_unique<KeywordTokenizer>();
     std::vector<std::unique_ptr<TokenFilter>> filters;
 
-    return std::make_unique<CompositeAnalyzer>(
-        "keyword",
-        std::move(tokenizer),
-        std::move(filters)
-    );
+    return std::make_unique<CompositeAnalyzer>("keyword", std::move(tokenizer), std::move(filters));
 }
 
 std::unique_ptr<Analyzer> AnalyzerFactory::createSimple() {
@@ -42,11 +35,7 @@ std::unique_ptr<Analyzer> AnalyzerFactory::createSimple() {
     std::vector<std::unique_ptr<TokenFilter>> filters;
     filters.push_back(std::make_unique<LowercaseFilter>());
 
-    return std::make_unique<CompositeAnalyzer>(
-        "simple",
-        std::move(tokenizer),
-        std::move(filters)
-    );
+    return std::make_unique<CompositeAnalyzer>("simple", std::move(tokenizer), std::move(filters));
 }
 
 std::unique_ptr<Analyzer> AnalyzerFactory::createStandard() {
@@ -57,11 +46,8 @@ std::unique_ptr<Analyzer> AnalyzerFactory::createStandard() {
     filters.push_back(std::make_unique<LowercaseFilter>());
     filters.push_back(std::make_unique<StopFilter>(StopFilter::StopWordSet::ENGLISH));
 
-    return std::make_unique<CompositeAnalyzer>(
-        "standard",
-        std::move(tokenizer),
-        std::move(filters)
-    );
+    return std::make_unique<CompositeAnalyzer>("standard", std::move(tokenizer),
+                                               std::move(filters));
 }
 
 std::unique_ptr<Analyzer> AnalyzerFactory::createChinese(const std::string& dictPath) {
@@ -72,11 +58,7 @@ std::unique_ptr<Analyzer> AnalyzerFactory::createChinese(const std::string& dict
     std::vector<std::unique_ptr<TokenFilter>> filters;
     filters.push_back(std::make_unique<StopFilter>(StopFilter::StopWordSet::CHINESE, true));
 
-    return std::make_unique<CompositeAnalyzer>(
-        "chinese",
-        std::move(tokenizer),
-        std::move(filters)
-    );
+    return std::make_unique<CompositeAnalyzer>("chinese", std::move(tokenizer), std::move(filters));
 }
 
 std::unique_ptr<Analyzer> AnalyzerFactory::createEnglish() {
@@ -88,11 +70,7 @@ std::unique_ptr<Analyzer> AnalyzerFactory::createEnglish() {
     filters.push_back(std::make_unique<ASCIIFoldingFilter>());
     filters.push_back(std::make_unique<StopFilter>(StopFilter::StopWordSet::ENGLISH));
 
-    return std::make_unique<CompositeAnalyzer>(
-        "english",
-        std::move(tokenizer),
-        std::move(filters)
-    );
+    return std::make_unique<CompositeAnalyzer>("english", std::move(tokenizer), std::move(filters));
 }
 
 std::unique_ptr<Analyzer> AnalyzerFactory::createMultilingual() {
@@ -104,11 +82,8 @@ std::unique_ptr<Analyzer> AnalyzerFactory::createMultilingual() {
     filters.push_back(std::make_unique<LowercaseFilter>());
     filters.push_back(std::make_unique<ASCIIFoldingFilter>());
 
-    return std::make_unique<CompositeAnalyzer>(
-        "multilingual",
-        std::move(tokenizer),
-        std::move(filters)
-    );
+    return std::make_unique<CompositeAnalyzer>("multilingual", std::move(tokenizer),
+                                               std::move(filters));
 }
 
 std::unique_ptr<Analyzer> AnalyzerFactory::createSearch() {
@@ -120,12 +95,8 @@ std::unique_ptr<Analyzer> AnalyzerFactory::createSearch() {
     filters.push_back(std::make_unique<ASCIIFoldingFilter>());
     filters.push_back(std::make_unique<StopFilter>(StopFilter::StopWordSet::ENGLISH));
 
-    return std::make_unique<CompositeAnalyzer>(
-        "search",
-        std::move(tokenizer),
-        std::move(filters)
-    );
+    return std::make_unique<CompositeAnalyzer>("search", std::move(tokenizer), std::move(filters));
 }
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon

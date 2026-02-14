@@ -8,40 +8,40 @@
 
 // Platform detection and SIMD intrinsics
 #if defined(__AVX512F__)
-    #include <immintrin.h>  // AVX512
-    #define DIAGON_HAVE_AVX512 1
-    #define DIAGON_HAVE_AVX2 1  // AVX512 implies AVX2
-    #define DIAGON_SIMD_WIDTH_BYTES 64
-    #define DIAGON_SIMD_WIDTH_I32 16
-    #define DIAGON_SIMD_WIDTH_F32 16
+#    include <immintrin.h>  // AVX512
+#    define DIAGON_HAVE_AVX512 1
+#    define DIAGON_HAVE_AVX2 1  // AVX512 implies AVX2
+#    define DIAGON_SIMD_WIDTH_BYTES 64
+#    define DIAGON_SIMD_WIDTH_I32 16
+#    define DIAGON_SIMD_WIDTH_F32 16
 #elif defined(__AVX2__)
-    #include <immintrin.h>  // AVX2
-    #define DIAGON_HAVE_AVX2 1
-    #define DIAGON_SIMD_WIDTH_BYTES 32
-    #define DIAGON_SIMD_WIDTH_I32 8
-    #define DIAGON_SIMD_WIDTH_F32 8
+#    include <immintrin.h>  // AVX2
+#    define DIAGON_HAVE_AVX2 1
+#    define DIAGON_SIMD_WIDTH_BYTES 32
+#    define DIAGON_SIMD_WIDTH_I32 8
+#    define DIAGON_SIMD_WIDTH_F32 8
 #elif defined(__SSE4_2__)
-    #include <nmmintrin.h>  // SSE4.2
-    #define DIAGON_HAVE_SSE4_2 1
-    #define DIAGON_SIMD_WIDTH_BYTES 16
-    #define DIAGON_SIMD_WIDTH_I32 4
-    #define DIAGON_SIMD_WIDTH_F32 4
+#    include <nmmintrin.h>  // SSE4.2
+#    define DIAGON_HAVE_SSE4_2 1
+#    define DIAGON_SIMD_WIDTH_BYTES 16
+#    define DIAGON_SIMD_WIDTH_I32 4
+#    define DIAGON_SIMD_WIDTH_F32 4
 #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
-    #include <arm_neon.h>
-    #define DIAGON_HAVE_NEON 1
-    #define DIAGON_SIMD_WIDTH_BYTES 16
-    #define DIAGON_SIMD_WIDTH_I32 4
-    #define DIAGON_SIMD_WIDTH_F32 4
+#    include <arm_neon.h>
+#    define DIAGON_HAVE_NEON 1
+#    define DIAGON_SIMD_WIDTH_BYTES 16
+#    define DIAGON_SIMD_WIDTH_I32 4
+#    define DIAGON_SIMD_WIDTH_F32 4
 #else
-    // Scalar fallback
-    #define DIAGON_SIMD_WIDTH_BYTES 8
-    #define DIAGON_SIMD_WIDTH_I32 1
-    #define DIAGON_SIMD_WIDTH_F32 1
+// Scalar fallback
+#    define DIAGON_SIMD_WIDTH_BYTES 8
+#    define DIAGON_SIMD_WIDTH_I32 1
+#    define DIAGON_SIMD_WIDTH_F32 1
 #endif
 
 // FMA (Fused Multiply-Add) detection
 #if defined(__FMA__)
-    #define DIAGON_HAVE_FMA 1
+#    define DIAGON_HAVE_FMA 1
 #endif
 
 namespace diagon {
@@ -115,7 +115,7 @@ public:
                 _mm_prefetch(static_cast<const char*>(addr), _MM_HINT_T2);  // L3
                 break;
             case Locality::NTA:
-                _mm_prefetch(static_cast<const char*>(addr), _MM_HINT_NTA); // Non-temporal
+                _mm_prefetch(static_cast<const char*>(addr), _MM_HINT_NTA);  // Non-temporal
                 break;
         }
 #else
@@ -171,7 +171,8 @@ public:
      * Usage:
      *   Prefetch::readRange(large_buffer, 4096);  // Prefetch 4KB
      */
-    static inline void readRange(const void* addr, size_t size, Locality locality = Locality::HIGH) {
+    static inline void readRange(const void* addr, size_t size,
+                                 Locality locality = Locality::HIGH) {
         constexpr size_t CACHE_LINE_SIZE = 64;  // Typical x86/ARM cache line
 
         const uint8_t* ptr = static_cast<const uint8_t*>(addr);
@@ -195,13 +196,13 @@ struct PrefetchDistance {
     static constexpr size_t SEQUENTIAL_SCAN = 512;  // 8 cache lines
 
     // Random access: shorter lookahead (2-4 cache lines)
-    static constexpr size_t RANDOM_ACCESS = 128;    // 2 cache lines
+    static constexpr size_t RANDOM_ACCESS = 128;  // 2 cache lines
 
     // Heavy computation: longer lookahead (16-32 cache lines)
     static constexpr size_t COMPUTE_INTENSIVE = 1024;  // 16 cache lines
 
     // Posting list iteration: moderate (4-8 cache lines)
-    static constexpr size_t POSTING_LIST = 256;     // 4 cache lines
+    static constexpr size_t POSTING_LIST = 256;  // 4 cache lines
 };
 
 /**
@@ -262,10 +263,10 @@ struct CacheConstants {
     static constexpr size_t LINE_SIZE = 64;
 
     // L1 cache size (typical)
-    static constexpr size_t L1_SIZE = 32 * 1024;      // 32 KB
+    static constexpr size_t L1_SIZE = 32 * 1024;  // 32 KB
 
     // L2 cache size (typical)
-    static constexpr size_t L2_SIZE = 256 * 1024;     // 256 KB
+    static constexpr size_t L2_SIZE = 256 * 1024;  // 256 KB
 
     // L3 cache size (typical, varies widely)
     static constexpr size_t L3_SIZE = 8 * 1024 * 1024;  // 8 MB

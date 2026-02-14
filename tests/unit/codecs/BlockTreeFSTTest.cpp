@@ -32,11 +32,9 @@ FieldInfo createFieldInfo(const std::string& name) {
 }
 
 // Helper: Write and read terms using in-memory buffers
-void writeAndReadTerms(
-    const std::vector<std::pair<std::string, int64_t>>& terms,
-    const FieldInfo& fieldInfo,
-    std::function<void(BlockTreeTermsReader&)> testFunc) {
-
+void writeAndReadTerms(const std::vector<std::pair<std::string, int64_t>>& terms,
+                       const FieldInfo& fieldInfo,
+                       std::function<void(BlockTreeTermsReader&)> testFunc) {
     // Write phase
     ByteBuffersIndexOutput timOut("test.tim");
     ByteBuffersIndexOutput tipOut("test.tip");
@@ -71,7 +69,7 @@ void writeAndReadTerms(
     testFunc(reader);
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 // ==================== TIP2 Format Tests ====================
 
@@ -79,11 +77,7 @@ TEST(BlockTreeFSTTest, WriteTIP2_ReadBack) {
     FieldInfo fieldInfo = createFieldInfo("test_field");
 
     std::vector<std::pair<std::string, int64_t>> terms = {
-        {"apple", 100},
-        {"banana", 200},
-        {"cherry", 300},
-        {"date", 400}
-    };
+        {"apple", 100}, {"banana", 200}, {"cherry", 300}, {"date", 400}};
 
     writeAndReadTerms(terms, fieldInfo, [&](BlockTreeTermsReader& reader) {
         EXPECT_EQ(4, reader.getNumTerms());
@@ -127,12 +121,7 @@ TEST(BlockTreeFSTTest, TIP2_IterateAllTerms) {
     FieldInfo fieldInfo = createFieldInfo("test_field");
 
     std::vector<std::pair<std::string, int64_t>> terms = {
-        {"cat", 10},
-        {"dog", 20},
-        {"elephant", 30},
-        {"fox", 40},
-        {"giraffe", 50}
-    };
+        {"cat", 10}, {"dog", 20}, {"elephant", 30}, {"fox", 40}, {"giraffe", 50}};
 
     writeAndReadTerms(terms, fieldInfo, [&](BlockTreeTermsReader& reader) {
         auto termsEnum = reader.iterator();
@@ -140,10 +129,7 @@ TEST(BlockTreeFSTTest, TIP2_IterateAllTerms) {
         std::vector<std::string> foundTerms;
         while (termsEnum->next()) {
             BytesRef term = termsEnum->term();
-            foundTerms.emplace_back(
-                reinterpret_cast<const char*>(term.data()),
-                term.length()
-            );
+            foundTerms.emplace_back(reinterpret_cast<const char*>(term.data()), term.length());
         }
 
         // Verify all terms found in order
@@ -160,11 +146,7 @@ TEST(BlockTreeFSTTest, TIP2_SeekCeil) {
     FieldInfo fieldInfo = createFieldInfo("test_field");
 
     std::vector<std::pair<std::string, int64_t>> terms = {
-        {"apple", 10},
-        {"banana", 20},
-        {"cherry", 30},
-        {"date", 40}
-    };
+        {"apple", 10}, {"banana", 20}, {"cherry", 30}, {"date", 40}};
 
     writeAndReadTerms(terms, fieldInfo, [&](BlockTreeTermsReader& reader) {
         auto termsEnum = reader.iterator();

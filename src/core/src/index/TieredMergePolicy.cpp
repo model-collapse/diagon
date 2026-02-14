@@ -33,10 +33,11 @@ TieredMergePolicy::getSortedSegments(const SegmentInfos& infos) const {
 }
 
 int TieredMergePolicy::calculateAllowedSegmentCount(int64_t totalBytes,
-                                                      int64_t minSegmentBytes) const {
+                                                    int64_t minSegmentBytes) const {
     // Calculate how many segments are allowed based on tier size
     // Start with floor segment size as level 0
-    int64_t levelSize = std::max(minSegmentBytes, static_cast<int64_t>(floorSegmentMB_ * 1024 * 1024));
+    int64_t levelSize = std::max(minSegmentBytes,
+                                 static_cast<int64_t>(floorSegmentMB_ * 1024 * 1024));
     int64_t bytesLeft = totalBytes;
     double allowedSegCount = 0;
 
@@ -80,7 +81,7 @@ double TieredMergePolicy::computeSkew(const std::vector<SegmentSize*>& segments)
 }
 
 OneMerge* TieredMergePolicy::findBestMerge(const std::vector<SegmentSize>& eligible,
-                                             int64_t maxBytes) const {
+                                           int64_t maxBytes) const {
     if (eligible.size() < 2) {
         return nullptr;  // Need at least 2 segments to merge
     }
@@ -127,8 +128,7 @@ OneMerge* TieredMergePolicy::findBestMerge(const std::vector<SegmentSize>& eligi
                 // For now, we'll store SegmentInfo* cast to SegmentCommitInfo*
                 // This is a temporary simplification until we implement SegmentCommitInfo
                 for (auto* seg : mergeSegments) {
-                    segmentPtrs.push_back(
-                        reinterpret_cast<SegmentCommitInfo*>(seg->info.get()));
+                    segmentPtrs.push_back(reinterpret_cast<SegmentCommitInfo*>(seg->info.get()));
                 }
                 bestMerge = new OneMerge(segmentPtrs);
             }
@@ -141,7 +141,7 @@ OneMerge* TieredMergePolicy::findBestMerge(const std::vector<SegmentSize>& eligi
 // ==================== Merge Selection ====================
 
 MergeSpecification* TieredMergePolicy::findMerges(MergeTrigger trigger,
-                                                    const SegmentInfos& segmentInfos) {
+                                                  const SegmentInfos& segmentInfos) {
     if (segmentInfos.size() < 2) {
         return nullptr;  // Need at least 2 segments
     }
@@ -195,7 +195,7 @@ MergeSpecification* TieredMergePolicy::findMerges(MergeTrigger trigger,
 
 MergeSpecification*
 TieredMergePolicy::findForcedMerges(const SegmentInfos& segmentInfos, int maxSegmentCount,
-                                     const std::map<SegmentCommitInfo*, bool>& segmentsToMerge) {
+                                    const std::map<SegmentCommitInfo*, bool>& segmentsToMerge) {
     if (segmentInfos.size() <= maxSegmentCount) {
         return nullptr;  // Already at or below target
     }
@@ -211,16 +211,15 @@ TieredMergePolicy::findForcedMerges(const SegmentInfos& segmentInfos, int maxSeg
     std::reverse(sortedSegments.begin(), sortedSegments.end());
 
     // Group segments into maxSegmentCount groups
-    int segmentsPerGroup =
-        (sortedSegments.size() + maxSegmentCount - 1) / maxSegmentCount;  // Round up
+    int segmentsPerGroup = (sortedSegments.size() + maxSegmentCount - 1) /
+                           maxSegmentCount;  // Round up
 
     for (int group = 0; group < maxSegmentCount && !sortedSegments.empty(); group++) {
         std::vector<SegmentCommitInfo*> toMerge;
         int take = std::min(segmentsPerGroup, static_cast<int>(sortedSegments.size()));
 
         for (int i = 0; i < take; i++) {
-            toMerge.push_back(
-                reinterpret_cast<SegmentCommitInfo*>(sortedSegments[i].info.get()));
+            toMerge.push_back(reinterpret_cast<SegmentCommitInfo*>(sortedSegments[i].info.get()));
         }
 
         sortedSegments.erase(sortedSegments.begin(), sortedSegments.begin() + take);

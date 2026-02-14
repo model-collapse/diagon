@@ -30,7 +30,9 @@ namespace search {
  */
 class TotalHitCountCollector : public Collector {
 public:
-    TotalHitCountCollector() : totalHits_(0), weight_(nullptr) {}
+    TotalHitCountCollector()
+        : totalHits_(0)
+        , weight_(nullptr) {}
 
     /**
      * Set the weight for sub-linear counting via Weight::count().
@@ -66,9 +68,7 @@ private:
             // No-op: we don't need scores
         }
 
-        void collect(int /*doc*/) override {
-            parent_->totalHits_++;
-        }
+        void collect(int /*doc*/) override { parent_->totalHits_++; }
 
     private:
         TotalHitCountCollector* parent_;

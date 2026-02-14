@@ -76,7 +76,9 @@ public:
                 Output output;
 
                 Arc(uint8_t l, BuildNode* t, Output o = 0)
-                    : label(l), target(t), output(o) {}
+                    : label(l)
+                    , target(t)
+                    , output(o) {}
 
                 bool operator<(const Arc& other) const { return label < other.label; }
             };
@@ -86,7 +88,7 @@ public:
             bool isFinal = false;
 
             // Computed during packing
-            size_t nodeOffset = 0;      // Offset in packed byte array
+            size_t nodeOffset = 0;  // Offset in packed byte array
             ArcEncoding encoding = ARCS_FOR_LINEAR_SCAN;
 
             ~BuildNode();
@@ -187,10 +189,12 @@ private:
     class ByteReader {
     public:
         ByteReader(const std::vector<uint8_t>& data, size_t pos)
-            : data_(data), pos_(pos) {}
+            : data_(data)
+            , pos_(pos) {}
 
         uint8_t readByte() {
-            if (pos_ >= data_.size()) throw std::runtime_error("FST read past end");
+            if (pos_ >= data_.size())
+                throw std::runtime_error("FST read past end");
             return data_[pos_++];
         }
 

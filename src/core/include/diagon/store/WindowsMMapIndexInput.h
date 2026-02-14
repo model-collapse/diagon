@@ -3,14 +3,14 @@
 
 #pragma once
 
-#include "diagon/store/MMapIndexInput.h"
 #include "diagon/store/IOContext.h"
+#include "diagon/store/MMapIndexInput.h"
 
 #include <filesystem>
 
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#    define WIN32_LEAN_AND_MEAN
+#    include <windows.h>
 #endif
 
 namespace diagon::store {
@@ -69,9 +69,7 @@ public:
      * File and mapping handles are kept open until all clones/slices
      * are destroyed (managed by shared_ptr reference counting).
      */
-    WindowsMMapIndexInput(const std::filesystem::path& path,
-                          int chunk_power,
-                          bool preload,
+    WindowsMMapIndexInput(const std::filesystem::path& path, int chunk_power, bool preload,
                           IOContext::ReadAdvice advice = IOContext::ReadAdvice::NORMAL);
 
     /**
@@ -108,8 +106,7 @@ public:
      * @return Unique pointer to sliced IndexInput
      * @throws IOException if offset+length exceeds file length
      */
-    std::unique_ptr<IndexInput> slice(const std::string& sliceDescription,
-                                      int64_t offset,
+    std::unique_ptr<IndexInput> slice(const std::string& sliceDescription, int64_t offset,
                                       int64_t length) const override;
 
 protected:

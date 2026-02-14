@@ -4,6 +4,7 @@
 #include "diagon/util/FastTokenizer.h"
 
 #include <benchmark/benchmark.h>
+
 #include <sstream>
 #include <string>
 #include <vector>
@@ -12,14 +13,14 @@ using namespace diagon::util;
 
 // Generate test text
 static std::string generateTestText(int numWords) {
-    static const std::vector<std::string> words = {
-        "the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog",
-        "search", "engine", "index", "document", "query", "result", "score"
-    };
+    static const std::vector<std::string> words = {"the",   "quick",    "brown", "fox",    "jumps",
+                                                   "over",  "lazy",     "dog",   "search", "engine",
+                                                   "index", "document", "query", "result", "score"};
 
     std::ostringstream oss;
     for (int i = 0; i < numWords; i++) {
-        if (i > 0) oss << " ";
+        if (i > 0)
+            oss << " ";
         oss << words[i % words.size()];
     }
     return oss.str();
@@ -70,11 +71,6 @@ BENCHMARK(BM_FastTokenizer)
     ->Arg(500)    // 500 words (large doc)
     ->Arg(1000);  // 1000 words
 
-BENCHMARK(BM_IStringStreamTokenizer)
-    ->Arg(10)
-    ->Arg(50)
-    ->Arg(100)
-    ->Arg(500)
-    ->Arg(1000);
+BENCHMARK(BM_IStringStreamTokenizer)->Arg(10)->Arg(50)->Arg(100)->Arg(500)->Arg(1000);
 
 BENCHMARK_MAIN();

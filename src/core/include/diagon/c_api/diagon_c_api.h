@@ -19,9 +19,9 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 // ==================== Opaque Handle Types ====================
 
@@ -231,7 +231,8 @@ DiagonField diagon_create_double_field(const char* name, double value);
 
 /**
  * Create indexed numeric field (int64) - searchable with range queries
- * This creates a field that can be searched, unlike diagon_create_long_field which only stores doc values
+ * This creates a field that can be searched, unlike diagon_create_long_field which only stores doc
+ * values
  * @param name Field name
  * @param value Numeric value
  * @return Field handle
@@ -240,7 +241,8 @@ DiagonField diagon_create_indexed_long_field(const char* name, int64_t value);
 
 /**
  * Create indexed numeric field (double) - searchable with range queries
- * This creates a field that can be searched, unlike diagon_create_double_field which only stores doc values
+ * This creates a field that can be searched, unlike diagon_create_double_field which only stores
+ * doc values
  * @param name Field name
  * @param value Numeric value
  * @return Field handle
@@ -340,13 +342,9 @@ DiagonQuery diagon_create_match_all_query();
  * @param include_upper true for <= (lte), false for < (lt)
  * @return Query handle or NULL on error
  */
-DiagonQuery diagon_create_numeric_range_query(
-    const char* field_name,
-    double lower_value,
-    double upper_value,
-    bool include_lower,
-    bool include_upper
-);
+DiagonQuery diagon_create_numeric_range_query(const char* field_name, double lower_value,
+                                              double upper_value, bool include_lower,
+                                              bool include_upper);
 
 /**
  * Create double range query (double precision)
@@ -359,13 +357,9 @@ DiagonQuery diagon_create_numeric_range_query(
  * @param include_upper Include upper bound? (true for <=, false for <)
  * @return Query handle or NULL on error
  */
-DiagonQuery diagon_create_double_range_query(
-    const char* field_name,
-    double lower_value,
-    double upper_value,
-    bool include_lower,
-    bool include_upper
-);
+DiagonQuery diagon_create_double_range_query(const char* field_name, double lower_value,
+                                             double upper_value, bool include_lower,
+                                             bool include_upper);
 
 /**
  * Create boolean query
@@ -494,8 +488,8 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id);
  * @param out_value_len Size of output buffer
  * @return true if field found, false otherwise
  */
-bool diagon_document_get_field_value(DiagonDocument doc, const char* field_name,
-                                     char* out_value, size_t out_value_len);
+bool diagon_document_get_field_value(DiagonDocument doc, const char* field_name, char* out_value,
+                                     size_t out_value_len);
 
 /**
  * Get numeric field value (int64)
@@ -504,8 +498,7 @@ bool diagon_document_get_field_value(DiagonDocument doc, const char* field_name,
  * @param out_value Output for numeric value
  * @return true if field found, false otherwise
  */
-bool diagon_document_get_long_value(DiagonDocument doc, const char* field_name,
-                                    int64_t* out_value);
+bool diagon_document_get_long_value(DiagonDocument doc, const char* field_name, int64_t* out_value);
 
 /**
  * Get numeric field value (double)
@@ -603,4 +596,4 @@ void diagon_free_postings_enum(DiagonPostingsEnum postings);
 }
 #endif
 
-#endif // DIAGON_C_API_H
+#endif  // DIAGON_C_API_H

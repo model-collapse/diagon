@@ -48,7 +48,7 @@ std::shared_ptr<SegmentInfo> SegmentMerger::merge() {
 
     // Create merged SegmentInfo
     auto mergedInfo = std::make_shared<SegmentInfo>(segmentName_, docMapping_.newMaxDoc,
-                                                     sourceSegments_[0]->codecName());
+                                                    sourceSegments_[0]->codecName());
 
     // Set FieldInfos
     mergedInfo->setFieldInfos(std::move(mergedFieldInfos));

@@ -12,6 +12,7 @@
 #include "diagon/store/FSDirectory.h"
 
 #include <benchmark/benchmark.h>
+
 #include <filesystem>
 #include <random>
 
@@ -30,10 +31,9 @@ std::vector<Document> generateDocuments(int num_docs, int words_per_doc) {
 
     // Vocabulary for test
     const std::vector<std::string> vocab = {
-        "search", "engine", "index", "query", "document", "term", "score",
-        "lucene", "elasticsearch", "solr", "algorithm", "data", "structure",
-        "performance", "benchmark", "optimization", "cache", "memory", "disk"
-    };
+        "search",    "engine",        "index", "query",     "document", "term",      "score",
+        "lucene",    "elasticsearch", "solr",  "algorithm", "data",     "structure", "performance",
+        "benchmark", "optimization",  "cache", "memory",    "disk"};
 
     std::mt19937 rng(42);
     std::uniform_int_distribution<> word_dist(0, vocab.size() - 1);
@@ -50,7 +50,8 @@ std::vector<Document> generateDocuments(int num_docs, int words_per_doc) {
         // Generate document text
         std::string text;
         for (int j = 0; j < words_per_doc; j++) {
-            if (j > 0) text += " ";
+            if (j > 0)
+                text += " ";
             text += vocab[word_dist(rng)];
         }
 
@@ -159,9 +160,8 @@ static void BM_Search_Comparison(benchmark::State& state) {
     bool use_batch = state.range(1);  // 0 = one-at-a-time, 1 = batch
     int num_docs = state.range(0);
 
-    std::string index_path = use_batch
-        ? "/tmp/diagon_batch_bench_compare_batch"
-        : "/tmp/diagon_batch_bench_compare_baseline";
+    std::string index_path = use_batch ? "/tmp/diagon_batch_bench_compare_batch"
+                                       : "/tmp/diagon_batch_bench_compare_baseline";
 
     // Create test index
     auto directory = createTestIndex(index_path, num_docs);

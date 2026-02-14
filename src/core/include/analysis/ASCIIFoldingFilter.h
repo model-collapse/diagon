@@ -57,5 +57,5 @@ private:
     static char foldCharSimple(unsigned char c);
 };
 
-} // namespace analysis
-} // namespace diagon
+}  // namespace analysis
+}  // namespace diagon
