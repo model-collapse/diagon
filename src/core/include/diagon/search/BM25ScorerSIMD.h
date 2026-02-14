@@ -155,7 +155,9 @@ private:
  */
 std::unique_ptr<BM25ScorerSIMD> createBM25Scorer(const Weight& weight,
                                                  std::unique_ptr<index::PostingsEnum> postings,
-                                                 float idf, float k1 = 1.2f, float b = 0.75f);
+                                                 float idf, float k1 = 1.2f, float b = 0.75f,
+                                                 float avgFieldLength = 1.0f,
+                                                 index::NumericDocValues* norms = nullptr);
 
 }  // namespace search
 }  // namespace diagon

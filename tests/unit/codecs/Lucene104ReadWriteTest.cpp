@@ -15,7 +15,6 @@
  */
 
 #include "diagon/codecs/Codec.h"
-#include "diagon/codecs/SegmentState.h"
 #include "diagon/codecs/lucene104/Lucene104Codec.h"
 #include "diagon/codecs/lucene104/Lucene104FieldsProducer.h"
 #include "diagon/document/Document.h"
@@ -24,9 +23,9 @@
 #include "diagon/index/FieldInfo.h"
 #include "diagon/index/FreqProxFields.h"
 #include "diagon/index/PostingsEnum.h"
+#include "diagon/index/SegmentWriteState.h"
 #include "diagon/index/TermsEnum.h"
 #include "diagon/store/FSDirectory.h"
-#include "diagon/store/IOContext.h"
 
 #include <gtest/gtest.h>
 
@@ -35,7 +34,6 @@
 #include <memory>
 
 using namespace diagon;
-using namespace diagon::codecs;
 using namespace diagon::codecs::lucene104;
 using namespace diagon::document;
 using namespace diagon::index;
@@ -77,7 +75,7 @@ TEST_F(Lucene104ReadWriteTest, BasicRoundTrip) {
         Document doc;
         std::string text = terms[i % terms.size()];
         auto field = std::make_unique<TextField>("content", text);
-        doc.addField(std::move(field));
+        doc.add(std::move(field));
         dwpt.addDocument(doc);
     }
 
@@ -86,7 +84,7 @@ TEST_F(Lucene104ReadWriteTest, BasicRoundTrip) {
     ASSERT_NE(segmentInfo, nullptr);
 
     std::cout << "Segment created: " << segmentInfo->name() << std::endl;
-    std::cout << "Documents: " << segmentInfo->numDocs() << std::endl;
+    std::cout << "Documents: " << segmentInfo->maxDoc() << std::endl;
     std::cout << "Files: ";
     for (const auto& file : segmentInfo->files()) {
         std::cout << file << " ";
@@ -99,7 +97,7 @@ TEST_F(Lucene104ReadWriteTest, BasicRoundTrip) {
     // ==================== READ PHASE ====================
 
     // Create segment read state
-    SegmentReadState readState(*directory_, segmentInfo->name(), "", IOContext::READ,
+    SegmentReadState readState(directory_.get(), segmentInfo->name(), segmentInfo->maxDoc(),
                                segmentInfo->fieldInfos());
 
     // Create fields producer
@@ -191,14 +189,14 @@ TEST_F(Lucene104ReadWriteTest, NonExistentField) {
 
     Document doc;
     auto field = std::make_unique<TextField>("field1", "test");
-    doc.addField(std::move(field));
+    doc.add(std::move(field));
     dwpt.addDocument(doc);
 
     auto segmentInfo = dwpt.flush();
     ASSERT_NE(segmentInfo, nullptr);
 
     // Create reader
-    SegmentReadState readState(*directory_, segmentInfo->name(), "", IOContext::READ,
+    SegmentReadState readState(directory_.get(), segmentInfo->name(), segmentInfo->maxDoc(),
                                segmentInfo->fieldInfos());
     Lucene104FieldsProducer fieldsProducer(readState);
 
@@ -220,7 +218,7 @@ TEST_F(Lucene104ReadWriteTest, EmptySegment) {
     }
 
     // If it does create a segment, reading should work
-    SegmentReadState readState(*directory_, segmentInfo->name(), "", IOContext::READ,
+    SegmentReadState readState(directory_.get(), segmentInfo->name(), segmentInfo->maxDoc(),
                                segmentInfo->fieldInfos());
     Lucene104FieldsProducer fieldsProducer(readState);
 

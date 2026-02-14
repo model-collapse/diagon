@@ -94,7 +94,7 @@ TEST_F(BM25ScorerSIMDTest, SIMDCorrectnessVsScalar) {
     TestDummyWeight weight;
 
     // Create scorer
-    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_);
+    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_, 1.0f, nullptr);
 
     // Test frequencies (batch size depends on platform)
     constexpr int BATCH = DIAGON_BM25_BATCH_SIZE;
@@ -124,7 +124,7 @@ TEST_F(BM25ScorerSIMDTest, SIMDUniformNorm) {
     // Test uniform norm optimization
 
     TestDummyWeight weight;
-    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_);
+    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_, 1.0f, nullptr);
 
     alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {1, 2, 3, 5, 10, 20, 50, 100};
     alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
@@ -145,7 +145,7 @@ TEST_F(BM25ScorerSIMDTest, ZeroFrequencies) {
     // Test that zero frequencies produce zero scores
 
     TestDummyWeight weight;
-    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_);
+    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_, 1.0f, nullptr);
 
     alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0};
     alignas(32) long norms[DIAGON_BM25_BATCH_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1};
@@ -162,7 +162,7 @@ TEST_F(BM25ScorerSIMDTest, MixedFrequencies) {
     // Test mixed zero and non-zero frequencies
 
     TestDummyWeight weight;
-    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_);
+    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_, 1.0f, nullptr);
 
     alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {0, 1, 0, 5, 0, 20, 0, 100};
     alignas(32) long norms[DIAGON_BM25_BATCH_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1};
@@ -182,7 +182,7 @@ TEST_F(BM25ScorerSIMDTest, HighFrequencies) {
     // Test saturation behavior with high frequencies
 
     TestDummyWeight weight;
-    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_);
+    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_, 1.0f, nullptr);
 
     alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {100, 200, 500, 1000, 2000, 5000, 10000, 20000};
     alignas(32) long norms[DIAGON_BM25_BATCH_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1};
@@ -224,7 +224,7 @@ TEST_F(BM25ScorerSIMDTest, DifferentParameters) {
     alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
 
     for (const auto& [k1, b] : params) {
-        auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1, b);
+        auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1, b, 1.0f, nullptr);
         scorer->scoreBatch(freqs, norms, scores);
 
         // Verify against scalar with same parameters
@@ -243,7 +243,7 @@ TEST_F(BM25ScorerSIMDTest, Alignment) {
     // Test that SIMD functions work with both aligned and unaligned data
 
     TestDummyWeight weight;
-    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_);
+    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_, 1.0f, nullptr);
 
     // Unaligned data (offset by 1 byte)
     std::vector<uint8_t> buffer(sizeof(int) * 8 + 1);
@@ -271,7 +271,7 @@ TEST_F(BM25ScorerSIMDTest, RandomData) {
     // Test with random frequencies
 
     TestDummyWeight weight;
-    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_);
+    auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_, 1.0f, nullptr);
 
     std::mt19937 rng(42);
     std::uniform_int_distribution<int> freq_dist(0, 100);
