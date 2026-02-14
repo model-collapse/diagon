@@ -195,12 +195,12 @@ public:
     }
 
 private:
-    const UnifiedColumnReader& reader_;
+    [[maybe_unused]] const UnifiedColumnReader& reader_;
     ScoringMode mode_;
 
     SIMDBm25Scorer bm25Scorer_;
-    RankFeaturesScorer rankFeaturesScorer_;
-    SIMDTfIdfScorer tfIdfScorer_;
+    [[maybe_unused]] RankFeaturesScorer rankFeaturesScorer_;
+    [[maybe_unused]] SIMDTfIdfScorer tfIdfScorer_;
 };
 
 }  // namespace simd

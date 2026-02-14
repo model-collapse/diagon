@@ -126,8 +126,12 @@ TEST_F(BM25ScorerSIMDTest, SIMDUniformNorm) {
     TestDummyWeight weight;
     auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_, 1.0f, nullptr);
 
-    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {1, 2, 3, 5, 10, 20, 50, 100};
+    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {};
     alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
+    // Use varied frequencies up to batch size
+    constexpr int test_freqs[] = {1, 2, 3, 5, 10, 20, 50, 100};
+    for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++)
+        freqs[i] = test_freqs[i % 8];
 
     // Compute with uniform norm
     scorer->scoreBatchUniformNorm(freqs, 1L, scores);
@@ -147,8 +151,9 @@ TEST_F(BM25ScorerSIMDTest, ZeroFrequencies) {
     TestDummyWeight weight;
     auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_, 1.0f, nullptr);
 
-    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0};
-    alignas(32) long norms[DIAGON_BM25_BATCH_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1};
+    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {};
+    alignas(32) long norms[DIAGON_BM25_BATCH_SIZE];
+    for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) norms[i] = 1;
     alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
 
     scorer->scoreBatch(freqs, norms, scores);
@@ -164,8 +169,14 @@ TEST_F(BM25ScorerSIMDTest, MixedFrequencies) {
     TestDummyWeight weight;
     auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_, 1.0f, nullptr);
 
-    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {0, 1, 0, 5, 0, 20, 0, 100};
-    alignas(32) long norms[DIAGON_BM25_BATCH_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1};
+    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {};
+    alignas(32) long norms[DIAGON_BM25_BATCH_SIZE];
+    // Mixed zero and non-zero frequencies
+    constexpr int mixed_freqs[] = {0, 1, 0, 5, 0, 20, 0, 100};
+    for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
+        freqs[i] = mixed_freqs[i % 8];
+        norms[i] = 1;
+    }
     alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
 
     scorer->scoreBatch(freqs, norms, scores);
@@ -184,15 +195,20 @@ TEST_F(BM25ScorerSIMDTest, HighFrequencies) {
     TestDummyWeight weight;
     auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1_, b_, 1.0f, nullptr);
 
-    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {100, 200, 500, 1000, 2000, 5000, 10000, 20000};
-    alignas(32) long norms[DIAGON_BM25_BATCH_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1};
+    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {};
+    alignas(32) long norms[DIAGON_BM25_BATCH_SIZE];
     alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
+    constexpr int high_freqs[] = {100, 200, 500, 1000, 2000, 5000, 10000, 20000};
+    for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
+        freqs[i] = high_freqs[i % 8];
+        norms[i] = 1;
+    }
 
     scorer->scoreBatch(freqs, norms, scores);
 
     // BM25 should saturate at high frequencies
     // Verify saturation: score(2000) < 2 * score(1000)
-    for (int i = 1; i < 8; i++) {
+    for (int i = 1; i < DIAGON_BM25_BATCH_SIZE; i++) {
         float ratio = scores[i] / scores[i - 1];
         EXPECT_LT(ratio, 2.0f) << "i=" << i << ", no saturation observed";
         EXPECT_GT(ratio, 1.0f) << "i=" << i << ", scores should increase";
@@ -219,9 +235,14 @@ TEST_F(BM25ScorerSIMDTest, DifferentParameters) {
         {0.5f, 0.5f},   // Low k1 and b
     };
 
-    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {1, 2, 3, 5, 10, 20, 50, 100};
-    alignas(32) long norms[DIAGON_BM25_BATCH_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1};
+    alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {};
+    alignas(32) long norms[DIAGON_BM25_BATCH_SIZE];
     alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
+    constexpr int param_freqs[] = {1, 2, 3, 5, 10, 20, 50, 100};
+    for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
+        freqs[i] = param_freqs[i % 8];
+        norms[i] = 1;
+    }
 
     for (const auto& [k1, b] : params) {
         auto scorer = std::make_unique<BM25ScorerSIMD>(weight, nullptr, idf_, k1, b, 1.0f, nullptr);

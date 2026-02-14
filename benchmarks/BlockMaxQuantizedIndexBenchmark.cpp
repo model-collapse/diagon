@@ -435,7 +435,7 @@ void testDocumentRetrieval(const BlockMaxQuantizedIndex& index,
     try {
         doc_id_t invalid_id = index.numDocuments() + 1000;
         std::cout << "  Attempting to retrieve invalid doc ID " << invalid_id << "..." << std::endl;
-        const auto& invalid_doc = index.getDocument(invalid_id);
+        [[maybe_unused]] const auto& invalid_doc = index.getDocument(invalid_id);
         std::cout << "  ERROR: Should have thrown exception!" << std::endl;
     } catch (const std::out_of_range& e) {
         std::cout << "  ✓ Correctly threw exception: " << e.what() << std::endl;
