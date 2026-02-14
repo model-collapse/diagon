@@ -197,6 +197,7 @@ TEST(Lucene104CodecTest, VectorFormat) {
 TEST(Lucene104CodecTest, Capabilities) {
     Lucene104Codec codec;
     uint64_t caps = codec.getCapabilities();
+    (void)caps;
 
     // Should have these capabilities
     EXPECT_TRUE(codec.hasCapability(Codec::Capability::POSTINGS));
@@ -273,6 +274,7 @@ TEST(CapabilityTest, SingleCapability) {
     uint64_t caps = static_cast<uint64_t>(Codec::Capability::POSTINGS);
 
     Codec* testCodec = nullptr;
+    (void)testCodec;
     class TestCodec : public Codec {
     public:
         TestCodec(uint64_t c)

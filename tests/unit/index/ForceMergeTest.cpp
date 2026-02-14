@@ -135,6 +135,7 @@ TEST_F(ForceMergeTest, ForceMergeWithPendingDocs) {
     }
 
     int segmentsBeforePending = writer.getSegmentInfos().size();
+    (void)segmentsBeforePending;
 
     // Add pending docs in RAM
     for (int i = 0; i < 20; i++) {

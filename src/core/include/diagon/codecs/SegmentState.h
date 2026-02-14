@@ -10,7 +10,7 @@ namespace diagon {
 // Forward declarations
 namespace store {
 class Directory;
-class IOContext;
+struct IOContext;
 }  // namespace store
 
 namespace index {

@@ -165,7 +165,7 @@ private:
     std::unique_ptr<DocumentsWriterPerThread> dwpt_;
 
     // Directory for writing segment files
-    store::Directory* directory_{nullptr};
+    [[maybe_unused]] store::Directory* directory_{nullptr};
 
     // Flushed segments (SegmentInfo objects)
     std::vector<std::shared_ptr<SegmentInfo>> segments_;

@@ -85,6 +85,7 @@ TEST_F(IndexWriterRollbackTest, RollbackDiscardsPendingDocuments) {
 
         // Should have segments from first commit
         const auto& infos = writer.getSegmentInfos();
+        (void)infos;
         // Note: Can't easily verify exact doc count without reading segments
         // Just verify writer opened successfully (index exists)
         EXPECT_TRUE(writer.isOpen());
