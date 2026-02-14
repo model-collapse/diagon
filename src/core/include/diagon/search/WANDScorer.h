@@ -86,7 +86,7 @@ public:
      *
      * @param minScore New minimum competitive score
      */
-    void setMinCompetitiveScore(float minScore);
+    void setMinCompetitiveScore(float minScore) override;
 
     /**
      * Get total number of documents that matched the query.

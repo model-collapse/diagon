@@ -41,6 +41,7 @@ namespace search {
  */
 class BM25ScorerSIMD : public Scorer {
 public:
+    using Scorer::scoreBatch;
     /**
      * Constructor
      * @param weight Parent weight (for explain)

@@ -63,8 +63,8 @@ TEST(SIMDUtilsTest, PrefetchNullptr) {
 }
 
 TEST(SIMDUtilsTest, AlignmentCheck) {
-    alignas(32) uint8_t aligned_data[64];
-    uint8_t unaligned_data[64];
+    alignas(32) uint8_t aligned_data[64] = {};
+    uint8_t unaligned_data[64] = {};
 
     // Aligned pointer
     EXPECT_TRUE(Alignment::isAligned(aligned_data, 32));
@@ -78,7 +78,7 @@ TEST(SIMDUtilsTest, AlignmentCheck) {
 }
 
 TEST(SIMDUtilsTest, SIMDAlignment) {
-    alignas(DIAGON_SIMD_WIDTH_BYTES) uint8_t aligned_data[64];
+    alignas(DIAGON_SIMD_WIDTH_BYTES) uint8_t aligned_data[64] = {};
 
     // Check SIMD alignment
     EXPECT_TRUE(Alignment::isSIMDAligned(aligned_data));
@@ -101,7 +101,7 @@ TEST(SIMDUtilsTest, AlignUp) {
 }
 
 TEST(SIMDUtilsTest, BytesToAlign) {
-    alignas(32) uint8_t aligned_data[64];
+    alignas(32) uint8_t aligned_data[64] = {};
 
     // Already aligned
     EXPECT_EQ(Alignment::bytesToAlign(aligned_data, 32), 0);

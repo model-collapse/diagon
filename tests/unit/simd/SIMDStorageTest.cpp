@@ -271,12 +271,14 @@ TEST(SIMDBm25ScorerTest, SetParameters) {
 
 TEST(RankFeaturesScorerTest, Construction) {
     RankFeaturesScorer scorer;
+    (void)scorer;  // Suppress unused variable warning
     // Should construct without error
     SUCCEED();
 }
 
 TEST(SIMDTfIdfScorerTest, Construction) {
     SIMDTfIdfScorer scorer;
+    (void)scorer;  // Suppress unused variable warning
     // Should construct without error
     SUCCEED();
 }

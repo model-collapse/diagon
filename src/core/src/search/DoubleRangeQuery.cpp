@@ -206,7 +206,7 @@ public:
 
 private:
     const DoubleRangeQuery& query_;
-    IndexSearcher& searcher_;
+    [[maybe_unused]] IndexSearcher& searcher_;
     float constantScore_;
 };
 

@@ -498,7 +498,7 @@ private:
     const BooleanQuery& query_;
     IndexSearcher& searcher_;
     ScoreMode scoreMode_;
-    float boost_;
+    [[maybe_unused]] float boost_;
     std::vector<WeightClause> weights_;
 };
 

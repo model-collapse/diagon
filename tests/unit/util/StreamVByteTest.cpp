@@ -171,6 +171,7 @@ TEST(StreamVByteTest, Decode_Count1) {
     uint8_t buffer[10];
 
     int encoded = StreamVByte::encode(&value, 1, buffer);
+    (void)encoded;  // Suppress unused variable warning
 
     uint32_t decoded;
     int consumed = StreamVByte::decode(buffer, 1, &decoded);
