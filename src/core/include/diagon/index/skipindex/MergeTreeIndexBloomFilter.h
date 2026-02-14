@@ -173,7 +173,7 @@ private:
     };
 
     std::vector<std::string> index_columns_;
-    size_t hash_functions_;
+    [[maybe_unused]] size_t hash_functions_;
     std::vector<Predicate> predicates_;
 
     /**
@@ -217,7 +217,7 @@ public:
 private:
     std::string index_name_;
     std::vector<std::string> columns_;
-    size_t granularity_;
+    [[maybe_unused]] size_t granularity_;
     size_t bits_per_row_;
     size_t hash_functions_;
 };

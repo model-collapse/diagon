@@ -22,7 +22,7 @@ using namespace diagon::store;
 TEST(NumericDocValuesReaderTest, BasicReadWrite) {
     // Write values
     NumericDocValuesWriter writer("_0", 5);
-    FieldInfo fieldInfo("price", 0);
+    FieldInfo fieldInfo{.name = "price", .number = 0};
 
     writer.addValue(fieldInfo, 0, 100);
     writer.addValue(fieldInfo, 1, 200);
@@ -68,8 +68,8 @@ TEST(NumericDocValuesReaderTest, BasicReadWrite) {
 TEST(NumericDocValuesReaderTest, MultipleFields) {
     // Write values for multiple fields
     NumericDocValuesWriter writer("_0", 3);
-    FieldInfo priceInfo("price", 0);
-    FieldInfo quantityInfo("quantity", 1);
+    FieldInfo priceInfo{.name = "price", .number = 0};
+    FieldInfo quantityInfo{.name = "quantity", .number = 1};
 
     writer.addValue(priceInfo, 0, 100);
     writer.addValue(priceInfo, 1, 200);
@@ -116,7 +116,7 @@ TEST(NumericDocValuesReaderTest, MultipleFields) {
 TEST(NumericDocValuesReaderTest, Iteration) {
     // Write values
     NumericDocValuesWriter writer("_0", 5);
-    FieldInfo fieldInfo("score", 0);
+    FieldInfo fieldInfo{.name = "score", .number = 0};
 
     writer.addValue(fieldInfo, 0, 10);
     writer.addValue(fieldInfo, 1, 20);
@@ -163,7 +163,7 @@ TEST(NumericDocValuesReaderTest, Iteration) {
 TEST(NumericDocValuesReaderTest, FieldMetadata) {
     // Write values
     NumericDocValuesWriter writer("_0", 5);
-    FieldInfo fieldInfo("price", 0);
+    FieldInfo fieldInfo{.name = "price", .number = 0};
 
     writer.addValue(fieldInfo, 0, 50);
     writer.addValue(fieldInfo, 1, 300);

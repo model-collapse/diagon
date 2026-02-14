@@ -202,6 +202,7 @@ void BlockMaxQuantizedIndex::build(const std::vector<SparseDoc>& documents) {
 
         // On-demand allocation complete
         (void)allocated_groups;  // Prevent unused variable warning
+        (void)empty_term_blocks;
 
     } else {
         // Traditional allocation: allocate all groups for all term+block combinations
@@ -458,6 +459,7 @@ void BlockMaxQuantizedIndex::scatterAdd(const std::vector<BlockWithScore>& block
 
             valid_blocks++;
         }
+        (void)valid_blocks;
 
         // Part 1: Pure accumulation (no tracking overhead)
         int32_t* __restrict buf = score_buf.data();
