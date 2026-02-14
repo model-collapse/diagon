@@ -12,8 +12,6 @@ namespace codecs {
 // Codec constants
 static const std::string CODEC_NAME = "DiagonDocValues";
 static const int VERSION = 1;
-static const std::string DATA_EXTENSION = "dvd";
-static const std::string META_EXTENSION = "dvm";
 
 // ==================== Constructor ====================
 

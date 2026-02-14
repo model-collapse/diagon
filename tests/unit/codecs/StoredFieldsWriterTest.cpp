@@ -22,8 +22,8 @@ TEST(StoredFieldsWriterTest, BasicWriting) {
     StoredFieldsWriter writer("_0");
 
     // Create field infos
-    FieldInfo field1{.name = "title", .number = 0};
-    FieldInfo field2{.name = "count", .number = 1};
+    FieldInfo field1("title", 0);
+    FieldInfo field2("count", 1);
 
     // Write first document
     writer.startDocument();
@@ -57,9 +57,9 @@ TEST(StoredFieldsWriterTest, BasicWriting) {
 TEST(StoredFieldsWriterTest, MultipleFields) {
     StoredFieldsWriter writer("_0");
 
-    FieldInfo field1{.name = "name", .number = 0};
-    FieldInfo field2{.name = "age", .number = 1};
-    FieldInfo field3{.name = "score", .number = 2};
+    FieldInfo field1("name", 0);
+    FieldInfo field2("age", 1);
+    FieldInfo field3("score", 2);
 
     // Write document with multiple fields
     writer.startDocument();
@@ -105,7 +105,7 @@ TEST(StoredFieldsWriterTest, EmptyDocument) {
 TEST(StoredFieldsWriterTest, ErrorHandling) {
     StoredFieldsWriter writer("_0");
 
-    FieldInfo field{.name = "test", .number = 0};
+    FieldInfo field("test", 0);
 
     // Try to write field without starting document - should throw
     EXPECT_THROW(writer.writeField(field, std::string("value")), std::runtime_error);
@@ -140,7 +140,7 @@ TEST(StoredFieldsWriterTest, RAMUsage) {
     // Initially should have minimal RAM usage
     EXPECT_EQ(writer.ramBytesUsed(), 0);
 
-    FieldInfo field{.name = "text", .number = 0};
+    FieldInfo field("text", 0);
 
     // Add some documents
     for (int i = 0; i < 5; i++) {
@@ -159,9 +159,9 @@ TEST(StoredFieldsWriterTest, RAMUsage) {
 TEST(StoredFieldsWriterTest, DifferentFieldTypes) {
     StoredFieldsWriter writer("_0");
 
-    FieldInfo stringField{.name = "text", .number = 0};
-    FieldInfo intField{.name = "count", .number = 1};
-    FieldInfo longField{.name = "timestamp", .number = 2};
+    FieldInfo stringField("text", 0);
+    FieldInfo intField("count", 1);
+    FieldInfo longField("timestamp", 2);
 
     writer.startDocument();
     writer.writeField(stringField, std::string("Hello World"));

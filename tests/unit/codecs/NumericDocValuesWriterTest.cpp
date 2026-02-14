@@ -22,7 +22,7 @@ TEST(NumericDocValuesWriterTest, BasicWriting) {
     NumericDocValuesWriter writer("_0", 10);
 
     // Create field info
-    FieldInfo fieldInfo{.name = "price", .number = 0};
+    FieldInfo fieldInfo("price", 0);
 
     // Add values
     writer.addValue(fieldInfo, 0, 100);
@@ -49,8 +49,8 @@ TEST(NumericDocValuesWriterTest, MultipleFields) {
     NumericDocValuesWriter writer("_0", 5);
 
     // Create field infos
-    FieldInfo priceInfo{.name = "price", .number = 0};
-    FieldInfo quantityInfo{.name = "quantity", .number = 1};
+    FieldInfo priceInfo("price", 0);
+    FieldInfo quantityInfo("quantity", 1);
 
     // Add values for price
     writer.addValue(priceInfo, 0, 100);
@@ -81,7 +81,7 @@ TEST(NumericDocValuesWriterTest, DuplicateDocID) {
     NumericDocValuesWriter writer("_0", 10);
 
     // Create field info
-    FieldInfo fieldInfo{.name = "price", .number = 0};
+    FieldInfo fieldInfo("price", 0);
 
     // Add value
     writer.addValue(fieldInfo, 0, 100);
@@ -95,7 +95,7 @@ TEST(NumericDocValuesWriterTest, DocIDOutOfRange) {
     NumericDocValuesWriter writer("_0", 5);
 
     // Create field info
-    FieldInfo fieldInfo{.name = "price", .number = 0};
+    FieldInfo fieldInfo("price", 0);
 
     // Try to add doc with ID >= maxDoc - should throw
     EXPECT_THROW(writer.addValue(fieldInfo, 5, 100), std::invalid_argument);
@@ -110,7 +110,7 @@ TEST(NumericDocValuesWriterTest, RAMUsage) {
     EXPECT_EQ(writer.ramBytesUsed(), 0);
 
     // Create field info
-    FieldInfo fieldInfo{.name = "price", .number = 0};
+    FieldInfo fieldInfo("price", 0);
 
     // Add some values
     writer.addValue(fieldInfo, 0, 100);
@@ -127,7 +127,7 @@ TEST(NumericDocValuesWriterTest, MinMaxTracking) {
     NumericDocValuesWriter writer("_0", 10);
 
     // Create field info
-    FieldInfo fieldInfo{.name = "price", .number = 0};
+    FieldInfo fieldInfo("price", 0);
 
     // Add values (min=50, max=300)
     writer.addValue(fieldInfo, 0, 100);

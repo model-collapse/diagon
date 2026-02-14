@@ -125,6 +125,13 @@ enum class DocValuesSkipIndexType : uint8_t {
  * Based on: org.apache.lucene.index.FieldInfo
  */
 struct FieldInfo {
+    // ==================== Constructors ====================
+
+    FieldInfo() = default;
+    FieldInfo(std::string fieldName, int32_t fieldNumber)
+        : name(std::move(fieldName))
+        , number(fieldNumber) {}
+
     // ==================== Basic Identity ====================
 
     std::string name;    // Field name (unique)
