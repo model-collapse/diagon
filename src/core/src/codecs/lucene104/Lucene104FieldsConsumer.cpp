@@ -61,10 +61,8 @@ void Lucene104FieldsConsumer::write(index::Fields& fields, codecs::NormsProducer
     // Iterate over all fields
     auto fieldIterator = fields.iterator();
 
-    int fieldCount = 0;
     while (fieldIterator->hasNext()) {
         std::string fieldName = fieldIterator->next();
-        fieldCount++;
 
         // Get terms for this field
         auto terms = fields.terms(fieldName);
@@ -100,7 +98,6 @@ void Lucene104FieldsConsumer::writeField(const std::string& fieldName, index::Te
     // Iterate over all terms for this field
     auto termsEnum = terms.iterator();
 
-    int termCount = 0;
     while (termsEnum->next()) {
         auto termBytes = termsEnum->term();
         std::string term(reinterpret_cast<const char*>(termBytes.data()), termBytes.length());
@@ -143,7 +140,6 @@ void Lucene104FieldsConsumer::writeField(const std::string& fieldName, index::Te
             docFreq, totalTermFreq, termState.docStartFP, termState.skipStartFP);
 
         termDictWriter.addTerm(termBytesRef, termStats);
-        termCount++;
     }
 
     // Set document count before finish (from Terms)

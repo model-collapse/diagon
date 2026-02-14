@@ -18,7 +18,6 @@ namespace lucene104 {
 
 // File extensions
 static const std::string DOC_EXTENSION = "doc";
-static const std::string SKIP_EXTENSION = "skp";
 
 Lucene104PostingsReader::Lucene104PostingsReader(index::SegmentReadState& state)
     : docIn_(nullptr)

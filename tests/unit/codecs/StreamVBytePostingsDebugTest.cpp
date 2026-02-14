@@ -112,7 +112,7 @@ TEST(StreamVBytePostingsDebugTest, FourDocsRoundTrip) {
     termState.docStartFP = 0;
     termState.docFreq = 4;          // 4 documents
     termState.totalTermFreq = 100;  // 10+20+30+40
-    termState.skipOffset = -1;
+    termState.skipStartFP = -1;
 
     auto field = createTestField("content", IndexOptions::DOCS_AND_FREQS);
 

@@ -18,7 +18,7 @@ namespace diagon {
 
 // Forward declaration
 namespace index {
-class SegmentReadState;
+struct SegmentReadState;
 }  // namespace index
 
 namespace codecs {

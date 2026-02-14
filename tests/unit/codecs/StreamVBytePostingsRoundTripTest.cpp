@@ -92,7 +92,7 @@ TEST(StreamVBytePostingsRoundTripTest, FourDocsExact) {
     termState.docStartFP = 0;
     termState.docFreq = 4;
     termState.totalTermFreq = 100;
-    termState.skipOffset = -1;
+    termState.skipStartFP = -1;
 
     auto postings = reader.postings(field, termState);
 
@@ -150,7 +150,7 @@ TEST(StreamVBytePostingsRoundTripTest, EightDocs) {
     termState.docStartFP = 0;
     termState.docFreq = 8;
     termState.totalTermFreq = 360;
-    termState.skipOffset = -1;
+    termState.skipStartFP = -1;
 
     auto postings = reader.postings(field, termState);
 
@@ -194,7 +194,7 @@ TEST(StreamVBytePostingsRoundTripTest, FiveDocsHybrid) {
     termState.docStartFP = 0;
     termState.docFreq = 5;
     termState.totalTermFreq = 150;
-    termState.skipOffset = -1;
+    termState.skipStartFP = -1;
 
     auto postings = reader.postings(field, termState);
 
@@ -230,7 +230,7 @@ TEST(StreamVBytePostingsRoundTripTest, ThreeDocsVIntOnly) {
     termState.docStartFP = 0;
     termState.docFreq = 3;
     termState.totalTermFreq = 60;
-    termState.skipOffset = -1;
+    termState.skipStartFP = -1;
 
     auto postings = reader.postings(field, termState);
 

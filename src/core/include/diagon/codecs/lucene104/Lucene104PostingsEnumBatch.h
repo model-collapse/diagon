@@ -80,7 +80,7 @@ public:
 private:
     std::unique_ptr<store::IndexInput> docIn_;  // Owned clone
     int docFreq_;
-    int64_t totalTermFreq_;
+    [[maybe_unused]] int64_t totalTermFreq_;
     bool writeFreqs_;
 
     // Current state (for one-at-a-time compatibility)

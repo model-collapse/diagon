@@ -168,7 +168,7 @@ private:
     int64_t totalTermFreq_;
 
     // Segment info
-    store::Directory* directory_;  // Directory for writing files
+    [[maybe_unused]] store::Directory* directory_;  // Directory for writing files
     std::string segmentName_;
     std::string segmentSuffix_;
     std::string docFileName_;   // Full .doc file name

@@ -68,7 +68,7 @@ TEST(PostingsWriterTest, SingleTermSingleDoc) {
     EXPECT_EQ(0, termState.docStartFP);
     EXPECT_EQ(1, termState.docFreq);
     EXPECT_EQ(3, termState.totalTermFreq);
-    EXPECT_EQ(-1, termState.skipOffset);  // No skip list
+    EXPECT_EQ(-1, termState.skipStartFP);  // No skip list
 }
 
 TEST(PostingsWriterTest, SingleTermMultipleDocs) {
