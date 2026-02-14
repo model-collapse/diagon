@@ -13,19 +13,6 @@ namespace util {
 
 namespace {
 
-inline uint64_t rotl64(uint64_t x, int8_t r) {
-    return (x << r) | (x >> (64 - r));
-}
-
-inline uint64_t fmix64(uint64_t k) {
-    k ^= k >> 33;
-    k *= 0xff51afd7ed558ccdULL;
-    k ^= k >> 33;
-    k *= 0xc4ceb9fe1a85ec53ULL;
-    k ^= k >> 33;
-    return k;
-}
-
 // Simple 64-bit hash (MurmurHash64-like)
 uint64_t simpleHash64(const char* data, size_t len, uint64_t seed) {
     const uint64_t m = 0xc6a4a7935bd1e995ULL;

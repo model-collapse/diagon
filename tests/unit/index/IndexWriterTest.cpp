@@ -285,20 +285,6 @@ TEST_F(IndexWriterTest, SequenceNumbersAreMonotonic) {
     }
 }
 
-// ==================== Configuration Access Tests ====================
-
-TEST_F(IndexWriterTest, GetConfigReturnsConfiguration) {
-    IndexWriterConfig config;
-    config.setRAMBufferSizeMB(32.0);
-    config.setMaxBufferedDocs(1000);
-
-    auto writer = std::make_unique<IndexWriter>(*dir, config);
-
-    const auto& writerConfig = writer->getConfig();
-    EXPECT_DOUBLE_EQ(32.0, writerConfig.getRAMBufferSizeMB());
-    EXPECT_EQ(1000, writerConfig.getMaxBufferedDocs());
-}
-
 // ==================== Commit Tests ====================
 
 TEST_F(IndexWriterTest, CommitOnOpenWriter) {

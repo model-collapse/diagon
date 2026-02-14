@@ -125,12 +125,12 @@ private:
         void updateMinCompetitiveScore();
         void flushBatch();
 
-#if defined(DIAGON_HAVE_AVX512)
+#if defined(__AVX512F__)
         static constexpr int BATCH_SIZE = 16;  // AVX512: 16 floats
         alignas(64) int docBatch_[BATCH_SIZE];
         alignas(64) float scoreBatch_[BATCH_SIZE];
         int batchPos_;
-#elif defined(DIAGON_HAVE_AVX2)
+#elif defined(__AVX2__)
         static constexpr int BATCH_SIZE = 8;  // AVX2: 8 floats
         alignas(32) int docBatch_[BATCH_SIZE];
         alignas(32) float scoreBatch_[BATCH_SIZE];

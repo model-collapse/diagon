@@ -9,7 +9,7 @@
 #include <cmath>
 
 // SIMD headers for batched collection
-#if defined(DIAGON_HAVE_AVX512) || defined(DIAGON_HAVE_AVX2)
+#if defined(__AVX512F__) || defined(__AVX2__)
 #    include <immintrin.h>
 #endif
 
@@ -98,7 +98,7 @@ TopDocs TopScoreDocCollector::topDocs(int start, int howMany) {
 
 TopScoreDocCollector::TopScoreLeafCollector::TopScoreLeafCollector(
     TopScoreDocCollector* parent, const index::LeafReaderContext& context)
-#if defined(DIAGON_HAVE_AVX512) || defined(DIAGON_HAVE_AVX2)
+#if defined(__AVX512F__) || defined(__AVX2__)
     : batchPos_(0)
     , parent_(parent)
 #else
@@ -112,7 +112,7 @@ TopScoreDocCollector::TopScoreLeafCollector::TopScoreLeafCollector(
 }
 
 TopScoreDocCollector::TopScoreLeafCollector::~TopScoreLeafCollector() {
-#if defined(DIAGON_HAVE_AVX512) || defined(DIAGON_HAVE_AVX2)
+#if defined(__AVX512F__) || defined(__AVX2__)
     // Flush any remaining documents in batch
     flushBatch();
 #endif
@@ -122,7 +122,7 @@ TopScoreDocCollector::TopScoreLeafCollector::~TopScoreLeafCollector() {
 }
 
 void TopScoreDocCollector::TopScoreLeafCollector::finishSegment() {
-#if defined(DIAGON_HAVE_AVX512) || defined(DIAGON_HAVE_AVX2)
+#if defined(__AVX512F__) || defined(__AVX2__)
     flushBatch();
 #endif
 
@@ -177,7 +177,7 @@ void TopScoreDocCollector::TopScoreLeafCollector::collect(int doc) {
         }
     }
 
-#if defined(DIAGON_HAVE_AVX512) || defined(DIAGON_HAVE_AVX2)
+#if defined(__AVX512F__) || defined(__AVX2__)
     // Add to batch (AVX512: 16 floats, AVX2: 8 floats)
     docBatch_[batchPos_] = globalDoc;
     scoreBatch_[batchPos_] = score;
@@ -241,7 +241,7 @@ void TopScoreDocCollector::TopScoreLeafCollector::updateMinCompetitiveScore() {
     }
 }
 
-#if defined(DIAGON_HAVE_AVX512)
+#if defined(__AVX512F__)
 void TopScoreDocCollector::TopScoreLeafCollector::flushBatch() {
     if (batchPos_ == 0) {
         return;  // Nothing to flush
@@ -275,7 +275,7 @@ void TopScoreDocCollector::TopScoreLeafCollector::flushBatch() {
 
     batchPos_ = 0;  // Reset batch
 }
-#elif defined(DIAGON_HAVE_AVX2)
+#elif defined(__AVX2__)
 void TopScoreDocCollector::TopScoreLeafCollector::flushBatch() {
     if (batchPos_ == 0) {
         return;  // Nothing to flush

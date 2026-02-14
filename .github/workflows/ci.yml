@@ -116,17 +116,21 @@ jobs:
             ninja \
             lz4 \
             zstd \
+            icu4c \
             googletest \
             google-benchmark
 
       - name: Configure CMake
         run: |
+          ICU_PREFIX=$(brew --prefix icu4c)
           cmake -B build \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DDIAGON_BUILD_TESTS=ON \
             -DDIAGON_BUILD_BENCHMARKS=ON \
-            -DDIAGON_ENABLE_SIMD=ON
+            -DDIAGON_ENABLE_SIMD=ON \
+            -DCMAKE_PREFIX_PATH="$ICU_PREFIX" \
+            -DICU_ROOT="$ICU_PREFIX"
 
       - name: Build
         run: cmake --build build --parallel
