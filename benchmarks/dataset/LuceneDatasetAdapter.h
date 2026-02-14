@@ -74,9 +74,9 @@ public:
         doc = document::Document();
 
         // Add fields (match Lucene field names)
-        doc.addField(std::make_unique<document::TextField>("title", title));
-        doc.addField(std::make_unique<document::TextField>("body", body));
-        doc.addField(std::make_unique<document::StringField>("date", date));
+        doc.add(std::make_unique<document::TextField>("title", title));
+        doc.add(std::make_unique<document::TextField>("body", body));
+        doc.add(std::make_unique<document::StringField>("date", date));
 
         documentCount_++;
         return true;

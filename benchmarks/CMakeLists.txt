@@ -85,7 +85,8 @@ add_diagon_benchmark(BatchScoringBenchmark BatchScoringBenchmark.cpp)
 add_diagon_benchmark(PostingsFormatBenchmark PostingsFormatBenchmark.cpp)
 add_diagon_benchmark(PostingsOptimizationBenchmark PostingsOptimizationBenchmark.cpp)
 add_diagon_benchmark(ColumnarIngestionBenchmark ColumnarIngestionBenchmark.cpp)
-add_diagon_benchmark(LuceneCompatBenchmark LuceneCompatBenchmark.cpp)
+# LuceneCompatBenchmark disabled: uses Java-style factory API not yet implemented in C++
+# add_diagon_benchmark(LuceneCompatBenchmark LuceneCompatBenchmark.cpp)
 add_diagon_benchmark(LuceneComparisonBenchmark LuceneComparisonBenchmark.cpp)
 add_diagon_benchmark(ScaleComparisonBenchmark ScaleComparisonBenchmark.cpp)
 add_diagon_benchmark(TokenizerBenchmark TokenizerBenchmark.cpp)
@@ -114,7 +115,7 @@ target_include_directories(ReutersBenchmark PRIVATE
 # ==================== Combined Benchmark Target ====================
 
 add_custom_target(run_all_benchmarks
-    DEPENDS run_IndexingBenchmark run_SearchBenchmark run_SIMDBenchmark run_MMapDirectoryBenchmark run_PostingsFormatBenchmark run_PostingsOptimizationBenchmark run_ColumnarIngestionBenchmark run_LuceneCompatBenchmark
+    DEPENDS run_IndexingBenchmark run_SearchBenchmark run_SIMDBenchmark run_MMapDirectoryBenchmark run_PostingsFormatBenchmark run_PostingsOptimizationBenchmark run_ColumnarIngestionBenchmark
     COMMENT "Running all benchmarks"
 )
 

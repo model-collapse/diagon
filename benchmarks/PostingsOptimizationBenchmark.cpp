@@ -170,8 +170,8 @@ static void BM_PostingsDecode_Optimized(benchmark::State& state) {
 
     // Benchmark decoding with optimized implementation
     for (auto _ : state) {
-        // Create input for this iteration
-        ByteBuffersIndexInput input("bench.doc", encodedData);
+        // Create input for this iteration (enum takes ownership)
+        auto input = std::make_unique<ByteBuffersIndexInput>("bench.doc", encodedData);
 
         TermState termState;
         termState.docStartFP = 0;
@@ -179,7 +179,7 @@ static void BM_PostingsDecode_Optimized(benchmark::State& state) {
         termState.totalTermFreq = data.totalTermFreq;
 
         // Directly construct optimized PostingsEnum
-        Lucene104PostingsEnumOptimized postings(&input, termState, true);
+        Lucene104PostingsEnumOptimized postings(std::move(input), termState, true);
 
         // Iterate through all docs
         int count = 0;

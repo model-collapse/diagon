@@ -144,11 +144,12 @@ static void BM_Lucene104_OneAtATime(benchmark::State& state) {
     termState.docStartFP = 0;
 
     for (auto _ : state) {
-        // Reset input
+        // Clone input for each iteration (enum takes ownership)
         input->seek(0);
+        auto clonedInput = input->clone();
 
         // Create regular one-at-a-time enum directly
-        Lucene104PostingsEnum regularEnum(input.get(), termState, true);
+        Lucene104PostingsEnum regularEnum(std::move(clonedInput), termState, true);
 
         // Iterate one-at-a-time (standard approach)
         int docsScored = 0;
@@ -182,11 +183,12 @@ static void BM_Lucene104_BatchAtATime(benchmark::State& state) {
     termState.docStartFP = 0;
 
     for (auto _ : state) {
-        // Reset input
+        // Clone input for each iteration (enum takes ownership)
         input->seek(0);
+        auto clonedInput = input->clone();
 
         // Create batch enum directly
-        Lucene104PostingsEnumBatch batchEnum(input.get(), termState, true);
+        Lucene104PostingsEnumBatch batchEnum(std::move(clonedInput), termState, true);
 
         // Simulate batch iteration (8 docs at a time)
         PostingsBatch batch(8);

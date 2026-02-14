@@ -238,6 +238,7 @@ TEST(PostingsWriterReaderRoundTripTest, ThousandDocsLarge) {
     }
 
     TermState termState = writer.finishTerm();
+    EXPECT_EQ(expectedTotalFreq, termState.totalTermFreq);
 
     std::cout << "Writer: docFreq=" << termState.docFreq
               << ", totalTermFreq=" << termState.totalTermFreq << std::endl;
@@ -342,6 +343,7 @@ TEST(PostingsWriterReaderRoundTripTest, RandomDocIDs) {
     }
 
     TermState termState = writer.finishTerm();
+    EXPECT_EQ(expectedTotalFreq, termState.totalTermFreq);
 
     std::cout << "Writer: docFreq=" << termState.docFreq
               << ", totalTermFreq=" << termState.totalTermFreq << std::endl;

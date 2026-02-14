@@ -384,66 +384,59 @@ endif()
 
 # ==================== Link Libraries ====================
 
-# Link compression libraries
-target_link_libraries(diagon_core
-    PUBLIC
-        ZLIB::ZLIB
-)
-
-# Link ZSTD (try zstd::libzstd first, then fallback to zstd::zstd)
-if(TARGET zstd::libzstd)
-    target_link_libraries(diagon_core PUBLIC zstd::libzstd)
-elseif(TARGET zstd::zstd)
-    target_link_libraries(diagon_core PUBLIC zstd::zstd)
-else()
-    message(FATAL_ERROR "ZSTD target not found")
+# Collect targets to link (shared + static if building)
+set(_DIAGON_TARGETS diagon_core)
+if(DIAGON_BUILD_STATIC)
+    list(APPEND _DIAGON_TARGETS diagon_core_static)
 endif()
 
-if(TARGET LZ4::LZ4)
-    target_link_libraries(diagon_core PUBLIC LZ4::LZ4)
-else()
-    target_link_libraries(diagon_core PUBLIC ${LZ4_LIBRARY})
-    target_include_directories(diagon_core PUBLIC ${LZ4_INCLUDE_DIR})
-endif()
+foreach(_target ${_DIAGON_TARGETS})
+    # Link compression libraries
+    target_link_libraries(${_target} PUBLIC ZLIB::ZLIB)
 
-# Define compression library availability
-if(HAVE_LZ4)
-    target_compile_definitions(diagon_core PUBLIC HAVE_LZ4)
-endif()
-
-if(HAVE_ZSTD)
-    target_compile_definitions(diagon_core PUBLIC HAVE_ZSTD)
-endif()
-
-# Link ICU libraries (for text analysis)
-if(TARGET ICU::uc AND TARGET ICU::i18n)
-    target_link_libraries(diagon_core PUBLIC ICU::uc ICU::i18n)
-else()
-    message(FATAL_ERROR "ICU libraries not found")
-endif()
-
-# Link cppjieba (for Chinese text segmentation)
-# cppjieba is header-only, linking brings in include directories
-if(TARGET cppjieba)
-    target_link_libraries(diagon_core PRIVATE cppjieba)
-
-    # Add dictionary path as compile definition
-    if(DEFINED CPPJIEBA_DICT_DIR)
-        target_compile_definitions(diagon_core PRIVATE
-            CPPJIEBA_DICT_DIR="${CPPJIEBA_DICT_DIR}")
+    # Link ZSTD
+    if(TARGET zstd::libzstd)
+        target_link_libraries(${_target} PUBLIC zstd::libzstd)
+    elseif(TARGET zstd::zstd)
+        target_link_libraries(${_target} PUBLIC zstd::zstd)
+    else()
+        message(FATAL_ERROR "ZSTD target not found")
     endif()
 
-    # Also link for static library if building
-    if(DIAGON_BUILD_STATIC)
-        target_link_libraries(diagon_core_static PRIVATE cppjieba)
+    # Link LZ4
+    if(TARGET LZ4::LZ4)
+        target_link_libraries(${_target} PUBLIC LZ4::LZ4)
+    else()
+        target_link_libraries(${_target} PUBLIC ${LZ4_LIBRARY})
+        target_include_directories(${_target} PUBLIC ${LZ4_INCLUDE_DIR})
+    endif()
+
+    # Define compression library availability
+    if(HAVE_LZ4)
+        target_compile_definitions(${_target} PUBLIC HAVE_LZ4)
+    endif()
+    if(HAVE_ZSTD)
+        target_compile_definitions(${_target} PUBLIC HAVE_ZSTD)
+    endif()
+
+    # Link ICU libraries (for text analysis)
+    if(TARGET ICU::uc AND TARGET ICU::i18n)
+        target_link_libraries(${_target} PUBLIC ICU::uc ICU::i18n)
+    else()
+        message(FATAL_ERROR "ICU libraries not found")
+    endif()
+
+    # Link cppjieba (for Chinese text segmentation)
+    if(TARGET cppjieba)
+        target_link_libraries(${_target} PRIVATE cppjieba)
         if(DEFINED CPPJIEBA_DICT_DIR)
-            target_compile_definitions(diagon_core_static PRIVATE
+            target_compile_definitions(${_target} PRIVATE
                 CPPJIEBA_DICT_DIR="${CPPJIEBA_DICT_DIR}")
         endif()
+    else()
+        message(FATAL_ERROR "cppjieba not found")
     endif()
-else()
-    message(FATAL_ERROR "cppjieba not found")
-endif()
+endforeach()
 
 # ==================== Compiler Features ====================
 

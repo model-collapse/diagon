@@ -49,9 +49,9 @@ public:
         std::string body = generateText(numWords);
 
         // Add fields
-        doc.addField(std::make_unique<document::TextField>("title", title));
-        doc.addField(std::make_unique<document::TextField>("body", body));
-        doc.addField(std::make_unique<document::NumericDocValuesField>("id", id));
+        doc.add(std::make_unique<document::TextField>("title", title));
+        doc.add(std::make_unique<document::TextField>("body", body));
+        doc.add(std::make_unique<document::NumericDocValuesField>("id", id));
 
         return doc;
     }

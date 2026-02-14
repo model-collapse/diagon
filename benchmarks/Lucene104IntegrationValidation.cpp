@@ -65,7 +65,7 @@ int main() {
             }
 
             auto field = std::make_unique<TextField>("content", text);
-            doc.addField(std::move(field));
+            doc.add(std::move(field));
 
             dwpt.addDocument(doc);
         }
@@ -81,7 +81,7 @@ int main() {
         }
 
         std::cout << "Segment: " << segmentInfo->name() << std::endl;
-        std::cout << "Documents: " << segmentInfo->numDocs() << std::endl;
+        std::cout << "Documents: " << segmentInfo->maxDoc() << std::endl;
 
         // Verify files created
         std::cout << "\n=== File Validation ===" << std::endl;
