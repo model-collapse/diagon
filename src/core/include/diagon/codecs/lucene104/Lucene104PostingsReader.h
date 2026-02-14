@@ -183,6 +183,16 @@ public:
     int getMaxNorm(int upTo) const;
 
     /**
+     * Get both max frequency and max norm in a single pass over skip entries.
+     * Avoids scanning skip entries twice (getMaxFreq + getMaxNorm separately).
+     *
+     * @param upTo Upper bound doc ID (inclusive)
+     * @param outMaxFreq Output: maximum term frequency in range
+     * @param outMaxNorm Output: maximum norm value in range
+     */
+    void getMaxFreqAndNorm(int upTo, int& outMaxFreq, int& outMaxNorm) const;
+
+    /**
      * DEPRECATED: Get maximum score achievable up to upTo doc ID.
      * This method couples PostingsEnum to BM25. Use getMaxFreq/getMaxNorm instead.
      *

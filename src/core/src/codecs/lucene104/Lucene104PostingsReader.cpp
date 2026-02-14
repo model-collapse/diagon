@@ -521,6 +521,39 @@ int Lucene104PostingsEnumWithImpacts::getMaxNorm(int upTo) const {
     return maxNorm > 0 ? maxNorm : 127;
 }
 
+void Lucene104PostingsEnumWithImpacts::getMaxFreqAndNorm(int upTo, int& outMaxFreq, int& outMaxNorm) const {
+    if (skipEntries_.empty()) {
+        outMaxFreq = std::numeric_limits<int>::max();
+        outMaxNorm = 127;
+        return;
+    }
+
+    int maxFreq = 0;
+    int maxNorm = 0;
+    bool foundEntry = false;
+
+    size_t startIdx = (currentSkipIndex_ > 0) ? static_cast<size_t>(currentSkipIndex_ - 1) : 0;
+    for (size_t i = startIdx; i < skipEntries_.size(); ++i) {
+        const auto& entry = skipEntries_[i];
+        if (entry.doc > upTo) {
+            break;
+        }
+        if (entry.doc >= currentDoc_) {
+            maxFreq = std::max(maxFreq, entry.maxFreq);
+            maxNorm = std::max(maxNorm, static_cast<int>(entry.maxNorm));
+            foundEntry = true;
+        }
+    }
+
+    if (!foundEntry && !skipEntries_.empty()) {
+        maxFreq = skipEntries_[0].maxFreq;
+        maxNorm = static_cast<int>(skipEntries_[0].maxNorm);
+    }
+
+    outMaxFreq = maxFreq > 0 ? maxFreq : std::numeric_limits<int>::max();
+    outMaxNorm = maxNorm > 0 ? maxNorm : 127;
+}
+
 int Lucene104PostingsEnumWithImpacts::getNextBlockBoundary(int target) const {
     // Phase 2: Smart upTo calculation
     // Find the next block boundary from skip entries

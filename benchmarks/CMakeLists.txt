@@ -97,6 +97,7 @@ add_standalone_benchmark(BloomFilterBenchmark BloomFilterBenchmark.cpp)
 add_standalone_benchmark(BlockMaxQuantizedIndexBenchmark BlockMaxQuantizedIndexBenchmark.cpp)
 add_standalone_benchmark(Lucene104IntegrationValidation Lucene104IntegrationValidation.cpp)
 add_standalone_benchmark(ScalabilityTest scalability_test.cpp)
+add_standalone_benchmark(ProfileWAND ProfileWAND.cpp)
 
 # ==================== Reuters Benchmark ====================
 

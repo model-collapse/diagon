@@ -89,9 +89,9 @@ public:
     // Block-Max WAND support: compute maximum possible score
     float getMaxScore(int upTo) const override {
         if (impactsEnum_) {
-            // Get max frequency and max norm from skip metadata
-            int maxFreq = impactsEnum_->getMaxFreq(upTo);
-            int maxNorm = impactsEnum_->getMaxNorm(upTo);
+            // Get max frequency and max norm in single pass over skip entries
+            int maxFreq, maxNorm;
+            impactsEnum_->getMaxFreqAndNorm(upTo, maxFreq, maxNorm);
 
             // Compute BM25 upper bound with these maximums
             return simScorer_.score(static_cast<float>(maxFreq), maxNorm);

@@ -215,17 +215,58 @@ private:
 
     void essentialQueueClear();
     void essentialQueuePush(DisiWrapper* w);
-    DisiWrapper* essentialQueueTop();
+
+    inline DisiWrapper* essentialQueueTop() {
+        if (essentialQueueSize_ == 0) return nullptr;
+        return essentialQueue_[0];
+    }
+
     DisiWrapper* essentialQueueTop2();  // Second-smallest by doc
-    void essentialQueueUpdateTop();
+
+    inline void essentialQueueUpdateTop() {
+        if (essentialQueueSize_ > 0) {
+            essentialQueueSiftDown(0);
+        }
+    }
+
     void essentialQueueSiftDown(int i);
     void essentialQueueSiftUp(int i);
 
-    // ==================== Bitset Helpers ====================
+    // ==================== Bitset Helpers (inlined for hot path) ====================
 
-    void windowSetBit(int index);
-    void windowClearAll(int size);
-    int windowNextSetBit(int from, int limit) const;
+    inline void windowSetBit(int index) {
+        windowMatches_[index >> 6] |= (1ULL << (index & 63));
+    }
+
+    inline void windowClearAll(int size) {
+        int words = (size + 63) >> 6;
+        for (int i = 0; i < words; i++) {
+            windowMatches_[i] = 0;
+        }
+    }
+
+    inline int windowNextSetBit(int from, int limit) const {
+        int wordIndex = from >> 6;
+        int maxWord = (limit + 63) >> 6;
+
+        if (wordIndex >= maxWord) return limit;
+
+        uint64_t word = windowMatches_[wordIndex] >> (from & 63);
+        if (word != 0) {
+            return from + __builtin_ctzll(word);
+        }
+
+        wordIndex++;
+        while (wordIndex < maxWord) {
+            word = windowMatches_[wordIndex];
+            if (word != 0) {
+                int bit = (wordIndex << 6) + __builtin_ctzll(word);
+                return bit < limit ? bit : limit;
+            }
+            wordIndex++;
+        }
+        return limit;
+    }
 };
 
 }  // namespace search

@@ -94,6 +94,7 @@ void createReutersIndex(const fs::path& indexPath) {
 
     IndexWriterConfig config;
     config.setRAMBufferSizeMB(128.0);
+    config.setMaxBufferedDocs(50000);  // Single segment for controlled benchmarking
     IndexWriter writer(*dir, config);
 
     FieldType ft;

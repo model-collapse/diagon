@@ -495,11 +495,6 @@ void MaxScoreBulkScorer::essentialQueuePush(DisiWrapper* w) {
     essentialQueueSize_++;
 }
 
-MaxScoreBulkScorer::DisiWrapper* MaxScoreBulkScorer::essentialQueueTop() {
-    if (essentialQueueSize_ == 0) return nullptr;
-    return essentialQueue_[0];
-}
-
 MaxScoreBulkScorer::DisiWrapper* MaxScoreBulkScorer::essentialQueueTop2() {
     // Second-smallest element in min-heap is one of the children of root
     if (essentialQueueSize_ < 2) return nullptr;
@@ -510,12 +505,6 @@ MaxScoreBulkScorer::DisiWrapper* MaxScoreBulkScorer::essentialQueueTop2() {
         return essentialQueue_[1];
     }
     return essentialQueue_[2];
-}
-
-void MaxScoreBulkScorer::essentialQueueUpdateTop() {
-    if (essentialQueueSize_ > 0) {
-        essentialQueueSiftDown(0);
-    }
 }
 
 void MaxScoreBulkScorer::essentialQueueSiftDown(int i) {
@@ -555,42 +544,7 @@ void MaxScoreBulkScorer::essentialQueueSiftUp(int i) {
     essentialQueue_[i] = node;
 }
 
-// ==================== Bitset Helpers ====================
-
-void MaxScoreBulkScorer::windowSetBit(int index) {
-    windowMatches_[index >> 6] |= (1ULL << (index & 63));
-}
-
-void MaxScoreBulkScorer::windowClearAll(int size) {
-    int words = (size + 63) >> 6;
-    for (int i = 0; i < words; i++) {
-        windowMatches_[i] = 0;
-    }
-}
-
-int MaxScoreBulkScorer::windowNextSetBit(int from, int limit) const {
-    int wordIndex = from >> 6;
-    int maxWord = (limit + 63) >> 6;
-
-    if (wordIndex >= maxWord) return limit;
-
-    uint64_t word = windowMatches_[wordIndex] >> (from & 63);
-    if (word != 0) {
-        return from + __builtin_ctzll(word);
-    }
-
-    wordIndex++;
-    while (wordIndex < maxWord) {
-        word = windowMatches_[wordIndex];
-        if (word != 0) {
-            int bit = (wordIndex << 6) + __builtin_ctzll(word);
-            return bit < limit ? bit : limit;
-        }
-        wordIndex++;
-    }
-
-    return limit;
-}
+// Bitset helpers are inlined in MaxScoreBulkScorer.h
 
 }  // namespace search
 }  // namespace diagon
