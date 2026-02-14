@@ -1,7 +1,6 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include "diagon/codecs/SegmentState.h"
 #include "diagon/codecs/lucene104/Lucene104NormsReader.h"
 #include "diagon/codecs/lucene104/Lucene104NormsWriter.h"
 #include "diagon/index/FieldInfo.h"
@@ -33,6 +32,16 @@ protected:
 
         directory_ = FSDirectory::open(testDir_.string());
         segmentInfo_ = std::make_shared<SegmentInfo>("_0", 100, "Lucene104");
+
+        // Create FieldInfos for SegmentWriteState/SegmentReadState
+        std::vector<FieldInfo> infos;
+        FieldInfo fi;
+        fi.name = "body";
+        fi.number = 0;
+        fi.indexOptions = IndexOptions::DOCS_AND_FREQS_AND_POSITIONS;
+        fi.omitNorms = false;
+        infos.push_back(fi);
+        fieldInfos_ = std::make_unique<FieldInfos>(std::move(infos));
     }
 
     void TearDown() override {
@@ -108,7 +117,7 @@ protected:
     fs::path testDir_;
     std::unique_ptr<FSDirectory> directory_;
     std::shared_ptr<SegmentInfo> segmentInfo_;
-    IOContext ioContext_{IOContext::DEFAULT};
+    std::unique_ptr<FieldInfos> fieldInfos_;
 };
 
 // ==================== Test 1: Write and Read Norms ====================
@@ -129,9 +138,8 @@ TEST_F(NormsTest, WriteAndReadNorms) {
 
     // Write norms
     {
-        SegmentWriteState writeState(*directory_, segmentInfo_->name(), "", ioContext_);
-        writeState.segmentInfo = segmentInfo_.get();
-
+        index::SegmentWriteState writeState(directory_.get(), segmentInfo_->name(), 100,
+                                            *fieldInfos_);
         Lucene104NormsWriter writer(writeState);
         TestNormsProducer producer(expectedNorms);
         writer.addNormsField(field, producer);
@@ -140,9 +148,8 @@ TEST_F(NormsTest, WriteAndReadNorms) {
 
     // Read norms
     {
-        SegmentReadState readState(*directory_, segmentInfo_->name(), "", ioContext_);
-        readState.segmentInfo = segmentInfo_.get();
-
+        index::SegmentReadState readState(directory_.get(), segmentInfo_->name(), 100,
+                                          *fieldInfos_);
         Lucene104NormsReader reader(readState);
         auto normsIter = reader.getNorms(field);
         ASSERT_TRUE(normsIter);
@@ -172,9 +179,8 @@ TEST_F(NormsTest, EmptyNorms) {
 
     // Write and read
     {
-        SegmentWriteState writeState(*directory_, segmentInfo_->name(), "", ioContext_);
-        writeState.segmentInfo = segmentInfo_.get();
-
+        index::SegmentWriteState writeState(directory_.get(), segmentInfo_->name(), 100,
+                                            *fieldInfos_);
         Lucene104NormsWriter writer(writeState);
         TestNormsProducer producer(expectedNorms);
         writer.addNormsField(field, producer);
@@ -182,9 +188,8 @@ TEST_F(NormsTest, EmptyNorms) {
     }
 
     {
-        SegmentReadState readState(*directory_, segmentInfo_->name(), "", ioContext_);
-        readState.segmentInfo = segmentInfo_.get();
-
+        index::SegmentReadState readState(directory_.get(), segmentInfo_->name(), 100,
+                                          *fieldInfos_);
         Lucene104NormsReader reader(readState);
         auto normsIter = reader.getNorms(field);
         ASSERT_TRUE(normsIter);
@@ -213,9 +218,8 @@ TEST_F(NormsTest, MaximumNorms) {
 
     // Write and read
     {
-        SegmentWriteState writeState(*directory_, segmentInfo_->name(), "", ioContext_);
-        writeState.segmentInfo = segmentInfo_.get();
-
+        index::SegmentWriteState writeState(directory_.get(), segmentInfo_->name(), 100,
+                                            *fieldInfos_);
         Lucene104NormsWriter writer(writeState);
         TestNormsProducer producer(expectedNorms);
         writer.addNormsField(field, producer);
@@ -223,9 +227,8 @@ TEST_F(NormsTest, MaximumNorms) {
     }
 
     {
-        SegmentReadState readState(*directory_, segmentInfo_->name(), "", ioContext_);
-        readState.segmentInfo = segmentInfo_.get();
-
+        index::SegmentReadState readState(directory_.get(), segmentInfo_->name(), 100,
+                                          *fieldInfos_);
         Lucene104NormsReader reader(readState);
         auto normsIter = reader.getNorms(field);
         ASSERT_TRUE(normsIter);
@@ -257,9 +260,8 @@ TEST_F(NormsTest, NegativeNorms) {
 
     // Write and read
     {
-        SegmentWriteState writeState(*directory_, segmentInfo_->name(), "", ioContext_);
-        writeState.segmentInfo = segmentInfo_.get();
-
+        index::SegmentWriteState writeState(directory_.get(), segmentInfo_->name(), 100,
+                                            *fieldInfos_);
         Lucene104NormsWriter writer(writeState);
         TestNormsProducer producer(expectedNorms);
         writer.addNormsField(field, producer);
@@ -267,9 +269,8 @@ TEST_F(NormsTest, NegativeNorms) {
     }
 
     {
-        SegmentReadState readState(*directory_, segmentInfo_->name(), "", ioContext_);
-        readState.segmentInfo = segmentInfo_.get();
-
+        index::SegmentReadState readState(directory_.get(), segmentInfo_->name(), 100,
+                                          *fieldInfos_);
         Lucene104NormsReader reader(readState);
         auto normsIter = reader.getNorms(field);
         ASSERT_TRUE(normsIter);
@@ -301,9 +302,8 @@ TEST_F(NormsTest, NormsIterator) {
 
     // Write and read
     {
-        SegmentWriteState writeState(*directory_, segmentInfo_->name(), "", ioContext_);
-        writeState.segmentInfo = segmentInfo_.get();
-
+        index::SegmentWriteState writeState(directory_.get(), segmentInfo_->name(), 100,
+                                            *fieldInfos_);
         Lucene104NormsWriter writer(writeState);
         TestNormsProducer producer(expectedNorms);
         writer.addNormsField(field, producer);
@@ -311,9 +311,8 @@ TEST_F(NormsTest, NormsIterator) {
     }
 
     {
-        SegmentReadState readState(*directory_, segmentInfo_->name(), "", ioContext_);
-        readState.segmentInfo = segmentInfo_.get();
-
+        index::SegmentReadState readState(directory_.get(), segmentInfo_->name(), 100,
+                                          *fieldInfos_);
         Lucene104NormsReader reader(readState);
         auto normsIter = reader.getNorms(field);
         ASSERT_TRUE(normsIter);

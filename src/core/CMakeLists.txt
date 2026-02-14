@@ -329,11 +329,13 @@ add_library(diagon_core SHARED ${DIAGON_CORE_SOURCES} ${DIAGON_CORE_HEADERS})
 # Enable search profiling for SearchInternalProfiler (can be disabled for production)
 target_compile_definitions(diagon_core PRIVATE DIAGON_PROFILE_SEARCH)
 
-# TopScoreDocCollector needs proper NaN/infinity handling, disable -ffast-math for it
+# TopScoreDocCollector needs proper NaN/infinity handling for score comparisons.
+# Use -fno-finite-math-only (instead of -fno-fast-math) to avoid clang's
+# -Woverriding-t-option when -ffast-math and -fno-fast-math conflict on -ffp-contract.
 if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
     set_source_files_properties(
         src/search/TopScoreDocCollector.cpp
-        PROPERTIES COMPILE_FLAGS "-fno-fast-math"
+        PROPERTIES COMPILE_FLAGS "-fno-finite-math-only"
     )
 endif()
 

@@ -10,7 +10,7 @@ namespace diagon {
 
 // Forward declarations
 namespace index {
-class LeafReaderContext;
+struct LeafReaderContext;
 }  // namespace index
 
 namespace search {

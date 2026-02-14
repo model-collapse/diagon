@@ -16,10 +16,18 @@ using namespace diagon::codecs::lucene105;
 class Lucene105PostingsWriterTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // Create segment write state
-        writeState_ = std::make_unique<index::SegmentWriteState>();
-        writeState_->segmentName = "test_segment";
-        writeState_->segmentSuffix = "";
+        // Create field infos (required by SegmentWriteState)
+        std::vector<index::FieldInfo> infos;
+        index::FieldInfo fi;
+        fi.name = "body";
+        fi.number = 0;
+        fi.indexOptions = index::IndexOptions::DOCS_AND_FREQS;
+        infos.push_back(fi);
+        fieldInfos_ = std::make_unique<index::FieldInfos>(std::move(infos));
+
+        // Create segment write state with required parameters
+        writeState_ = std::make_unique<index::SegmentWriteState>(nullptr, "test_segment", 0,
+                                                                 *fieldInfos_, "");
 
         // Create field info for "body" field
         fieldInfo_ = std::make_unique<index::FieldInfo>();
@@ -27,6 +35,7 @@ protected:
         fieldInfo_->indexOptions = index::IndexOptions::DOCS_AND_FREQS;
     }
 
+    std::unique_ptr<index::FieldInfos> fieldInfos_;
     std::unique_ptr<index::SegmentWriteState> writeState_;
     std::unique_ptr<index::FieldInfo> fieldInfo_;
 };
@@ -119,6 +128,7 @@ TEST_F(Lucene105PostingsWriterTest, ImpactsTrackedCorrectly) {
     // Read first skip entry
     int32_t docDelta1 = skipIn->readVInt();
     int64_t docFPDelta1 = skipIn->readVLong();
+    (void)docFPDelta1;
     int32_t maxFreq1 = skipIn->readVInt();
     uint8_t maxNorm1 = skipIn->readByte();
 
@@ -129,6 +139,7 @@ TEST_F(Lucene105PostingsWriterTest, ImpactsTrackedCorrectly) {
     // Read second skip entry
     int32_t docDelta2 = skipIn->readVInt();
     int64_t docFPDelta2 = skipIn->readVLong();
+    (void)docFPDelta2;
     int32_t maxFreq2 = skipIn->readVInt();
     uint8_t maxNorm2 = skipIn->readByte();
 
@@ -208,6 +219,7 @@ TEST_F(Lucene105PostingsWriterTest, StreamVByteIntegration) {
     }
 
     TermState state = writer.finishTerm();
+    (void)state;
 
     // Verify doc bytes were written (StreamVByte encoded)
     std::vector<uint8_t> docBytes = writer.getDocBytes();

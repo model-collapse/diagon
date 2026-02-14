@@ -118,7 +118,7 @@ private:
 
         void collect(int doc) override;
 
-        void finishSegment();  // Flush remaining batch
+        void finishSegment() override;  // Flush remaining batch
 
     private:
         void collectSingle(int doc, float score);

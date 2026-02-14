@@ -146,7 +146,7 @@ private:
         int docID_;
     };
 
-    index::SegmentReadState& state_;
+    [[maybe_unused]] index::SegmentReadState& state_;
     std::unique_ptr<store::IndexInput> data_;  // .nvd file
     std::unique_ptr<store::IndexInput> meta_;  // .nvm file
     bool closed_{false};

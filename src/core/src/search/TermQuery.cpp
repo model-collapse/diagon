@@ -341,8 +341,8 @@ public:
 private:
     const TermQuery& query_;
     IndexSearcher& searcher_;
-    ScoreMode scoreMode_;
-    float boost_;
+    [[maybe_unused]] ScoreMode scoreMode_;
+    [[maybe_unused]] float boost_;
     BM25Similarity::SimScorer simScorer_;
 };
 
