@@ -363,7 +363,7 @@ TEST_F(IndexWriterTest, ConcurrentAddDocument) {
     std::vector<int64_t> seqNos(numThreads * opsPerThread);
 
     for (int t = 0; t < numThreads; t++) {
-        threads.emplace_back([&writer, &seqNos, t, opsPerThread]() {
+        threads.emplace_back([&writer, &seqNos, t]() {
             for (int i = 0; i < opsPerThread; i++) {
                 Document doc;
                 doc.add(std::make_unique<TextField>("body", "test", TextField::TYPE_STORED));

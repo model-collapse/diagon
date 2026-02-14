@@ -105,7 +105,7 @@ static void BM_BM25_SIMD(benchmark::State& state) {
 
     DummyWeight weight;
     auto scorer = std::make_unique<BM25ScorerSIMD>(
-        weight, std::unique_ptr<diagon::index::PostingsEnum>(nullptr), idf, k1, b);
+        weight, std::unique_ptr<diagon::index::PostingsEnum>(nullptr), idf, k1, b, 1.0f, nullptr);
 
     int64_t docsProcessed = 0;
 
@@ -169,7 +169,7 @@ static void BM_BM25_SIMDUniformNorm(benchmark::State& state) {
 
     DummyWeight weight;
     auto scorer = std::make_unique<BM25ScorerSIMD>(
-        weight, std::unique_ptr<diagon::index::PostingsEnum>(nullptr), idf, k1, b);
+        weight, std::unique_ptr<diagon::index::PostingsEnum>(nullptr), idf, k1, b, 1.0f, nullptr);
 
     int64_t docsProcessed = 0;
 

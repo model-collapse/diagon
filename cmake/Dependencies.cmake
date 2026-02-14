@@ -122,13 +122,32 @@ if(NOT TARGET LZ4::LZ4)
 endif()
 
 # ICU - Required for text analysis (StandardTokenizer)
+# On macOS, Homebrew icu4c is keg-only; ensure ICU_ROOT is in search path
+if(APPLE AND DEFINED ICU_ROOT)
+    list(PREPEND CMAKE_PREFIX_PATH "${ICU_ROOT}")
+endif()
 if(NOT TARGET ICU::uc OR NOT TARGET ICU::i18n)
     find_package(ICU COMPONENTS uc i18n QUIET)
     if(NOT ICU_FOUND)
         # Try manually finding ICU
-        find_library(ICU_UC_LIBRARY NAMES icuuc)
-        find_library(ICU_I18N_LIBRARY NAMES icui18n)
-        find_path(ICU_INCLUDE_DIR NAMES unicode/unistr.h)
+        # On macOS with Homebrew, icu4c is keg-only; use ICU_ROOT hint
+        set(_ICU_HINTS "")
+        if(DEFINED ICU_ROOT)
+            list(APPEND _ICU_HINTS "${ICU_ROOT}")
+        endif()
+        if(APPLE)
+            # Common Homebrew paths for icu4c
+            execute_process(COMMAND brew --prefix icu4c
+                            OUTPUT_VARIABLE _BREW_ICU_PREFIX
+                            OUTPUT_STRIP_TRAILING_WHITESPACE
+                            ERROR_QUIET)
+            if(_BREW_ICU_PREFIX)
+                list(APPEND _ICU_HINTS "${_BREW_ICU_PREFIX}")
+            endif()
+        endif()
+        find_library(ICU_UC_LIBRARY NAMES icuuc HINTS ${_ICU_HINTS} PATH_SUFFIXES lib)
+        find_library(ICU_I18N_LIBRARY NAMES icui18n HINTS ${_ICU_HINTS} PATH_SUFFIXES lib)
+        find_path(ICU_INCLUDE_DIR NAMES unicode/unistr.h HINTS ${_ICU_HINTS} PATH_SUFFIXES include)
         if(ICU_UC_LIBRARY AND ICU_I18N_LIBRARY AND ICU_INCLUDE_DIR)
             add_library(ICU::uc UNKNOWN IMPORTED)
             set_target_properties(ICU::uc PROPERTIES

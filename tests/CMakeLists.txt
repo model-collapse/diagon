@@ -73,7 +73,7 @@ add_diagon_test(BloomFilterTest unit/util/BloomFilterTest.cpp)
 
 # NumericUtilsTest needs proper NaN/Infinity handling, disable -ffast-math
 if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
-    target_compile_options(NumericUtilsTest PRIVATE -fno-fast-math)
+    target_compile_options(NumericUtilsTest PRIVATE -fno-finite-math-only)
 endif()
 
 # Store tests
@@ -133,7 +133,7 @@ add_diagon_test(ColumnTest unit/columns/ColumnTest.cpp)
 
 # ColumnTest needs proper NaN handling, disable -ffast-math
 if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
-    target_compile_options(ColumnTest PRIVATE -fno-fast-math)
+    target_compile_options(ColumnTest PRIVATE -fno-finite-math-only)
 endif()
 
 # Compression tests
@@ -168,7 +168,7 @@ add_diagon_test(AnalyzerFactoryTest unit/analysis/AnalyzerFactoryTest.cpp)
 
 # TopScoreDocCollectorTest needs proper NaN handling, disable -ffast-math
 if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
-    target_compile_options(TopScoreDocCollectorTest PRIVATE -fno-fast-math)
+    target_compile_options(TopScoreDocCollectorTest PRIVATE -fno-finite-math-only)
 endif()
 
 # Filter tests
