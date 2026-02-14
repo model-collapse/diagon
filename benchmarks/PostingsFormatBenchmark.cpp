@@ -207,7 +207,8 @@ static void BM_PostingsEncode_StreamVByte(benchmark::State& state) {
     for (auto _ : state) {
         ByteBuffersIndexOutput out("bench.doc");
         writeStreamVByteFormat(out, data.docDeltas, data.freqs);
-        benchmark::DoNotOptimize(out.toArrayCopy());
+        auto encoded = out.toArrayCopy();
+        benchmark::DoNotOptimize(encoded);
     }
 
     state.SetItemsProcessed(state.iterations() * numDocs);
@@ -221,7 +222,8 @@ static void BM_PostingsEncode_VInt_Baseline(benchmark::State& state) {
     for (auto _ : state) {
         ByteBuffersIndexOutput out("bench.doc");
         writeVIntFormat(out, data.docDeltas, data.freqs);
-        benchmark::DoNotOptimize(out.toArrayCopy());
+        auto encoded = out.toArrayCopy();
+        benchmark::DoNotOptimize(encoded);
     }
 
     state.SetItemsProcessed(state.iterations() * numDocs);

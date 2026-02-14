@@ -88,6 +88,7 @@ TEST_F(IndexSearcherTest, SearchWithTermQuery) {
 
     // Should find 2 documents containing "hello"
     EXPECT_EQ(results.totalHits.value, 2);
+    ASSERT_GE(results.scoreDocs.size(), 1);
     EXPECT_EQ(results.scoreDocs.size(), 2);
     EXPECT_GT(results.scoreDocs[0].score, 0.0f);
 }
@@ -297,5 +298,6 @@ TEST_F(IndexSearcherTest, MaxScoreInResults) {
 
     // maxScore should match the highest score in results
     EXPECT_GT(results.maxScore, 0.0f);
+    ASSERT_GE(results.scoreDocs.size(), 1);
     EXPECT_EQ(results.maxScore, results.scoreDocs[0].score);
 }

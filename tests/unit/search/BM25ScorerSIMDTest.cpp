@@ -153,7 +153,8 @@ TEST_F(BM25ScorerSIMDTest, ZeroFrequencies) {
 
     alignas(32) int freqs[DIAGON_BM25_BATCH_SIZE] = {};
     alignas(32) long norms[DIAGON_BM25_BATCH_SIZE];
-    for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) norms[i] = 1;
+    for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++)
+        norms[i] = 1;
     alignas(32) float scores[DIAGON_BM25_BATCH_SIZE];
 
     scorer->scoreBatch(freqs, norms, scores);
