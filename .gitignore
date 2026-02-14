@@ -117,6 +117,9 @@ $RECYCLE.BIN/
 
 # ==================== Language-Specific ====================
 
+# Java (Lucene comparison benchmarks)
+*.class
+
 # C/C++
 *.d
 *.dSYM/
@@ -194,6 +197,11 @@ htmlcov/
 # Benchmark results
 benchmark_results/
 *.bench
+
+# Lucene comparison output artifacts
+benchmarks/lucene_comparison/*.txt
+benchmarks/lucene_comparison/*.md
+benchmarks/lucene_comparison/*.log
 
 # Plan and review documents (generated during development)
 PHASE_*.md
