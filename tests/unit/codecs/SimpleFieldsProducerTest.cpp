@@ -40,9 +40,8 @@ protected:
     void writeTestData(const std::string& segmentName,
                        const std::unordered_map<std::string, std::vector<int>>& terms) {
         // Create minimal FieldInfos with body field
-        FieldInfo bodyField{.name = "body",
-                            .number = 0,
-                            .indexOptions = IndexOptions::DOCS_AND_FREQS_AND_POSITIONS};
+        FieldInfo bodyField("body", 0);
+        bodyField.indexOptions = IndexOptions::DOCS_AND_FREQS_AND_POSITIONS;
         FieldInfos fieldInfos({bodyField});
 
         index::SegmentWriteState state(dir.get(), segmentName, 1000, fieldInfos, "");
@@ -73,7 +72,7 @@ TEST_F(SimpleFieldsProducerTest, ReadSimpleData) {
     EXPECT_EQ(producer.size(), 2);
 
     // Get terms
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     EXPECT_NE(termsObj, nullptr);
     EXPECT_EQ(termsObj->size(), 2);
 }
@@ -89,7 +88,7 @@ TEST_F(SimpleFieldsProducerTest, IterateTerms) {
 
     // Read and iterate
     SimpleFieldsProducer producer(*dir, "_0", "body");
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     auto termsEnum = termsObj->iterator();
 
     // Should iterate in sorted order
@@ -120,7 +119,7 @@ TEST_F(SimpleFieldsProducerTest, ReadPostings) {
 
     // Read back
     SimpleFieldsProducer producer(*dir, "_0", "body");
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     auto termsEnum = termsObj->iterator();
 
     // Get to "test" term
@@ -163,7 +162,7 @@ TEST_F(SimpleFieldsProducerTest, SeekExactFound) {
 
     // Read and seek
     SimpleFieldsProducer producer(*dir, "_0", "body");
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     auto termsEnum = termsObj->iterator();
 
     // Seek to "banana"
@@ -187,7 +186,7 @@ TEST_F(SimpleFieldsProducerTest, SeekExactNotFound) {
 
     // Read and seek
     SimpleFieldsProducer producer(*dir, "_0", "body");
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     auto termsEnum = termsObj->iterator();
 
     // Seek to "banana" (not present)
@@ -206,7 +205,7 @@ TEST_F(SimpleFieldsProducerTest, SeekCeilFound) {
 
     // Read and seek
     SimpleFieldsProducer producer(*dir, "_0", "body");
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     auto termsEnum = termsObj->iterator();
 
     // Seek ceil to "banana" (exists)
@@ -228,7 +227,7 @@ TEST_F(SimpleFieldsProducerTest, SeekCeilNotFoundButPositioned) {
 
     // Read and seek
     SimpleFieldsProducer producer(*dir, "_0", "body");
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     auto termsEnum = termsObj->iterator();
 
     // Seek ceil to "banana" (not present, should position at "cherry")
@@ -250,7 +249,7 @@ TEST_F(SimpleFieldsProducerTest, SeekCeilEnd) {
 
     // Read and seek
     SimpleFieldsProducer producer(*dir, "_0", "body");
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     auto termsEnum = termsObj->iterator();
 
     // Seek ceil past last term
@@ -270,7 +269,7 @@ TEST_F(SimpleFieldsProducerTest, PostingsAdvance) {
 
     // Read back
     SimpleFieldsProducer producer(*dir, "_0", "body");
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     auto termsEnum = termsObj->iterator();
     ASSERT_TRUE(termsEnum->next());
 
@@ -304,7 +303,7 @@ TEST_F(SimpleFieldsProducerTest, ManyTerms) {
     SimpleFieldsProducer producer(*dir, "_0", "body");
     EXPECT_EQ(producer.size(), 100);
 
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     auto termsEnum = termsObj->iterator();
 
     // Count terms
@@ -329,7 +328,7 @@ TEST_F(SimpleFieldsProducerTest, LargePostingsList) {
 
     // Read back
     SimpleFieldsProducer producer(*dir, "_0", "body");
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     auto termsEnum = termsObj->iterator();
     ASSERT_TRUE(termsEnum->next());
 
@@ -354,7 +353,7 @@ TEST_F(SimpleFieldsProducerTest, EmptyTerms) {
     SimpleFieldsProducer producer(*dir, "_0", "body");
     EXPECT_EQ(producer.size(), 0);
 
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     EXPECT_EQ(termsObj->size(), 0);
 
     auto termsEnum = termsObj->iterator();
@@ -372,7 +371,7 @@ TEST_F(SimpleFieldsProducerTest, SingleTerm) {
     SimpleFieldsProducer producer(*dir, "_0", "body");
     EXPECT_EQ(producer.size(), 1);
 
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     auto termsEnum = termsObj->iterator();
 
     ASSERT_TRUE(termsEnum->next());
@@ -398,7 +397,7 @@ TEST_F(SimpleFieldsProducerTest, HighFrequencies) {
 
     // Read back
     SimpleFieldsProducer producer(*dir, "_0", "body");
-    auto termsObj = producer.terms();
+    auto termsObj = producer.terms("body");
     auto termsEnum = termsObj->iterator();
     ASSERT_TRUE(termsEnum->next());
 
