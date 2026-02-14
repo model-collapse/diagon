@@ -16,11 +16,18 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <vector>
+
+#ifdef __APPLE__
+#    include <mach/mach.h>
+#else
+#    include <unistd.h>
+#endif
 
 using namespace diagon;
 using namespace std::chrono;
@@ -37,6 +44,15 @@ struct ScalabilityResult {
 
 // Get RSS (Resident Set Size) memory usage in MB
 int64_t getCurrentMemoryMB() {
+#ifdef __APPLE__
+    struct mach_task_basic_info info;
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &count) ==
+        KERN_SUCCESS) {
+        return static_cast<int64_t>(info.resident_size) / (1024 * 1024);
+    }
+    return 0;
+#else
     std::ifstream statm("/proc/self/statm");
     long pages;
     statm >> pages;  // First field is total program size in pages
@@ -44,23 +60,22 @@ int64_t getCurrentMemoryMB() {
 
     long pageSize = sysconf(_SC_PAGESIZE);
     return (pages * pageSize) / (1024 * 1024);  // Convert to MB
+#endif
 }
 
 // Get directory size in bytes
 int64_t getDirectorySize(const std::string& path) {
-    std::string cmd = "du -sb " + path + " 2>/dev/null | cut -f1";
-    FILE* pipe = popen(cmd.c_str(), "r");
-    if (!pipe)
+    int64_t total = 0;
+    try {
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
+            if (entry.is_regular_file()) {
+                total += static_cast<int64_t>(entry.file_size());
+            }
+        }
+    } catch (...) {
         return 0;
-
-    char buffer[128];
-    std::string result;
-    while (fgets(buffer, sizeof(buffer), pipe)) {
-        result += buffer;
     }
-    pclose(pipe);
-
-    return std::stoll(result);
+    return total;
 }
 
 ScalabilityResult runScalabilityTest(int numDocs) {

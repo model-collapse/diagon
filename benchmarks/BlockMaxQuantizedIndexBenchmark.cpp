@@ -66,7 +66,11 @@ CsrMatrix loadCsrMatrix(const std::string& file_path) {
     }
 
     size_t file_size = sb.st_size;
-    void* mapped = mmap(nullptr, file_size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
+    int mmap_flags = MAP_PRIVATE;
+#ifdef MAP_POPULATE
+    mmap_flags |= MAP_POPULATE;
+#endif
+    void* mapped = mmap(nullptr, file_size, PROT_READ, mmap_flags, fd, 0);
     if (mapped == MAP_FAILED) {
         close(fd);
         std::cerr << "Error: mmap failed" << std::endl;
