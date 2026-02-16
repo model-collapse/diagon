@@ -80,7 +80,7 @@ endif()
 
 # ==================== ARM NEON Detection ====================
 
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64|arm64")
     set(NEON_CODE "
     #include <arm_neon.h>
     int main() {

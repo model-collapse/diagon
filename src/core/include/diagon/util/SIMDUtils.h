@@ -34,7 +34,7 @@
 #    define DIAGON_SIMD_WIDTH_F32 4
 #else
 // Scalar fallback
-#    define DIAGON_SIMD_WIDTH_BYTES 8
+#    define DIAGON_SIMD_WIDTH_BYTES 4
 #    define DIAGON_SIMD_WIDTH_I32 1
 #    define DIAGON_SIMD_WIDTH_F32 1
 #endif

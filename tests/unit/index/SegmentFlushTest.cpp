@@ -71,8 +71,7 @@ TEST_F(SegmentFlushTest, FlushWithDirectory) {
     // Check that postings-related file exists (.doc for Lucene104, .post for Simple)
     bool hasPostingsFile = false;
     for (const auto& file : segmentInfo->files()) {
-        if (file.find(".doc") != std::string::npos ||
-            file.find(".post") != std::string::npos) {
+        if (file.find(".doc") != std::string::npos || file.find(".post") != std::string::npos) {
             hasPostingsFile = true;
 
             // Verify file exists on disk
