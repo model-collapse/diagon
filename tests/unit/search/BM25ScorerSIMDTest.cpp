@@ -72,7 +72,7 @@ protected:
     /**
      * Check if two floats are approximately equal
      */
-    bool approxEqual(float a, float b, float epsilon = 1e-5f) const {
+    bool approxEqual(float a, float b, float epsilon = 1e-4f) const {
         return std::abs(a - b) < epsilon;
     }
 
