@@ -105,8 +105,8 @@ TEST_F(SegmentReaderTest, GetTerms) {
     auto infos = SegmentInfos::readLatestCommit(*dir);
     auto reader = SegmentReader::open(*dir, infos.info(0));
 
-    // Get terms for "_all" field (Phase 3: all fields combined into _all)
-    auto terms = reader->terms("_all");
+    // Get terms for "body" field
+    auto terms = reader->terms("body");
     EXPECT_NE(terms, nullptr);
     EXPECT_GT(terms->size(), 0);
 }
@@ -128,8 +128,8 @@ TEST_F(SegmentReaderTest, IterateTermsAndPostings) {
     auto infos = SegmentInfos::readLatestCommit(*dir);
     auto reader = SegmentReader::open(*dir, infos.info(0));
 
-    // Get terms (Phase 3: all fields combined into _all)
-    auto terms = reader->terms("_all");
+    // Get terms for "body" field
+    auto terms = reader->terms("body");
     ASSERT_NE(terms, nullptr);
 
     // Get iterator

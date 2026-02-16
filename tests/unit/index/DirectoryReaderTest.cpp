@@ -185,8 +185,8 @@ TEST_F(DirectoryReaderTest, AccessTermsViaLeaves) {
     for (const auto& ctx : leaves) {
         auto leafReader = ctx.reader;
 
-        // Get terms for "_all" field (Phase 3: all fields combined)
-        auto terms = leafReader->terms("_all");
+        // Get terms for "body" field
+        auto terms = leafReader->terms("body");
         EXPECT_NE(terms, nullptr);
         EXPECT_GT(terms->size(), 0);
     }

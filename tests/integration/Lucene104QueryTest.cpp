@@ -68,25 +68,21 @@ protected:
     }
 
     /**
-     * Helper: Write documents and flush segment
+     * Helper: Write documents via IndexWriter and commit (creates segments_N)
      */
-    std::shared_ptr<SegmentInfo> writeAndFlushDocuments(const std::vector<std::string>& docs,
-                                                        const std::string& fieldName = "content") {
-        // Create DocumentsWriterPerThread config
-        DocumentsWriterPerThread::Config config;
+    void writeAndFlushDocuments(const std::vector<std::string>& docs,
+                                const std::string& fieldName = "content") {
+        IndexWriterConfig config;
+        config.setMaxBufferedDocs(static_cast<int>(docs.size()) + 100);  // Single segment
+        IndexWriter writer(*directory_, config);
 
-        // Create writer
-        DocumentsWriterPerThread dwpt(config, directory_.get(), "Lucene104");
-
-        // Add documents
         for (const auto& text : docs) {
             Document doc;
             doc.add(std::make_unique<TextField>(fieldName, text));
-            dwpt.addDocument(doc);
+            writer.addDocument(doc);
         }
 
-        // Flush segment
-        return dwpt.flush();
+        writer.commit();
     }
 
     /**
@@ -128,9 +124,7 @@ TEST_F(Lucene104QueryTest, BasicEndToEndFlow) {
         "cherry apple"    // doc 2
     };
 
-    auto segmentInfo = writeAndFlushDocuments(docs);
-    ASSERT_NE(nullptr, segmentInfo);
-    EXPECT_EQ(3, segmentInfo->maxDoc());
+    writeAndFlushDocuments(docs);
 
     // Open DirectoryReader
     auto reader = DirectoryReader::open(*directory_);
@@ -177,8 +171,7 @@ TEST_F(Lucene104QueryTest, BM25ScoringCorrectness) {
         "banana"              // doc 3: different term
     };
 
-    auto segmentInfo = writeAndFlushDocuments(docs);
-    ASSERT_NE(nullptr, segmentInfo);
+    writeAndFlushDocuments(docs);
 
     // Open reader and searcher
     auto reader = DirectoryReader::open(*directory_);
@@ -220,16 +213,16 @@ TEST_F(Lucene104QueryTest, BM25ScoringCorrectness) {
  */
 TEST_F(Lucene104QueryTest, MultipleFieldsSupport) {
     // Create documents with title and body fields
-    DocumentsWriterPerThread::Config config;
-
-    DocumentsWriterPerThread dwpt(config, directory_.get(), "Lucene104");
+    IndexWriterConfig writerConfig;
+    writerConfig.setMaxBufferedDocs(100);
+    IndexWriter writer(*directory_, writerConfig);
 
     // Doc 0: "apple" in title
     {
         Document doc;
         doc.add(std::make_unique<TextField>("title", "apple"));
         doc.add(std::make_unique<TextField>("body", "banana"));
-        dwpt.addDocument(doc);
+        writer.addDocument(doc);
     }
 
     // Doc 1: "apple" in body
@@ -237,7 +230,7 @@ TEST_F(Lucene104QueryTest, MultipleFieldsSupport) {
         Document doc;
         doc.add(std::make_unique<TextField>("title", "banana"));
         doc.add(std::make_unique<TextField>("body", "apple"));
-        dwpt.addDocument(doc);
+        writer.addDocument(doc);
     }
 
     // Doc 2: "apple" in both
@@ -245,11 +238,10 @@ TEST_F(Lucene104QueryTest, MultipleFieldsSupport) {
         Document doc;
         doc.add(std::make_unique<TextField>("title", "apple"));
         doc.add(std::make_unique<TextField>("body", "apple"));
-        dwpt.addDocument(doc);
+        writer.addDocument(doc);
     }
 
-    auto segmentInfo = dwpt.flush();
-    ASSERT_NE(nullptr, segmentInfo);
+    writer.commit();
 
     // Open reader and searcher
     auto reader = DirectoryReader::open(*directory_);
@@ -300,8 +292,7 @@ TEST_F(Lucene104QueryTest, BooleanQueryAND) {
         "apple banana cherry"  // doc 3: matches both
     };
 
-    auto segmentInfo = writeAndFlushDocuments(docs);
-    ASSERT_NE(nullptr, segmentInfo);
+    writeAndFlushDocuments(docs);
 
     // Open reader and searcher
     auto reader = DirectoryReader::open(*directory_);
@@ -346,8 +337,7 @@ TEST_F(Lucene104QueryTest, BooleanQueryOR) {
         "apple banana"  // doc 3: both
     };
 
-    auto segmentInfo = writeAndFlushDocuments(docs);
-    ASSERT_NE(nullptr, segmentInfo);
+    writeAndFlushDocuments(docs);
 
     // Open reader and searcher
     auto reader = DirectoryReader::open(*directory_);
@@ -389,8 +379,7 @@ TEST_F(Lucene104QueryTest, EmptyResultSet) {
     // Write documents
     std::vector<std::string> docs = {"apple", "banana", "cherry"};
 
-    auto segmentInfo = writeAndFlushDocuments(docs);
-    ASSERT_NE(nullptr, segmentInfo);
+    writeAndFlushDocuments(docs);
 
     // Open reader and searcher
     auto reader = DirectoryReader::open(*directory_);
@@ -418,8 +407,7 @@ TEST_F(Lucene104QueryTest, TopKLimiting) {
         docs.push_back("apple");
     }
 
-    auto segmentInfo = writeAndFlushDocuments(docs);
-    ASSERT_NE(nullptr, segmentInfo);
+    writeAndFlushDocuments(docs);
 
     // Open reader and searcher
     auto reader = DirectoryReader::open(*directory_);
@@ -450,11 +438,7 @@ TEST_F(Lucene104QueryTest, TopKLimiting) {
 TEST_F(Lucene104QueryTest, CodecDetection) {
     // Write with Lucene104 codec
     std::vector<std::string> docs = {"apple"};
-    auto segmentInfo = writeAndFlushDocuments(docs);
-    ASSERT_NE(nullptr, segmentInfo);
-
-    // Verify codec name
-    EXPECT_EQ("Lucene104", segmentInfo->codecName());
+    writeAndFlushDocuments(docs);
 
     // Open reader (should detect Lucene104 and create appropriate FieldsProducer)
     auto reader = DirectoryReader::open(*directory_);

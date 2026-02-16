@@ -129,7 +129,7 @@ TEST_F(BasicEndToEndTest, IndexingPerformance) {
         EXPECT_EQ(NUM_DOCS, reader->maxDoc());
 
         IndexSearcher searcher(*reader);
-        search::Term term("title", "Document");
+        search::Term term("title", "document");
         TermQuery query(term);
 
         auto searchStart = std::chrono::high_resolution_clock::now();

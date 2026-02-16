@@ -69,6 +69,12 @@ TopDocs TopScoreDocCollector::topDocs(int start, int howMany) {
         throw std::invalid_argument("start and howMany must be >= 0");
     }
 
+    // Flush any remaining batched documents from the leaf collector
+    // (AVX2/AVX512 paths batch docs and only flush when batch is full)
+    if (leafCollector_) {
+        leafCollector_->finishSegment();
+    }
+
     // Convert priority queue to vector
     // Heap has worst document at top, so extraction gives worst-to-best order
     std::vector<ScoreDoc> results;
@@ -127,6 +133,7 @@ void TopScoreDocCollector::TopScoreLeafCollector::finishSegment() {
 #endif
 
     // Use scorer's total matches if available (for WAND and other early-terminating scorers)
+    // Guard with scorerTracksTotalMatches_ to make this idempotent (safe to call multiple times)
     if (scorer_ && parent_ && scorerTracksTotalMatches_) {
         int totalMatches = scorer_->getTotalMatches();
         if (totalMatches >= 0) {
@@ -138,6 +145,8 @@ void TopScoreDocCollector::TopScoreLeafCollector::finishSegment() {
             // Mark as approximate since WAND provides lower bound
             parent_->totalHitsRelation_ = TotalHits::Relation::GREATER_THAN_OR_EQUAL_TO;
         }
+        // Prevent double-counting if finishSegment() is called again (e.g., from destructor)
+        scorerTracksTotalMatches_ = false;
     }
     // else: totalHits_ was already incremented correctly in collect()
 }

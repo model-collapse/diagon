@@ -74,19 +74,27 @@ void Lucene104PostingsEnumOptimized::refillBuffer() {
     int bufferIdx = 0;
 
 #if defined(__AVX2__)
-    // AVX2 fast path: Decode 8 docs at a time (2x throughput)
+    // AVX2 fast path: Decode 8 docs at a time using two interleaved 4-wide decodes
+    // Writer format is interleaved: [4 doc deltas][4 freqs][4 doc deltas][4 freqs]
+    // So we must decode 4 deltas, then 4 freqs, then 4 deltas, then 4 freqs
     constexpr int AVX2_GROUP_SIZE = 8;
     while (remaining >= AVX2_GROUP_SIZE && bufferIdx + AVX2_GROUP_SIZE <= BUFFER_SIZE) {
         // Prefetch next data for better cache performance
         __builtin_prefetch(&ioBatch_[ioBatchPos_ + 64], 0, 3);
 
-        // Decode 8 doc deltas using AVX2 (stores deltas, not absolute docIDs)
-        decodeStreamVByte8_AVX2(&docDeltaBuffer_[bufferIdx]);
-
-        // Decode 8 frequencies using AVX2
+        // First group: 4 doc deltas then 4 freqs
+        decodeStreamVByte4(&docDeltaBuffer_[bufferIdx]);
         if (writeFreqs_) {
-            decodeStreamVByte8_AVX2(&freqBuffer_[bufferIdx]);
-        } else {
+            decodeStreamVByte4(&freqBuffer_[bufferIdx]);
+        }
+
+        // Second group: 4 doc deltas then 4 freqs
+        decodeStreamVByte4(&docDeltaBuffer_[bufferIdx + STREAMVBYTE_GROUP_SIZE]);
+        if (writeFreqs_) {
+            decodeStreamVByte4(&freqBuffer_[bufferIdx + STREAMVBYTE_GROUP_SIZE]);
+        }
+
+        if (!writeFreqs_) {
             // Set default frequencies using SIMD (faster than 8 scalar stores)
             __m256i ones = _mm256_set1_epi32(1);
             _mm256_storeu_si256(reinterpret_cast<__m256i*>(&freqBuffer_[bufferIdx]), ones);

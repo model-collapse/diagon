@@ -81,7 +81,7 @@ TEST_F(IndexSearcherTest, SearchWithTermQuery) {
     IndexSearcher searcher(*reader);
 
     // Search for "hello"
-    search::Term searchTerm("_all", "hello");  // Phase 3: all fields indexed to "_all"
+    search::Term searchTerm("body", "hello");  // Phase 3: all fields indexed to "_all"
     TermQuery query(searchTerm);
 
     auto results = searcher.search(query, 10);
@@ -102,7 +102,7 @@ TEST_F(IndexSearcherTest, SearchNoMatches) {
     IndexSearcher searcher(*reader);
 
     // Search for searchTerm that doesn't exist
-    search::Term searchTerm("_all", "nonexistent");
+    search::Term searchTerm("body", "nonexistent");
     TermQuery query(searchTerm);
 
     auto results = searcher.search(query, 10);
@@ -125,7 +125,7 @@ TEST_F(IndexSearcherTest, SearchWithTopK) {
     IndexSearcher searcher(*reader);
 
     // Search for "search"
-    search::Term searchTerm("_all", "search");
+    search::Term searchTerm("body", "search");
     TermQuery query(searchTerm);
 
     // Request only top 5
@@ -157,7 +157,7 @@ TEST_F(IndexSearcherTest, BM25Scoring) {
     IndexSearcher searcher(*reader);
 
     // Search for "apple"
-    search::Term searchTerm("_all", "apple");
+    search::Term searchTerm("body", "apple");
     TermQuery query(searchTerm);
 
     auto results = searcher.search(query, 10);
@@ -190,7 +190,7 @@ TEST_F(IndexSearcherTest, SearchWithCollector) {
     auto collector = TopScoreDocCollector::create(10);
 
     // Search for "search"
-    search::Term searchTerm("_all", "search");
+    search::Term searchTerm("body", "search");
     TermQuery query(searchTerm);
 
     searcher.search(query, collector.get());
@@ -229,7 +229,7 @@ TEST_F(IndexSearcherTest, SearchAcrossMultipleSegments) {
     IndexSearcher searcher(*reader);
 
     // Search for "word" (appears in all documents)
-    search::Term searchTerm("_all", "word");
+    search::Term searchTerm("body", "word");
     TermQuery query(searchTerm);
 
     auto results = searcher.search(query, 10);
@@ -250,7 +250,7 @@ TEST_F(IndexSearcherTest, CountMatchingDocs) {
     IndexSearcher searcher(*reader);
 
     // Count documents containing "count"
-    search::Term searchTerm("_all", "count");
+    search::Term searchTerm("body", "count");
     TermQuery query(searchTerm);
 
     int count = searcher.count(query);
@@ -271,7 +271,7 @@ TEST_F(IndexSearcherTest, SearchEmptyIndex) {
     IndexSearcher searcher(*reader);
 
     // Search in empty index
-    search::Term searchTerm("_all", "anything");
+    search::Term searchTerm("body", "anything");
     TermQuery query(searchTerm);
 
     auto results = searcher.search(query, 10);
@@ -291,7 +291,7 @@ TEST_F(IndexSearcherTest, MaxScoreInResults) {
     IndexSearcher searcher(*reader);
 
     // Search for "score"
-    search::Term searchTerm("_all", "score");
+    search::Term searchTerm("body", "score");
     TermQuery query(searchTerm);
 
     auto results = searcher.search(query, 10);

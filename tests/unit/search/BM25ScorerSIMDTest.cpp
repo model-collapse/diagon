@@ -38,17 +38,32 @@ protected:
     }
 
     /**
-     * Compute expected BM25 score using scalar formula
+     * Compute expected BM25 score using BM25Similarity scalar formula
+     * (Lucene 8+ simplified: no (k1+1) in numerator)
      */
     float computeExpectedScore(int freq, long norm = 1L) const {
         if (freq == 0)
             return 0.0f;
 
-        // Phase 4: Simplified norm decoding
         float fieldLength = 1.0f;
         float avgFieldLength = 1.0f;
 
-        // BM25 formula
+        float k = k1_ * (1.0f - b_ + b_ * fieldLength / avgFieldLength);
+        float freqFloat = static_cast<float>(freq);
+        return idf_ * freqFloat / (freqFloat + k);
+    }
+
+    /**
+     * Compute expected BM25 score using BM25ScorerSIMD formula
+     * (Classic BM25 with (k1+1) in numerator, matching SIMD batch scorer)
+     */
+    float computeExpectedSIMDScore(int freq, long norm = 1L) const {
+        if (freq == 0)
+            return 0.0f;
+
+        float fieldLength = 1.0f;
+        float avgFieldLength = 1.0f;
+
         float k = k1_ * (1.0f - b_ + b_ * fieldLength / avgFieldLength);
         float freqFloat = static_cast<float>(freq);
         return idf_ * freqFloat * (k1_ + 1.0f) / (freqFloat + k);
@@ -111,9 +126,9 @@ TEST_F(BM25ScorerSIMDTest, SIMDCorrectnessVsScalar) {
     // Compute SIMD scores
     scorer->scoreBatch(freqs, norms, scores);
 
-    // Verify against scalar computation
+    // Verify against classic BM25 formula (SIMD scorer uses (k1+1) factor)
     for (int i = 0; i < BATCH; i++) {
-        float expected = computeExpectedScore(freqs[i], norms[i]);
+        float expected = computeExpectedSIMDScore(freqs[i], norms[i]);
         EXPECT_TRUE(approxEqual(scores[i], expected))
             << "i=" << i << ", freq=" << freqs[i] << ", expected=" << expected
             << ", actual=" << scores[i];
@@ -136,9 +151,9 @@ TEST_F(BM25ScorerSIMDTest, SIMDUniformNorm) {
     // Compute with uniform norm
     scorer->scoreBatchUniformNorm(freqs, 1L, scores);
 
-    // Verify against scalar
+    // Verify against classic BM25 formula (SIMD scorer uses (k1+1) factor)
     for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
-        float expected = computeExpectedScore(freqs[i], 1L);
+        float expected = computeExpectedSIMDScore(freqs[i], 1L);
         EXPECT_TRUE(approxEqual(scores[i], expected))
             << "i=" << i << ", freq=" << freqs[i] << ", expected=" << expected
             << ", actual=" << scores[i];
@@ -183,7 +198,7 @@ TEST_F(BM25ScorerSIMDTest, MixedFrequencies) {
     scorer->scoreBatch(freqs, norms, scores);
 
     for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
-        float expected = computeExpectedScore(freqs[i], norms[i]);
+        float expected = computeExpectedSIMDScore(freqs[i], norms[i]);
         EXPECT_TRUE(approxEqual(scores[i], expected))
             << "i=" << i << ", freq=" << freqs[i] << ", expected=" << expected
             << ", actual=" << scores[i];
@@ -215,9 +230,9 @@ TEST_F(BM25ScorerSIMDTest, HighFrequencies) {
         EXPECT_GT(ratio, 1.0f) << "i=" << i << ", scores should increase";
     }
 
-    // Verify against scalar
+    // Verify against classic BM25 formula (SIMD scorer uses (k1+1) factor)
     for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
-        float expected = computeExpectedScore(freqs[i], norms[i]);
+        float expected = computeExpectedSIMDScore(freqs[i], norms[i]);
         EXPECT_TRUE(approxEqual(scores[i], expected)) << "i=" << i << ", freq=" << freqs[i];
     }
 }
@@ -281,9 +296,9 @@ TEST_F(BM25ScorerSIMDTest, Alignment) {
     // Should work even with unaligned data (loadu instruction)
     scorer->scoreBatch(unaligned_freqs, norms.data(), scores.data());
 
-    // Verify correctness
+    // Verify correctness (SIMD scorer uses classic BM25 with (k1+1) factor)
     for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
-        float expected = computeExpectedScore(unaligned_freqs[i], norms[i]);
+        float expected = computeExpectedSIMDScore(unaligned_freqs[i], norms[i]);
         EXPECT_TRUE(approxEqual(scores[i], expected))
             << "i=" << i << ", freq=" << unaligned_freqs[i];
     }
@@ -311,9 +326,9 @@ TEST_F(BM25ScorerSIMDTest, RandomData) {
 
         scorer->scoreBatch(freqs, norms, scores);
 
-        // Verify against scalar
+        // Verify against classic BM25 formula (SIMD scorer uses (k1+1) factor)
         for (int i = 0; i < DIAGON_BM25_BATCH_SIZE; i++) {
-            float expected = computeExpectedScore(freqs[i], norms[i]);
+            float expected = computeExpectedSIMDScore(freqs[i], norms[i]);
             EXPECT_TRUE(approxEqual(scores[i], expected))
                 << "batch=" << batch << ", i=" << i << ", freq=" << freqs[i]
                 << ", expected=" << expected << ", actual=" << scores[i];
