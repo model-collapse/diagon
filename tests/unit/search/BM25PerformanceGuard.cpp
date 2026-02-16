@@ -151,19 +151,25 @@ struct LatencyStats {
 // Test fixture
 class BM25PerformanceGuardTest : public ::testing::Test {
 protected:
+    static inline bool datasetAvailable_ = false;
+
     static void SetUpTestSuite() {
         // Check if Reuters dataset exists
         if (!std::filesystem::exists(REUTERS_DATASET_PATH)) {
-            GTEST_SKIP()
-                << "Reuters dataset not found at: " << REUTERS_DATASET_PATH
-                << "\nPlease run: cd /home/ubuntu/opensearch_warmroom/lucene/lucene/benchmark && "
-                   "./gradlew getReuters";
+            // Note: GTEST_SKIP() in SetUpTestSuite doesn't reliably propagate
+            // to individual tests in all GTest versions. We use a flag instead.
+            datasetAvailable_ = false;
+            return;
         }
 
+        datasetAvailable_ = true;
         createTestIndex();
     }
 
     void SetUp() override {
+        if (!datasetAvailable_) {
+            GTEST_SKIP() << "Reuters dataset not found at: " << REUTERS_DATASET_PATH;
+        }
         directory_ = MMapDirectory::open(TEST_INDEX_PATH);
         reader_ = index::DirectoryReader::open(*directory_);
         searcher_ = std::make_unique<search::IndexSearcher>(*reader_);
