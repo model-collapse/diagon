@@ -287,8 +287,9 @@ TEST_F(BM25PerformanceGuardTest, AND2Query_P50_Baseline) {
                                   << " µs (target: ≤80 µs, Lucene: 43.1 µs)";
 
     // Critical failure: > 3x slower than Lucene
-    EXPECT_LE(stats.p50_us, 130.0) << "CRITICAL: AND-2 query > 3x slower than Lucene: "
-                                   << stats.p50_us << " µs (Lucene: 43.1 µs)";
+    EXPECT_LE(stats.p50_us, 130.0)
+        << "CRITICAL: AND-2 query > 3x slower than Lucene: " << stats.p50_us
+        << " µs (Lucene: 43.1 µs)";
 }
 
 TEST_F(BM25PerformanceGuardTest, AND2Query_P99_Baseline) {
