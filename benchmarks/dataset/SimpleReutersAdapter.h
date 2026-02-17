@@ -17,6 +17,7 @@
 
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/index/FieldInfo.h"
 
 #include <filesystem>
 #include <fstream>
@@ -78,8 +79,18 @@ public:
             if (bodyStr.empty())
                 continue;
 
-            doc.add(std::make_unique<document::TextField>("title", title));
-            doc.add(std::make_unique<document::TextField>("body", bodyStr));
+            // Use DOCS_AND_FREQS_AND_POSITIONS to enable phrase queries.
+            // Matches Lucene's default TextField behavior.
+            static const document::FieldType ftPos = []() {
+                document::FieldType ft;
+                ft.indexOptions = index::IndexOptions::DOCS_AND_FREQS_AND_POSITIONS;
+                ft.stored = false;
+                ft.tokenized = true;
+                return ft;
+            }();
+
+            doc.add(std::make_unique<document::TextField>("title", title, ftPos));
+            doc.add(std::make_unique<document::TextField>("body", bodyStr, ftPos));
             doc.add(std::make_unique<document::StringField>("date", date));
 
             docCount_++;

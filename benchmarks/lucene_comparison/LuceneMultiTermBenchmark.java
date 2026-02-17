@@ -376,6 +376,54 @@ public class LuceneMultiTermBenchmark {
             printResult(r);
         }
 
+        // Test 10: Phrase queries (exact match, slop=0)
+        {
+            PhraseQuery.Builder builder = new PhraseQuery.Builder();
+            builder.add(new Term("body", "oil"), 0);
+            builder.add(new Term("body", "price"), 1);
+            PhraseQuery query = builder.build();
+            QueryResult r = benchmarkQuery(searcher, "Phrase: 'oil price'", 2, "PHRASE", query, 10, 100, 10);
+            results.add(r);
+            printResult(r);
+        }
+        {
+            PhraseQuery.Builder builder = new PhraseQuery.Builder();
+            builder.add(new Term("body", "trade"), 0);
+            builder.add(new Term("body", "deficit"), 1);
+            PhraseQuery query = builder.build();
+            QueryResult r = benchmarkQuery(searcher, "Phrase: 'trade deficit'", 2, "PHRASE", query, 10, 100, 10);
+            results.add(r);
+            printResult(r);
+        }
+        {
+            PhraseQuery.Builder builder = new PhraseQuery.Builder();
+            builder.add(new Term("body", "interest"), 0);
+            builder.add(new Term("body", "rate"), 1);
+            PhraseQuery query = builder.build();
+            QueryResult r = benchmarkQuery(searcher, "Phrase: 'interest rate'", 2, "PHRASE", query, 10, 100, 10);
+            results.add(r);
+            printResult(r);
+        }
+        {
+            PhraseQuery.Builder builder = new PhraseQuery.Builder();
+            builder.add(new Term("body", "stock"), 0);
+            builder.add(new Term("body", "market"), 1);
+            PhraseQuery query = builder.build();
+            QueryResult r = benchmarkQuery(searcher, "Phrase: 'stock market'", 2, "PHRASE", query, 10, 100, 10);
+            results.add(r);
+            printResult(r);
+        }
+        {
+            PhraseQuery.Builder builder = new PhraseQuery.Builder();
+            builder.add(new Term("body", "federal"), 0);
+            builder.add(new Term("body", "reserve"), 1);
+            builder.add(new Term("body", "bank"), 2);
+            PhraseQuery query = builder.build();
+            QueryResult r = benchmarkQuery(searcher, "Phrase 3-term: 'federal reserve bank'", 3, "PHRASE", query, 10, 100, 10);
+            results.add(r);
+            printResult(r);
+        }
+
         reader.close();
         dir.close();
 

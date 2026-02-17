@@ -10,6 +10,7 @@
 #include "diagon/index/IndexWriter.h"
 #include "diagon/search/BooleanQuery.h"
 #include "diagon/search/IndexSearcher.h"
+#include "diagon/search/PhraseQuery.h"
 #include "diagon/search/TermQuery.h"
 #include "diagon/store/FSDirectory.h"
 #include "diagon/store/MMapDirectory.h"
@@ -268,6 +269,43 @@ int main(int argc, char* argv[]) {
                      builder.add(std::make_shared<search::TermQuery>(search::Term("body", t)),
                                  search::Occur::SHOULD);
                  }
+                 return builder.build();
+             }},
+            // Phrase queries (exact match, slop=0)
+            {"Phrase: 'oil price'",
+             []() {
+                 search::PhraseQuery::Builder builder("body");
+                 builder.add("oil");
+                 builder.add("price");
+                 return builder.build();
+             }},
+            {"Phrase: 'trade deficit'",
+             []() {
+                 search::PhraseQuery::Builder builder("body");
+                 builder.add("trade");
+                 builder.add("deficit");
+                 return builder.build();
+             }},
+            {"Phrase: 'interest rate'",
+             []() {
+                 search::PhraseQuery::Builder builder("body");
+                 builder.add("interest");
+                 builder.add("rate");
+                 return builder.build();
+             }},
+            {"Phrase: 'stock market'",
+             []() {
+                 search::PhraseQuery::Builder builder("body");
+                 builder.add("stock");
+                 builder.add("market");
+                 return builder.build();
+             }},
+            {"Phrase 3-term: 'federal reserve bank'",
+             []() {
+                 search::PhraseQuery::Builder builder("body");
+                 builder.add("federal");
+                 builder.add("reserve");
+                 builder.add("bank");
                  return builder.build();
              }}};
 
