@@ -190,6 +190,7 @@ public:
     int64_t totalTermFreq() const override;
     std::unique_ptr<index::PostingsEnum> postings() override;
     std::unique_ptr<index::PostingsEnum> postings(bool useBatch) override;
+    std::unique_ptr<index::PostingsEnum> postings(int features) override;
 
     /**
      * Get impacts-aware postings for WAND optimization.

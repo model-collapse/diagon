@@ -98,6 +98,23 @@ public:
     void setSkipInput(std::unique_ptr<store::IndexInput> input) { skipIn_ = std::move(input); }
 
     /**
+     * Set position input stream.
+     *
+     * @param input IndexInput to read position data from (.pos file)
+     */
+    void setPositionInput(std::unique_ptr<store::IndexInput> input) { posIn_ = std::move(input); }
+
+    /**
+     * Get postings with position support for phrase queries.
+     *
+     * @param fieldInfo Field metadata
+     * @param termState Term state from writer (file pointers including posStartFP)
+     * @return PostingsEnum with nextPosition() support
+     */
+    std::unique_ptr<index::PostingsEnum> postingsWithPositions(const index::FieldInfo& fieldInfo,
+                                                                const TermState& termState);
+
+    /**
      * Read skip entries for a term from .skp file.
      *
      * @param termState Term state with skip file pointer
@@ -109,6 +126,7 @@ private:
     // Input files
     std::unique_ptr<store::IndexInput> docIn_;   // Doc IDs and frequencies
     std::unique_ptr<store::IndexInput> skipIn_;  // Skip entries with impacts
+    std::unique_ptr<store::IndexInput> posIn_;   // Position data (optional)
 
     // Segment info
     std::string segmentName_;
@@ -327,6 +345,73 @@ private:
      * Falls back to VInt for remaining docs (< 4).
      */
     void refillBuffer();
+};
+
+/**
+ * PostingsEnum with position support for phrase queries.
+ *
+ * Reads doc/freq from .doc file (StreamVByte) and positions from .pos file (VInt delta).
+ * Supports nextPosition() for phrase matching.
+ */
+class Lucene104PostingsEnumWithPositions : public index::PostingsEnum {
+public:
+    /**
+     * Constructor
+     * @param docIn Input for reading doc IDs and freqs
+     * @param posIn Input for reading positions
+     * @param termState Term state with file pointers
+     * @param writeFreqs Whether frequencies are encoded
+     */
+    Lucene104PostingsEnumWithPositions(std::unique_ptr<store::IndexInput> docIn,
+                                       std::unique_ptr<store::IndexInput> posIn,
+                                       const TermState& termState, bool writeFreqs);
+
+    // ==================== DocIdSetIterator ====================
+
+    int docID() const override { return currentDoc_; }
+
+    int nextDoc() override;
+
+    int advance(int target) override;
+
+    int64_t cost() const override { return docFreq_; }
+
+    // ==================== PostingsEnum ====================
+
+    int freq() const override { return currentFreq_; }
+
+    int nextPosition() override;
+
+private:
+    std::unique_ptr<store::IndexInput> docIn_;
+    std::unique_ptr<store::IndexInput> posIn_;
+    int docFreq_;
+    [[maybe_unused]] int64_t totalTermFreq_;
+    bool writeFreqs_;
+
+    // Current state
+    int currentDoc_;
+    int currentFreq_;
+    int docsRead_;
+
+    // Position state
+    int positionsRemaining_;  // freq - positions consumed for current doc
+    int lastPosition_;        // For delta decoding within a doc
+
+    // StreamVByte buffering for docs
+    static constexpr int BUFFER_SIZE = 32;
+    static constexpr int STREAMVBYTE_GROUP_SIZE = 4;
+    uint32_t docDeltaBuffer_[BUFFER_SIZE];
+    uint32_t freqBuffer_[BUFFER_SIZE];
+    int bufferPos_;
+    int bufferLimit_;
+
+    void refillBuffer();
+
+    /**
+     * Skip any unread positions from the previous document.
+     */
+    void skipPositions();
 };
 
 }  // namespace lucene104

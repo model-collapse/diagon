@@ -91,6 +91,7 @@ set(DIAGON_CORE_SOURCES
     src/search/BM25ScorerSIMD.cpp
     src/search/WANDScorer.cpp
     src/search/MaxScoreBulkScorer.cpp
+    src/search/PhraseQuery.cpp
 
     # Sparse (Sparse vector support)
     src/sparse/SparseVector.cpp
@@ -275,6 +276,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/search/BulkScorer.h
     include/diagon/search/MaxScoreBulkScorer.h
     include/diagon/search/BM25Similarity.h
+    include/diagon/search/PhraseQuery.h
 
     # Sparse
     include/diagon/sparse/SparseVector.h

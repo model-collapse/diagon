@@ -18,6 +18,7 @@ namespace lucene104 {
 
 // File extensions
 static const std::string DOC_EXTENSION = "doc";
+static const std::string POS_EXTENSION = "pos";
 
 Lucene104PostingsReader::Lucene104PostingsReader(index::SegmentReadState& state)
     : docIn_(nullptr)
@@ -98,12 +99,33 @@ Lucene104PostingsReader::impactsPostings(const index::FieldInfo& fieldInfo,
                                                               writeFreqs, skipEntries);
 }
 
+std::unique_ptr<index::PostingsEnum>
+Lucene104PostingsReader::postingsWithPositions(const index::FieldInfo& fieldInfo,
+                                                const TermState& termState) {
+    if (!docIn_) {
+        throw std::runtime_error("No input set for PostingsReader");
+    }
+
+    if (termState.posStartFP < 0 || !posIn_) {
+        // No position data - fall back to regular postings
+        return postings(fieldInfo, termState);
+    }
+
+    bool writeFreqs = (fieldInfo.indexOptions >= index::IndexOptions::DOCS_AND_FREQS);
+
+    return std::make_unique<Lucene104PostingsEnumWithPositions>(
+        docIn_->clone(), posIn_->clone(), termState, writeFreqs);
+}
+
 void Lucene104PostingsReader::close() {
     if (docIn_) {
         docIn_.reset();
     }
     if (skipIn_) {
         skipIn_.reset();
+    }
+    if (posIn_) {
+        posIn_.reset();
     }
 }
 
@@ -698,6 +720,146 @@ int Lucene104PostingsEnum::advance(int target) {
         }
     }
     return currentDoc_;
+}
+
+// ==================== Lucene104PostingsEnumWithPositions ====================
+
+Lucene104PostingsEnumWithPositions::Lucene104PostingsEnumWithPositions(
+    std::unique_ptr<store::IndexInput> docIn, std::unique_ptr<store::IndexInput> posIn,
+    const TermState& termState, bool writeFreqs)
+    : docIn_(std::move(docIn))
+    , posIn_(std::move(posIn))
+    , docFreq_(termState.docFreq)
+    , totalTermFreq_(termState.totalTermFreq)
+    , writeFreqs_(writeFreqs)
+    , currentDoc_(-1)
+    , currentFreq_(1)
+    , docsRead_(0)
+    , positionsRemaining_(0)
+    , lastPosition_(0)
+    , docDeltaBuffer_{}
+    , freqBuffer_{}
+    , bufferPos_(0)
+    , bufferLimit_(0) {
+    // Seek to start of this term's doc/freq data
+    docIn_->seek(termState.docStartFP);
+    // Seek to start of this term's position data
+    posIn_->seek(termState.posStartFP);
+}
+
+int Lucene104PostingsEnumWithPositions::nextDoc() {
+    // Skip any unread positions from previous doc
+    skipPositions();
+
+    if (docsRead_ >= docFreq_) {
+        currentDoc_ = NO_MORE_DOCS;
+        return NO_MORE_DOCS;
+    }
+
+    // Refill doc/freq buffer if empty
+    if (bufferPos_ >= bufferLimit_) {
+        refillBuffer();
+    }
+
+    // Get doc delta from buffer
+    int docDelta = static_cast<int32_t>(docDeltaBuffer_[bufferPos_]);
+
+    // Update current doc (delta encoding)
+    if (currentDoc_ == -1) {
+        currentDoc_ = docDelta;
+    } else {
+        currentDoc_ += docDelta;
+    }
+
+    // Get frequency from buffer
+    currentFreq_ = writeFreqs_ ? static_cast<int32_t>(freqBuffer_[bufferPos_]) : 1;
+
+    bufferPos_++;
+    docsRead_++;
+
+    // Reset position state for new doc
+    positionsRemaining_ = currentFreq_;
+    lastPosition_ = 0;
+
+    return currentDoc_;
+}
+
+int Lucene104PostingsEnumWithPositions::advance(int target) {
+    while (currentDoc_ < target) {
+        if (nextDoc() == NO_MORE_DOCS) {
+            return NO_MORE_DOCS;
+        }
+    }
+    return currentDoc_;
+}
+
+int Lucene104PostingsEnumWithPositions::nextPosition() {
+    if (positionsRemaining_ <= 0) {
+        return -1;
+    }
+    // Delta decode position
+    int posDelta = posIn_->readVInt();
+    lastPosition_ += posDelta;
+    positionsRemaining_--;
+    return lastPosition_;
+}
+
+void Lucene104PostingsEnumWithPositions::skipPositions() {
+    // Skip any unread positions from previous doc by reading them from the stream
+    while (positionsRemaining_ > 0) {
+        posIn_->readVInt();  // Read and discard delta
+        positionsRemaining_--;
+    }
+}
+
+void Lucene104PostingsEnumWithPositions::refillBuffer() {
+    // Same logic as Lucene104PostingsEnum::refillBuffer()
+    bufferPos_ = 0;
+    int remaining = docFreq_ - docsRead_;
+    int bufferIdx = 0;
+
+    // Fill buffer with StreamVByte groups
+    while (remaining >= STREAMVBYTE_GROUP_SIZE &&
+           bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
+        uint8_t docDeltaEncoded[17];
+        uint8_t controlByte = docIn_->readByte();
+        docDeltaEncoded[0] = controlByte;
+        int dataBytes = 0;
+        for (int i = 0; i < 4; ++i) {
+            dataBytes += ((controlByte >> (i * 2)) & 0x03) + 1;
+        }
+        docIn_->readBytes(docDeltaEncoded + 1, dataBytes);
+        util::StreamVByte::decode4(docDeltaEncoded, &docDeltaBuffer_[bufferIdx]);
+
+        if (writeFreqs_) {
+            uint8_t freqEncoded[17];
+            controlByte = docIn_->readByte();
+            freqEncoded[0] = controlByte;
+            dataBytes = 0;
+            for (int i = 0; i < 4; ++i) {
+                dataBytes += ((controlByte >> (i * 2)) & 0x03) + 1;
+            }
+            docIn_->readBytes(freqEncoded + 1, dataBytes);
+            util::StreamVByte::decode4(freqEncoded, &freqBuffer_[bufferIdx]);
+        }
+        bufferIdx += STREAMVBYTE_GROUP_SIZE;
+        remaining -= STREAMVBYTE_GROUP_SIZE;
+    }
+
+    // VInt tail for remaining < 4 docs
+    int spaceLeft = BUFFER_SIZE - bufferIdx;
+    int docsToRead = std::min(remaining, spaceLeft);
+    if (docsToRead > 0) {
+        for (int i = 0; i < docsToRead; ++i) {
+            docDeltaBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+            if (writeFreqs_) {
+                freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+            }
+        }
+        bufferIdx += docsToRead;
+    }
+
+    bufferLimit_ = bufferIdx;
 }
 
 }  // namespace lucene104

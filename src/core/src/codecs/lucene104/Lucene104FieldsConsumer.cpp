@@ -86,6 +86,9 @@ void Lucene104FieldsConsumer::writeField(const std::string& fieldName, index::Te
     // Set field on postings writer
     postingsWriter_->setField(*fieldInfo);
 
+    // Determine if field has positions
+    bool writePositions = fieldInfo->hasPositions();
+
     // Get norms for this field if available
     std::unique_ptr<index::NumericDocValues> normValues;
     if (norms) {
@@ -126,6 +129,14 @@ void Lucene104FieldsConsumer::writeField(const std::string& fieldName, index::Te
             // Write document to postings writer with norm
             postingsWriter_->startDoc(doc, freq, norm);
 
+            // Write positions if field has them
+            if (writePositions) {
+                for (int p = 0; p < freq; p++) {
+                    int pos = postingsEnum->nextPosition();
+                    postingsWriter_->addPosition(pos);
+                }
+            }
+
             // Update statistics
             docFreq++;
             totalTermFreq += freq;
@@ -134,10 +145,11 @@ void Lucene104FieldsConsumer::writeField(const std::string& fieldName, index::Te
         // Finish term and get term state (file pointers, metadata)
         TermState termState = postingsWriter_->finishTerm();
 
-        // Add term to term dictionary with statistics (including skipStartFP for WAND)
+        // Add term to term dictionary with statistics
         util::BytesRef termBytesRef(reinterpret_cast<const uint8_t*>(term.data()), term.size());
         blocktree::BlockTreeTermsWriter::TermStats termStats(
-            docFreq, totalTermFreq, termState.docStartFP, termState.skipStartFP);
+            docFreq, totalTermFreq, termState.docStartFP, termState.skipStartFP,
+            termState.posStartFP);
 
         termDictWriter.addTerm(termBytesRef, termStats);
     }
@@ -204,6 +216,11 @@ void Lucene104FieldsConsumer::close() {
             // Get accumulated bytes from in-memory buffers
             auto docBytes = postingsWriter_->getBytes();
             auto skipBytes = postingsWriter_->getSkipBytes();
+            auto posBytes = postingsWriter_->getPositionBytes();
+
+            // Save file names before close (close resets the writer)
+            std::string skipFile = postingsWriter_->getSkipFileName();
+            std::string posFile = postingsWriter_->getPosFileName();
 
             // Close the writer (clears in-memory buffers)
             postingsWriter_->close();
@@ -223,13 +240,18 @@ void Lucene104FieldsConsumer::close() {
 
             // Write skip file if we have skip data
             if (!skipBytes.empty()) {
-                std::string skipFile = postingsWriter_->getSkipFileName();
-
-                // Write bytes to actual .skp file
                 auto skipOut = state_.directory->createOutput(skipFile, store::IOContext::DEFAULT);
                 skipOut->writeBytes(skipBytes.data(), skipBytes.size());
                 skipOut->close();
                 files_.push_back(skipFile);
+            }
+
+            // Write position file if we have position data
+            if (!posBytes.empty()) {
+                auto posOut = state_.directory->createOutput(posFile, store::IOContext::DEFAULT);
+                posOut->writeBytes(posBytes.data(), posBytes.size());
+                posOut->close();
+                files_.push_back(posFile);
             }
         }
 

@@ -17,12 +17,15 @@ namespace lucene104 {
 // File extensions
 static const std::string DOC_EXTENSION = "doc";
 static const std::string SKIP_EXTENSION = "skp";
+static const std::string POS_EXTENSION = "pos";
 
 Lucene104PostingsWriter::Lucene104PostingsWriter(index::SegmentWriteState& state)
     : docOut_(nullptr)
     , skipOut_(nullptr)
+    , posOut_(nullptr)
     , indexOptions_(index::IndexOptions::DOCS)
     , writeFreqs_(false)
+    , writePositions_(false)
     , docStartFP_(0)
     , skipStartFP_(-1)
     , lastDocID_(0)
@@ -31,6 +34,8 @@ Lucene104PostingsWriter::Lucene104PostingsWriter(index::SegmentWriteState& state
     , directory_(state.directory)
     , segmentName_(state.segmentName)
     , segmentSuffix_(state.segmentSuffix)
+    , posStartFP_(-1)
+    , lastPosition_(0)
     , docDeltaBuffer_{}  // Zero-initialize
     , freqBuffer_{}      // Zero-initialize
     , bufferPos_(0)
@@ -53,14 +58,22 @@ Lucene104PostingsWriter::Lucene104PostingsWriter(index::SegmentWriteState& state
     }
     skipFileName_ += "." + SKIP_EXTENSION;
 
+    // Create .pos output file name (for positions)
+    posFileName_ = segmentName_;
+    if (!segmentSuffix_.empty()) {
+        posFileName_ += "_" + segmentSuffix_;
+    }
+    posFileName_ += "." + POS_EXTENSION;
+
     // Use in-memory buffers - FieldsConsumer will write to actual files
     docOut_ = std::make_unique<store::ByteBuffersIndexOutput>(docFileName_);
     skipOut_ = std::make_unique<store::ByteBuffersIndexOutput>(skipFileName_);
+    posOut_ = std::make_unique<store::ByteBuffersIndexOutput>(posFileName_);
 }
 
 Lucene104PostingsWriter::~Lucene104PostingsWriter() {
     // Ensure close() was called
-    if (docOut_ || skipOut_) {
+    if (docOut_ || skipOut_ || posOut_) {
         try {
             close();
         } catch (...) {
@@ -74,10 +87,7 @@ void Lucene104PostingsWriter::setField(const index::FieldInfo& fieldInfo) {
 
     // Determine what to write based on index options
     writeFreqs_ = (indexOptions_ >= index::IndexOptions::DOCS_AND_FREQS);
-
-    // TODO Phase 2.1: Support positions, offsets, payloads
-    // bool writePositions = (indexOptions >= IndexOptions::DOCS_AND_FREQS_AND_POSITIONS);
-    // bool writeOffsets = (indexOptions >= IndexOptions::DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
+    writePositions_ = (indexOptions_ >= index::IndexOptions::DOCS_AND_FREQS_AND_POSITIONS);
 }
 
 void Lucene104PostingsWriter::startTerm() {
@@ -88,6 +98,10 @@ void Lucene104PostingsWriter::startTerm() {
     docCount_ = 0;
     totalTermFreq_ = 0;
     bufferPos_ = 0;  // Reset StreamVByte buffer
+
+    // Record position file pointer for this term
+    posStartFP_ = writePositions_ ? posOut_->getFilePointer() : -1;
+    lastPosition_ = 0;
 
     // Reset block-level tracking for impacts
     blockMaxFreq_ = 0;
@@ -139,10 +153,22 @@ void Lucene104PostingsWriter::startDoc(int docID, int freq, int8_t norm) {
     lastDocID_ = docID;
     docCount_++;
 
+    // Reset position delta for new document
+    lastPosition_ = 0;
+
     // Flush when buffer is full
     if (bufferPos_ >= BUFFER_SIZE) {
         flushBuffer();
     }
+}
+
+void Lucene104PostingsWriter::addPosition(int position) {
+    if (!writePositions_) return;
+
+    // Delta-encode positions within a document
+    int posDelta = position - lastPosition_;
+    posOut_->writeVInt(posDelta);
+    lastPosition_ = position;
 }
 
 TermState Lucene104PostingsWriter::finishTerm() {
@@ -175,6 +201,7 @@ TermState Lucene104PostingsWriter::finishTerm() {
 
     TermState state;
     state.docStartFP = docStartFP_;
+    state.posStartFP = posStartFP_;
     state.skipStartFP = skipStartFP_;
     state.docFreq = docCount_;
     state.totalTermFreq = totalTermFreq_;
@@ -267,6 +294,10 @@ void Lucene104PostingsWriter::close() {
         skipOut_->close();
         skipOut_.reset();
     }
+    if (posOut_) {
+        posOut_->close();
+        posOut_.reset();
+    }
 }
 
 int64_t Lucene104PostingsWriter::getFilePointer() const {
@@ -285,6 +316,15 @@ std::vector<uint8_t> Lucene104PostingsWriter::getBytes() const {
 std::vector<uint8_t> Lucene104PostingsWriter::getSkipBytes() const {
     // Cast to ByteBuffersIndexOutput to access toArrayCopy()
     auto* bufOut = dynamic_cast<store::ByteBuffersIndexOutput*>(skipOut_.get());
+    if (bufOut) {
+        return bufOut->toArrayCopy();
+    }
+    return std::vector<uint8_t>();
+}
+
+std::vector<uint8_t> Lucene104PostingsWriter::getPositionBytes() const {
+    // Cast to ByteBuffersIndexOutput to access toArrayCopy()
+    auto* bufOut = dynamic_cast<store::ByteBuffersIndexOutput*>(posOut_.get());
     if (bufOut) {
         return bufOut->toArrayCopy();
     }

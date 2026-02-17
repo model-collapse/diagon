@@ -103,6 +103,22 @@ public:
      */
     virtual std::unique_ptr<PostingsEnum> postings(bool useBatch) {
         // Default implementation: ignore useBatch flag
+        (void)useBatch;
+        return postings();
+    }
+
+    /**
+     * Returns postings for current term with requested features.
+     *
+     * When FEATURE_POSITIONS is set, returns a PostingsEnum that supports
+     * nextPosition() for phrase matching.
+     *
+     * @param features Bitmask of PostingsFeatures flags
+     * @return PostingsEnum with requested capabilities
+     */
+    virtual std::unique_ptr<PostingsEnum> postings(int features) {
+        // Default implementation: ignore features
+        (void)features;
         return postings();
     }
 };

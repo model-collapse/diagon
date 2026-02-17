@@ -67,13 +67,17 @@ public:
         /** Skip file pointer (Block-Max WAND support) */
         int64_t skipStartFP = -1;
 
+        /** Position data file pointer (-1 = no positions) */
+        int64_t posStartFP = -1;
+
         /** Constructor */
         TermStats() = default;
-        TermStats(int df, int64_t ttf, int64_t fp, int64_t skip = -1)
+        TermStats(int df, int64_t ttf, int64_t fp, int64_t skip = -1, int64_t pos = -1)
             : docFreq(df)
             , totalTermFreq(ttf)
             , postingsFP(fp)
-            , skipStartFP(skip) {}
+            , skipStartFP(skip)
+            , posStartFP(pos) {}
     };
 
     /**

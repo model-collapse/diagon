@@ -42,6 +42,9 @@ struct TermState {
     // File pointer to start of doc IDs
     int64_t docStartFP = 0;
 
+    // File pointer to start of position data (-1 = no positions)
+    int64_t posStartFP = -1;
+
     // Document frequency (number of docs containing this term)
     int docFreq = 0;
 
@@ -116,6 +119,14 @@ public:
     void startDoc(int docID, int freq, int8_t norm = 0);
 
     /**
+     * Add a position for the current document.
+     * Must be called after startDoc() and before the next startDoc().
+     * Only writes when field has positions indexed.
+     * @param position Term position in document
+     */
+    void addPosition(int position);
+
+    /**
      * Finish the current term and return its state.
      * @return TermState with file pointers
      */
@@ -146,19 +157,34 @@ public:
     std::vector<uint8_t> getSkipBytes() const;
 
     /**
+     * Get the bytes written to the .pos file (for testing).
+     * Only works with ByteBuffersIndexOutput.
+     * @return Vector of bytes written
+     */
+    std::vector<uint8_t> getPositionBytes() const;
+
+    /**
      * Get skip file name.
      * @return Skip file name
      */
     std::string getSkipFileName() const { return skipFileName_; }
 
+    /**
+     * Get position file name.
+     * @return Position file name
+     */
+    std::string getPosFileName() const { return posFileName_; }
+
 private:
     // Output files
     std::unique_ptr<store::IndexOutput> docOut_;   // Doc IDs and frequencies
     std::unique_ptr<store::IndexOutput> skipOut_;  // Skip entries with impacts (optional)
+    std::unique_ptr<store::IndexOutput> posOut_;   // Position data (optional)
 
     // Current field being written
     index::IndexOptions indexOptions_;
     bool writeFreqs_;
+    bool writePositions_;
 
     // Per-term state
     int64_t docStartFP_;
@@ -173,6 +199,11 @@ private:
     std::string segmentSuffix_;
     std::string docFileName_;   // Full .doc file name
     std::string skipFileName_;  // Full .skp file name
+    std::string posFileName_;   // Full .pos file name
+
+    // Per-term position state
+    int64_t posStartFP_;   // File pointer at start of positions for current term
+    int lastPosition_;     // Last position written (for delta encoding within a doc)
 
     // StreamVByte buffering
     static constexpr int BUFFER_SIZE = 4;  // StreamVByte processes 4 integers at a time

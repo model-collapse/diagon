@@ -51,8 +51,9 @@ public:
 
 private:
     const FreqProxTermsWriter& termsWriter_;
+    const FieldInfos& fieldInfos_;
 
-    // Pre-computed field list (currently only "_all" field)
+    // Pre-computed field list
     std::vector<std::string> fields_;
 
     // Fields iterator implementation
@@ -89,8 +90,10 @@ public:
      *
      * @param fieldName Field name
      * @param termsWriter Terms writer containing postings
+     * @param hasPositions Whether the field indexes positions
      */
-    FreqProxTerms(const std::string& fieldName, const FreqProxTermsWriter& termsWriter);
+    FreqProxTerms(const std::string& fieldName, const FreqProxTermsWriter& termsWriter,
+                  bool hasPositions = false);
 
     // ==================== Terms Interface ====================
 
@@ -107,6 +110,7 @@ public:
 private:
     std::string fieldName_;
     const FreqProxTermsWriter& termsWriter_;
+    bool hasPositions_;
 
     // Pre-computed sorted term list
     std::vector<std::string> sortedTerms_;
@@ -130,9 +134,10 @@ public:
      * @param fieldName Field name for this terms enum
      * @param sortedTerms List of terms in sorted order
      * @param termsWriter Terms writer containing postings
+     * @param hasPositions Whether the field indexes positions
      */
     FreqProxTermsEnum(const std::string& fieldName, const std::vector<std::string>& sortedTerms,
-                      const FreqProxTermsWriter& termsWriter);
+                      const FreqProxTermsWriter& termsWriter, bool hasPositions = false);
 
     // ==================== TermsEnum Interface ====================
 
@@ -156,6 +161,7 @@ private:
     std::string fieldName_;
     const std::vector<std::string>& sortedTerms_;
     const FreqProxTermsWriter& termsWriter_;
+    bool hasPositions_;
 
     // Current position in term iteration
     int64_t termOrd_;  // Current term ordinal (-1 = before first term)
@@ -170,29 +176,49 @@ private:
     void loadCurrentPostings();
 
     // PostingsEnum implementation that wraps posting list
+    // Supports both formats:
+    //   Without positions: [docID, freq, docID, freq, ...]
+    //   With positions: [docID, freq, pos0, ..., posN, docID, freq, pos0, ...]
     class FreqProxPostingsEnum : public PostingsEnum {
     public:
-        FreqProxPostingsEnum(const std::vector<int>& postings)
+        FreqProxPostingsEnum(const std::vector<int>& postings, bool hasPositions = false)
             : postings_(postings)
-            , position_(-1)
+            , cursor_(-1)
             , currentDoc_(-1)
-            , currentFreq_(1) {}
+            , currentFreq_(1)
+            , hasPositions_(hasPositions)
+            , positionStart_(0)
+            , positionIndex_(0) {}
 
         // DocIdSetIterator
         int docID() const override { return currentDoc_; }
 
         int nextDoc() override {
-            position_++;
-            if (position_ >= static_cast<int>(postings_.size())) {
+            // First call: start at 0. Subsequent: skip past current entry.
+            if (cursor_ == -1) {
+                cursor_ = 0;
+            } else {
+                // Skip past: docID(1) + freq(1) + positions(currentFreq_ if hasPositions)
+                cursor_ += 2;
+                if (hasPositions_) {
+                    cursor_ += currentFreq_;
+                }
+            }
+
+            if (cursor_ >= static_cast<int>(postings_.size())) {
                 currentDoc_ = NO_MORE_DOCS;
                 return NO_MORE_DOCS;
             }
 
-            currentDoc_ = postings_[position_];
-            currentFreq_ = (position_ + 1 < static_cast<int>(postings_.size()))
-                               ? postings_[position_ + 1]
+            currentDoc_ = postings_[cursor_];
+            currentFreq_ = (cursor_ + 1 < static_cast<int>(postings_.size()))
+                               ? postings_[cursor_ + 1]
                                : 1;
-            position_++;  // Skip freq
+
+            if (hasPositions_) {
+                positionStart_ = cursor_ + 2;  // positions start after docID and freq
+                positionIndex_ = 0;
+            }
 
             return currentDoc_;
         }
@@ -205,17 +231,39 @@ private:
         }
 
         int64_t cost() const override {
-            return postings_.size() / 2;  // Number of docs (postings has [doc, freq] pairs)
+            // Estimate number of docs - not exact when positions present
+            // but sufficient for cost estimation
+            if (hasPositions_) {
+                // Can't easily compute without scanning; return conservative estimate
+                return std::max(static_cast<int64_t>(1),
+                                static_cast<int64_t>(postings_.size()) / 4);
+            }
+            return postings_.size() / 2;
         }
 
         // PostingsEnum
         int freq() const override { return currentFreq_; }
 
+        int nextPosition() override {
+            if (!hasPositions_ || positionIndex_ >= currentFreq_) {
+                return -1;
+            }
+            int idx = positionStart_ + positionIndex_;
+            if (idx >= static_cast<int>(postings_.size())) {
+                return -1;
+            }
+            positionIndex_++;
+            return postings_[idx];
+        }
+
     private:
         const std::vector<int>& postings_;
-        int position_;
+        int cursor_;       // Points to docID of current entry
         int currentDoc_;
         int currentFreq_;
+        bool hasPositions_;
+        int positionStart_;   // Index into postings_ where positions for current doc begin
+        int positionIndex_;   // How many positions consumed via nextPosition()
     };
 };
 

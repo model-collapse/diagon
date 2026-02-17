@@ -155,6 +155,7 @@ add_diagon_test(BM25NormsIntegrationTest unit/search/BM25NormsIntegrationTest.cp
 add_diagon_test(NumericRangeQueryTest unit/search/NumericRangeQueryTest.cpp)
 add_diagon_test(BooleanQueryTest unit/search/BooleanQueryTest.cpp)
 add_diagon_test(BM25PerformanceGuard unit/search/BM25PerformanceGuard.cpp)
+add_diagon_test(PhraseQueryTest unit/search/PhraseQueryTest.cpp)
 
 # Analysis tests
 add_diagon_test(TokenTest unit/analysis/TokenTest.cpp)

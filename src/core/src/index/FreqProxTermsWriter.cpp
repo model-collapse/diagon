@@ -28,9 +28,9 @@ FreqProxTermsWriter::FreqProxTermsWriter(FieldInfosBuilder& fieldInfosBuilder, s
     fieldToSortedTerms_.reserve(EXPECTED_FIELDS);
     fieldNameToId_.reserve(EXPECTED_FIELDS);
 
-    // Pre-size per-document term frequency cache (typical: 50-100 unique terms per doc)
+    // Pre-size per-document term positions cache (typical: 50-100 unique terms per doc)
     // This is reused across documents, so one-time allocation
-    termFreqsCache_.reserve(128);
+    termPositionsCache_.reserve(128);
 }
 
 void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) {
@@ -68,21 +68,30 @@ void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) 
         }
         fieldLengthMap[docID] = static_cast<int>(tokens.size());
 
-        // Count term frequencies using cached map (avoid allocation per document)
-        termFreqsCache_.clear();  // Reuse existing map
-        for (const auto& token : tokens) {
-            termFreqsCache_[token]++;
+        // Collect term positions using cached map (avoid allocation per document)
+        termPositionsCache_.clear();  // Reuse existing map
+        for (int pos = 0; pos < static_cast<int>(tokens.size()); pos++) {
+            termPositionsCache_[tokens[pos]].push_back(pos);
         }
 
-        // Add each unique term to posting lists with actual frequency
-        for (const auto& [term, freq] : termFreqsCache_) {
-            addTermOccurrence(fieldName, term, docID, freq, fieldType.indexOptions);
+        // Determine whether to store positions based on indexOptions
+        bool storePositions =
+            (fieldType.indexOptions >= IndexOptions::DOCS_AND_FREQS_AND_POSITIONS);
+
+        // Add each unique term to posting lists with actual frequency and positions
+        for (const auto& [term, positions] : termPositionsCache_) {
+            int freq = static_cast<int>(positions.size());
+            addTermOccurrence(fieldName, term, docID, freq,
+                              storePositions ? positions : std::vector<int>{},
+                              fieldType.indexOptions);
         }
     }
 }
 
 void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const std::string& term,
-                                            int docID, int freq, IndexOptions indexOptions) {
+                                            int docID, int freq,
+                                            const std::vector<int>& positions,
+                                            IndexOptions indexOptions) {
     // Get or assign field ID (reduces hash overhead: hash int vs hash string)
     auto fieldIdIt = fieldNameToId_.find(fieldName);
     int fieldId;
@@ -104,8 +113,8 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
     FieldStats& stats = fieldStats_[fieldName];
 
     if (it == termToPosting_.end()) {
-        // New term - create posting list with actual frequency
-        PostingData data = createPostingList(term, docID, freq);
+        // New term - create posting list with actual frequency and positions
+        PostingData data = createPostingList(term, docID, freq, positions);
 
         // Track memory incrementally: field + term + posting data
         bytesUsed_ += fieldName.capacity() + term.capacity();  // String storage
@@ -130,7 +139,7 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
         }
 
         size_t oldCapacity = data.postings.capacity();
-        appendToPostingList(data, docID, freq);
+        appendToPostingList(data, docID, freq, positions);
         size_t newCapacity = data.postings.capacity();
 
         // Track delta only if vector grew (reallocation occurred)
@@ -144,29 +153,38 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
     }
 }
 
-FreqProxTermsWriter::PostingData FreqProxTermsWriter::createPostingList(const std::string& term,
-                                                                        int docID, int freq) {
+FreqProxTermsWriter::PostingData FreqProxTermsWriter::createPostingList(
+    const std::string& term, int docID, int freq, const std::vector<int>& positions) {
     PostingData data;
 
     // Aggressive pre-allocation: typical term has 10-50 postings in Reuters
-    // Pre-allocate 100 ints (50 postings = 50 docs) to avoid most reallocations
-    // For terms with > 50 postings, vector will still grow but far less frequently
+    // Pre-allocate 100 ints to avoid most reallocations
     data.postings.reserve(100);
 
     // Store initial [docID, freq] pair
     data.postings.push_back(docID);
     data.postings.push_back(freq);
 
+    // Append positions after freq if provided
+    for (int pos : positions) {
+        data.postings.push_back(pos);
+    }
+
     data.lastDocID = docID;
 
     return data;
 }
 
-void FreqProxTermsWriter::appendToPostingList(PostingData& data, int docID, int freq) {
-    // Append [docID, freq] pair
-    // Most lists won't exceed 100 ints due to aggressive pre-allocation
+void FreqProxTermsWriter::appendToPostingList(PostingData& data, int docID, int freq,
+                                               const std::vector<int>& positions) {
+    // Append [docID, freq, pos0, ..., posN]
     data.postings.push_back(docID);
     data.postings.push_back(freq);
+
+    // Append positions after freq if provided
+    for (int pos : positions) {
+        data.postings.push_back(pos);
+    }
 
     data.lastDocID = docID;
 }

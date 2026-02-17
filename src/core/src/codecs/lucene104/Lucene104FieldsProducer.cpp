@@ -120,6 +120,17 @@ Lucene104FieldsProducer::Lucene104FieldsProducer(index::SegmentReadState& state)
         // Skip file doesn't exist - that's OK for small indexes
         // PostingsReader will work without skip data (just won't use WAND optimization)
     }
+
+    // Open .pos file if it exists (may not exist for indexes without positions)
+    // Position file is optional - used for phrase queries
+    try {
+        std::string posFile = segmentName_ + ".pos";
+        auto posInput = state.directory->openInput(posFile, store::IOContext::READ);
+        postingsReader_->setPositionInput(std::move(posInput));
+    } catch (const std::exception& e) {
+        // Position file doesn't exist - that's OK for indexes without position data
+        (void)e;
+    }
 }
 
 Lucene104FieldsProducer::~Lucene104FieldsProducer() {

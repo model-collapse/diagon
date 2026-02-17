@@ -135,6 +135,7 @@ void BlockTreeTermsWriter::writeBlock() {
         timOut_->writeVLong(stats.totalTermFreq);
         timOut_->writeVLong(stats.postingsFP);
         timOut_->writeVLong(stats.skipStartFP);  // Block-Max WAND support
+        timOut_->writeVLong(stats.posStartFP);   // Position data support
     }
 
     // Add block to FST

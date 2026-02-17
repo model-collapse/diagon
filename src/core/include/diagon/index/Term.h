@@ -82,6 +82,20 @@ public:
      */
     bool operator<(const Term& other) const { return compareTo(other) < 0; }
 
+    /**
+     * Equality check (for PhraseQuery)
+     */
+    bool equals(const Term& other) const { return field_ == other.field_ && *bytes_ == *other.bytes_; }
+
+    /**
+     * Hash code (for PhraseQuery)
+     */
+    size_t hashCode() const {
+        size_t h = std::hash<std::string>{}(field_);
+        h ^= std::hash<std::string>{}(bytes_->toString()) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        return h;
+    }
+
     // ==================== String Representation ====================
 
     std::string toString() const { return field_ + ":" + text(); }

@@ -35,9 +35,10 @@ class FieldInfosBuilder;
  *   ByteBlockPool: "term1\0term2\0term3\0..."
  *   IntBlockPool:  [docID, freq, docID, freq, ...]
  *
- * Posting List Format (Phase 2 - Simplified):
+ * Posting List Format:
  *   - Absolute docIDs (not deltas)
- *   - Format: [docID_abs, freq, docID_abs, freq, ...]
+ *   - Without positions: [docID, freq, docID, freq, ...]
+ *   - With positions: [docID, freq, pos0, ..., posN, docID, freq, pos0, ...]
  *   - Delta encoding happens during flush to codec
  *
  * Thread Safety: NOT thread-safe (per-thread instance in DWPT)
@@ -188,9 +189,10 @@ private:
     // Field metadata tracker (reference)
     FieldInfosBuilder& fieldInfosBuilder_;
 
-    // Reusable term frequency map (avoids allocating one per document)
+    // Reusable term positions map (avoids allocating one per document)
     // Cleared and reused for each document to reduce malloc overhead
-    std::unordered_map<std::string, int> termFreqsCache_;
+    // Maps term -> list of positions within the document
+    std::unordered_map<std::string, std::vector<int>> termPositionsCache_;
 
     // Field lengths for norm computation: fieldName -> (docID -> fieldLength)
     std::unordered_map<std::string, std::unordered_map<int, int>> fieldLengths_;
@@ -215,10 +217,12 @@ private:
      * @param term Term text
      * @param docID Document ID
      * @param freq Term frequency in document
+     * @param positions Term positions in document (empty if positions not indexed)
      * @param indexOptions Index options for field
      */
     void addTermOccurrence(const std::string& fieldName, const std::string& term, int docID,
-                           int freq, IndexOptions indexOptions);
+                           int freq, const std::vector<int>& positions,
+                           IndexOptions indexOptions);
 
     /**
      * Create new posting list for term
@@ -226,18 +230,22 @@ private:
      * @param term Term text
      * @param docID Document ID
      * @param freq Term frequency in document
+     * @param positions Term positions (appended after freq if non-empty)
      * @return Posting data
      */
-    PostingData createPostingList(const std::string& term, int docID, int freq);
+    PostingData createPostingList(const std::string& term, int docID, int freq,
+                                  const std::vector<int>& positions);
 
     /**
-     * Append docID/freq to existing posting list
+     * Append docID/freq/positions to existing posting list
      *
      * @param data Posting data to update
      * @param docID Document ID
      * @param freq Term frequency in document
+     * @param positions Term positions (appended after freq if non-empty)
      */
-    void appendToPostingList(PostingData& data, int docID, int freq);
+    void appendToPostingList(PostingData& data, int docID, int freq,
+                             const std::vector<int>& positions);
 };
 
 }  // namespace index

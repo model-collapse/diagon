@@ -9,6 +9,17 @@ namespace diagon {
 namespace index {
 
 /**
+ * Flags for requesting specific postings features.
+ * Based on: org.apache.lucene.index.PostingsEnum flags
+ */
+enum PostingsFeatures : int {
+    FEATURE_FREQS = 0x1,
+    FEATURE_POSITIONS = 0x2,
+    FEATURE_OFFSETS = 0x4,
+    FEATURE_PAYLOADS = 0x8
+};
+
+/**
  * Iterates over postings (doc IDs and term frequencies).
  *
  * Extends DocIdSetIterator with term-specific data access.
@@ -39,11 +50,10 @@ public:
      * Next position (for DOCS_AND_FREQS_AND_POSITIONS).
      * Call freq() times to iterate all positions.
      *
-     * Phase 2 MVP: Not implemented yet
-     * @return Position or -1
+     * @return Position or -1 if positions not available
      */
     virtual int nextPosition() {
-        return -1;  // Not supported in Phase 2 MVP
+        return -1;  // Default: no position support
     }
 
     /**

@@ -16,7 +16,8 @@ namespace index {
 // ==================== FreqProxFields Implementation ====================
 
 FreqProxFields::FreqProxFields(const FreqProxTermsWriter& termsWriter, const FieldInfos& fieldInfos)
-    : termsWriter_(termsWriter) {
+    : termsWriter_(termsWriter)
+    , fieldInfos_(fieldInfos) {
     // Iterate over actual fields from FieldInfos
     for (const auto& fieldInfo : fieldInfos) {
         // Only include indexed fields
@@ -33,7 +34,14 @@ std::unique_ptr<Terms> FreqProxFields::terms(const std::string& field) {
         return nullptr;  // Field not found
     }
 
-    return std::make_unique<FreqProxTerms>(field, termsWriter_);
+    // Check if field indexes positions
+    bool hasPositions = false;
+    const auto* fi = fieldInfos_.fieldInfo(field);
+    if (fi) {
+        hasPositions = fi->hasPositions();
+    }
+
+    return std::make_unique<FreqProxTerms>(field, termsWriter_, hasPositions);
 }
 
 int FreqProxFields::size() const {
@@ -46,9 +54,11 @@ std::unique_ptr<Fields::Iterator> FreqProxFields::iterator() {
 
 // ==================== FreqProxTerms Implementation ====================
 
-FreqProxTerms::FreqProxTerms(const std::string& fieldName, const FreqProxTermsWriter& termsWriter)
+FreqProxTerms::FreqProxTerms(const std::string& fieldName, const FreqProxTermsWriter& termsWriter,
+                             bool hasPositions)
     : fieldName_(fieldName)
     , termsWriter_(termsWriter)
+    , hasPositions_(hasPositions)
     , sumTotalTermFreq_(0)
     , sumDocFreq_(0)
     , docCount_(0) {
@@ -64,7 +74,8 @@ FreqProxTerms::FreqProxTerms(const std::string& fieldName, const FreqProxTermsWr
 }
 
 std::unique_ptr<TermsEnum> FreqProxTerms::iterator() const {
-    return std::make_unique<FreqProxTermsEnum>(fieldName_, sortedTerms_, termsWriter_);
+    return std::make_unique<FreqProxTermsEnum>(fieldName_, sortedTerms_, termsWriter_,
+                                                hasPositions_);
 }
 
 int64_t FreqProxTerms::size() const {
@@ -87,10 +98,11 @@ int64_t FreqProxTerms::getSumDocFreq() const {
 
 FreqProxTermsEnum::FreqProxTermsEnum(const std::string& fieldName,
                                      const std::vector<std::string>& sortedTerms,
-                                     const FreqProxTermsWriter& termsWriter)
+                                     const FreqProxTermsWriter& termsWriter, bool hasPositions)
     : fieldName_(fieldName)
     , sortedTerms_(sortedTerms)
     , termsWriter_(termsWriter)
+    , hasPositions_(hasPositions)
     , termOrd_(-1)  // Before first term
     , currentDocFreq_(0)
     , currentTotalTermFreq_(0) {}
@@ -156,7 +168,7 @@ std::unique_ptr<PostingsEnum> FreqProxTermsEnum::postings() {
         throw std::runtime_error("No current term (call next() first)");
     }
 
-    return std::make_unique<FreqProxPostingsEnum>(currentPostings_);
+    return std::make_unique<FreqProxPostingsEnum>(currentPostings_, hasPositions_);
 }
 
 std::unique_ptr<PostingsEnum> FreqProxTermsEnum::postings(bool useBatch) {
@@ -170,14 +182,22 @@ void FreqProxTermsEnum::loadCurrentPostings() {
     currentPostings_ = termsWriter_.getPostingList(fieldName_, currentTerm_);
 
     // Compute statistics
-    // postings format: [docID, freq, docID, freq, ...]
+    // Without positions: [docID, freq, docID, freq, ...]
+    // With positions: [docID, freq, pos0, ..., posN, docID, freq, pos0, ...]
     currentDocFreq_ = 0;
     currentTotalTermFreq_ = 0;
 
-    for (size_t i = 0; i < currentPostings_.size(); i += 2) {
+    size_t i = 0;
+    while (i < currentPostings_.size()) {
+        // docID at i, freq at i+1
         int freq = (i + 1 < currentPostings_.size()) ? currentPostings_[i + 1] : 1;
         currentTotalTermFreq_ += freq;
         currentDocFreq_++;
+        // Skip: docID(1) + freq(1) + positions(freq if hasPositions)
+        i += 2;
+        if (hasPositions_) {
+            i += freq;
+        }
     }
 }
 
