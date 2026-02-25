@@ -1,280 +1,85 @@
-# Lucene++ Design Documentation Index
+# DIAGON Design Documentation Index
 
-This directory contains comprehensive design documentation for the Lucene++ search engine library.
+This directory contains comprehensive design documentation for the DIAGON search engine library.
 
 ## Design Documents
 
-### High-Level Design
+### Numbered Design Modules (00-15)
 
-**[design_overview.md](design_overview.md)** - System Architecture & Core Concepts
-- Executive summary and design goals
-- System architecture diagram
-- Core components overview
-- Design decisions and trade-offs
-- API examples
-- Performance considerations
-- Comparison with Apache Lucene and ClickHouse
+All design modules are complete and production-ready.
 
-### Core Module Designs
+| # | File | Description |
+|---|------|-------------|
+| 00 | [00_ARCHITECTURE_OVERVIEW.md](00_ARCHITECTURE_OVERVIEW.md) | System architecture, module organization, hybrid design |
+| 01 | [01_INDEX_READER_WRITER.md](01_INDEX_READER_WRITER.md) | IndexReader/Writer interfaces, concurrency, crash recovery |
+| 02 | [02_CODEC_ARCHITECTURE.md](02_CODEC_ARCHITECTURE.md) | Pluggable codec system, Producer/Consumer pattern |
+| 03 | [03_COLUMN_STORAGE.md](03_COLUMN_STORAGE.md) | IColumn with COW semantics, type system |
+| 04 | [04_COMPRESSION_CODECS.md](04_COMPRESSION_CODECS.md) | LZ4, ZSTD, Delta, Gorilla compression codecs |
+| 05 | [05_MERGETREE_DATA_PARTS.md](05_MERGETREE_DATA_PARTS.md) | MergeTree Wide/Compact data parts |
+| 06 | [06_GRANULARITY_AND_MARKS.md](06_GRANULARITY_AND_MARKS.md) | Granule-based indexing, mark files |
+| 07 | [07_QUERY_EXECUTION.md](07_QUERY_EXECUTION.md) | Query/Weight/Scorer framework, timeout, phrase queries |
+| 07a | [07a_FILTERS.md](07a_FILTERS.md) | Non-scoring filter system with skip index integration |
+| 08 | [08_MERGE_SYSTEM.md](08_MERGE_SYSTEM.md) | Merge policies, scheduler, write amplification |
+| 09 | [09_DIRECTORY_ABSTRACTION.md](09_DIRECTORY_ABSTRACTION.md) | FSDirectory, MMapDirectory, IndexInput/Output |
+| 10 | [10_FIELD_INFO.md](10_FIELD_INFO.md) | Field metadata, IndexOptions, DocValuesType |
+| 11 | [11_SKIP_INDEXES.md](11_SKIP_INDEXES.md) | MinMax, Set, BloomFilter skip indexes |
+| 12 | [12_STORAGE_TIERS.md](12_STORAGE_TIERS.md) | Hot/Warm/Cold/Frozen tier management |
+| 13 | [13_SIMD_POSTINGS_FORMAT.md](13_SIMD_POSTINGS_FORMAT.md) | SIMD-optimized format (superseded by 14) |
+| 14 | [14_UNIFIED_SIMD_STORAGE.md](14_UNIFIED_SIMD_STORAGE.md) | Unified SIMD storage layer |
+| 15 | [15_MULTI_VALUED_FIELDS.md](15_MULTI_VALUED_FIELDS.md) | Multi-valued array field support |
 
-#### Indexing
+### Supporting Documents
 
-**[design_index_writer.md](design_index_writer.md)** - Document Indexing & Segment Creation
-- DocumentsWriter for in-memory buffering
-- FieldRouter for storage routing
-- InMemoryTermDictionary and PostingLists
-- ColumnBuilder for columnar data
-- Flush flow and memory management
-- Concurrency model (single writer)
-- Circuit breaker integration points
+| File | Description |
+|------|-------------|
+| [README.md](README.md) | Design documentation overview and reading guide |
+| [DESIGN_SUMMARY.md](DESIGN_SUMMARY.md) | Complete design summary with all 15 modules |
+| [DESIGN_REVIEW.md](DESIGN_REVIEW.md) | Principal SDE design review |
+| [DESIGN_REFINEMENT_STATUS.md](DESIGN_REFINEMENT_STATUS.md) | Refinement tracking (13/13 complete) |
+| [REFINEMENT_SUMMARY.md](REFINEMENT_SUMMARY.md) | Refinement summary |
+| [ARCHITECTURE_CLARIFICATION_INDEXES.md](ARCHITECTURE_CLARIFICATION_INDEXES.md) | Inverted vs forward index clarification |
+| [RESEARCH_SIMD_FILTER_STRATEGIES.md](RESEARCH_SIMD_FILTER_STRATEGIES.md) | SIMD filter strategy cost model |
 
-**[design_index_reader.md](design_index_reader.md)** - Index Reading & Query Execution
-- Lock-free segment list management
-- Search implementation (basic and sorted)
-- Document loading
-- Column access for analytical queries
-- Aggregation support
-- Refresh mechanism
-- Caching strategies
-- Concurrent access patterns
+### Infrastructure Documents
 
-#### Data Structures
-
-**[design_term_dictionary.md](design_term_dictionary.md)** - Term Index Implementations
-- Trie (FST) implementation for prefix queries
-- Hash map implementation for exact lookups
-- Performance comparison
-- Serialization formats
-- Memory-mapped structures
-- Field-specific configuration
-- Iterator implementations
-
-**[design_posting_list.md](design_posting_list.md)** - Inverted Index Storage
-- Posting list structure and compression
-- Doc ID compression (VByte, PForDelta)
-- Skip lists for fast intersection
-- Position and payload encoding
-- Impact-ordered posting lists (for WAND)
-- Posting list merging (union/intersection)
-- Memory-mapped implementation
-- SIMD optimizations
-
-**[design_column_storage.md](design_column_storage.md)** - Columnar Data Organization
-- Type-level partitioning architecture
-- Granule-based organization (8K-16K rows)
-- Sparse primary indexing
-- Type-specific compression
-- ColumnReader and ColumnScanner
-- Multi-type columns (dynamic fields)
-- Array and nested column support
-- Granule caching and prefetching
-
-#### Query Processing
-
-**[design_query_execution.md](design_query_execution.md)** - Query Types & Execution
-- Query hierarchy (Query, Scorer interfaces)
-- TermQuery, BooleanQuery, RangeQuery
-- PhraseQuery with position checking
-- WildcardQuery expansion
-- Query rewriting and optimization
-- Early termination (WAND/BMW algorithms)
-- Circuit breaker integration
-- Testing strategies
-
-#### Management
-
-**[design_segment_management.md](design_segment_management.md)** - Segment Lifecycle
-- Segment structure and metadata
-- SegmentManager for lifecycle management
-- MergePolicy (TieredMergePolicy)
-- MergeScheduler with background threads
-- SegmentMerger implementation
-- Commit points and versioning
-- File management and cleanup
-- Concurrent merge handling
-
-**[design_storage_tier.md](design_storage_tier.md)** - Multi-Tier Storage
-- Hot/Warm/Cold tier definitions
-- Lifecycle policies (age-based, access-based)
-- Segment migration between tiers
-- Tier-specific memory management
-- Query routing across tiers
-- Tier statistics and metrics
-- Configuration examples
+| File | Description |
+|------|-------------|
+| [BUILD_SYSTEM.md](BUILD_SYSTEM.md) | CMake build system design |
+| [TESTING_STRATEGY.md](TESTING_STRATEGY.md) | Testing approach (unit, integration, stress) |
+| [OBSERVABILITY.md](OBSERVABILITY.md) | Metrics, logging, tracing design |
 
 ## Reading Guide
 
-### For Developers Starting Fresh
+### For Implementation
 
-1. **Start with**: [design_overview.md](design_overview.md)
-   - Understand system architecture and design philosophy
-   - Review API examples
-
-2. **Then read**: [design_index_writer.md](design_index_writer.md) and [design_index_reader.md](design_index_reader.md)
-   - Learn the core indexing and reading flows
-   - Understand the concurrency model
-
-3. **Data structures**: [design_term_dictionary.md](design_term_dictionary.md), [design_posting_list.md](design_posting_list.md), [design_column_storage.md](design_column_storage.md)
-   - Deep dive into storage formats
-   - Understand compression and optimization techniques
-
-4. **Query processing**: [design_query_execution.md](design_query_execution.md)
-   - Learn query types and execution strategies
-   - Understand scoring and ranking
-
-5. **Advanced topics**: [design_segment_management.md](design_segment_management.md), [design_storage_tier.md](design_storage_tier.md)
-   - Segment lifecycle and merging
-   - Multi-tier storage architecture
+1. **Start with**: [00_ARCHITECTURE_OVERVIEW.md](00_ARCHITECTURE_OVERVIEW.md) — system architecture and module dependencies
+2. **Core interfaces**: [01_INDEX_READER_WRITER.md](01_INDEX_READER_WRITER.md) — IndexReader/Writer
+3. **Codec system**: [02_CODEC_ARCHITECTURE.md](02_CODEC_ARCHITECTURE.md) — pluggable formats
+4. **Column storage**: [03_COLUMN_STORAGE.md](03_COLUMN_STORAGE.md) — IColumn COW semantics
+5. **Next priorities**: 04-07 (compression, data parts, granularity, queries)
 
 ### For Specific Use Cases
 
-#### Implementing Inverted Index Features
-- [design_term_dictionary.md](design_term_dictionary.md) - Term lookup
-- [design_posting_list.md](design_posting_list.md) - Posting list storage
-- [design_query_execution.md](design_query_execution.md) - Query processing
-
-#### Implementing Column Storage Features
-- [design_column_storage.md](design_column_storage.md) - Column organization
-- [design_index_writer.md](design_index_writer.md) - Column building during indexing
-- [design_query_execution.md](design_query_execution.md) - Range queries and aggregations
-
-#### Performance Optimization
-- [design_posting_list.md](design_posting_list.md) - Compression and skip lists
-- [design_column_storage.md](design_column_storage.md) - Granule caching and SIMD
-- [design_storage_tier.md](design_storage_tier.md) - Memory management and tiering
-
-#### Operating at Scale
-- [design_segment_management.md](design_segment_management.md) - Merge policies
-- [design_storage_tier.md](design_storage_tier.md) - Multi-tier architecture
-- [design_index_reader.md](design_index_reader.md) - Concurrent access
+- **Inverted index features**: 02, 07, 13/14
+- **Column storage features**: 03, 05, 06
+- **Query processing**: 07, 07a, 14
+- **Performance optimization**: 04, 13, 14
+- **Operations**: 08, 09, 12
 
 ## Key Design Principles
 
-### 1. Immutable Segments
-- Segments never modified after creation
-- Lock-free reads
-- Background merging for compaction
-
-### 2. Hybrid Storage
-- Inverted index for text search
-- Column storage for analytics
-- Configurable per field
-
-### 3. Type-Aware Architecture
-- Type-specific compression
-- Type-level partitioning for dynamic fields
-- Efficient handling of mixed types
-
-### 4. Multi-Tier Storage
-- Hot tier for recent/active data
-- Warm/cold tiers for older data
-- Automatic lifecycle management
-
-### 5. Pluggable Components
-- Term dictionary (Trie vs Hash)
-- Compression codecs
-- Merge policies
-- Scoring algorithms
-
-### 6. Performance First
-- Zero-copy reads where possible
-- Memory-mapped files
-- SIMD optimizations
-- Cache-friendly data structures
-
-### 7. Circuit Breaker Ready
-- Query complexity checks
-- Memory limit enforcement
-- Result size limits
-- Timeout handling
-
-## Implementation Checklist
-
-### Phase 1: Core Indexing
-- [ ] IndexWriter with document buffering
-- [ ] FieldRouter for storage selection
-- [ ] Basic TermDictionary (hash-based)
-- [ ] Simple PostingList with VByte compression
-- [ ] Segment flushing
-
-### Phase 2: Core Reading
-- [ ] IndexReader with segment management
-- [ ] TermQuery execution
-- [ ] BooleanQuery (AND/OR)
-- [ ] Document retrieval
-- [ ] Basic top-k search
-
-### Phase 3: Column Storage
-- [ ] ColumnBuilder with type partitioning
-- [ ] Granule organization
-- [ ] ColumnReader and ColumnScanner
-- [ ] RangeQuery support
-- [ ] Basic aggregations
-
-### Phase 4: Advanced Indexing
-- [ ] Trie-based TermDictionary
-- [ ] PForDelta compression for posting lists
-- [ ] Skip lists
-- [ ] Position encoding for phrase queries
-- [ ] Term vectors
-
-### Phase 5: Query Optimization
-- [ ] PhraseQuery with positions
-- [ ] WildcardQuery expansion
-- [ ] Query rewriting
-- [ ] Early termination (WAND)
-- [ ] Query result caching
-
-### Phase 6: Segment Management
-- [ ] MergePolicy implementation
-- [ ] MergeScheduler with background threads
-- [ ] SegmentMerger
-- [ ] Commit points
-- [ ] File cleanup
-
-### Phase 7: Storage Tiers
-- [ ] TierManager
-- [ ] Lifecycle policies
-- [ ] Segment migration
-- [ ] Tier-aware query routing
-- [ ] Memory management per tier
-
-### Phase 8: Optimizations
-- [ ] Memory-mapped file support
-- [ ] SIMD compression/decompression
-- [ ] Granule prefetching
-- [ ] Block caching
-- [ ] Lazy position loading
-
-### Phase 9: Production Features
-- [ ] Circuit breakers
-- [ ] Metrics and monitoring
-- [ ] Error handling and recovery
-- [ ] Index repair tools
-- [ ] Comprehensive testing
-
-## Contributing to Design
-
-When modifying or extending the design:
-
-1. **Update relevant design document** - Keep designs in sync with implementation
-2. **Add examples** - Include code examples and usage patterns
-3. **Document trade-offs** - Explain why specific choices were made
-4. **Update this index** - If adding new design documents
-5. **Cross-reference** - Link related sections across documents
-
-## Questions & Discussion
-
-For design questions or discussions:
-- Reference specific design document and section
-- Provide context about use case
-- Suggest alternatives if proposing changes
-- Consider backward compatibility
+1. **Immutable Segments**: Never modify after creation; background merge for compaction
+2. **Hybrid Storage**: Inverted index for text, column storage for analytics, configurable per field
+3. **Type-Aware Architecture**: Type-specific compression, partitioning, and codecs
+4. **Pluggable Components**: Codecs, merge policies, compression, scoring algorithms
+5. **Performance First**: Zero-copy reads, memory-mapped files, SIMD optimizations
 
 ## References
 
 - **Apache Lucene**: https://lucene.apache.org/
 - **ClickHouse Architecture**: https://clickhouse.com/docs/en/development/architecture/
-- **Finite State Transducers**: http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.24.3698
-- **WAND Algorithm**: "Using Block-Max Indexes for Score-At-A-Time WAND Processing"
-- **PForDelta**: "SIMD Compression and the Intersection of Sorted Integers"
+
+---
+
+**Last Updated**: 2026-02-25
+**Status**: All 15 design modules complete (100%)
