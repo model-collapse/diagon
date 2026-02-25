@@ -112,6 +112,18 @@ target_include_directories(ReutersBenchmark PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# ==================== ClickBench Benchmark ====================
+
+add_executable(ClickBenchBenchmark clickbench_benchmark.cpp)
+target_link_libraries(ClickBenchBenchmark PRIVATE diagon_core)
+if(TARGET ICU::uc AND TARGET ICU::i18n)
+    target_link_libraries(ClickBenchBenchmark PRIVATE ICU::uc ICU::i18n)
+endif()
+target_include_directories(ClickBenchBenchmark PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
 # ==================== Combined Benchmark Target ====================
 
 add_custom_target(run_all_benchmarks
