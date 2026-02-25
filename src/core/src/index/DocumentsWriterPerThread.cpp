@@ -325,7 +325,7 @@ std::vector<int64_t> DocumentsWriterPerThread::computeNorms(const std::string& f
         std::vector<int> postings = termsWriter_.getPostingList(fieldName, term);
 
         // Posting list format: [docID, freq, docID, freq, ...]
-        for (size_t i = 0; i < postings.size(); i += 2) {
+        for (size_t i = 0; i + 1 < postings.size(); i += 2) {
             int docID = postings[i];
             int freq = postings[i + 1];
 
