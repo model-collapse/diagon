@@ -81,7 +81,7 @@ public:
          */
         std::unique_ptr<PhraseQuery> build() {
             return std::make_unique<PhraseQuery>(field_, std::move(terms_), std::move(positions_),
-                                                  slop_);
+                                                 slop_);
         }
 
     private:

@@ -202,8 +202,8 @@ private:
     std::string posFileName_;   // Full .pos file name
 
     // Per-term position state
-    int64_t posStartFP_;   // File pointer at start of positions for current term
-    int lastPosition_;     // Last position written (for delta encoding within a doc)
+    int64_t posStartFP_;  // File pointer at start of positions for current term
+    int lastPosition_;    // Last position written (for delta encoding within a doc)
 
     // StreamVByte buffering
     static constexpr int BUFFER_SIZE = 4;  // StreamVByte processes 4 integers at a time

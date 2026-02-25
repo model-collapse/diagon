@@ -112,7 +112,7 @@ public:
      * @return PostingsEnum with nextPosition() support
      */
     std::unique_ptr<index::PostingsEnum> postingsWithPositions(const index::FieldInfo& fieldInfo,
-                                                                const TermState& termState);
+                                                               const TermState& termState);
 
     /**
      * Read skip entries for a term from .skp file.

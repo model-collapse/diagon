@@ -85,7 +85,9 @@ public:
     /**
      * Equality check (for PhraseQuery)
      */
-    bool equals(const Term& other) const { return field_ == other.field_ && *bytes_ == *other.bytes_; }
+    bool equals(const Term& other) const {
+        return field_ == other.field_ && *bytes_ == *other.bytes_;
+    }
 
     /**
      * Hash code (for PhraseQuery)

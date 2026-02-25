@@ -186,7 +186,8 @@ private:
             lead.pos = lead.postings->nextPosition();
             lead.upTo++;
 
-            if (lead.pos < 0) break;
+            if (lead.pos < 0)
+                break;
 
             // Expected phrase position based on lead
             int phrasePos = lead.pos - lead.offset;
@@ -257,7 +258,7 @@ public:
         auto* norms = context.reader->getNormValues(query_.getField());
 
         return std::make_unique<PhraseScorer>(*this, std::move(postingsEnums), positions,
-                                               simScorer_, norms);
+                                              simScorer_, norms);
     }
 
     const Query& getQuery() const override { return query_; }
@@ -271,8 +272,8 @@ private:
     IndexSearcher& searcher_;
     BM25Similarity::SimScorer simScorer_;
 
-    static BM25Similarity::SimScorer createScorer(const PhraseQuery& query,
-                                                   IndexSearcher& searcher, float boost) {
+    static BM25Similarity::SimScorer createScorer(const PhraseQuery& query, IndexSearcher& searcher,
+                                                  float boost) {
         const std::string& field = query.getField();
         auto& reader = searcher.getIndexReader();
 
@@ -282,16 +283,21 @@ private:
 
         for (const auto& ctx : reader.leaves()) {
             auto terms = ctx.reader->terms(field);
-            if (!terms) continue;
+            if (!terms)
+                continue;
 
             int64_t sttf = terms->getSumTotalTermFreq();
             int64_t sdf = terms->getSumDocFreq();
-            if (sttf > 0) sumTotalTermFreq += sttf;
-            if (sdf > 0) sumDocFreq += sdf;
+            if (sttf > 0)
+                sumTotalTermFreq += sttf;
+            if (sdf > 0)
+                sumDocFreq += sdf;
         }
 
-        if (sumTotalTermFreq <= 0) sumTotalTermFreq = maxDoc * 10;
-        if (sumDocFreq <= 0) sumDocFreq = maxDoc;
+        if (sumTotalTermFreq <= 0)
+            sumTotalTermFreq = maxDoc * 10;
+        if (sumDocFreq <= 0)
+            sumDocFreq = maxDoc;
 
         int64_t docCount = maxDoc;
         CollectionStatistics collectionStats(field, maxDoc, docCount, sumTotalTermFreq, sumDocFreq);
@@ -306,13 +312,16 @@ private:
             int64_t termTotalTermFreq = 0;
             for (const auto& ctx : reader.leaves()) {
                 auto terms = ctx.reader->terms(field);
-                if (!terms) continue;
+                if (!terms)
+                    continue;
                 auto te = terms->iterator();
-                if (!te) continue;
+                if (!te)
+                    continue;
                 if (te->seekExact(qt.bytes())) {
                     termDocFreq += te->docFreq();
                     int64_t ttf = te->totalTermFreq();
-                    if (ttf > 0) termTotalTermFreq += ttf;
+                    if (ttf > 0)
+                        termTotalTermFreq += ttf;
                 }
             }
             if (termDocFreq > 0) {
@@ -321,8 +330,10 @@ private:
             }
         }
 
-        if (minDocFreq <= 0) minDocFreq = 1;
-        if (totalTermFreqSum <= 0) totalTermFreqSum = minDocFreq;
+        if (minDocFreq <= 0)
+            minDocFreq = 1;
+        if (totalTermFreqSum <= 0)
+            totalTermFreqSum = minDocFreq;
 
         // Use the rarest term's docFreq for IDF - phrase can't match more docs
         // than the rarest term
@@ -347,7 +358,7 @@ PhraseQuery::PhraseQuery(const std::string& field, std::vector<Term> terms,
 }
 
 std::unique_ptr<Weight> PhraseQuery::createWeight(IndexSearcher& searcher, ScoreMode scoreMode,
-                                                   float boost) const {
+                                                  float boost) const {
     return std::make_unique<PhraseWeight>(*this, searcher, scoreMode, boost);
 }
 
@@ -370,7 +381,8 @@ std::string PhraseQuery::toString(const std::string& field) const {
     }
     oss << "\"";
     for (size_t i = 0; i < terms_.size(); i++) {
-        if (i > 0) oss << " ";
+        if (i > 0)
+            oss << " ";
         // Output UTF-8 string directly from bytes, not hex-encoded
         const auto& b = terms_[i].bytes();
         oss << std::string(reinterpret_cast<const char*>(b.data()), b.length());
@@ -384,12 +396,17 @@ std::string PhraseQuery::toString(const std::string& field) const {
 
 bool PhraseQuery::equals(const Query& other) const {
     auto* pq = dynamic_cast<const PhraseQuery*>(&other);
-    if (!pq) return false;
-    if (field_ != pq->field_ || slop_ != pq->slop_) return false;
-    if (terms_.size() != pq->terms_.size()) return false;
+    if (!pq)
+        return false;
+    if (field_ != pq->field_ || slop_ != pq->slop_)
+        return false;
+    if (terms_.size() != pq->terms_.size())
+        return false;
     for (size_t i = 0; i < terms_.size(); i++) {
-        if (!terms_[i].equals(pq->terms_[i])) return false;
-        if (positions_[i] != pq->positions_[i]) return false;
+        if (!terms_[i].equals(pq->terms_[i]))
+            return false;
+        if (positions_[i] != pq->positions_[i])
+            return false;
     }
     return true;
 }

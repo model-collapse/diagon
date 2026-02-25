@@ -18,7 +18,6 @@ namespace lucene104 {
 
 // File extensions
 static const std::string DOC_EXTENSION = "doc";
-static const std::string POS_EXTENSION = "pos";
 
 Lucene104PostingsReader::Lucene104PostingsReader(index::SegmentReadState& state)
     : docIn_(nullptr)
@@ -101,7 +100,7 @@ Lucene104PostingsReader::impactsPostings(const index::FieldInfo& fieldInfo,
 
 std::unique_ptr<index::PostingsEnum>
 Lucene104PostingsReader::postingsWithPositions(const index::FieldInfo& fieldInfo,
-                                                const TermState& termState) {
+                                               const TermState& termState) {
     if (!docIn_) {
         throw std::runtime_error("No input set for PostingsReader");
     }
@@ -113,8 +112,8 @@ Lucene104PostingsReader::postingsWithPositions(const index::FieldInfo& fieldInfo
 
     bool writeFreqs = (fieldInfo.indexOptions >= index::IndexOptions::DOCS_AND_FREQS);
 
-    return std::make_unique<Lucene104PostingsEnumWithPositions>(
-        docIn_->clone(), posIn_->clone(), termState, writeFreqs);
+    return std::make_unique<Lucene104PostingsEnumWithPositions>(docIn_->clone(), posIn_->clone(),
+                                                                termState, writeFreqs);
 }
 
 void Lucene104PostingsReader::close() {

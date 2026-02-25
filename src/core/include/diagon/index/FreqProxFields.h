@@ -258,12 +258,12 @@ private:
 
     private:
         const std::vector<int>& postings_;
-        int cursor_;       // Points to docID of current entry
+        int cursor_;  // Points to docID of current entry
         int currentDoc_;
         int currentFreq_;
         bool hasPositions_;
-        int positionStart_;   // Index into postings_ where positions for current doc begin
-        int positionIndex_;   // How many positions consumed via nextPosition()
+        int positionStart_;  // Index into postings_ where positions for current doc begin
+        int positionIndex_;  // How many positions consumed via nextPosition()
     };
 };
 

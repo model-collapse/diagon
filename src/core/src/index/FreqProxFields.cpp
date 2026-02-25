@@ -75,7 +75,7 @@ FreqProxTerms::FreqProxTerms(const std::string& fieldName, const FreqProxTermsWr
 
 std::unique_ptr<TermsEnum> FreqProxTerms::iterator() const {
     return std::make_unique<FreqProxTermsEnum>(fieldName_, sortedTerms_, termsWriter_,
-                                                hasPositions_);
+                                               hasPositions_);
 }
 
 int64_t FreqProxTerms::size() const {

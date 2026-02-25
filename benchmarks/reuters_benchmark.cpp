@@ -254,7 +254,8 @@ int main(int argc, char* argv[]) {
                  }
                  return builder.build();
              }},
-            {"Boolean OR 50-term", []() {
+            {"Boolean OR 50-term",
+             []() {
                  search::BooleanQuery::Builder builder;
                  for (const auto& t :
                       {"market",     "company",  "stock",    "trade",      "price",   "bank",
@@ -300,8 +301,7 @@ int main(int argc, char* argv[]) {
                  builder.add("market");
                  return builder.build();
              }},
-            {"Phrase 3-term: 'federal reserve bank'",
-             []() {
+            {"Phrase 3-term: 'federal reserve bank'", []() {
                  search::PhraseQuery::Builder builder("body");
                  builder.add("federal");
                  builder.add("reserve");

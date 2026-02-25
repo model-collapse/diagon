@@ -157,7 +157,7 @@ void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
         stats.totalTermFreq = timIn_->readVLong();
         stats.postingsFP = timIn_->readVLong();
         stats.skipStartFP = timIn_->readVLong();  // Block-Max WAND support
-        stats.posStartFP = timIn_->readVLong();    // Position data support
+        stats.posStartFP = timIn_->readVLong();   // Position data support
         block.stats.push_back(stats);
     }
 

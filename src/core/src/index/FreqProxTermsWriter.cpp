@@ -75,8 +75,8 @@ void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) 
         }
 
         // Determine whether to store positions based on indexOptions
-        bool storePositions =
-            (fieldType.indexOptions >= IndexOptions::DOCS_AND_FREQS_AND_POSITIONS);
+        bool storePositions = (fieldType.indexOptions >=
+                               IndexOptions::DOCS_AND_FREQS_AND_POSITIONS);
 
         // Add each unique term to posting lists with actual frequency and positions
         for (const auto& [term, positions] : termPositionsCache_) {
@@ -89,8 +89,7 @@ void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) 
 }
 
 void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const std::string& term,
-                                            int docID, int freq,
-                                            const std::vector<int>& positions,
+                                            int docID, int freq, const std::vector<int>& positions,
                                             IndexOptions indexOptions) {
     // Get or assign field ID (reduces hash overhead: hash int vs hash string)
     auto fieldIdIt = fieldNameToId_.find(fieldName);
@@ -153,8 +152,9 @@ void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const 
     }
 }
 
-FreqProxTermsWriter::PostingData FreqProxTermsWriter::createPostingList(
-    const std::string& term, int docID, int freq, const std::vector<int>& positions) {
+FreqProxTermsWriter::PostingData
+FreqProxTermsWriter::createPostingList(const std::string& term, int docID, int freq,
+                                       const std::vector<int>& positions) {
     PostingData data;
 
     // Aggressive pre-allocation: typical term has 10-50 postings in Reuters
@@ -176,7 +176,7 @@ FreqProxTermsWriter::PostingData FreqProxTermsWriter::createPostingList(
 }
 
 void FreqProxTermsWriter::appendToPostingList(PostingData& data, int docID, int freq,
-                                               const std::vector<int>& positions) {
+                                              const std::vector<int>& positions) {
     // Append [docID, freq, pos0, ..., posN]
     data.postings.push_back(docID);
     data.postings.push_back(freq);

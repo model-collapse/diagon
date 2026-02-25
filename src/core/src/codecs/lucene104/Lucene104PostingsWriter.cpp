@@ -163,7 +163,8 @@ void Lucene104PostingsWriter::startDoc(int docID, int freq, int8_t norm) {
 }
 
 void Lucene104PostingsWriter::addPosition(int position) {
-    if (!writePositions_) return;
+    if (!writePositions_)
+        return;
 
     // Delta-encode positions within a document
     int posDelta = position - lastPosition_;
