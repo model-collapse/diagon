@@ -19,6 +19,8 @@
  * 8. Empty phrase handling
  */
 
+#include "diagon/search/PhraseQuery.h"
+
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
 #include "diagon/index/DirectoryReader.h"
@@ -26,7 +28,6 @@
 #include "diagon/index/IndexWriter.h"
 #include "diagon/index/Term.h"
 #include "diagon/search/IndexSearcher.h"
-#include "diagon/search/PhraseQuery.h"
 #include "diagon/search/TermQuery.h"
 #include "diagon/store/FSDirectory.h"
 
@@ -75,7 +76,7 @@ protected:
      * Index documents with position-enabled field type.
      */
     void indexDocuments(const std::vector<std::string>& docs,
-                       const std::string& fieldName = "content") {
+                        const std::string& fieldName = "content") {
         IndexWriterConfig config;
         config.setMaxBufferedDocs(static_cast<int>(docs.size()) + 100);
         IndexWriter writer(*directory_, config);
@@ -334,7 +335,7 @@ TEST_F(PhraseQueryTest, NonAdjacentTermsNoMatch) {
 TEST_F(PhraseQueryTest, PhraseScoring) {
     indexDocuments({
         "oil price oil price oil price",  // 3 matches
-        "oil price report today",          // 1 match
+        "oil price report today",         // 1 match
     });
 
     auto reader = DirectoryReader::open(*directory_);

@@ -269,7 +269,7 @@ public:
 
 private:
     const PhraseQuery& query_;
-    IndexSearcher& searcher_;
+    [[maybe_unused]] IndexSearcher& searcher_;
     BM25Similarity::SimScorer simScorer_;
 
     static BM25Similarity::SimScorer createScorer(const PhraseQuery& query, IndexSearcher& searcher,
