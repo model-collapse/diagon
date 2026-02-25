@@ -95,17 +95,18 @@ DIAGON provides diverse indexing capabilities through specialized index architec
 ## Project Structure
 
 ```
-/home/ubuntu/opensearch_warmroom/lucene-pp/
-├── design/                              # Detailed design specifications
+/home/ubuntu/diagon/
+├── design/                              # Detailed design specifications (00-15)
 │   ├── README.md                        # Design documentation index
 │   ├── 00_ARCHITECTURE_OVERVIEW.md      # System architecture
 │   ├── 01_INDEX_READER_WRITER.md        # IndexReader/Writer interfaces
 │   ├── 02_CODEC_ARCHITECTURE.md         # Pluggable codec system
 │   ├── 03_COLUMN_STORAGE.md             # IColumn, IDataType, ISerialization
-│   └── [04-12 to be created]            # Additional modules
-├── research/                            # Research documents
-│   ├── clickhouse_granules_explained.md
-│   └── storage_comparison_report.md
+│   └── [04-15]                          # Compression, MergeTree, queries, etc.
+├── docs/                                # Reference docs, guides, examples
+├── src/                                 # C++ source (core, columns, compression, simd)
+├── benchmarks/                          # Benchmark binaries and Lucene comparison
+├── benchmark_results/                   # Generated benchmark reports
 └── CLAUDE.md                            # This file
 ```
 
@@ -526,8 +527,6 @@ auto dir = store::FSDirectory::open(indexPath);
 
 - **Root cause analysis**: `docs/TASK51_PHASE4_MMAP_BREAKTHROUGH.md`
 - **Performance comparison**: `docs/REUTERS_MMAP_COMPARISON.md`
-- **Postings profiling**: `docs/POSTINGS_DECODING_ANALYSIS.md`
-- **FST profiling**: `docs/FST_TRAVERSAL_ANALYSIS.md`
 
 ## CRITICAL: Hit Count Profiling — Use `IndexSearcher.count(Query)` Only
 
