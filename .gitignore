@@ -194,8 +194,7 @@ callgrind.out.*
 coverage/
 htmlcov/
 
-# Benchmark results
-benchmark_results/
+# Benchmark artifacts (not reports)
 *.bench
 
 # Lucene comparison output artifacts

@@ -1,0 +1,79 @@
+{
+  "timestamp": "2026-02-17T05:32:00Z",
+  "lucene_version": "11.0.0-SNAPSHOT",
+  "dataset": "Reuters-21578",
+  "documents": 21578,
+  "indexing": {
+    "throughput_docs_per_sec": 24520,
+    "time_seconds": 0.88,
+    "index_size_mb": 10.5,
+    "bytes_per_doc": 487
+  },
+  "queries": {
+    "single_term": {
+      "p50_us": 300,
+      "p99_us": 790,
+      "hits": 1013
+    },
+    "or_2": {
+      "p50_us": 260,
+      "p99_us": 800,
+      "hits": 1358
+    },
+    "or_3": {
+      "p50_us": 380,
+      "p99_us": 910,
+      "hits": 1813
+    },
+    "or_5": {
+      "p50_us": 540,
+      "p99_us": 970,
+      "hits": 1433
+    },
+    "or_10": {
+      "p50_us": 310,
+      "p99_us": 1080,
+      "hits": 1235
+    },
+    "or_20": {
+      "p50_us": 530,
+      "p99_us": 840,
+      "hits": 1227
+    },
+    "or_50": {
+      "p50_us": 1160,
+      "p99_us": 1410,
+      "hits": 1115
+    },
+    "and_2": {
+      "p50_us": 60,
+      "p99_us": 220,
+      "hits": 338
+    },
+    "and_3": {
+      "p50_us": 70,
+      "p99_us": 480,
+      "hits": 155
+    },
+    "or_5_topk10": {
+      "p50_us": 120,
+      "p99_us": 160,
+      "hits": 1433
+    },
+    "or_5_topk100": {
+      "p50_us": 140,
+      "p99_us": 420,
+      "hits": 2356
+    },
+    "or_5_topk1000": {
+      "p50_us": 290,
+      "p99_us": 500,
+      "hits": 5567
+    },
+    "or_2_rare": {
+      "p50_us": 30,
+      "p99_us": 80,
+      "hits": 267
+    }
+  }
+}

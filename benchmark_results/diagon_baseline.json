@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-02-17T04:15:00Z",
+  "change": "Post phrase query implementation (Steps 1-8). Added position pipeline (.pos files), PhraseQuery/PhraseWeight/PhraseScorer. Index size increased ~22% due to position data (expected).",
+  "dataset": "Reuters-21578",
+  "documents": 19043,
+  "indexing": {
+    "throughput_docs_per_sec": 10417,
+    "time_seconds": 1.828,
+    "index_size_mb": 11,
+    "bytes_per_doc": 615
+  },
+  "queries": {
+    "single_dollar": { "p50_ms": 0.027, "p90_ms": 0.029, "p99_ms": 0.044, "hits": 983 },
+    "single_oil": { "p50_ms": 0.034, "p90_ms": 0.036, "p99_ms": 0.061, "hits": 1368 },
+    "single_trade": { "p50_ms": 0.042, "p90_ms": 0.044, "p99_ms": 0.056, "hits": 1868 },
+    "and_2": { "p50_ms": 0.048, "p90_ms": 0.050, "p99_ms": 0.065, "hits": 332 },
+    "or_2": { "p50_ms": 0.064, "p90_ms": 0.066, "p99_ms": 0.082, "hits": 1756 },
+    "or_5": { "p50_ms": 0.131, "p90_ms": 0.140, "p99_ms": 0.167, "hits": 3161 },
+    "or_10": { "p50_ms": 0.234, "p90_ms": 0.245, "p99_ms": 0.248, "hits": 2445 },
+    "or_20": { "p50_ms": 0.334, "p90_ms": 0.345, "p99_ms": 0.366, "hits": 1595 },
+    "or_50": { "p50_ms": 1.026, "p90_ms": 1.036, "p99_ms": 1.056, "hits": 699 }
+  },
+  "wand": {
+    "or_2_exhaustive_us": 235,
+    "or_2_wand_us": 90.7,
+    "or_5_exhaustive_us": 545,
+    "or_5_wand_us": 178,
+    "or_10_exhaustive_us": 1104,
+    "or_10_wand_us": 192,
+    "or_20_exhaustive_us": 2426,
+    "or_20_wand_us": 322,
+    "or_50_exhaustive_us": 7216,
+    "or_50_wand_us": 838,
+    "topk_10_wand_us": 141,
+    "topk_100_wand_us": 172,
+    "topk_1000_wand_us": 255,
+    "rare_exhaustive_us": 16.9,
+    "rare_wand_us": 19.0
+  }
+}
