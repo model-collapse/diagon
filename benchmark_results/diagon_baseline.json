@@ -1,40 +1,28 @@
 {
-  "timestamp": "2026-02-17T04:15:00Z",
-  "change": "Post phrase query implementation (Steps 1-8). Added position pipeline (.pos files), PhraseQuery/PhraseWeight/PhraseScorer. Index size increased ~22% due to position data (expected).",
+  "timestamp": "2026-02-27T10:01:25Z",
+  "change": "Issue #6 complete: O(n²) ramBytesUsed fix, ASCII fast-path tokenizer, direct-to-posting tokenization, jemalloc allocator, fair timing methodology, per-field posting maps, cached BreakIterator, single-pass DWPT.",
   "dataset": "Reuters-21578",
   "documents": 19043,
   "indexing": {
-    "throughput_docs_per_sec": 10417,
-    "time_seconds": 1.828,
-    "index_size_mb": 11,
-    "bytes_per_doc": 615
+    "throughput_docs_per_sec": 43378,
+    "time_seconds": 0.439,
+    "index_size_mb": 12,
+    "bytes_per_doc": 685
   },
   "queries": {
-    "single_dollar": { "p50_ms": 0.027, "p90_ms": 0.029, "p99_ms": 0.044, "hits": 983 },
-    "single_oil": { "p50_ms": 0.034, "p90_ms": 0.036, "p99_ms": 0.061, "hits": 1368 },
-    "single_trade": { "p50_ms": 0.042, "p90_ms": 0.044, "p99_ms": 0.056, "hits": 1868 },
-    "and_2": { "p50_ms": 0.048, "p90_ms": 0.050, "p99_ms": 0.065, "hits": 332 },
-    "or_2": { "p50_ms": 0.064, "p90_ms": 0.066, "p99_ms": 0.082, "hits": 1756 },
-    "or_5": { "p50_ms": 0.131, "p90_ms": 0.140, "p99_ms": 0.167, "hits": 3161 },
-    "or_10": { "p50_ms": 0.234, "p90_ms": 0.245, "p99_ms": 0.248, "hits": 2445 },
-    "or_20": { "p50_ms": 0.334, "p90_ms": 0.345, "p99_ms": 0.366, "hits": 1595 },
-    "or_50": { "p50_ms": 1.026, "p90_ms": 1.036, "p99_ms": 1.056, "hits": 699 }
-  },
-  "wand": {
-    "or_2_exhaustive_us": 235,
-    "or_2_wand_us": 90.7,
-    "or_5_exhaustive_us": 545,
-    "or_5_wand_us": 178,
-    "or_10_exhaustive_us": 1104,
-    "or_10_wand_us": 192,
-    "or_20_exhaustive_us": 2426,
-    "or_20_wand_us": 322,
-    "or_50_exhaustive_us": 7216,
-    "or_50_wand_us": 838,
-    "topk_10_wand_us": 141,
-    "topk_100_wand_us": 172,
-    "topk_1000_wand_us": 255,
-    "rare_exhaustive_us": 16.9,
-    "rare_wand_us": 19.0
+    "single_dollar": { "p50_ms": 0.027, "p90_ms": 0.030, "p99_ms": 0.043, "hits": 983 },
+    "single_oil": { "p50_ms": 0.034, "p90_ms": 0.035, "p99_ms": 0.064, "hits": 1368 },
+    "single_trade": { "p50_ms": 0.043, "p90_ms": 0.045, "p99_ms": 0.058, "hits": 1868 },
+    "and_2": { "p50_ms": 0.047, "p90_ms": 0.048, "p99_ms": 0.063, "hits": 332 },
+    "or_2": { "p50_ms": 0.052, "p90_ms": 0.053, "p99_ms": 0.071, "hits": 1011 },
+    "or_5": { "p50_ms": 0.121, "p90_ms": 0.130, "p99_ms": 0.135, "hits": 1833 },
+    "or_10": { "p50_ms": 0.208, "p90_ms": 0.219, "p99_ms": 0.223, "hits": 1245 },
+    "or_20": { "p50_ms": 0.311, "p90_ms": 0.322, "p99_ms": 0.349, "hits": 1429 },
+    "or_50": { "p50_ms": 0.775, "p90_ms": 0.792, "p99_ms": 0.805, "hits": 673 },
+    "phrase_oil_price": { "p50_ms": 0.070, "p90_ms": 0.074, "p99_ms": 0.093, "hits": 55 },
+    "phrase_trade_deficit": { "p50_ms": 0.061, "p90_ms": 0.063, "p99_ms": 0.090, "hits": 220 },
+    "phrase_interest_rate": { "p50_ms": 0.075, "p90_ms": 0.085, "p99_ms": 0.116, "hits": 233 },
+    "phrase_stock_market": { "p50_ms": 0.121, "p90_ms": 0.129, "p99_ms": 0.134, "hits": 167 },
+    "phrase_federal_reserve_bank": { "p50_ms": 0.090, "p90_ms": 0.093, "p99_ms": 0.102, "hits": 25 }
   }
 }
