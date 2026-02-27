@@ -140,6 +140,19 @@ DiagonIndexWriter diagon_create_index_writer(DiagonDirectory dir, DiagonIndexWri
 bool diagon_add_document(DiagonIndexWriter writer, DiagonDocument doc);
 
 /**
+ * Add multiple documents to index in a single batch
+ *
+ * More efficient than calling diagon_add_document() in a loop because
+ * the underlying mutex is acquired once for the entire batch.
+ *
+ * @param writer IndexWriter handle
+ * @param docs Array of Document handles
+ * @param count Number of documents in array
+ * @return Number of documents successfully added, or -1 on error
+ */
+int diagon_add_documents(DiagonIndexWriter writer, DiagonDocument* docs, int count);
+
+/**
  * Flush buffered documents to disk
  * @param writer IndexWriter handle
  * @return true on success, false on error

@@ -55,6 +55,7 @@ void StoredFieldsWriter::writeField(const index::FieldInfo& fieldInfo, const std
 
     StoredField field(fieldInfo.number, FieldType::STRING);
     field.stringValue = value;
+    bytesUsed_ += sizeof(StoredField) + value.size();
     currentDocument_.push_back(std::move(field));
 }
 
@@ -65,6 +66,7 @@ void StoredFieldsWriter::writeField(const index::FieldInfo& fieldInfo, int32_t v
 
     StoredField field(fieldInfo.number, FieldType::INT);
     field.numericValue = value;
+    bytesUsed_ += sizeof(StoredField);
     currentDocument_.push_back(std::move(field));
 }
 
@@ -75,6 +77,7 @@ void StoredFieldsWriter::writeField(const index::FieldInfo& fieldInfo, int64_t v
 
     StoredField field(fieldInfo.number, FieldType::LONG);
     field.numericValue = value;
+    bytesUsed_ += sizeof(StoredField);
     currentDocument_.push_back(std::move(field));
 }
 
@@ -114,27 +117,7 @@ void StoredFieldsWriter::flush(store::IndexOutput& dataOut, store::IndexOutput& 
 // ==================== RAM Usage ====================
 
 int64_t StoredFieldsWriter::ramBytesUsed() const {
-    int64_t bytes = 0;
-
-    // Approximate size of all stored field values
-    for (const auto& doc : documents_) {
-        for (const auto& field : doc.fields) {
-            bytes += sizeof(StoredField);
-            if (field.fieldType == FieldType::STRING) {
-                bytes += field.stringValue.size();
-            }
-        }
-    }
-
-    // Current document
-    for (const auto& field : currentDocument_) {
-        bytes += sizeof(StoredField);
-        if (field.fieldType == FieldType::STRING) {
-            bytes += field.stringValue.size();
-        }
-    }
-
-    return bytes;
+    return bytesUsed_;
 }
 
 // ==================== Close ====================
@@ -145,6 +128,7 @@ void StoredFieldsWriter::close() {
     inDocument_ = false;
     finished_ = false;
     numDocs_ = 0;
+    bytesUsed_ = 0;
 }
 
 // ==================== Private Methods ====================

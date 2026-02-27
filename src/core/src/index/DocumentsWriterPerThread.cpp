@@ -124,41 +124,35 @@ DocumentsWriterPerThread::DocumentsWriterPerThread(const Config& config,
     , codecName_(codecName) {}
 
 bool DocumentsWriterPerThread::addDocument(const document::Document& doc) {
-    // Add document to terms writer
-    termsWriter_.addDocument(doc, nextDocID_);
-
-    // Process stored fields
+    // Single-pass field processing: handle indexing, stored fields, and doc values
+    // in one iteration instead of 4 separate passes (4x fewer field iterations)
     bool hasStoredFields = false;
+
     for (const auto& field : doc.getFields()) {
         const auto& fieldType = field->fieldType();
 
-        // Check if this is a stored field
+        // Pass 1: Index terms (delegates to FreqProxTermsWriter::addField)
+        if (fieldType.indexOptions != IndexOptions::NONE) {
+            termsWriter_.addField(*field, nextDocID_);
+        }
+
+        // Pass 2: Stored fields (collected inline)
         if (fieldType.stored) {
-            hasStoredFields = true;
-            break;
-        }
-    }
+            if (!hasStoredFields && directory_) {
+                // Lazy initialize stored fields writer on first stored field
+                if (!storedFieldsWriter_) {
+                    storedFieldsWriter_ = std::make_unique<codecs::StoredFieldsWriter>("_temp");
+                }
+                storedFieldsWriter_->startDocument();
+                hasStoredFields = true;
+            }
 
-    if (hasStoredFields && directory_) {
-        // Lazy initialize stored fields writer on first use
-        if (!storedFieldsWriter_) {
-            storedFieldsWriter_ = std::make_unique<codecs::StoredFieldsWriter>("_temp");
-        }
-
-        // Start document
-        storedFieldsWriter_->startDocument();
-
-        // Write stored fields
-        for (const auto& field : doc.getFields()) {
-            const auto& fieldType = field->fieldType();
-
-            if (fieldType.stored) {
-                // Get or create field info
+            if (hasStoredFields) {
                 fieldInfosBuilder_.getOrAdd(field->name());
 
                 // Propagate numeric type to field metadata if present
                 if (fieldType.numericType != document::NumericType::NONE) {
-                    std::string numericTypeStr;
+                    const char* numericTypeStr = nullptr;
                     switch (fieldType.numericType) {
                         case document::NumericType::LONG:
                             numericTypeStr = "LONG";
@@ -175,17 +169,14 @@ bool DocumentsWriterPerThread::addDocument(const document::Document& doc) {
                         default:
                             break;
                     }
-                    if (!numericTypeStr.empty()) {
+                    if (numericTypeStr) {
                         fieldInfosBuilder_.setAttribute(field->name(), "numeric_type",
                                                         numericTypeStr);
                     }
                 }
 
                 FieldInfo* fieldInfo = fieldInfosBuilder_.getFieldInfo(field->name());
-
                 if (fieldInfo) {
-                    // Check field value type and write
-                    // Check numeric first, since numeric fields also have string representation
                     if (auto numericVal = field->numericValue()) {
                         storedFieldsWriter_->writeField(*fieldInfo, *numericVal);
                     } else if (auto stringVal = field->stringValue()) {
@@ -195,33 +186,21 @@ bool DocumentsWriterPerThread::addDocument(const document::Document& doc) {
             }
         }
 
-        // Finish document
-        storedFieldsWriter_->finishDocument();
-    }
-
-    // Process numeric doc values fields
-    for (const auto& field : doc.getFields()) {
-        const auto& fieldType = field->fieldType();
-
-        // Check if this is a numeric doc values field
+        // Pass 3: Numeric doc values (collected inline)
         if (fieldType.docValuesType == DocValuesType::NUMERIC) {
             auto numericValue = field->numericValue();
             if (numericValue) {
-                // Lazy initialize doc values writer on first use
                 if (!docValuesWriter_ && directory_) {
-                    // Create temporary segment name for sizing (actual name created in flush)
                     docValuesWriter_ = std::make_unique<codecs::NumericDocValuesWriter>(
                         "_temp", config_.maxBufferedDocs);
                 }
 
                 if (docValuesWriter_) {
-                    // Get or create field number, then get FieldInfo
                     fieldInfosBuilder_.getOrAdd(field->name());
                     fieldInfosBuilder_.updateDocValuesType(field->name(), DocValuesType::NUMERIC);
 
-                    // Propagate numeric type to field metadata if present
                     if (fieldType.numericType != document::NumericType::NONE) {
-                        std::string numericTypeStr;
+                        const char* numericTypeStr = nullptr;
                         switch (fieldType.numericType) {
                             case document::NumericType::LONG:
                                 numericTypeStr = "LONG";
@@ -238,21 +217,24 @@ bool DocumentsWriterPerThread::addDocument(const document::Document& doc) {
                             default:
                                 break;
                         }
-                        if (!numericTypeStr.empty()) {
+                        if (numericTypeStr) {
                             fieldInfosBuilder_.setAttribute(field->name(), "numeric_type",
                                                             numericTypeStr);
                         }
                     }
 
                     FieldInfo* fieldInfo = fieldInfosBuilder_.getFieldInfo(field->name());
-
                     if (fieldInfo) {
-                        // Add value to doc values writer
                         docValuesWriter_->addValue(*fieldInfo, nextDocID_, *numericValue);
                     }
                 }
             }
         }
+    }
+
+    // Finalize stored fields for this document
+    if (hasStoredFields) {
+        storedFieldsWriter_->finishDocument();
     }
 
     // Increment counters
@@ -416,14 +398,18 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
 
         // Create norms producer from field lengths computed during indexing
         auto normsProducer = std::make_unique<InMemoryNormsProducer>();
-        const auto& fieldLengths = termsWriter_.getFieldLengths();
 
-        // Populate norms from field lengths
-        for (const auto& [fieldName, docLengths] : fieldLengths) {
-            for (const auto& [docID, fieldLength] : docLengths) {
-                normsProducer->setNormFromLength(fieldName, docID, fieldLength);
-            }
-        }
+        // Populate norms from field lengths (flat vector iteration by field ID)
+        termsWriter_.forEachFieldLength(
+            [&normsProducer](const std::string& fieldName,
+                             const FreqProxTermsWriter::FieldLengthData& fieldLengthData) {
+                const auto& lengths = fieldLengthData.lengths;
+                for (int docID = 0; docID < static_cast<int>(lengths.size()); docID++) {
+                    if (lengths[docID] != 0) {
+                        normsProducer->setNormFromLength(fieldName, docID, lengths[docID]);
+                    }
+                }
+            });
 
         // Use streaming API - codec iterates over fields/terms/postings
         consumer->write(fields, normsProducer.get());

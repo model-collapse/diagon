@@ -182,6 +182,34 @@ bool diagon_add_document(DiagonIndexWriter writer, DiagonDocument doc) {
     }
 }
 
+int diagon_add_documents(DiagonIndexWriter writer, DiagonDocument* docs, int count) {
+    if (!writer || !docs || count <= 0) {
+        set_error("Invalid writer, docs array, or count");
+        return -1;
+    }
+
+    try {
+        auto* index_writer = static_cast<diagon::index::IndexWriter*>(writer);
+
+        // Build vector of document pointers
+        std::vector<const diagon::document::Document*> doc_ptrs;
+        doc_ptrs.reserve(count);
+        for (int i = 0; i < count; i++) {
+            if (!docs[i]) {
+                set_error("NULL document at index " + std::to_string(i));
+                return -1;
+            }
+            doc_ptrs.push_back(static_cast<const diagon::document::Document*>(docs[i]));
+        }
+
+        index_writer->addDocuments(doc_ptrs);
+        return count;
+    } catch (const std::exception& e) {
+        set_error(e);
+        return -1;
+    }
+}
+
 bool diagon_flush(DiagonIndexWriter writer) {
     if (!writer) {
         set_error("Invalid writer");

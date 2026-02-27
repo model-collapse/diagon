@@ -107,6 +107,29 @@ int64_t IndexWriter::addDocument(const document::Document& doc) {
     return nextSequenceNumber();
 }
 
+int64_t IndexWriter::addDocuments(const std::vector<const document::Document*>& docs) {
+    ensureOpen();
+
+    int segmentsCreated = documentsWriter_->addDocuments(docs);
+
+    if (segmentsCreated > 0) {
+        for (const auto& segmentInfo : documentsWriter_->getSegmentInfos()) {
+            bool isNew = true;
+            for (int i = 0; i < segmentInfos_.size(); i++) {
+                if (segmentInfos_.info(i)->name() == segmentInfo->name()) {
+                    isNew = false;
+                    break;
+                }
+            }
+            if (isNew) {
+                segmentInfos_.add(segmentInfo);
+            }
+        }
+    }
+
+    return nextSequenceNumber();
+}
+
 int64_t IndexWriter::deleteDocuments(const Term& term) {
     ensureOpen();
 

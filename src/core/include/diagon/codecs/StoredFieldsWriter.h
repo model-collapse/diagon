@@ -150,6 +150,9 @@ private:
     // Whether finish() has been called
     bool finished_{false};
 
+    // Incremental RAM usage tracking (avoids O(n²) recomputation)
+    int64_t bytesUsed_{0};
+
     /**
      * Write header to output stream
      */

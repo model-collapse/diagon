@@ -91,6 +91,17 @@ public:
     int addDocument(const document::Document& doc);
 
     /**
+     * Add multiple documents to index in a single batch
+     *
+     * Acquires the mutex once for the entire batch, amortizing lock overhead.
+     * For 500-doc batches, reduces lock contention by ~500x vs per-document calls.
+     *
+     * @param docs Vector of document pointers to add
+     * @return Number of segments created during batch
+     */
+    int addDocuments(const std::vector<const document::Document*>& docs);
+
+    /**
      * Flush all pending documents to segments
      *
      * Forces flush even if limits not reached.

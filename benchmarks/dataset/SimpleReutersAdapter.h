@@ -65,17 +65,16 @@ public:
             // Line 4: Empty (skip)
             std::getline(ifs, line);
 
-            // Lines 5+: Body
-            std::ostringstream body;
+            // Lines 5+: Body (pre-reserve and append directly, avoid ostringstream)
+            std::string bodyStr;
+            bodyStr.reserve(2048);
             bool first = true;
             while (std::getline(ifs, line)) {
                 if (!first)
-                    body << " ";
-                body << line;
+                    bodyStr += ' ';
+                bodyStr += line;
                 first = false;
             }
-
-            std::string bodyStr = body.str();
             if (bodyStr.empty())
                 continue;
 

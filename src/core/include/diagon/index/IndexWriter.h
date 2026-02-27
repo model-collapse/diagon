@@ -173,6 +173,17 @@ public:
     int64_t addDocument(const document::Document& doc);
 
     /**
+     * Add multiple documents in a single batch
+     *
+     * More efficient than calling addDocument() in a loop because
+     * the underlying DocumentsWriter acquires its mutex once for the batch.
+     *
+     * @param docs Vector of document pointers to add
+     * @return sequence number
+     */
+    int64_t addDocuments(const std::vector<const document::Document*>& docs);
+
+    /**
      * Delete all documents matching the given term
      * @param term Term to match for deletion
      * @return sequence number

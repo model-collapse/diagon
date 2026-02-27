@@ -8,8 +8,9 @@
 #include "diagon/util/ByteBlockPool.h"
 #include "diagon/util/IntBlockPool.h"
 
+#include <algorithm>
+#include <functional>
 #include <memory>
-#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -25,37 +26,18 @@ class FieldInfosBuilder;
  *
  * Based on: org.apache.lucene.index.FreqProxTermsWriter
  *
- * Builds in-memory posting lists during document indexing:
- * - Tokenizes fields
- * - Stores term bytes in ByteBlockPool
- * - Stores [docID, freq] pairs in IntBlockPool
- * - Maintains term → posting list offset mapping
- *
- * Memory Layout:
- *   ByteBlockPool: "term1\0term2\0term3\0..."
- *   IntBlockPool:  [docID, freq, docID, freq, ...]
- *
- * Posting List Format:
- *   - Absolute docIDs (not deltas)
- *   - Without positions: [docID, freq, docID, freq, ...]
- *   - With positions: [docID, freq, pos0, ..., posN, docID, freq, pos0, ...]
- *   - Delta encoding happens during flush to codec
+ * Data structure layout (optimized for indexing throughput):
+ *   - Per-field posting maps: fieldPostings_[fieldId][term] = PostingData
+ *   - Field metadata in flat vectors indexed by field ID (no string hashing)
+ *   - Sorted terms computed lazily at flush time (no std::set during indexing)
  *
  * Thread Safety: NOT thread-safe (per-thread instance in DWPT)
  */
 class FreqProxTermsWriter {
 public:
-    /**
-     * Constructor
-     * @param fieldInfosBuilder Field metadata tracker (reference)
-     * @param expectedTerms Expected number of unique terms (for pre-sizing hash table)
-     */
     explicit FreqProxTermsWriter(FieldInfosBuilder& fieldInfosBuilder,
                                  size_t expectedTerms = 10000);
 
-    /**
-     * Destructor
-     */
     ~FreqProxTermsWriter() = default;
 
     // Disable copy/move
@@ -66,11 +48,14 @@ public:
 
     /**
      * Add document to in-memory posting lists
-     *
-     * @param doc Document to add
-     * @param docID Absolute document ID in segment
      */
     void addDocument(const document::Document& doc, int docID);
+
+    /**
+     * Add a single indexed field to in-memory posting lists
+     * Used by DWPT's single-pass field processing.
+     */
+    void addField(const document::IndexableField& field, int docID);
 
     /**
      * Get bytes used (approximate)
@@ -78,173 +63,164 @@ public:
     int64_t bytesUsed() const;
 
     /**
-     * Get posting list for term (for testing/debugging)
-     * Returns vector of [docID, freq] pairs
-     *
-     * @param term Term to lookup
-     * @return Vector of [docID, freq] pairs, empty if term not found
+     * Get posting list for term (legacy, for testing)
      */
     std::vector<int> getPostingList(const std::string& term) const;
 
     /**
-     * Get all terms (for testing/debugging)
-     * Returns sorted list of unique terms
+     * Get all terms (legacy, for testing)
      */
     std::vector<std::string> getTerms() const;
 
     /**
      * Get posting list for field-specific term
-     *
-     * @param field Field name
-     * @param term Term text
-     * @return Vector of [docID, freq] pairs, empty if term not found
      */
     std::vector<int> getPostingList(const std::string& field, const std::string& term) const;
 
     /**
-     * Get all terms for a specific field
-     *
-     * @param field Field name
-     * @return Sorted list of unique terms in field
+     * Get all terms for a specific field (sorted)
+     * Sorting deferred to call time — no std::set maintained during indexing.
      */
     std::vector<std::string> getTermsForField(const std::string& field) const;
 
     /**
-     * Field statistics for Terms implementation
-     * Computed incrementally during indexing to avoid scanning posting lists during flush
+     * Posting list data
      */
-    struct FieldStats {
-        int64_t sumTotalTermFreq = 0;  // Sum of all term frequencies in field
-        int64_t sumDocFreq = 0;        // Sum of document frequencies (docs per term)
-        int docCount = 0;              // Number of unique documents with this field
+    struct PostingData {
+        int lastDocID = -1;
+        int pendingFreqIndex = -1;  // Index of freq slot in postings (for in-place update)
+        std::vector<int> postings;  // [docID, freq, pos..., docID, freq, pos..., ...]
     };
 
     /**
-     * Get field statistics (pre-computed during indexing)
-     *
-     * @param fieldName Field name
-     * @return Field statistics, or default-initialized if field not found
+     * Field statistics for Terms implementation
+     */
+    struct FieldStats {
+        int64_t sumTotalTermFreq = 0;
+        int64_t sumDocFreq = 0;
+        int docCount = 0;
+    };
+
+    /**
+     * Get field statistics by name
      */
     FieldStats getFieldStats(const std::string& fieldName) const;
 
     /**
-     * Get field lengths for norm computation
-     *
-     * @return Map of (fieldName, docID) -> fieldLength
+     * Per-field document lengths for norm computation.
+     * Flat vector keyed by docID — O(1) access, no hashing.
      */
-    const std::unordered_map<std::string, std::unordered_map<int, int>>& getFieldLengths() const {
-        return fieldLengths_;
-    }
+    struct FieldLengthData {
+        std::vector<int> lengths;
 
-    /**
-     * Reset for reuse across segments
-     * Clears all data but keeps allocated memory
-     */
-    void reset();
+        void set(int docID, int length) {
+            if (docID >= static_cast<int>(lengths.size())) {
+                lengths.resize(docID + 1, 0);
+            }
+            lengths[docID] = length;
+        }
 
-    /**
-     * Clear all memory
-     * Releases all allocated blocks
-     */
-    void clear();
+        int get(int docID) const {
+            if (docID < static_cast<int>(lengths.size())) {
+                return lengths[docID];
+            }
+            return 0;
+        }
 
-private:
-    /**
-     * Posting list data stored in termToPosting_ map
-     *
-     * Uses aggressive pre-allocation to minimize vector reallocation overhead.
-     * Typical posting list has ~10-50 postings, so we pre-allocate 100 ints (50 postings).
-     */
-    struct PostingData {
-        int lastDocID;              // Last docID added (for duplicate detection)
-        std::vector<int> postings;  // [docID, freq, docID, freq, ...]
-    };
-
-    // Custom hash function for pair<int, string>
-    // Uses field ID (integer) instead of field name string for faster hashing
-    struct FieldTermHash {
-        size_t operator()(const std::pair<int, std::string>& p) const {
-            // Hash field ID (integer) + term (string)
-            // Integer hashing is ~10x faster than string hashing
-            size_t h1 = std::hash<int>{}(p.first);
-            size_t h2 = std::hash<std::string>{}(p.second);
-            // Better hash combining than XOR (from Boost)
-            return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+        bool has(int docID) const {
+            return docID < static_cast<int>(lengths.size()) && lengths[docID] != 0;
         }
     };
 
-    // Field name to field ID mapping (assigned incrementally)
-    // Reduces hash computation overhead: hash(int, string) vs hash(string, string)
+    /**
+     * Get field name for a given field ID
+     */
+    const std::string& getFieldName(int fieldId) const {
+        return idToFieldName_[fieldId];
+    }
+
+    /**
+     * Get number of registered fields
+     */
+    int getFieldCount() const { return nextFieldId_; }
+
+    /**
+     * Get field lengths by field ID (for flush)
+     */
+    const FieldLengthData& getFieldLengthData(int fieldId) const {
+        return fieldLengths_[fieldId];
+    }
+
+    /**
+     * Get field stats by field ID
+     */
+    const FieldStats& getFieldStatsById(int fieldId) const {
+        return fieldStats_[fieldId];
+    }
+
+    /**
+     * Get per-field posting map by field ID (for flush, getPostingList, etc.)
+     */
+    const std::unordered_map<std::string, PostingData>& getFieldPostings(int fieldId) const {
+        return fieldPostings_[fieldId];
+    }
+
+    /**
+     * Get field ID by name, or -1 if not found
+     */
+    int getFieldId(const std::string& fieldName) const {
+        auto it = fieldNameToId_.find(fieldName);
+        return it != fieldNameToId_.end() ? it->second : -1;
+    }
+
+    /**
+     * Get field lengths for norm computation (backward-compatible interface for DWPT flush)
+     * Returns pairs of (fieldName, fieldLengthData) for all fields.
+     */
+    void forEachFieldLength(
+        const std::function<void(const std::string& fieldName, const FieldLengthData& data)>& fn)
+        const {
+        for (int i = 0; i < nextFieldId_; i++) {
+            fn(idToFieldName_[i], fieldLengths_[i]);
+        }
+    }
+
+    void reset();
+    void clear();
+
+private:
+    // Field name <-> ID mapping
     std::unordered_map<std::string, int> fieldNameToId_;
+    std::vector<std::string> idToFieldName_;  // reverse mapping
     int nextFieldId_ = 0;
 
-    // Term byte storage
-    util::ByteBlockPool termBytePool_;
+    // Resolve or assign field ID. Returns field ID.
+    int resolveFieldId(const std::string& fieldName);
 
-    // Term → posting list mapping
-    // Key: (fieldID, term) pair - uses integer field ID instead of string for faster hashing
-    // Integer hashing is ~10x faster than string hashing
-    std::unordered_map<std::pair<int, std::string>, PostingData, FieldTermHash> termToPosting_;
+    // Ensure per-field vectors are sized for fieldId
+    void ensureFieldCapacity(int fieldId);
+
+    // === Per-field posting maps ===
+    // fieldPostings_[fieldId][term] = PostingData
+    // Eliminates pair key hashing — just string hash per term lookup.
+    std::vector<std::unordered_map<std::string, PostingData>> fieldPostings_;
+
+    // === Field metadata in flat vectors (indexed by field ID) ===
+    std::vector<FieldLengthData> fieldLengths_;
+    std::vector<FieldStats> fieldStats_;
 
     // Field metadata tracker (reference)
     FieldInfosBuilder& fieldInfosBuilder_;
 
-    // Reusable term positions map (avoids allocating one per document)
-    // Cleared and reused for each document to reduce malloc overhead
-    // Maps term -> list of positions within the document
-    std::unordered_map<std::string, std::vector<int>> termPositionsCache_;
+    // Term byte storage
+    util::ByteBlockPool termBytePool_;
 
-    // Field lengths for norm computation: fieldName -> (docID -> fieldLength)
-    std::unordered_map<std::string, std::unordered_map<int, int>> fieldLengths_;
-
-    // Incremental memory usage tracking (like Lucene's approach)
-    // Track memory as we add terms, not by scanning all posting lists
+    // Incremental memory usage tracking
     int64_t bytesUsed_ = 0;
 
-    // Incremental field statistics (computed during indexing, not during flush)
-    // Eliminates need to scan all posting lists during FreqProxTerms construction
-    std::unordered_map<std::string, FieldStats> fieldStats_;
+    // Pre-sizing hint
+    size_t expectedTermsPerField_;
 
-    // Pre-sorted term index per field (maintained incrementally during indexing)
-    // Eliminates O(n log n) sorting during flush - getTermsForField() is now O(k)
-    // Trade-off: O(log n) insert per unique term vs O(n log n) sort on every flush
-    std::unordered_map<std::string, std::set<std::string>> fieldToSortedTerms_;
-
-    /**
-     * Add term occurrence to posting list
-     *
-     * @param fieldName Field name
-     * @param term Term text
-     * @param docID Document ID
-     * @param freq Term frequency in document
-     * @param positions Term positions in document (empty if positions not indexed)
-     * @param indexOptions Index options for field
-     */
-    void addTermOccurrence(const std::string& fieldName, const std::string& term, int docID,
-                           int freq, const std::vector<int>& positions, IndexOptions indexOptions);
-
-    /**
-     * Create new posting list for term
-     *
-     * @param term Term text
-     * @param docID Document ID
-     * @param freq Term frequency in document
-     * @param positions Term positions (appended after freq if non-empty)
-     * @return Posting data
-     */
-    PostingData createPostingList(const std::string& term, int docID, int freq,
-                                  const std::vector<int>& positions);
-
-    /**
-     * Append docID/freq/positions to existing posting list
-     *
-     * @param data Posting data to update
-     * @param docID Document ID
-     * @param freq Term frequency in document
-     * @param positions Term positions (appended after freq if non-empty)
-     */
-    void appendToPostingList(PostingData& data, int docID, int freq,
-                             const std::vector<int>& positions);
 };
 
 }  // namespace index

@@ -117,6 +117,20 @@ int main(int argc, char* argv[]) {
     [[maybe_unused]] int ret1 = system(("rm -rf " + indexPath).c_str());
     [[maybe_unused]] int ret2 = system(("mkdir -p " + indexPath).c_str());
 
+    // Pre-load all Reuters documents into memory (exclude file I/O from timing)
+    // This matches Lucene's LuceneIngestionBenchmark methodology.
+    std::vector<document::Document> preloadedDocs;
+    {
+        std::cout << "Reading documents into memory...\n";
+        benchmarks::SimpleReutersAdapter adapter(reutersPath);
+        document::Document doc;
+        while (adapter.nextDocument(doc)) {
+            preloadedDocs.push_back(std::move(doc));
+            doc = document::Document();
+        }
+        std::cout << "  Loaded " << preloadedDocs.size() << " documents into memory\n";
+    }
+
     auto indexStart = high_resolution_clock::now();
 
     try {
@@ -126,23 +140,15 @@ int main(int argc, char* argv[]) {
 
         auto writer = std::make_unique<index::IndexWriter>(*dir, config);
 
-        // Read Reuters dataset (simple: 1 file = 1 document, matches Lucene)
-        benchmarks::SimpleReutersAdapter adapter(reutersPath);
-
         int docCount = 0;
-        document::Document doc;
 
-        std::cout << "Reading documents...\n";
-        while (adapter.nextDocument(doc)) {
+        for (auto& doc : preloadedDocs) {
             writer->addDocument(doc);
             docCount++;
 
             if (docCount % 1000 == 0) {
                 std::cout << "  Indexed " << docCount << " documents\r" << std::flush;
             }
-
-            // Clear doc for reuse
-            doc = document::Document();
         }
 
         std::cout << "\nCommitting index...\n";

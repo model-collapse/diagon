@@ -238,6 +238,145 @@ static void BM_IndexDifferentDocSizes(benchmark::State& state) {
     state.SetLabel(std::to_string(wordsPerDoc) + " words/doc");
 }
 
+// ==================== Multi-Field Benchmarks (Issue #6 workload) ====================
+
+/**
+ * Benchmark: Multi-field document indexing (matches Issue #6 CGO workload)
+ *
+ * Issue #6 reports 25-field documents via C API at ~8,900 docs/sec.
+ * This benchmark measures the C++ side with 25 text fields per document,
+ * isolating the C++ indexing path from CGO overhead.
+ */
+static void BM_IndexMultiFieldDocuments(benchmark::State& state) {
+    const int numDocs = state.range(0);
+    const int numFields = 25;  // Match Issue #6 workload
+    const int wordsPerField = 20;
+
+    std::mt19937 rng(42);
+
+    for (auto _ : state) {
+        state.PauseTiming();
+
+        auto tempDir = fs::temp_directory_path() / ("diagon_bench_mf_" + std::to_string(rng()));
+        fs::create_directories(tempDir);
+        auto dir = FSDirectory::open(tempDir.string());
+
+        IndexWriterConfig config;
+        config.setRAMBufferSizeMB(64.0);
+        config.setMaxBufferedDocs(50000);
+
+        IndexWriter writer(*dir, config);
+        FieldType ft = createIndexedFieldType();
+
+        // Pre-generate field names
+        std::vector<std::string> fieldNames;
+        fieldNames.reserve(numFields);
+        for (int f = 0; f < numFields; f++) {
+            fieldNames.push_back("field_" + std::to_string(f));
+        }
+
+        state.ResumeTiming();
+
+        for (int i = 0; i < numDocs; i++) {
+            Document doc;
+            for (int f = 0; f < numFields; f++) {
+                std::string text = generateRandomText(wordsPerField, rng);
+                doc.add(std::make_unique<Field>(fieldNames[f], text, ft));
+            }
+            writer.addDocument(doc);
+        }
+
+        writer.commit();
+
+        state.PauseTiming();
+        dir->close();
+        fs::remove_all(tempDir);
+        state.ResumeTiming();
+    }
+
+    state.SetItemsProcessed(state.iterations() * numDocs);
+    state.SetLabel(std::to_string(numDocs) + " docs x " + std::to_string(numFields) + " fields");
+}
+
+/**
+ * Benchmark: Batch addDocuments() vs single addDocument()
+ *
+ * Measures the throughput improvement from the batch API that acquires
+ * the DocumentsWriter mutex once per batch instead of once per document.
+ */
+static void BM_IndexBatchDocuments(benchmark::State& state) {
+    const int batchSize = state.range(0);
+    const int totalDocs = 5000;
+    const int numFields = 10;
+    const int wordsPerField = 20;
+
+    std::mt19937 rng(42);
+
+    for (auto _ : state) {
+        state.PauseTiming();
+
+        auto tempDir = fs::temp_directory_path() / ("diagon_bench_batch_" + std::to_string(rng()));
+        fs::create_directories(tempDir);
+        auto dir = FSDirectory::open(tempDir.string());
+
+        IndexWriterConfig config;
+        config.setRAMBufferSizeMB(64.0);
+        config.setMaxBufferedDocs(50000);
+
+        IndexWriter writer(*dir, config);
+        FieldType ft = createIndexedFieldType();
+
+        std::vector<std::string> fieldNames;
+        for (int f = 0; f < numFields; f++) {
+            fieldNames.push_back("field_" + std::to_string(f));
+        }
+
+        state.ResumeTiming();
+
+        if (batchSize == 1) {
+            // Single-document path (baseline)
+            for (int i = 0; i < totalDocs; i++) {
+                Document doc;
+                for (int f = 0; f < numFields; f++) {
+                    std::string text = generateRandomText(wordsPerField, rng);
+                    doc.add(std::make_unique<Field>(fieldNames[f], text, ft));
+                }
+                writer.addDocument(doc);
+            }
+        } else {
+            // Batch path
+            for (int i = 0; i < totalDocs; i += batchSize) {
+                int thisBatch = std::min(batchSize, totalDocs - i);
+
+                // Build batch
+                std::vector<Document> docs(thisBatch);
+                std::vector<const Document*> docPtrs;
+                docPtrs.reserve(thisBatch);
+
+                for (int j = 0; j < thisBatch; j++) {
+                    for (int f = 0; f < numFields; f++) {
+                        std::string text = generateRandomText(wordsPerField, rng);
+                        docs[j].add(std::make_unique<Field>(fieldNames[f], text, ft));
+                    }
+                    docPtrs.push_back(&docs[j]);
+                }
+
+                writer.addDocuments(docPtrs);
+            }
+        }
+
+        writer.commit();
+
+        state.PauseTiming();
+        dir->close();
+        fs::remove_all(tempDir);
+        state.ResumeTiming();
+    }
+
+    state.SetItemsProcessed(state.iterations() * totalDocs);
+    state.SetLabel("batch=" + std::to_string(batchSize));
+}
+
 // ==================== Benchmark Registrations ====================
 
 // Basic indexing with different document counts
@@ -265,6 +404,21 @@ BENCHMARK(BM_IndexDifferentDocSizes)
     ->Arg(50)
     ->Arg(100)
     ->Arg(200)
+    ->Unit(benchmark::kMillisecond);
+
+// Multi-field indexing (Issue #6 workload: 25 fields per doc)
+BENCHMARK(BM_IndexMultiFieldDocuments)
+    ->Arg(1000)
+    ->Arg(5000)
+    ->Arg(10000)
+    ->Unit(benchmark::kMillisecond);
+
+// Batch vs single document (mutex amortization)
+BENCHMARK(BM_IndexBatchDocuments)
+    ->Arg(1)     // Single-document baseline
+    ->Arg(50)    // Small batch
+    ->Arg(200)   // Medium batch
+    ->Arg(500)   // Large batch (Issue #6 target)
     ->Unit(benchmark::kMillisecond);
 
 BENCHMARK_MAIN();

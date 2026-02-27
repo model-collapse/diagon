@@ -4,7 +4,6 @@
 #include "diagon/index/FreqProxTermsWriter.h"
 
 #include <algorithm>
-#include <iostream>
 #include <set>
 #include <stdexcept>
 
@@ -14,272 +13,215 @@ namespace index {
 // ==================== FreqProxTermsWriter ====================
 
 FreqProxTermsWriter::FreqProxTermsWriter(FieldInfosBuilder& fieldInfosBuilder, size_t expectedTerms)
-    : fieldInfosBuilder_(fieldInfosBuilder) {
-    // Aggressive pre-sizing to minimize rehashing and malloc overhead
-    // Rehashing is expensive: allocate new buckets + move all entries
-
-    // Pre-size term dictionary (main data structure)
-    termToPosting_.reserve(expectedTerms);
-
-    // Pre-size field-related containers (typical: 5-20 fields per schema)
-    // Reserve extra capacity (1.3x) to avoid rehashing as fields are added
-    constexpr size_t EXPECTED_FIELDS = 20;
-    fieldStats_.reserve(EXPECTED_FIELDS);
-    fieldToSortedTerms_.reserve(EXPECTED_FIELDS);
+    : fieldInfosBuilder_(fieldInfosBuilder)
+    , expectedTermsPerField_(expectedTerms / 4) {
+    // Pre-size field-related containers
+    constexpr size_t EXPECTED_FIELDS = 32;
     fieldNameToId_.reserve(EXPECTED_FIELDS);
+    idToFieldName_.reserve(EXPECTED_FIELDS);
+    fieldPostings_.reserve(EXPECTED_FIELDS);
+    fieldLengths_.reserve(EXPECTED_FIELDS);
+    fieldStats_.reserve(EXPECTED_FIELDS);
+}
 
-    // Pre-size per-document term positions cache (typical: 50-100 unique terms per doc)
-    // This is reused across documents, so one-time allocation
-    termPositionsCache_.reserve(128);
+int FreqProxTermsWriter::resolveFieldId(const std::string& fieldName) {
+    auto it = fieldNameToId_.find(fieldName);
+    if (it != fieldNameToId_.end()) {
+        return it->second;
+    }
+    int id = nextFieldId_++;
+    fieldNameToId_[fieldName] = id;
+    idToFieldName_.push_back(fieldName);
+    ensureFieldCapacity(id);
+    return id;
+}
+
+void FreqProxTermsWriter::ensureFieldCapacity(int fieldId) {
+    size_t needed = static_cast<size_t>(fieldId) + 1;
+    if (fieldPostings_.size() < needed) {
+        fieldPostings_.resize(needed);
+        fieldPostings_.back().reserve(expectedTermsPerField_);
+        fieldLengths_.resize(needed);
+        fieldStats_.resize(needed);
+    }
 }
 
 void FreqProxTermsWriter::addDocument(const document::Document& doc, int docID) {
-    // Iterate over all fields in document
     for (const auto& field : doc.getFields()) {
-        const std::string& fieldName = field->name();
-        const auto& fieldType = field->fieldType();
-
-        // Ensure field exists (get or create)
-        fieldInfosBuilder_.getOrAdd(fieldName);
-
-        // Update field metadata
-        fieldInfosBuilder_.updateIndexOptions(fieldName, fieldType.indexOptions);
-        fieldInfosBuilder_.updateDocValuesType(fieldName, fieldType.docValuesType);
-
-        // Skip non-indexed fields
-        if (fieldType.indexOptions == IndexOptions::NONE) {
-            continue;
-        }
-
-        // Get field value
-        auto value = field->stringValue();
-        if (!value.has_value()) {
-            continue;  // Skip null values
-        }
-
-        // Tokenize field
-        std::vector<std::string> tokens = field->tokenize();
-
-        // Track field length for norm computation
-        auto& fieldLengthMap = fieldLengths_[fieldName];
-        if (fieldLengthMap.find(docID) == fieldLengthMap.end()) {
-            // First time seeing this document for this field
-            fieldStats_[fieldName].docCount++;
-        }
-        fieldLengthMap[docID] = static_cast<int>(tokens.size());
-
-        // Collect term positions using cached map (avoid allocation per document)
-        termPositionsCache_.clear();  // Reuse existing map
-        for (int pos = 0; pos < static_cast<int>(tokens.size()); pos++) {
-            termPositionsCache_[tokens[pos]].push_back(pos);
-        }
-
-        // Determine whether to store positions based on indexOptions
-        bool storePositions = (fieldType.indexOptions >=
-                               IndexOptions::DOCS_AND_FREQS_AND_POSITIONS);
-
-        // Add each unique term to posting lists with actual frequency and positions
-        for (const auto& [term, positions] : termPositionsCache_) {
-            int freq = static_cast<int>(positions.size());
-            addTermOccurrence(fieldName, term, docID, freq,
-                              storePositions ? positions : std::vector<int>{},
-                              fieldType.indexOptions);
-        }
+        addField(*field, docID);
     }
 }
 
-void FreqProxTermsWriter::addTermOccurrence(const std::string& fieldName, const std::string& term,
-                                            int docID, int freq, const std::vector<int>& positions,
-                                            IndexOptions indexOptions) {
-    // Get or assign field ID (reduces hash overhead: hash int vs hash string)
-    auto fieldIdIt = fieldNameToId_.find(fieldName);
-    int fieldId;
-    if (fieldIdIt == fieldNameToId_.end()) {
-        // New field - assign ID
-        fieldId = nextFieldId_++;
-        fieldNameToId_[fieldName] = fieldId;
-    } else {
-        fieldId = fieldIdIt->second;
+void FreqProxTermsWriter::addField(const document::IndexableField& field, int docID) {
+    const std::string& fieldName = field.name();
+    const auto& fieldType = field.fieldType();
+
+    fieldInfosBuilder_.getOrAdd(fieldName);
+    fieldInfosBuilder_.updateIndexOptions(fieldName, fieldType.indexOptions);
+    fieldInfosBuilder_.updateDocValuesType(fieldName, fieldType.docValuesType);
+
+    if (fieldType.indexOptions == IndexOptions::NONE) {
+        return;
     }
 
-    // Use (fieldID, term) as key - faster hashing than (fieldName, term)
-    auto key = std::make_pair(fieldId, term);
+    auto value = field.stringValue();
+    if (!value.has_value()) {
+        return;
+    }
 
-    // Check if term already exists
-    auto it = termToPosting_.find(key);
+    // Resolve field ID once
+    int fieldId = resolveFieldId(fieldName);
 
-    // Get or create field stats
-    FieldStats& stats = fieldStats_[fieldName];
+    std::vector<std::string> tokens = field.tokenize();
 
-    if (it == termToPosting_.end()) {
-        // New term - create posting list with actual frequency and positions
-        PostingData data = createPostingList(term, docID, freq, positions);
+    // Track field length (flat vector, O(1))
+    auto& fld = fieldLengths_[fieldId];
+    if (!fld.has(docID)) {
+        fieldStats_[fieldId].docCount++;
+    }
+    fld.set(docID, static_cast<int>(tokens.size()));
 
-        // Track memory incrementally: field + term + posting data
-        bytesUsed_ += fieldName.capacity() + term.capacity();  // String storage
-        bytesUsed_ += data.postings.capacity() * sizeof(int);  // Vector capacity
-        bytesUsed_ += 64;  // Hash map node overhead (approximate)
+    bool storePositions = (fieldType.indexOptions >=
+                           IndexOptions::DOCS_AND_FREQS_AND_POSITIONS);
 
-        // Update field statistics incrementally (new term)
-        stats.sumTotalTermFreq += freq;  // Add term frequency
-        stats.sumDocFreq += 1;           // One document has this term
+    // Direct-to-posting token processing: eliminates the intermediate termPositionsCache_.
+    // Each token does ONE hash lookup in fieldPostings_ instead of TWO (cache + postings).
+    // Freq is tracked in-place via pendingFreqIndex.
+    auto& postingMap = fieldPostings_[fieldId];
+    FieldStats& stats = fieldStats_[fieldId];
 
-        // Add term to sorted index (O(log n) insert, eliminates O(n log n) sort during flush)
-        fieldToSortedTerms_[fieldName].insert(term);
-
-        termToPosting_[std::move(key)] = std::move(data);
-    } else {
-        // Existing term - append to posting list
+    for (int pos = 0; pos < static_cast<int>(tokens.size()); pos++) {
+        const std::string& term = tokens[pos];
+        auto [it, inserted] = postingMap.try_emplace(term);
         PostingData& data = it->second;
 
-        // Skip if same document (duplicate term in same doc)
-        if (data.lastDocID == docID) {
-            return;
+        if (inserted) {
+            // Brand new term — initialize posting list
+            data.postings.reserve(100);
+            data.lastDocID = docID;
+            data.postings.push_back(docID);
+            data.pendingFreqIndex = static_cast<int>(data.postings.size());
+            data.postings.push_back(1);  // freq starts at 1
+            if (storePositions) data.postings.push_back(pos);
+
+            bytesUsed_ += term.capacity() + 100 * sizeof(int) + 64;
+            stats.sumDocFreq++;
+            stats.sumTotalTermFreq++;
+        } else if (data.lastDocID != docID) {
+            // Existing term, new document
+            size_t oldCap = data.postings.capacity();
+            data.lastDocID = docID;
+            data.postings.push_back(docID);
+            data.pendingFreqIndex = static_cast<int>(data.postings.size());
+            data.postings.push_back(1);
+            if (storePositions) data.postings.push_back(pos);
+            size_t newCap = data.postings.capacity();
+            if (newCap > oldCap) bytesUsed_ += (newCap - oldCap) * sizeof(int);
+
+            stats.sumDocFreq++;
+            stats.sumTotalTermFreq++;
+        } else {
+            // Same term, same document — increment freq in-place, append position
+            size_t oldCap = data.postings.capacity();
+            data.postings[data.pendingFreqIndex]++;
+            if (storePositions) data.postings.push_back(pos);
+            size_t newCap = data.postings.capacity();
+            if (newCap > oldCap) bytesUsed_ += (newCap - oldCap) * sizeof(int);
+
+            stats.sumTotalTermFreq++;
         }
-
-        size_t oldCapacity = data.postings.capacity();
-        appendToPostingList(data, docID, freq, positions);
-        size_t newCapacity = data.postings.capacity();
-
-        // Track delta only if vector grew (reallocation occurred)
-        if (newCapacity > oldCapacity) {
-            bytesUsed_ += (newCapacity - oldCapacity) * sizeof(int);
-        }
-
-        // Update field statistics incrementally (existing term, new document)
-        stats.sumTotalTermFreq += freq;  // Add term frequency
-        stats.sumDocFreq += 1;           // Another document has this term
     }
 }
 
-FreqProxTermsWriter::PostingData
-FreqProxTermsWriter::createPostingList(const std::string& term, int docID, int freq,
-                                       const std::vector<int>& positions) {
-    PostingData data;
-
-    // Aggressive pre-allocation: typical term has 10-50 postings in Reuters
-    // Pre-allocate 100 ints to avoid most reallocations
-    data.postings.reserve(100);
-
-    // Store initial [docID, freq] pair
-    data.postings.push_back(docID);
-    data.postings.push_back(freq);
-
-    // Append positions after freq if provided
-    for (int pos : positions) {
-        data.postings.push_back(pos);
-    }
-
-    data.lastDocID = docID;
-
-    return data;
-}
-
-void FreqProxTermsWriter::appendToPostingList(PostingData& data, int docID, int freq,
-                                              const std::vector<int>& positions) {
-    // Append [docID, freq, pos0, ..., posN]
-    data.postings.push_back(docID);
-    data.postings.push_back(freq);
-
-    // Append positions after freq if provided
-    for (int pos : positions) {
-        data.postings.push_back(pos);
-    }
-
-    data.lastDocID = docID;
-}
+// ==================== Query / Read Methods ====================
 
 std::vector<int> FreqProxTermsWriter::getPostingList(const std::string& term) const {
-    // Legacy method - search all fields for this term
-    // This is inefficient but maintains backward compatibility for tests
-    for (const auto& [key, data] : termToPosting_) {
-        // key is (fieldID, term) pair - check if term matches
-        if (key.second == term) {
-            return data.postings;
+    // Legacy: search all fields
+    for (int i = 0; i < nextFieldId_; i++) {
+        auto it = fieldPostings_[i].find(term);
+        if (it != fieldPostings_[i].end()) {
+            return it->second.postings;
         }
     }
-    return {};  // Term not found
+    return {};
 }
 
 std::vector<std::string> FreqProxTermsWriter::getTerms() const {
-    // Legacy method - return all terms from all fields
     std::set<std::string> uniqueTerms;
-
-    for (const auto& [key, _] : termToPosting_) {
-        // key.second is the term
-        uniqueTerms.insert(key.second);
+    for (int i = 0; i < nextFieldId_; i++) {
+        for (const auto& [term, _] : fieldPostings_[i]) {
+            uniqueTerms.insert(term);
+        }
     }
-
-    std::vector<std::string> terms(uniqueTerms.begin(), uniqueTerms.end());
-    return terms;  // Already sorted by set
+    return std::vector<std::string>(uniqueTerms.begin(), uniqueTerms.end());
 }
 
 std::vector<int> FreqProxTermsWriter::getPostingList(const std::string& field,
                                                      const std::string& term) const {
-    // Get field ID
     auto fieldIdIt = fieldNameToId_.find(field);
     if (fieldIdIt == fieldNameToId_.end()) {
-        return {};  // Field not found
+        return {};
     }
 
-    // Use (fieldID, term) as key - faster hashing
-    auto key = std::make_pair(fieldIdIt->second, term);
-
-    auto it = termToPosting_.find(key);
-    if (it == termToPosting_.end()) {
-        return {};  // Term not found in this field
+    auto it = fieldPostings_[fieldIdIt->second].find(term);
+    if (it == fieldPostings_[fieldIdIt->second].end()) {
+        return {};
     }
-
     return it->second.postings;
 }
 
 std::vector<std::string> FreqProxTermsWriter::getTermsForField(const std::string& field) const {
-    // Use pre-sorted index (eliminates O(n log n) sorting during flush)
-    auto it = fieldToSortedTerms_.find(field);
-    if (it == fieldToSortedTerms_.end()) {
-        return {};  // Field not found
+    auto fieldIdIt = fieldNameToId_.find(field);
+    if (fieldIdIt == fieldNameToId_.end()) {
+        return {};
     }
 
-    // Convert set to vector (already sorted)
-    return std::vector<std::string>(it->second.begin(), it->second.end());
+    // Collect terms from per-field posting map and sort (deferred from indexing time)
+    const auto& postingMap = fieldPostings_[fieldIdIt->second];
+    std::vector<std::string> terms;
+    terms.reserve(postingMap.size());
+    for (const auto& [term, _] : postingMap) {
+        terms.push_back(term);
+    }
+    std::sort(terms.begin(), terms.end());
+    return terms;
 }
 
 FreqProxTermsWriter::FieldStats
 FreqProxTermsWriter::getFieldStats(const std::string& fieldName) const {
-    auto it = fieldStats_.find(fieldName);
-    if (it != fieldStats_.end()) {
-        return it->second;
+    auto it = fieldNameToId_.find(fieldName);
+    if (it != fieldNameToId_.end() && it->second < static_cast<int>(fieldStats_.size())) {
+        return fieldStats_[it->second];
     }
-    // Return default-initialized stats if field not found
     return FieldStats{};
 }
 
 int64_t FreqProxTermsWriter::bytesUsed() const {
-    // Return incrementally tracked memory usage - O(1) instead of O(n)!
-    // No need to scan all posting lists anymore
     return bytesUsed_ + termBytePool_.bytesUsed();
 }
 
 void FreqProxTermsWriter::reset() {
     termBytePool_.reset();
-    termToPosting_.clear();
-    fieldLengths_.clear();
-    fieldStats_.clear();
-    fieldToSortedTerms_.clear();
+    for (int i = 0; i < nextFieldId_; i++) {
+        fieldPostings_[i].clear();
+        fieldLengths_[i].lengths.clear();
+        fieldStats_[i] = FieldStats{};
+    }
     fieldNameToId_.clear();
+    idToFieldName_.clear();
     nextFieldId_ = 0;
-    bytesUsed_ = 0;  // Reset memory counter
+    bytesUsed_ = 0;
 }
 
 void FreqProxTermsWriter::clear() {
     termBytePool_.clear();
-    termToPosting_.clear();
+    fieldPostings_.clear();
     fieldLengths_.clear();
     fieldStats_.clear();
-    fieldToSortedTerms_.clear();
     fieldNameToId_.clear();
+    idToFieldName_.clear();
     nextFieldId_ = 0;
-    bytesUsed_ = 0;  // Reset memory counter
+    bytesUsed_ = 0;
 }
 
 }  // namespace index

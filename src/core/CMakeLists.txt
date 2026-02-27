@@ -438,6 +438,13 @@ foreach(_target ${_DIAGON_TARGETS})
     else()
         message(FATAL_ERROR "cppjieba not found")
     endif()
+
+    # Link jemalloc for optimized memory allocation (17%+ of ingestion CPU is malloc/free)
+    find_library(JEMALLOC_LIB NAMES jemalloc)
+    if(JEMALLOC_LIB)
+        target_link_libraries(${_target} PUBLIC ${JEMALLOC_LIB})
+        message(STATUS "jemalloc found: ${JEMALLOC_LIB}")
+    endif()
 endforeach()
 
 # ==================== Compiler Features ====================

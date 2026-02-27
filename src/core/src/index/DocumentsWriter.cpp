@@ -32,6 +32,25 @@ int DocumentsWriter::addDocument(const document::Document& doc) {
     return 0;
 }
 
+int DocumentsWriter::addDocuments(const std::vector<const document::Document*>& docs) {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    int segmentsCreated = 0;
+    for (auto* doc : docs) {
+        bool needsFlush = dwpt_->addDocument(*doc);
+        numDocsAdded_++;
+
+        if (needsFlush) {
+            auto segmentInfo = maybeFlushdwpt();
+            if (segmentInfo) {
+                segmentsCreated++;
+            }
+        }
+    }
+
+    return segmentsCreated;
+}
+
 int DocumentsWriter::flush() {
     std::lock_guard<std::mutex> lock(mutex_);
 
