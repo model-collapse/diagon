@@ -42,7 +42,7 @@ jobs:
             asset_name: diagon-macos-x86_64.tar.gz
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install dependencies (Ubuntu)
         if: matrix.os == 'ubuntu-22.04'
