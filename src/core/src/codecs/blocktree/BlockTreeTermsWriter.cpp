@@ -53,8 +53,6 @@ BlockTreeTermsWriter::BlockTreeTermsWriter(store::IndexOutput* timOut, store::In
     , sumTotalTermFreq_(0)
     , sumDocFreq_(0)
     , docCount_(0) {
-    // DEBUG: Show what file pointer we captured
-
     if (!timOut_ || !tipOut_) {
         throw std::invalid_argument("Output streams cannot be null");
     }
@@ -236,26 +234,61 @@ void BlockTreeTermsWriter::writeBlock() {
     timOut_->writeVInt(static_cast<int>(statsBuf.size()));
     timOut_->writeBytes(statsBuf.data(), statsBuf.size());
 
-    // === Section 3: Metadata (column-stride file pointer deltas) ===
-    // All postingsFP deltas, then all posStartFP deltas, then all skipStartFP deltas.
-    // Each column uses cumulative delta encoding (reset to 0 at block start).
+    // === Section 3: Metadata (conditional column-stride file pointer deltas) ===
+    // Format: flags byte + [postingsFP column] + [posStartFP column?] + [skipStartFP section?]
+    // flags bit0: always 1 (postingsFP present)
+    // flags bit1: posStartFP column present (only if any term has posStartFP >= 0)
+    // flags bit2: skipStartFP section present (only if any term has skipStartFP >= 0)
     std::vector<uint8_t> metaBuf;
     metaBuf.reserve(pendingTerms_.size() * 9);
     {
+        bool blockHasSkip = false, blockHasPos = false;
+        for (const auto& pending : pendingTerms_) {
+            if (pending.stats.skipStartFP >= 0) blockHasSkip = true;
+            if (pending.stats.posStartFP >= 0) blockHasPos = true;
+        }
+
+        // Write flags byte
+        uint8_t flags = 0x01;  // bit0: postingsFP always present
+        if (blockHasPos)  flags |= 0x02;
+        if (blockHasSkip) flags |= 0x04;
+        metaBuf.push_back(flags);
+
+        // Column 1: postingsFP (always present)
         int64_t lastFP = 0;
         for (const auto& pending : pendingTerms_) {
             bufEncodeVLong(metaBuf, pending.stats.postingsFP - lastFP);
             lastFP = pending.stats.postingsFP;
         }
-        lastFP = 0;
-        for (const auto& pending : pendingTerms_) {
-            bufEncodeVLong(metaBuf, pending.stats.posStartFP - lastFP);
-            lastFP = pending.stats.posStartFP;
+
+        // Column 2: posStartFP (only if any term has position data)
+        if (blockHasPos) {
+            lastFP = 0;
+            for (const auto& pending : pendingTerms_) {
+                bufEncodeVLong(metaBuf, pending.stats.posStartFP - lastFP);
+                lastFP = pending.stats.posStartFP;
+            }
         }
-        lastFP = 0;
-        for (const auto& pending : pendingTerms_) {
-            bufEncodeVLong(metaBuf, pending.stats.skipStartFP - lastFP);
-            lastFP = pending.stats.skipStartFP;
+
+        // Column 3: skipStartFP (sparse — bitmap + values for terms with skip data)
+        if (blockHasSkip) {
+            // Write bitmap: 1 bit per term, ceil(termCount/8) bytes
+            int bitmapBytes = (termCount + 7) / 8;
+            size_t bitmapStart = metaBuf.size();
+            metaBuf.resize(metaBuf.size() + bitmapBytes, 0);
+            for (int i = 0; i < termCount; i++) {
+                if (pendingTerms_[i].stats.skipStartFP >= 0) {
+                    metaBuf[bitmapStart + (i / 8)] |= (1 << (i % 8));
+                }
+            }
+            // Delta-encode only the valid skipStartFP values
+            lastFP = 0;
+            for (int i = 0; i < termCount; i++) {
+                if (pendingTerms_[i].stats.skipStartFP >= 0) {
+                    bufEncodeVLong(metaBuf, pendingTerms_[i].stats.skipStartFP - lastFP);
+                    lastFP = pendingTerms_[i].stats.skipStartFP;
+                }
+            }
         }
     }
     timOut_->writeVInt(static_cast<int>(metaBuf.size()));

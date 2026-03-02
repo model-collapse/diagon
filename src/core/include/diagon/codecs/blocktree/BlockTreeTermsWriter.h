@@ -37,8 +37,13 @@ namespace blocktree {
  *   Section 2 - Stats:   VInt(statsSize) + singleton RLE encoded docFreq/totalTermFreq
  *     Singleton run: VInt(((count-1) << 1) | 1)
  *     Non-singleton: VInt((docFreq << 1) | 0) + VLong(totalTermFreq - docFreq)
- *   Section 3 - Metadata: VInt(metaSize) + column-stride delta-encoded file pointers
- *     [all postingsFP deltas][all posStartFP deltas][all skipStartFP deltas]
+ *   Section 3 - Metadata: VInt(metaSize) + conditional column-stride delta-encoded FPs
+ *     byte(flags): bit0=postingsFP(always), bit1=posStartFP, bit2=skipStartFP
+ *     [all postingsFP deltas]
+ *     [all posStartFP deltas]  (if bit1: field has positions)
+ *     [skipStartFP bitmap + sparse deltas]  (if bit2: block has skip data)
+ *       bitmap: ceil(termCount/8) bytes, 1 bit per term
+ *       deltas: VLong delta-encoded FPs for set bits only
  * - .tip: Compact block list mapping first terms to block file pointers
  */
 class BlockTreeTermsWriter {

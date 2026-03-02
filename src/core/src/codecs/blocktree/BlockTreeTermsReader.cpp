@@ -253,29 +253,60 @@ void BlockTreeTermsReader::loadBlock(int64_t blockFP, const util::BytesRef& bloc
         timIn_->seek(statsEnd);
     }
 
-    // === Section 3: Metadata (column-stride file pointer deltas) ===
+    // === Section 3: Metadata (conditional column-stride file pointer deltas) ===
+    // Format: flags byte + [postingsFP column] + [posStartFP column?] + [skipStartFP section?]
     {
         int metaSize = timIn_->readVInt();
         int64_t metaEnd = timIn_->getFilePointer() + metaSize;
 
-        // All postingsFP deltas
+        // Read flags byte
+        uint8_t flags = timIn_->readByte();
+        bool hasPosFP  = (flags & 0x02) != 0;
+        bool hasSkipFP = (flags & 0x04) != 0;
+
+        // Column 1: postingsFP (always present)
         int64_t lastFP = 0;
         for (int i = 0; i < termCount; i++) {
             block.stats[i].postingsFP = lastFP + timIn_->readVLong();
             lastFP = block.stats[i].postingsFP;
         }
-        // All posStartFP deltas
-        lastFP = 0;
-        for (int i = 0; i < termCount; i++) {
-            block.stats[i].posStartFP = lastFP + timIn_->readVLong();
-            lastFP = block.stats[i].posStartFP;
+
+        // Column 2: posStartFP (conditional)
+        if (hasPosFP) {
+            lastFP = 0;
+            for (int i = 0; i < termCount; i++) {
+                block.stats[i].posStartFP = lastFP + timIn_->readVLong();
+                lastFP = block.stats[i].posStartFP;
+            }
+        } else {
+            for (int i = 0; i < termCount; i++) {
+                block.stats[i].posStartFP = -1;
+            }
         }
-        // All skipStartFP deltas
-        lastFP = 0;
-        for (int i = 0; i < termCount; i++) {
-            block.stats[i].skipStartFP = lastFP + timIn_->readVLong();
-            lastFP = block.stats[i].skipStartFP;
+
+        // Column 3: skipStartFP (sparse bitmap + values)
+        if (hasSkipFP) {
+            // Read bitmap
+            int bitmapBytes = (termCount + 7) / 8;
+            std::vector<uint8_t> bitmap(bitmapBytes);
+            timIn_->readBytes(bitmap.data(), bitmapBytes);
+
+            // Read delta-encoded FPs for set bits only
+            lastFP = 0;
+            for (int i = 0; i < termCount; i++) {
+                if (bitmap[i / 8] & (1 << (i % 8))) {
+                    block.stats[i].skipStartFP = lastFP + timIn_->readVLong();
+                    lastFP = block.stats[i].skipStartFP;
+                } else {
+                    block.stats[i].skipStartFP = -1;
+                }
+            }
+        } else {
+            for (int i = 0; i < termCount; i++) {
+                block.stats[i].skipStartFP = -1;
+            }
         }
+
         // Seek to end of metadata section for forward compatibility
         timIn_->seek(metaEnd);
     }
