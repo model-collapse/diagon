@@ -204,14 +204,16 @@ TEST_F(SegmentInfosReadTest, FindLatestGeneration) {
     SegmentInfos infos = SegmentInfos::readLatestCommit(*dir);
     EXPECT_EQ(infos.getGeneration(), 2);
 
-    // Verify all segments files exist
-    EXPECT_TRUE(fs::exists(testDir_ / "segments_0"));
-    EXPECT_TRUE(fs::exists(testDir_ / "segments_1"));
+    // Only the latest segments file should exist (IndexWriter deletes old ones)
+    EXPECT_FALSE(fs::exists(testDir_ / "segments_0"));
+    EXPECT_FALSE(fs::exists(testDir_ / "segments_1"));
     EXPECT_TRUE(fs::exists(testDir_ / "segments_2"));
 }
 
 TEST_F(SegmentInfosReadTest, ReadOlderGeneration) {
     // Write multiple commits
+    // Note: IndexWriter deletes old segments_N files on each commit,
+    // so only the latest generation persists (default Lucene behavior).
     for (int i = 0; i < 3; i++) {
         IndexWriterConfig config;
         if (i > 0) {
@@ -223,17 +225,13 @@ TEST_F(SegmentInfosReadTest, ReadOlderGeneration) {
         writer.close();
     }
 
-    // Read generation 0
-    SegmentInfos infos0 = SegmentInfos::read(*dir, "segments_0");
-    EXPECT_EQ(infos0.getGeneration(), 0);
-
-    // Read generation 1
-    SegmentInfos infos1 = SegmentInfos::read(*dir, "segments_1");
-    EXPECT_EQ(infos1.getGeneration(), 1);
-
-    // Read generation 2 (latest)
+    // Only the latest generation (2) should be readable
     SegmentInfos infos2 = SegmentInfos::readLatestCommit(*dir);
     EXPECT_EQ(infos2.getGeneration(), 2);
+
+    // Old generations should have been cleaned up
+    EXPECT_THROW(SegmentInfos::read(*dir, "segments_0"), std::exception);
+    EXPECT_THROW(SegmentInfos::read(*dir, "segments_1"), std::exception);
 }
 
 // ==================== File Format Validation Tests ====================

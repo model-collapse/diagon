@@ -131,6 +131,7 @@ TEST_F(NormsIntegrationTest, NormsFilesCreated) {
     auto dir = FSDirectory::open(testDir_.string());
     IndexWriterConfig config;
     config.setOpenMode(IndexWriterConfig::OpenMode::CREATE);
+    config.setUseCompoundFile(false);  // Disable CFS so raw .nvd/.nvm are visible
 
     IndexWriter writer(*dir, config);
 

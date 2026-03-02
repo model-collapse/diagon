@@ -89,16 +89,18 @@ TEST(DocumentsWriterTest, AutoFlushByRAMLimit) {
     config.dwptConfig.maxBufferedDocs = 10000;  // High doc limit
     DocumentsWriter writer(config);
 
-    // Add documents with many unique terms until flush
+    // Add documents with many unique terms until flush.
+    // Use alphanumeric-only terms (no underscores) so the StandardTokenizer
+    // doesn't split them into smaller shared tokens.
     int totalSegments = 0;
     int docsAdded = 0;
 
     for (int i = 0; i < 100; i++) {
         Document doc;
-        // Create document with many unique terms
+        // Create document with 1000 unique terms across the entire corpus
         std::string text;
         for (int j = 0; j < 1000; j++) {
-            text += "term_" + std::to_string(i) + "_" + std::to_string(j) + " ";
+            text += "t" + std::to_string(i * 10000 + j) + " ";
         }
         doc.add(std::make_unique<TextField>("body", text, TextField::TYPE_STORED));
 

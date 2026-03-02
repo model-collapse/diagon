@@ -39,66 +39,61 @@ FieldInfo createTestField(const std::string& name, IndexOptions options) {
 
 TEST(StreamVBytePostingsDebugTest, FourDocsRoundTrip) {
     // Test exactly 4 docs (one StreamVByte group, no VInt fallback)
-    // We'll manually encode the data to ensure correct format
+    // Uses freq-in-docDelta encoding: freq=1 packed in low bit, non-1 freqs as VInt tail.
 
-    std::cout << "\n=== StreamVByte 4-Doc Debug Test ===" << std::endl;
+    std::cout << "\n=== StreamVByte 4-Doc Debug Test (freq-in-docDelta) ===" << std::endl;
 
     // Test data: doc IDs 0, 5, 10, 15 with frequencies 10, 20, 30, 40
     // Doc deltas: 0, 5, 5, 5
+    // All freqs > 1, so modified deltas = (delta << 1) | 0
     uint32_t docDeltas[4] = {0, 5, 5, 5};
     uint32_t freqs[4] = {10, 20, 30, 40};
 
-    std::cout << "Input doc deltas: [" << docDeltas[0] << ", " << docDeltas[1] << ", "
+    // Pack freq into low bit of doc delta
+    uint32_t modifiedDeltas[4];
+    for (int i = 0; i < 4; ++i) {
+        // All freqs > 1: low bit = 0
+        modifiedDeltas[i] = docDeltas[i] << 1;
+    }
+
+    std::cout << "Original doc deltas: [" << docDeltas[0] << ", " << docDeltas[1] << ", "
               << docDeltas[2] << ", " << docDeltas[3] << "]" << std::endl;
-    std::cout << "Input frequencies: [" << freqs[0] << ", " << freqs[1] << ", " << freqs[2] << ", "
+    std::cout << "Modified deltas (freq packed): [" << modifiedDeltas[0] << ", " << modifiedDeltas[1]
+              << ", " << modifiedDeltas[2] << ", " << modifiedDeltas[3] << "]" << std::endl;
+    std::cout << "Frequencies: [" << freqs[0] << ", " << freqs[1] << ", " << freqs[2] << ", "
               << freqs[3] << "]" << std::endl;
 
-    // Manually encode using StreamVByte
-    uint8_t docDeltaEncoded[17];  // Max: 1 control + 4*4 data bytes
-    int docDeltaBytes = StreamVByte::encode(docDeltas, 4, docDeltaEncoded);
+    // StreamVByte encode modified doc deltas
+    uint8_t docDeltaEncoded[17];
+    int docDeltaBytes = StreamVByte::encode(modifiedDeltas, 4, docDeltaEncoded);
 
-    uint8_t freqEncoded[17];
-    int freqBytes = StreamVByte::encode(freqs, 4, freqEncoded);
-
-    std::cout << "\nEncoded doc deltas (" << docDeltaBytes << " bytes): ";
+    std::cout << "\nEncoded modified deltas (" << docDeltaBytes << " bytes): ";
     for (int i = 0; i < docDeltaBytes; ++i) {
         printf("%02x ", docDeltaEncoded[i]);
     }
     std::cout << std::endl;
 
-    std::cout << "Encoded frequencies (" << freqBytes << " bytes): ";
-    for (int i = 0; i < freqBytes; ++i) {
-        printf("%02x ", freqEncoded[i]);
-    }
-    std::cout << std::endl;
-
     // Manual decode to verify encoding
-    uint32_t decodedDocDeltas[4];
-    uint32_t decodedFreqs[4];
-    StreamVByte::decode4(docDeltaEncoded, decodedDocDeltas);
-    StreamVByte::decode4(freqEncoded, decodedFreqs);
+    uint32_t decodedModifiedDeltas[4];
+    StreamVByte::decode4(docDeltaEncoded, decodedModifiedDeltas);
 
-    std::cout << "\nManual decode doc deltas: [" << decodedDocDeltas[0] << ", "
-              << decodedDocDeltas[1] << ", " << decodedDocDeltas[2] << ", " << decodedDocDeltas[3]
-              << "]" << std::endl;
-    std::cout << "Manual decode frequencies: [" << decodedFreqs[0] << ", " << decodedFreqs[1]
-              << ", " << decodedFreqs[2] << ", " << decodedFreqs[3] << "]" << std::endl;
+    std::cout << "\nManual decode modified deltas: [" << decodedModifiedDeltas[0] << ", "
+              << decodedModifiedDeltas[1] << ", " << decodedModifiedDeltas[2] << ", "
+              << decodedModifiedDeltas[3] << "]" << std::endl;
 
-    // Verify manual decode matches input
-    ASSERT_EQ(docDeltas[0], decodedDocDeltas[0]);
-    ASSERT_EQ(docDeltas[1], decodedDocDeltas[1]);
-    ASSERT_EQ(docDeltas[2], decodedDocDeltas[2]);
-    ASSERT_EQ(docDeltas[3], decodedDocDeltas[3]);
-    ASSERT_EQ(freqs[0], decodedFreqs[0]);
-    ASSERT_EQ(freqs[1], decodedFreqs[1]);
-    ASSERT_EQ(freqs[2], decodedFreqs[2]);
-    ASSERT_EQ(freqs[3], decodedFreqs[3]);
+    // Verify manual decode matches modified deltas
+    for (int i = 0; i < 4; ++i) {
+        ASSERT_EQ(modifiedDeltas[i], decodedModifiedDeltas[i]);
+    }
     std::cout << "✓ Manual decode verification passed" << std::endl;
 
-    // Create buffer with encoded data
+    // Create buffer: StreamVByte modified deltas + VInt freqs for non-1 entries
     ByteBuffersIndexOutput out("test.doc");
     out.writeBytes(docDeltaEncoded, docDeltaBytes);
-    out.writeBytes(freqEncoded, freqBytes);
+    // All freqs > 1, so write all as VInts
+    for (int i = 0; i < 4; ++i) {
+        out.writeVInt(static_cast<int32_t>(freqs[i]));
+    }
 
     std::cout << "\nTotal bytes written: " << out.getFilePointer() << std::endl;
 

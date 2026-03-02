@@ -81,16 +81,17 @@ TEST(DocumentsWriterPerThreadTest, FlushByRAMLimit) {
     config.maxBufferedDocs = 10000;  // High doc limit
     DocumentsWriterPerThread dwpt(config);
 
-    // Add documents with many unique terms to increase RAM usage
+    // Add documents with many unique terms to increase RAM usage.
+    // Use alphanumeric-only terms so the StandardTokenizer doesn't split them.
     bool needsFlush = false;
     int docsAdded = 0;
 
     for (int i = 0; i < 1000 && !needsFlush; i++) {
         Document doc;
-        // Create document with many unique terms
+        // Create document with 1000 unique terms across the entire corpus
         std::string text;
         for (int j = 0; j < 1000; j++) {
-            text += "term_" + std::to_string(i) + "_" + std::to_string(j) + " ";
+            text += "t" + std::to_string(i * 10000 + j) + " ";
         }
         doc.add(std::make_unique<TextField>("body", text, TextField::TYPE_STORED));
         needsFlush = dwpt.addDocument(doc);

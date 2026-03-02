@@ -61,27 +61,25 @@ std::vector<uint8_t> extractWriterBytes(Lucene104PostingsWriter& writer) {
 
 TEST(StreamVBytePostingsRoundTripTest, FourDocsExact) {
     // Test with exactly 4 docs (one StreamVByte group)
-    auto writeState = createWriteState();
+    // Uses freq-in-docDelta encoding: low bit encodes freq==1
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
 
-    // Create a custom ByteBuffersIndexOutput that we can access
     auto docOut = std::make_unique<ByteBuffersIndexOutput>("test.doc");
 
-    // Manually write what the writer would write for 4 docs
     // Doc IDs: 0, 5, 10, 15 with freqs: 10, 20, 30, 40
     // Doc deltas: 0, 5, 5, 5
-
-    // Use StreamVByte to encode
-    uint32_t docDeltas[4] = {0, 5, 5, 5};
+    // All freqs > 1: modified deltas = (delta << 1) | 0
+    uint32_t modifiedDeltas[4] = {0 << 1, 5 << 1, 5 << 1, 5 << 1};  // {0, 10, 10, 10}
     uint32_t freqs[4] = {10, 20, 30, 40};
 
     uint8_t docEncoded[17];
-    int docBytes = StreamVByte::encode(docDeltas, 4, docEncoded);
+    int docBytes = StreamVByte::encode(modifiedDeltas, 4, docEncoded);
     docOut->writeBytes(docEncoded, docBytes);
 
-    uint8_t freqEncoded[17];
-    int freqBytes = StreamVByte::encode(freqs, 4, freqEncoded);
-    docOut->writeBytes(freqEncoded, freqBytes);
+    // Write non-1 freqs as VInts (all 4 are non-1)
+    for (int i = 0; i < 4; ++i) {
+        docOut->writeVInt(static_cast<int32_t>(freqs[i]));
+    }
 
     // Create reader
     auto readState = createReadState();
@@ -114,32 +112,28 @@ TEST(StreamVBytePostingsRoundTripTest, FourDocsExact) {
 
 TEST(StreamVBytePostingsRoundTripTest, EightDocs) {
     // Test with 8 docs (two StreamVByte groups)
+    // Uses freq-in-docDelta encoding
     auto docOut = std::make_unique<ByteBuffersIndexOutput>("test.doc");
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
 
-    // Group 1: docs 0, 1, 2, 3 with freqs 10, 20, 30, 40
-    uint32_t docDeltas1[4] = {0, 1, 1, 1};
+    // Group 1: docs 0, 1, 2, 3 with freqs 10, 20, 30, 40 (all > 1)
+    // Modified deltas: (delta << 1) | 0
+    uint32_t modDeltas1[4] = {0 << 1, 1 << 1, 1 << 1, 1 << 1};  // {0, 2, 2, 2}
     uint32_t freqs1[4] = {10, 20, 30, 40};
 
     uint8_t docEncoded1[17];
-    int docBytes1 = StreamVByte::encode(docDeltas1, 4, docEncoded1);
+    int docBytes1 = StreamVByte::encode(modDeltas1, 4, docEncoded1);
     docOut->writeBytes(docEncoded1, docBytes1);
+    for (int i = 0; i < 4; ++i) docOut->writeVInt(static_cast<int32_t>(freqs1[i]));
 
-    uint8_t freqEncoded1[17];
-    int freqBytes1 = StreamVByte::encode(freqs1, 4, freqEncoded1);
-    docOut->writeBytes(freqEncoded1, freqBytes1);
-
-    // Group 2: docs 4, 5, 6, 7 with freqs 50, 60, 70, 80
-    uint32_t docDeltas2[4] = {1, 1, 1, 1};
+    // Group 2: docs 4, 5, 6, 7 with freqs 50, 60, 70, 80 (all > 1)
+    uint32_t modDeltas2[4] = {1 << 1, 1 << 1, 1 << 1, 1 << 1};  // {2, 2, 2, 2}
     uint32_t freqs2[4] = {50, 60, 70, 80};
 
     uint8_t docEncoded2[17];
-    int docBytes2 = StreamVByte::encode(docDeltas2, 4, docEncoded2);
+    int docBytes2 = StreamVByte::encode(modDeltas2, 4, docEncoded2);
     docOut->writeBytes(docEncoded2, docBytes2);
-
-    uint8_t freqEncoded2[17];
-    int freqBytes2 = StreamVByte::encode(freqs2, 4, freqEncoded2);
-    docOut->writeBytes(freqEncoded2, freqBytes2);
+    for (int i = 0; i < 4; ++i) docOut->writeVInt(static_cast<int32_t>(freqs2[i]));
 
     // Create reader
     auto readState = createReadState();
@@ -166,24 +160,23 @@ TEST(StreamVBytePostingsRoundTripTest, EightDocs) {
 
 TEST(StreamVBytePostingsRoundTripTest, FiveDocsHybrid) {
     // Test with 5 docs (one StreamVByte group + one VInt remainder)
+    // Uses freq-in-docDelta encoding
     auto docOut = std::make_unique<ByteBuffersIndexOutput>("test.doc");
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
 
-    // Group 1: docs 0, 1, 2, 3 with freqs 10, 20, 30, 40 (StreamVByte)
-    uint32_t docDeltas1[4] = {0, 1, 1, 1};
+    // Group 1: docs 0, 1, 2, 3 with freqs 10, 20, 30, 40 (all > 1)
+    uint32_t modDeltas1[4] = {0 << 1, 1 << 1, 1 << 1, 1 << 1};  // {0, 2, 2, 2}
     uint32_t freqs1[4] = {10, 20, 30, 40};
 
     uint8_t docEncoded1[17];
-    int docBytes1 = StreamVByte::encode(docDeltas1, 4, docEncoded1);
+    int docBytes1 = StreamVByte::encode(modDeltas1, 4, docEncoded1);
     docOut->writeBytes(docEncoded1, docBytes1);
+    for (int i = 0; i < 4; ++i) docOut->writeVInt(static_cast<int32_t>(freqs1[i]));
 
-    uint8_t freqEncoded1[17];
-    int freqBytes1 = StreamVByte::encode(freqs1, 4, freqEncoded1);
-    docOut->writeBytes(freqEncoded1, freqBytes1);
-
-    // Remaining: doc 4 with freq 50 (VInt)
-    docOut->writeVInt(1);   // delta from doc 3
-    docOut->writeVInt(50);  // freq
+    // Remaining: doc 4 with freq 50 (VInt, freq > 1)
+    // New format: writeVInt(delta << 1), writeVInt(freq)
+    docOut->writeVInt(1 << 1);  // delta=1, low bit=0 (freq > 1)
+    docOut->writeVInt(50);      // freq
 
     // Create reader
     auto readState = createReadState();
@@ -210,16 +203,18 @@ TEST(StreamVBytePostingsRoundTripTest, FiveDocsHybrid) {
 
 TEST(StreamVBytePostingsRoundTripTest, ThreeDocsVIntOnly) {
     // Test with 3 docs (all VInt, no StreamVByte)
+    // Uses freq-in-docDelta encoding
     auto docOut = std::make_unique<ByteBuffersIndexOutput>("test.doc");
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
 
-    // All 3 docs use VInt format
-    docOut->writeVInt(0);   // doc 0
-    docOut->writeVInt(10);  // freq
-    docOut->writeVInt(1);   // doc 1 (delta)
-    docOut->writeVInt(20);  // freq
-    docOut->writeVInt(1);   // doc 2 (delta)
-    docOut->writeVInt(30);  // freq
+    // All 3 docs use VInt format with freq-in-docDelta packing
+    // All freqs > 1: writeVInt(delta << 1), writeVInt(freq)
+    docOut->writeVInt(0 << 1);  // doc 0 delta=0, low bit=0 (freq > 1)
+    docOut->writeVInt(10);      // freq
+    docOut->writeVInt(1 << 1);  // doc 1 delta=1, low bit=0 (freq > 1)
+    docOut->writeVInt(20);      // freq
+    docOut->writeVInt(1 << 1);  // doc 2 delta=1, low bit=0 (freq > 1)
+    docOut->writeVInt(30);      // freq
 
     // Create reader
     auto readState = createReadState();

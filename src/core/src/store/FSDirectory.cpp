@@ -274,21 +274,23 @@ void FSIndexInput::seek(int64_t pos) {
         throw IOException("Invalid seek position: " + std::to_string(pos));
     }
 
-    // Calculate absolute file position
-    int64_t absolutePos = is_slice_ ? (slice_offset_ + pos) : pos;
-
-    // Check if position is in current buffer
-    int64_t bufferStart = file_position_ - buffer_length_;
-    if (absolutePos >= bufferStart && absolutePos < file_position_) {
+    // file_position_ is always RELATIVE to slice start (0 for non-slices).
+    // Check if the requested position falls within the current buffer.
+    int64_t bufferStart = file_position_ - static_cast<int64_t>(buffer_length_);
+    if (pos >= bufferStart && pos < file_position_) {
         // Position is in buffer
-        buffer_position_ = absolutePos - bufferStart;
+        buffer_position_ = static_cast<size_t>(pos - bufferStart);
     } else {
+        // Calculate absolute file position for the underlying file seek
+        int64_t absolutePos = is_slice_ ? (slice_offset_ + pos) : pos;
+
         // Need to seek in file
         file_.seekg(absolutePos, std::ios::beg);
         if (!file_) {
             throw IOException("Seek failed");
         }
-        file_position_ = absolutePos;
+        // Store RELATIVE position (pos), not the absolute position
+        file_position_ = pos;
         buffer_position_ = 0;
         buffer_length_ = 0;
     }

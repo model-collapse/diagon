@@ -190,39 +190,41 @@ bool DocumentsWriterPerThread::addDocument(const document::Document& doc) {
         if (fieldType.docValuesType == DocValuesType::NUMERIC) {
             auto numericValue = field->numericValue();
             if (numericValue) {
+                // Always register the field in metadata, even without a directory
+                fieldInfosBuilder_.getOrAdd(field->name());
+                fieldInfosBuilder_.updateDocValuesType(field->name(), DocValuesType::NUMERIC);
+
+                if (fieldType.numericType != document::NumericType::NONE) {
+                    const char* numericTypeStr = nullptr;
+                    switch (fieldType.numericType) {
+                        case document::NumericType::LONG:
+                            numericTypeStr = "LONG";
+                            break;
+                        case document::NumericType::DOUBLE:
+                            numericTypeStr = "DOUBLE";
+                            break;
+                        case document::NumericType::INT:
+                            numericTypeStr = "INT";
+                            break;
+                        case document::NumericType::FLOAT:
+                            numericTypeStr = "FLOAT";
+                            break;
+                        default:
+                            break;
+                    }
+                    if (numericTypeStr) {
+                        fieldInfosBuilder_.setAttribute(field->name(), "numeric_type",
+                                                        numericTypeStr);
+                    }
+                }
+
+                // Write doc values data if directory is available
                 if (!docValuesWriter_ && directory_) {
                     docValuesWriter_ = std::make_unique<codecs::NumericDocValuesWriter>(
                         "_temp", config_.maxBufferedDocs);
                 }
 
                 if (docValuesWriter_) {
-                    fieldInfosBuilder_.getOrAdd(field->name());
-                    fieldInfosBuilder_.updateDocValuesType(field->name(), DocValuesType::NUMERIC);
-
-                    if (fieldType.numericType != document::NumericType::NONE) {
-                        const char* numericTypeStr = nullptr;
-                        switch (fieldType.numericType) {
-                            case document::NumericType::LONG:
-                                numericTypeStr = "LONG";
-                                break;
-                            case document::NumericType::DOUBLE:
-                                numericTypeStr = "DOUBLE";
-                                break;
-                            case document::NumericType::INT:
-                                numericTypeStr = "INT";
-                                break;
-                            case document::NumericType::FLOAT:
-                                numericTypeStr = "FLOAT";
-                                break;
-                            default:
-                                break;
-                        }
-                        if (numericTypeStr) {
-                            fieldInfosBuilder_.setAttribute(field->name(), "numeric_type",
-                                                            numericTypeStr);
-                        }
-                    }
-
                     FieldInfo* fieldInfo = fieldInfosBuilder_.getFieldInfo(field->name());
                     if (fieldInfo) {
                         docValuesWriter_->addValue(*fieldInfo, nextDocID_, *numericValue);

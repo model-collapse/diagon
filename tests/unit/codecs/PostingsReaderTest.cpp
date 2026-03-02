@@ -41,8 +41,10 @@ FieldInfo createField(const std::string& name, IndexOptions options) {
     return field;
 }
 
-// Helper: Write posting list in StreamVByte format (Phase 2a)
-// Uses StreamVByte for groups of 4, VInt for remainder
+// Helper: Write posting list in StreamVByte format with freq-in-docDelta encoding.
+// For freq==1: docDelta = (docDelta << 1) | 1 (no separate freq needed)
+// For freq>1:  docDelta = (docDelta << 1) | 0 (freq written as VInt after block)
+// Uses StreamVByte for groups of 4, VInt for remainder.
 void writePostingsStreamVByte(ByteBuffersIndexOutput& out, const std::vector<int>& docDeltas,
                               const std::vector<int>& freqs, bool writeFreqs) {
     size_t numDocs = docDeltas.size();
@@ -51,33 +53,48 @@ void writePostingsStreamVByte(ByteBuffersIndexOutput& out, const std::vector<int
     // Write full groups of 4 using StreamVByte
     while (pos + 4 <= numDocs) {
         uint32_t docGroup[4];
-        uint32_t freqGroup[4];
 
         for (int i = 0; i < 4; ++i) {
-            docGroup[i] = static_cast<uint32_t>(docDeltas[pos + i]);
-            freqGroup[i] = static_cast<uint32_t>(freqs[pos + i]);
+            if (writeFreqs) {
+                // Pack freq=1 into low bit of doc delta
+                if (freqs[pos + i] == 1) {
+                    docGroup[i] = (static_cast<uint32_t>(docDeltas[pos + i]) << 1) | 1;
+                } else {
+                    docGroup[i] = static_cast<uint32_t>(docDeltas[pos + i]) << 1;
+                }
+            } else {
+                docGroup[i] = static_cast<uint32_t>(docDeltas[pos + i]);
+            }
         }
 
-        // Encode and write doc deltas
+        // Encode and write (modified) doc deltas
         uint8_t docEncoded[17];
         int docBytes = StreamVByte::encode(docGroup, 4, docEncoded);
         out.writeBytes(docEncoded, docBytes);
 
-        // Encode and write frequencies
+        // Write only non-1 frequencies as VInts after the block
         if (writeFreqs) {
-            uint8_t freqEncoded[17];
-            int freqBytes = StreamVByte::encode(freqGroup, 4, freqEncoded);
-            out.writeBytes(freqEncoded, freqBytes);
+            for (int i = 0; i < 4; ++i) {
+                if (freqs[pos + i] != 1) {
+                    out.writeVInt(freqs[pos + i]);
+                }
+            }
         }
 
         pos += 4;
     }
 
-    // Write remaining docs (< 4) using VInt
+    // Write remaining docs (< 4) using VInt with freq-in-docDelta packing
     while (pos < numDocs) {
-        out.writeVInt(docDeltas[pos]);
         if (writeFreqs) {
-            out.writeVInt(freqs[pos]);
+            if (freqs[pos] == 1) {
+                out.writeVInt((docDeltas[pos] << 1) | 1);
+            } else {
+                out.writeVInt(docDeltas[pos] << 1);
+                out.writeVInt(freqs[pos]);
+            }
+        } else {
+            out.writeVInt(docDeltas[pos]);
         }
         pos++;
     }
