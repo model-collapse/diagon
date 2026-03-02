@@ -22,35 +22,35 @@ Reuters-21578 dataset, AWS c7i.16xlarge (64 vCPU, 128 GB). Lucene 11.0.0-SNAPSHO
 
 | Query | Diagon | Lucene | Speedup |
 |-------|--------|--------|---------|
-| Single-term | 28 us | 310 us | **11.1x** |
-| OR-2 | 39 us | 250 us | **6.4x** |
-| OR-5 | 77 us | 530 us | **6.9x** |
-| OR-10 | 147 us | 310 us | **2.1x** |
-| OR-20 | 161 us | 560 us | **3.5x** |
-| OR-50 | 308 us | 1,160 us | **3.8x** |
-| AND-2 | 37 us | 70 us | **1.9x** |
-| Phrase (avg) | 64 us | 84 us | **1.3x** |
+| Single-term | 28 us | 290 us | **10.4x** |
+| OR-2 | 41 us | 250 us | **6.1x** |
+| OR-5 | 78 us | 540 us | **6.9x** |
+| OR-10 | 147 us | 320 us | **2.2x** |
+| OR-20 | 165 us | 570 us | **3.5x** |
+| OR-50 | 332 us | 1,190 us | **3.6x** |
+| AND-2 | 38 us | 70 us | **1.8x** |
+| Phrase (avg) | 62 us | 84 us | **1.4x** |
 
 **Query Latency — P99 (tail):**
 
 | Query | Diagon | Lucene | Speedup |
 |-------|--------|--------|---------|
-| Single-term | 139 us | 660 us | **4.7x** |
-| OR-2 | 52 us | 1,110 us | **21.3x** |
-| OR-5 | 90 us | 860 us | **9.6x** |
-| OR-10 | 159 us | 1,120 us | **7.0x** |
-| OR-20 | 176 us | 710 us | **4.0x** |
-| OR-50 | 327 us | 1,610 us | **4.9x** |
-| AND-2 | 52 us | 220 us | **4.2x** |
+| Single-term | 51 us | 720 us | **14.1x** |
+| OR-2 | 54 us | 590 us | **10.9x** |
+| OR-5 | 93 us | 1,010 us | **10.9x** |
+| OR-10 | 165 us | 1,140 us | **6.9x** |
+| OR-20 | 186 us | 690 us | **3.7x** |
+| OR-50 | 351 us | 1,470 us | **4.2x** |
+| AND-2 | 51 us | 240 us | **4.7x** |
 
 **Indexing & Storage:**
 
 | Metric | Diagon | Lucene |
 |--------|--------|--------|
-| Indexing throughput | 43,000 docs/sec | 24,200 docs/sec |
+| Indexing throughput | 43,000 docs/sec | 22,500 docs/sec |
 | Index size | 366 bytes/doc | 288 bytes/doc |
 
-Full report: [`benchmark_results/reuters_lucene_20260302_031800.md`](benchmark_results/reuters_lucene_20260302_031800.md)
+Full report: [`benchmark_results/reuters_lucene_20260302_055300.md`](benchmark_results/reuters_lucene_20260302_055300.md)
 
 ## Get Started
 
