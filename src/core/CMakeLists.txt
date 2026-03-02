@@ -116,6 +116,9 @@ set(DIAGON_CORE_SOURCES
     src/analysis/AnalyzerFactory.cpp
     src/analysis/analysis_c.cpp
 
+    # Document (JSON parsing)
+    src/document/JsonDocumentParser.cpp
+
     # C API (Main C API for language bindings)
     src/c_api/diagon_c_api.cpp
 )
@@ -321,6 +324,9 @@ set(DIAGON_CORE_HEADERS
     include/analysis/SynonymFilter.h
     include/diagon/analysis_c.h
 
+    # Document (JSON parsing)
+    include/diagon/document/JsonDocumentParser.h
+
     # C API
     include/diagon/c_api/diagon_c_api.h
 )
@@ -444,6 +450,10 @@ foreach(_target ${_DIAGON_TARGETS})
     else()
         message(FATAL_ERROR "cppjieba not found")
     endif()
+
+    # Link nlohmann-json (header-only, for JSON document parsing)
+    find_package(nlohmann_json 3.11 REQUIRED)
+    target_link_libraries(${_target} PUBLIC nlohmann_json::nlohmann_json)
 
     # Link jemalloc for optimized memory allocation (17%+ of ingestion CPU is malloc/free)
     find_library(JEMALLOC_LIB NAMES jemalloc)

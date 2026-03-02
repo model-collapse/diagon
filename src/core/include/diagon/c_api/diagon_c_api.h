@@ -539,6 +539,54 @@ int diagon_reader_get_segment_count(DiagonIndexReader reader);
  */
 int64_t diagon_directory_get_size(DiagonDirectory dir);
 
+// ==================== JSON Document Ingestion ====================
+
+/**
+ * Create a document from a JSON object string.
+ *
+ * Field type mapping:
+ *   JSON string  -> TextField (tokenized, stored)
+ *   JSON integer -> indexed long Field (searchable, stored, doc values)
+ *   JSON float   -> indexed double Field (searchable, stored, doc values)
+ *   JSON boolean -> StringField ("true"/"false", stored)
+ *   JSON null    -> skipped
+ *   Nested object -> flattened with dot notation (e.g. {"a":{"b":1}} -> field "a.b")
+ *   Array        -> multiple fields with same name (Lucene multi-value pattern)
+ *
+ * @param json_data JSON object string
+ * @param json_len Length of JSON string
+ * @return Document handle or NULL on error (check diagon_last_error())
+ */
+DiagonDocument diagon_create_document_from_json(const char* json_data, size_t json_len);
+
+/**
+ * Create a document from a JSON object string with an explicit document ID.
+ *
+ * Same as diagon_create_document_from_json, but additionally adds a StringField
+ * named "_id" with the provided ID value.
+ *
+ * @param json_data JSON object string
+ * @param json_len Length of JSON string
+ * @param id Document ID (added as StringField "_id")
+ * @return Document handle or NULL on error (check diagon_last_error())
+ */
+DiagonDocument diagon_create_document_from_json_with_id(const char* json_data, size_t json_len,
+                                                        const char* id);
+
+/**
+ * Parse a JSON array of objects and add all documents to the writer in one call.
+ *
+ * Combines parsing + indexing in a single CGO call. Uses IndexWriter::addDocuments()
+ * batch API internally for single-mutex-acquisition efficiency.
+ *
+ * @param writer IndexWriter handle
+ * @param json_array JSON array string (each element must be a JSON object)
+ * @param json_len Length of JSON array string
+ * @return Number of documents added, or -1 on error (check diagon_last_error())
+ */
+int diagon_add_documents_from_json(DiagonIndexWriter writer, const char* json_array,
+                                   size_t json_len);
+
 // ==================== Advanced: Terms Enumeration ====================
 
 /**

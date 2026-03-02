@@ -12,6 +12,7 @@
 // Diagon C++ headers
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
+#include "diagon/document/JsonDocumentParser.h"
 #include "diagon/index/DirectoryReader.h"
 #include "diagon/index/IndexWriter.h"
 #include "diagon/search/BooleanClause.h"
@@ -1141,6 +1142,69 @@ int diagon_postings_freq(DiagonPostingsEnum postings) {
 
 void diagon_free_postings_enum(DiagonPostingsEnum postings) {
     // No-op
+}
+
+// ==================== JSON Document Ingestion ====================
+
+DiagonDocument diagon_create_document_from_json(const char* json_data, size_t json_len) {
+    if (!json_data || json_len == 0) {
+        set_error("Invalid JSON data or length");
+        return nullptr;
+    }
+
+    try {
+        auto doc = diagon::document::JsonDocumentParser::parse(json_data, json_len);
+        return static_cast<DiagonDocument>(doc.release());
+    } catch (const std::exception& e) {
+        set_error(e);
+        return nullptr;
+    }
+}
+
+DiagonDocument diagon_create_document_from_json_with_id(const char* json_data, size_t json_len,
+                                                        const char* id) {
+    if (!json_data || json_len == 0) {
+        set_error("Invalid JSON data or length");
+        return nullptr;
+    }
+
+    try {
+        auto doc = diagon::document::JsonDocumentParser::parseWithId(json_data, json_len, id);
+        return static_cast<DiagonDocument>(doc.release());
+    } catch (const std::exception& e) {
+        set_error(e);
+        return nullptr;
+    }
+}
+
+int diagon_add_documents_from_json(DiagonIndexWriter writer, const char* json_array,
+                                   size_t json_len) {
+    if (!writer || !json_array || json_len == 0) {
+        set_error("Invalid writer, JSON data, or length");
+        return -1;
+    }
+
+    try {
+        auto* index_writer = static_cast<diagon::index::IndexWriter*>(writer);
+
+        auto docs = diagon::document::JsonDocumentParser::parseBatch(json_array, json_len);
+        if (docs.empty()) {
+            return 0;
+        }
+
+        // Build vector of const Document* for addDocuments()
+        std::vector<const diagon::document::Document*> doc_ptrs;
+        doc_ptrs.reserve(docs.size());
+        for (const auto& doc : docs) {
+            doc_ptrs.push_back(doc.get());
+        }
+
+        index_writer->addDocuments(doc_ptrs);
+        return static_cast<int>(docs.size());
+    } catch (const std::exception& e) {
+        set_error(e);
+        return -1;
+    }
 }
 
 }  // extern "C"

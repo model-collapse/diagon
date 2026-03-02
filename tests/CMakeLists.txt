@@ -47,6 +47,7 @@ endfunction()
 add_diagon_test(DocumentTest unit/document/DocumentTest.cpp)
 add_diagon_test(ArrayFieldTest unit/document/ArrayFieldTest.cpp)
 add_diagon_test(SparseVectorFieldTest unit/document/SparseVectorFieldTest.cpp)
+add_diagon_test(JsonDocumentParserTest unit/document/JsonDocumentParserTest.cpp)
 
 # Sparse tests
 add_diagon_test(SparseVectorTest unit/sparse/SparseVectorTest.cpp)
