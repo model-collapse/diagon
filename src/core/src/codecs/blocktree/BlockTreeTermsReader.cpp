@@ -117,23 +117,15 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
     }
 }
 
-void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
+void BlockTreeTermsReader::loadBlock(int64_t blockFP, const util::BytesRef& blockFirstTerm,
+                                     TermBlock& block) {
     block.blockFP = blockFP;
     timIn_->seek(blockFP);
 
-    // Read block header
-    int prefixLen = timIn_->readVInt();
-
-    if (prefixLen > 0) {
-        block.prefixData.resize(prefixLen);
-        timIn_->readBytes(block.prefixData.data(), prefixLen);
-        block.prefix = util::BytesRef(block.prefixData.data(), prefixLen);
-    } else {
-        block.prefix = util::BytesRef();
-        block.prefixData.clear();
-    }
-
-    int termCount = timIn_->readVInt();
+    // Read block header: VInt(code) where code = (termCount << 1) | isLastInFloor
+    int code = timIn_->readVInt();
+    int termCount = code >> 1;
+    // bool isLastInFloor = (code & 1) != 0;  // unused (no floor blocks yet)
 
     // Clear but reuse allocated capacity (no realloc after warmup)
     block.arena_.clear();
@@ -167,20 +159,54 @@ void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
         timIn_->readBytes(suffixData.data(), suffixRawSize);
     }
 
-    // Parse suffix data: [VInt(suffixLen) + suffix bytes] per term
+    // Parse new suffix format: [lengths section] + [concatenated suffix bytes]
     {
         int cursor = 0;
-        for (int i = 0; i < termCount; i++) {
-            // Decode VInt suffixLen from buffer
-            int suffixLen = 0;
-            {
-                uint8_t b = suffixData[cursor++];
-                suffixLen = b & 0x7F;
-                for (int shift = 7; (b & 0x80) != 0; shift += 7) {
-                    b = suffixData[cursor++];
-                    suffixLen |= (static_cast<int>(b & 0x7F)) << shift;
-                }
+
+        // Decode suffix lengths section header (VInt from buffer)
+        int lengthCode = 0;
+        {
+            uint8_t b = suffixData[cursor++];
+            lengthCode = b & 0x7F;
+            for (int shift = 7; (b & 0x80) != 0; shift += 7) {
+                b = suffixData[cursor++];
+                lengthCode |= (static_cast<int>(b & 0x7F)) << shift;
             }
+        }
+
+        bool allEqual = (lengthCode & 1) != 0;
+        int numBytes = lengthCode >> 1;
+
+        // Read suffix lengths
+        std::vector<uint8_t> suffixLens(termCount);
+        if (allEqual) {
+            uint8_t commonLen = suffixData[cursor++];
+            std::fill(suffixLens.begin(), suffixLens.end(), commonLen);
+        } else {
+            for (int i = 0; i < numBytes && i < termCount; i++) {
+                suffixLens[i] = suffixData[cursor++];
+            }
+        }
+
+        // Derive prefix from block's first term and first suffix length
+        int prefixLen = 0;
+        if (termCount > 0) {
+            prefixLen = static_cast<int>(blockFirstTerm.length()) - suffixLens[0];
+            if (prefixLen < 0) prefixLen = 0;
+        }
+
+        if (prefixLen > 0) {
+            block.prefixData.resize(prefixLen);
+            std::memcpy(block.prefixData.data(), blockFirstTerm.data(), prefixLen);
+            block.prefix = util::BytesRef(block.prefixData.data(), prefixLen);
+        } else {
+            block.prefixData.clear();
+            block.prefix = util::BytesRef();
+        }
+
+        // Read suffix bytes and reconstruct full terms
+        for (int i = 0; i < termCount; i++) {
+            int suffixLen = suffixLens[i];
             int termLen = prefixLen + suffixLen;
 
             uint32_t offset = static_cast<uint32_t>(block.arena_.size());
@@ -268,8 +294,7 @@ BlockTreeTermsReader::getCachedBlock(int blockIndex) {
 
     // Cache miss: load from disk and cache
     auto block = std::make_shared<TermBlock>();
-    int64_t blockFP = blockIndex_[blockIndex].blockFP;
-    loadBlock(blockFP, *block);
+    loadBlock(blockIndex_[blockIndex].blockFP, blockIndex_[blockIndex].firstTerm, *block);
 
     blockCache_[blockIndex] = block;
     return block;

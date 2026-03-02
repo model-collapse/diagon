@@ -37,25 +37,38 @@ static inline void unpackFreqFromDocDeltas(uint32_t* docDeltaBuf, uint32_t* freq
     }
 }
 
-// Helper: read a BitPack128 block from IndexInput into docDeltaBuffer at given offset.
-// Returns number of docs decoded (always blockSize).
+// Helper: read a PFOR-Delta block from IndexInput into docDeltaBuffer at given offset.
+// Token format: (numExceptions << 5) | patchedBitsRequired
 static inline void readBitPackBlock(store::IndexInput* docIn, uint32_t* docDeltaBuf,
                                      uint32_t* freqBuf, int offset, int blockSize,
                                      bool writeFreqs) {
-    // Read bitsPerValue header + packed data
-    // First read the header byte to know the data size
-    uint8_t bpvByte = docIn->readByte();
-    int bpv = bpvByte;
-    int dataBytes = (bpv == 0) ? 0 : (blockSize * bpv + 7) / 8;
+    // Read token byte: (numExceptions << 5) | bitsPerValue
+    uint8_t token = docIn->readByte();
+    int bpv = token & 0x1F;
+    int numEx = token >> 5;
 
-    // Read into temporary buffer: header + data
-    uint8_t encoded[1 + BITPACK_BLOCK_SIZE * 4];  // max possible
-    encoded[0] = bpvByte;
-    if (dataBytes > 0) {
-        docIn->readBytes(encoded + 1, dataBytes);
+    // Build encoded buffer for decode()
+    uint8_t encoded[util::BitPacking::maxBytesPerBlock(BITPACK_BLOCK_SIZE)];
+    encoded[0] = token;
+    int encodedPos = 1;
+
+    if (bpv == 0 && numEx == 0) {
+        // All-equal case: read VInt bytes
+        while (true) {
+            uint8_t b = docIn->readByte();
+            encoded[encodedPos++] = b;
+            if ((b & 0x80) == 0) break;
+        }
+    } else {
+        // Read packed data + exception pairs
+        int dataBytes = (bpv == 0) ? 0 : (blockSize * bpv + 7) / 8;
+        int exBytes = numEx * 2;
+        if (dataBytes + exBytes > 0) {
+            docIn->readBytes(encoded + 1, dataBytes + exBytes);
+        }
     }
 
-    // Decode
+    // Decode PFOR block
     util::BitPacking::decode(encoded, blockSize, &docDeltaBuf[offset]);
 
     // Unpack freq from low bit; read non-1 freqs as VInts
@@ -749,18 +762,32 @@ void Lucene104PostingsEnumWithPositions::refillPosBuffer() {
     int64_t remaining = totalPosCount_ - totalPosRead_;
     int bufferIdx = 0;
 
-    // Read one BitPack128 block if we have >= 128 remaining positions
+    // Read one PFOR-Delta block if we have >= 128 remaining positions
     if (remaining >= BITPACK_BLOCK_SIZE) {
-        // Read bitsPerValue header + packed data
-        uint8_t bpvByte = posIn_->readByte();
-        int bpv = bpvByte;
-        int dataBytes = (bpv == 0) ? 0 : (BITPACK_BLOCK_SIZE * bpv + 7) / 8;
+        // Read token byte: (numExceptions << 5) | bitsPerValue
+        uint8_t token = posIn_->readByte();
+        int bpv = token & 0x1F;
+        int numEx = token >> 5;
 
-        uint8_t encoded[1 + BITPACK_BLOCK_SIZE * 4];
-        encoded[0] = bpvByte;
-        if (dataBytes > 0) {
-            posIn_->readBytes(encoded + 1, dataBytes);
+        uint8_t encoded[util::BitPacking::maxBytesPerBlock(BITPACK_BLOCK_SIZE)];
+        encoded[0] = token;
+
+        if (bpv == 0 && numEx == 0) {
+            // All-equal case: read VInt bytes
+            int encodedPos = 1;
+            while (true) {
+                uint8_t b = posIn_->readByte();
+                encoded[encodedPos++] = b;
+                if ((b & 0x80) == 0) break;
+            }
+        } else {
+            int dataBytes = (bpv == 0) ? 0 : (BITPACK_BLOCK_SIZE * bpv + 7) / 8;
+            int exBytes = numEx * 2;
+            if (dataBytes + exBytes > 0) {
+                posIn_->readBytes(encoded + 1, dataBytes + exBytes);
+            }
         }
+
         util::BitPacking::decode(encoded, BITPACK_BLOCK_SIZE, posBuffer_);
         bufferIdx = BITPACK_BLOCK_SIZE;
     } else if (remaining > 0) {

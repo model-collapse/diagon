@@ -145,9 +145,10 @@ private:
      * Load term block at given file pointer.
      *
      * @param blockFP File pointer to block
+     * @param blockFirstTerm First term of this block (from .tip index), used to derive prefix
      * @param block Output: loaded block
      */
-    void loadBlock(int64_t blockFP, TermBlock& block);
+    void loadBlock(int64_t blockFP, const util::BytesRef& blockFirstTerm, TermBlock& block);
 
     /**
      * Get a cached block by index, loading from disk if not cached.

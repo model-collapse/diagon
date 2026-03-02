@@ -130,22 +130,50 @@ void BlockTreeTermsWriter::writeBlock() {
         }
     }
 
-    // Write block header: [prefixLen][prefix bytes][termCount]
-    timOut_->writeVInt(prefixLen);
-    if (prefixLen > 0) {
-        timOut_->writeBytes(prefix.data(), prefixLen);
-    }
-    timOut_->writeVInt(static_cast<int>(pendingTerms_.size()));
+    // Write block header: VInt(code) where code = (termCount << 1) | isLastInFloor
+    // Prefix is NOT stored here — derived from .tip block index first term at read time
+    int termCount = static_cast<int>(pendingTerms_.size());
+    timOut_->writeVInt((termCount << 1) | 0);  // isLastInFloor = 0 (no floor blocks)
 
     // === Section 1: Suffix data (with optional LZ4 compression) ===
-    // Collect all suffix lengths + suffix bytes into a flat buffer
-    std::vector<uint8_t> suffixBuf;
-    suffixBuf.reserve(pendingTerms_.size() * 10);
+    // Format: [suffix lengths section] + [concatenated suffix bytes]
+    // Suffix lengths section uses all-equal optimization when possible.
+
+    // Collect suffix lengths and check for all-equal
+    std::vector<uint8_t> suffixLengths;
+    suffixLengths.reserve(termCount);
+    bool allSuffixEqual = true;
+    int firstSuffixLen = -1;
+
     for (const auto& pending : pendingTerms_) {
         int suffixLen = static_cast<int>(pending.term.length()) - prefixLen;
-        bufEncodeVInt(suffixBuf, suffixLen);
+        suffixLengths.push_back(static_cast<uint8_t>(suffixLen));
+        if (firstSuffixLen < 0) {
+            firstSuffixLen = suffixLen;
+        } else if (suffixLen != firstSuffixLen) {
+            allSuffixEqual = false;
+        }
+    }
+
+    std::vector<uint8_t> suffixBuf;
+    suffixBuf.reserve(termCount * 10);
+
+    // Encode suffix lengths section
+    if (allSuffixEqual && !suffixLengths.empty()) {
+        // All suffix lengths equal: VInt((1 << 1) | 1) + byte(commonLength)
+        bufEncodeVInt(suffixBuf, (1 << 1) | 1);
+        suffixBuf.push_back(static_cast<uint8_t>(firstSuffixLen));
+    } else {
+        // Individual lengths: VInt((numLengths << 1) | 0) + [numLengths bytes]
+        bufEncodeVInt(suffixBuf, (static_cast<int>(suffixLengths.size()) << 1) | 0);
+        suffixBuf.insert(suffixBuf.end(), suffixLengths.begin(), suffixLengths.end());
+    }
+
+    // Concatenated suffix bytes (no per-term VInt overhead)
+    for (size_t i = 0; i < pendingTerms_.size(); i++) {
+        int suffixLen = suffixLengths[i];
         if (suffixLen > 0) {
-            const uint8_t* suffixStart = pending.term.data() + prefixLen;
+            const uint8_t* suffixStart = pendingTerms_[i].term.data() + prefixLen;
             suffixBuf.insert(suffixBuf.end(), suffixStart, suffixStart + suffixLen);
         }
     }

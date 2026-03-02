@@ -9,36 +9,51 @@ namespace diagon {
 namespace util {
 
 /**
- * Bit-packing encoder/decoder for 128-element blocks.
+ * PFOR-Delta encoder/decoder for 128-element blocks.
  *
- * Encodes N uint32 values using the minimum bits-per-value needed
- * to represent the maximum value in the block.
+ * Encodes N uint32 values using patched frame-of-reference delta encoding:
+ * - Chooses a base bit width covering most values (≤7 exceptions allowed)
+ * - Exception values store overflow bits as (index, highBits) pairs
  *
- * Format: [1 byte: bitsPerValue] [packed data: ceil(count * bitsPerValue / 8) bytes]
+ * Format:
+ *   Token byte: (numExceptions << 5) | patchedBitsRequired
+ *     - Low 5 bits: base bit width (0-31)
+ *     - High 3 bits: number of exceptions (0-7)
  *
- * Special case: bitsPerValue == 0 means all values are 0 (1 byte total).
+ *   If token == 0 (bpv=0, numEx=0):
+ *     - All values are equal
+ *     - Followed by VInt(value)
  *
- * Based on: org.apache.lucene.util.packed.PackedInts (Lucene's ForUtil)
+ *   Otherwise:
+ *     - Packed data: ceil(count * bpv / 8) bytes
+ *     - Exception pairs: numExceptions * 2 bytes, each (index, highBits)
+ *
+ * Based on: org.apache.lucene.util.packed.PForUtil (Lucene's PFOR encoding)
  */
 class BitPacking {
 public:
     /// Standard block size for postings
     static constexpr int BLOCK_SIZE = 128;
 
+    /// Maximum exceptions in a PFOR block
+    static constexpr int MAX_EXCEPTIONS = 7;
+
     /**
-     * Encode `count` uint32 values using minimum bits-per-value.
+     * Encode `count` uint32 values using PFOR-Delta.
      *
-     * @param values Input values to encode
+     * NOTE: This function MAY modify the values array (masking exception bits).
+     *
+     * @param values Input values to encode (may be modified)
      * @param count Number of values (typically 128)
      * @param output Output buffer (must be at least maxBytesPerBlock() bytes)
      * @return Number of bytes written to output
      */
-    static int encode(const uint32_t* values, int count, uint8_t* output);
+    static int encode(uint32_t* values, int count, uint8_t* output);
 
     /**
-     * Decode `count` values from packed input.
+     * Decode `count` values from PFOR-Delta packed input.
      *
-     * @param input Packed input data (starts with bitsPerValue byte)
+     * @param input Packed input data (starts with token byte)
      * @param count Number of values to decode
      * @param values Output buffer for decoded values
      * @return Number of bytes consumed from input
@@ -55,9 +70,11 @@ public:
 
     /**
      * Maximum bytes a single encode() call can produce for given count.
-     * = 1 (header) + ceil(count * 32 / 8) = 1 + count * 4
+     * = 1 (token) + ceil(count * 31 / 8) + 14 (max exceptions)
      */
-    static constexpr int maxBytesPerBlock(int count) { return 1 + count * 4; }
+    static constexpr int maxBytesPerBlock(int count) {
+        return 1 + (count * 31 + 7) / 8 + MAX_EXCEPTIONS * 2;
+    }
 };
 
 }  // namespace util

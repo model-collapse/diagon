@@ -66,8 +66,9 @@ void writePostingsBitPack(ByteBuffersIndexOutput& out, const std::vector<int>& d
             }
         }
 
-        // Encode and write BitPack block
+        // Encode and write PFOR-Delta block
         uint8_t encoded[BitPacking::maxBytesPerBlock(128)];
+        // encode() may modify docGroup (PFOR masking), but we don't reuse it
         int encodedBytes = BitPacking::encode(docGroup, 128, encoded);
         out.writeBytes(encoded, encodedBytes);
 

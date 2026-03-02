@@ -127,8 +127,9 @@ TEST(BitPackPostingsDebugTest, BitPackBlockRoundTrip) {
         }
     }
 
-    // Encode as BitPack block
+    // Encode as PFOR-Delta block
     uint8_t encoded[BitPacking::maxBytesPerBlock(128)];
+    // encode() may modify modifiedDeltas (PFOR masking), but OK since we saved freqs separately
     int encodedBytes = BitPacking::encode(modifiedDeltas, 128, encoded);
     out.writeBytes(encoded, encodedBytes);
 

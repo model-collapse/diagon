@@ -29,9 +29,11 @@ namespace blocktree {
  * - No floor blocks (will add later)
  *
  * File format (.tim):
- *   Per block: [prefixLen][prefix bytes][termCount]
+ *   Per block: VInt((termCount << 1) | isLastInFloor)
  *   Section 1 - Suffixes: VLong((rawSize << 3) | flags) [+ VInt(compSize) if LZ4]
- *     Contains: [VInt(suffixLen) + suffix bytes] per term, optionally LZ4 compressed
+ *     Suffix lengths: VInt((numBytes << 1) | allEqual)
+ *       allEqual=1: 1 byte commonLen; allEqual=0: numBytes individual uint8 lengths
+ *     Followed by concatenated suffix bytes; optionally LZ4 compressed
  *   Section 2 - Stats:   VInt(statsSize) + singleton RLE encoded docFreq/totalTermFreq
  *     Singleton run: VInt(((count-1) << 1) | 1)
  *     Non-singleton: VInt((docFreq << 1) | 0) + VLong(totalTermFreq - docFreq)

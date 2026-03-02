@@ -11,6 +11,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstring>
 #include <iostream>
 
 using namespace diagon::codecs::lucene104;
@@ -101,6 +102,7 @@ TEST(BitPackPostingsRoundTripTest, OneBitPackBlockPlusVIntTail) {
     }
 
     uint8_t encoded[BitPacking::maxBytesPerBlock(128)];
+    // encode() may modify modDeltas (PFOR masking), but that's OK since we don't reuse them
     int encodedBytes = BitPacking::encode(modDeltas, 128, encoded);
     docOut->writeBytes(encoded, encodedBytes);
     // No non-1 freqs to write
@@ -174,6 +176,149 @@ TEST(BitPackPostingsRoundTripTest, ThreeDocsVIntOnly) {
 
     EXPECT_EQ(2, postings->nextDoc());
     EXPECT_EQ(30, postings->freq());
+
+    EXPECT_EQ(PostingsEnum::NO_MORE_DOCS, postings->nextDoc());
+}
+
+TEST(BitPackPFORTest, ExceptionHandling) {
+    // 128 values: 125 values fit in 3 bits, 3 outliers need 10 bits
+    uint32_t values[128];
+    uint32_t original[128];
+    for (int i = 0; i < 125; i++) values[i] = i % 7;  // 0-6, fits in 3 bits
+    values[125] = 500;   // needs 9 bits
+    values[126] = 700;   // needs 10 bits
+    values[127] = 1000;  // needs 10 bits
+    std::memcpy(original, values, sizeof(values));
+
+    uint8_t encoded[BitPacking::maxBytesPerBlock(128)];
+    int encBytes = BitPacking::encode(values, 128, encoded);
+
+    // Verify token: should have exceptions and lower bit width
+    uint8_t token = encoded[0];
+    int bitsPerValue = token & 0x1F;
+    int numExceptions = token >> 5;
+    EXPECT_LT(bitsPerValue, 10);   // Should be < 10 (not worst case)
+    EXPECT_GT(numExceptions, 0);   // Should have exceptions
+
+    // Verify smaller than plain BitPacking would be
+    // Plain BitPack128 with max=1000 needs 10 bits: 1 + ceil(128*10/8) = 161 bytes
+    EXPECT_LT(encBytes, 161);
+
+    // Verify round-trip
+    uint32_t decoded[128];
+    int decBytes = BitPacking::decode(encoded, 128, decoded);
+    EXPECT_EQ(encBytes, decBytes);
+    for (int i = 0; i < 128; i++) {
+        EXPECT_EQ(original[i], decoded[i]) << "Mismatch at " << i;
+    }
+}
+
+TEST(BitPackPFORTest, AllZeros) {
+    uint32_t values[128] = {};
+    uint8_t encoded[BitPacking::maxBytesPerBlock(128)];
+    int encBytes = BitPacking::encode(values, 128, encoded);
+
+    // Token 0x00 + VInt(0) = 2 bytes
+    EXPECT_EQ(2, encBytes);
+    EXPECT_EQ(0, encoded[0]);  // token: bpv=0, numEx=0
+
+    uint32_t decoded[128];
+    int decBytes = BitPacking::decode(encoded, 128, decoded);
+    EXPECT_EQ(encBytes, decBytes);
+    for (int i = 0; i < 128; i++) {
+        EXPECT_EQ(0u, decoded[i]);
+    }
+}
+
+TEST(BitPackPFORTest, AllSameNonZero) {
+    uint32_t values[128];
+    for (int i = 0; i < 128; i++) values[i] = 42;
+
+    uint8_t encoded[BitPacking::maxBytesPerBlock(128)];
+    int encBytes = BitPacking::encode(values, 128, encoded);
+
+    // Token 0x00 + VInt(42) = 2 bytes (42 < 128, fits in 1 VInt byte)
+    EXPECT_EQ(2, encBytes);
+    EXPECT_EQ(0, encoded[0]);
+
+    uint32_t decoded[128];
+    int decBytes = BitPacking::decode(encoded, 128, decoded);
+    EXPECT_EQ(encBytes, decBytes);
+    for (int i = 0; i < 128; i++) {
+        EXPECT_EQ(42u, decoded[i]);
+    }
+}
+
+TEST(BitPackPFORTest, NoExceptions) {
+    // All values fit in same bit width — no exceptions expected
+    uint32_t values[128];
+    for (int i = 0; i < 128; i++) values[i] = i;  // 0-127, needs 7 bits
+    uint32_t original[128];
+    std::memcpy(original, values, sizeof(values));
+
+    uint8_t encoded[BitPacking::maxBytesPerBlock(128)];
+    BitPacking::encode(values, 128, encoded);
+
+    uint8_t token = encoded[0];
+    int numExceptions = token >> 5;
+    EXPECT_EQ(0, numExceptions);  // No exceptions for uniform data
+
+    uint32_t decoded[128];
+    BitPacking::decode(encoded, 128, decoded);
+    for (int i = 0; i < 128; i++) {
+        EXPECT_EQ(original[i], decoded[i]) << "Mismatch at " << i;
+    }
+}
+
+TEST(BitPackPFORTest, PostingsWriterReaderRoundTripWithExceptions) {
+    // Full round-trip through PostingsWriter → PostingsReader with data that triggers exceptions
+    auto writeState = createWriteState();
+    auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
+
+    Lucene104PostingsWriter writer(writeState);
+    writer.setField(field);
+    writer.startTerm();
+
+    // Write 200 docs with varying gaps to create exception-triggering deltas
+    // Most docs have small deltas (1-3), a few have large deltas (1000+)
+    int lastDoc = -1;
+    for (int i = 0; i < 200; i++) {
+        int docId;
+        if (i % 50 == 49) {
+            // Every 50th doc has a large gap
+            docId = lastDoc + 5000;
+        } else {
+            docId = lastDoc + (i % 3) + 1;
+        }
+        lastDoc = docId;
+        int freq = (i % 7) + 1;
+        writer.startDoc(docId, freq);
+    }
+
+    TermState termState = writer.finishTerm();
+    auto docBytes = writer.getBytes();
+
+    // Create reader
+    auto readState = createReadState();
+    Lucene104PostingsReader reader(readState);
+    reader.setInput(std::make_unique<ByteBuffersIndexInput>("test.doc", docBytes));
+
+    auto postings = reader.postings(field, termState);
+
+    // Verify all 200 docs match
+    lastDoc = -1;
+    for (int i = 0; i < 200; i++) {
+        int expectedDoc;
+        if (i % 50 == 49) {
+            expectedDoc = lastDoc + 5000;
+        } else {
+            expectedDoc = lastDoc + (i % 3) + 1;
+        }
+        lastDoc = expectedDoc;
+
+        EXPECT_EQ(expectedDoc, postings->nextDoc()) << "Doc " << i;
+        EXPECT_EQ((i % 7) + 1, postings->freq()) << "Freq for doc " << i;
+    }
 
     EXPECT_EQ(PostingsEnum::NO_MORE_DOCS, postings->nextDoc());
 }

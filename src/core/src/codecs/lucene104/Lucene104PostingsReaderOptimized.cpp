@@ -61,15 +61,28 @@ void Lucene104PostingsEnumOptimized::refillBuffer() {
     int bufferIdx = 0;
 
     if (remaining >= BITPACK_BLOCK) {
-        // Read BitPack128 block from I/O batch
-        uint8_t bpvByte = readByteFromBatch();
-        int bpv = bpvByte;
-        int dataBytes = (bpv == 0) ? 0 : (BITPACK_BLOCK * bpv + 7) / 8;
+        // Read PFOR-Delta block from I/O batch
+        uint8_t token = readByteFromBatch();
+        int bpv = token & 0x1F;
+        int numEx = token >> 5;
 
-        uint8_t encoded[1 + BITPACK_BLOCK * 4];
-        encoded[0] = bpvByte;
-        if (dataBytes > 0) {
-            readBytesFromBatch(encoded + 1, dataBytes);
+        uint8_t encoded[util::BitPacking::maxBytesPerBlock(BITPACK_BLOCK)];
+        encoded[0] = token;
+
+        if (bpv == 0 && numEx == 0) {
+            // All-equal case: read VInt bytes
+            int encodedPos = 1;
+            while (true) {
+                uint8_t b = readByteFromBatch();
+                encoded[encodedPos++] = b;
+                if ((b & 0x80) == 0) break;
+            }
+        } else {
+            int dataBytes = (bpv == 0) ? 0 : (BITPACK_BLOCK * bpv + 7) / 8;
+            int exBytes = numEx * 2;
+            if (dataBytes + exBytes > 0) {
+                readBytesFromBatch(encoded + 1, dataBytes + exBytes);
+            }
         }
 
         util::BitPacking::decode(encoded, BITPACK_BLOCK, docDeltaBuffer_);

@@ -153,17 +153,30 @@ void Lucene104PostingsEnumBatch::refillBuffer() {
 
     static constexpr int BITPACK_BLOCK = 128;
 
-    // Read one BitPack128 block if we have >= 128 remaining docs
+    // Read one PFOR-Delta block if we have >= 128 remaining docs
     if (remaining >= BITPACK_BLOCK) {
-        // Read bitsPerValue header + packed data
-        uint8_t bpvByte = docIn_->readByte();
-        int bpv = bpvByte;
-        int dataBytes = (bpv == 0) ? 0 : (BITPACK_BLOCK * bpv + 7) / 8;
+        // Read token byte: (numExceptions << 5) | bitsPerValue
+        uint8_t token = docIn_->readByte();
+        int bpv = token & 0x1F;
+        int numEx = token >> 5;
 
-        uint8_t encoded[1 + BITPACK_BLOCK * 4];
-        encoded[0] = bpvByte;
-        if (dataBytes > 0) {
-            docIn_->readBytes(encoded + 1, dataBytes);
+        uint8_t encoded[util::BitPacking::maxBytesPerBlock(BITPACK_BLOCK)];
+        encoded[0] = token;
+
+        if (bpv == 0 && numEx == 0) {
+            // All-equal case: read VInt bytes
+            int encodedPos = 1;
+            while (true) {
+                uint8_t b = docIn_->readByte();
+                encoded[encodedPos++] = b;
+                if ((b & 0x80) == 0) break;
+            }
+        } else {
+            int dataBytes = (bpv == 0) ? 0 : (BITPACK_BLOCK * bpv + 7) / 8;
+            int exBytes = numEx * 2;
+            if (dataBytes + exBytes > 0) {
+                docIn_->readBytes(encoded + 1, dataBytes + exBytes);
+            }
         }
 
         util::BitPacking::decode(encoded, BITPACK_BLOCK, docDeltaBuffer_);

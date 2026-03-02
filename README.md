@@ -48,7 +48,7 @@ Reuters-21578 dataset, AWS c7i.16xlarge (64 vCPU, 128 GB). Lucene 11.0.0-SNAPSHO
 | Metric | Diagon | Lucene |
 |--------|--------|--------|
 | Indexing throughput | 43,000 docs/sec | 22,500 docs/sec |
-| Index size | 366 bytes/doc | 288 bytes/doc |
+| Index size | 350 bytes/doc | 288 bytes/doc |
 
 Full report: [`benchmark_results/reuters_lucene_20260302_055300.md`](benchmark_results/reuters_lucene_20260302_055300.md)
 
