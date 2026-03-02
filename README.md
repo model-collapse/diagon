@@ -16,33 +16,41 @@
 
 ## Benchmark: Diagon vs Apache Lucene 11
 
-Reuters-21578 dataset, AWS c7i (64 vCPU @ 2.6 GHz). Lucene: JDK 25, `-Xmx4g`, G1GC. Diagon: `-O3 -march=native`, MMapDirectory.
+Reuters-21578 dataset, AWS c7i.16xlarge (64 vCPU, 128 GB). Lucene 11.0.0-SNAPSHOT: JDK 25, `-Xmx4g`, G1GC. Diagon: `-O3 -march=native`, jemalloc, MMapDirectory.
 
-**Query Latency (P99):**
-
-| Query | Diagon | Lucene | Speedup |
-|-------|--------|--------|---------|
-| Single-term | 44 us | 790 us | **18x** |
-| OR-2 | 82 us | 800 us | **9.8x** |
-| OR-5 | 167 us | 970 us | **5.8x** |
-| OR-10 | 248 us | 1,080 us | **4.4x** |
-| OR-20 | 366 us | 840 us | **2.3x** |
-| OR-50 | 1,056 us | 1,410 us | **1.3x** |
-| AND-2 | 65 us | 220 us | **3.4x** |
-
-**Query Latency (P50):**
+**Query Latency — P50 (median):**
 
 | Query | Diagon | Lucene | Speedup |
 |-------|--------|--------|---------|
-| Single-term | 27 us | 300 us | **11.1x** |
-| OR-2 | 64 us | 260 us | **4.1x** |
-| OR-5 | 131 us | 540 us | **4.1x** |
-| OR-10 | 234 us | 310 us | **1.3x** |
-| OR-50 | 1,026 us | 1,160 us | **1.1x** |
+| Single-term | 28 us | 310 us | **11.1x** |
+| OR-2 | 39 us | 250 us | **6.4x** |
+| OR-5 | 77 us | 530 us | **6.9x** |
+| OR-10 | 147 us | 310 us | **2.1x** |
+| OR-20 | 161 us | 560 us | **3.5x** |
+| OR-50 | 308 us | 1,160 us | **3.8x** |
+| AND-2 | 37 us | 70 us | **1.9x** |
+| Phrase (avg) | 64 us | 84 us | **1.3x** |
 
-**Indexing:** Diagon 10,417 docs/sec, Lucene 24,520 docs/sec. Index size: 11 MB vs 10.5 MB.
+**Query Latency — P99 (tail):**
 
-Full report: [`benchmark_results/reuters_lucene_20260217_053200.md`](benchmark_results/reuters_lucene_20260217_053200.md)
+| Query | Diagon | Lucene | Speedup |
+|-------|--------|--------|---------|
+| Single-term | 139 us | 660 us | **4.7x** |
+| OR-2 | 52 us | 1,110 us | **21.3x** |
+| OR-5 | 90 us | 860 us | **9.6x** |
+| OR-10 | 159 us | 1,120 us | **7.0x** |
+| OR-20 | 176 us | 710 us | **4.0x** |
+| OR-50 | 327 us | 1,610 us | **4.9x** |
+| AND-2 | 52 us | 220 us | **4.2x** |
+
+**Indexing & Storage:**
+
+| Metric | Diagon | Lucene |
+|--------|--------|--------|
+| Indexing throughput | 43,000 docs/sec | 24,200 docs/sec |
+| Index size | 412 bytes/doc | 288 bytes/doc |
+
+Full report: [`benchmark_results/reuters_lucene_20260302_031800.md`](benchmark_results/reuters_lucene_20260302_031800.md)
 
 ## Get Started
 
