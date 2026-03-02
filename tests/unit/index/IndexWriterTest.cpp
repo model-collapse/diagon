@@ -485,6 +485,38 @@ TEST_F(IndexWriterTest, HighSequenceNumbers) {
     EXPECT_GT(writer->getSequenceNumber(), 10000);
 }
 
+TEST_F(IndexWriterTest, CommitDeletesOldSegmentsFiles) {
+    IndexWriterConfig config;
+    config.setOpenMode(IndexWriterConfig::OpenMode::CREATE);
+
+    auto writer = std::make_unique<IndexWriter>(*dir, config);
+
+    // Commit 5 times to create multiple generations
+    for (int i = 0; i < 5; i++) {
+        Document doc = createDocument("test_" + std::to_string(i));
+        writer->addDocument(doc);
+        writer->commit();
+    }
+
+    writer->close();
+
+    // Count segments_N files on disk
+    auto files = dir->listAll();
+    int segmentsFileCount = 0;
+    std::string lastSegmentsFile;
+    for (const auto& file : files) {
+        if (file.find("segments_") == 0) {
+            segmentsFileCount++;
+            lastSegmentsFile = file;
+        }
+    }
+
+    // Only 1 segments_N file should remain (the latest generation)
+    EXPECT_EQ(1, segmentsFileCount)
+        << "Expected exactly 1 segments_N file after multiple commits, found "
+        << segmentsFileCount;
+}
+
 TEST_F(IndexWriterTest, ReopenAfterClose) {
     IndexWriterConfig config;
 

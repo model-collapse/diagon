@@ -134,9 +134,11 @@ void createReutersIndex(const fs::path& indexPath) {
         }
     }
 
+    std::cout << "Merging segments..." << std::endl;
+    writer.forceMerge(1);  // Merge all segments into 1 to eliminate duplicate term dictionaries
     std::cout << "Committing index with " << indexed << " documents..." << std::endl;
     writer.commit();
-    std::cout << "Reuters index created (multi-segment)!" << std::endl;
+    std::cout << "Reuters index created (single segment)!" << std::endl;
 }
 
 // ==================== Global Index Cache ====================

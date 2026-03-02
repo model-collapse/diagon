@@ -60,27 +60,19 @@ private:
     int mergePostings(const FieldInfos& mergedFieldInfos);
 
     /**
-     * Merge doc values (numeric, binary, sorted)
-     * @param docBase Starting doc ID for this segment
+     * Merge doc values (numeric) from source segments into merged segment
      */
-    void mergeDocValues(const FieldInfos& mergedFieldInfos, int docBase);
+    void mergeDocValues(const FieldInfos& mergedFieldInfos);
 
     /**
-     * Merge stored fields (original document content)
-     * @param docBase Starting doc ID for this segment
+     * Merge stored fields from source segments into merged segment
      */
-    void mergeStoredFields(int docBase);
+    void mergeStoredFields(const FieldInfos& mergedFieldInfos);
 
     /**
-     * Check if document is deleted in source segment
+     * Merge norms from source segments into merged segment
      */
-    bool isDeleted(int sourceSegmentIdx, int docID);
-
-    /**
-     * Map old doc IDs to new doc IDs (accounting for deletions)
-     * Returns new doc ID or -1 if deleted
-     */
-    int mapDocID(int sourceSegmentIdx, int oldDocID);
+    void mergeNorms(const FieldInfos& mergedFieldInfos);
 
     // ==================== Members ====================
 

@@ -13,9 +13,11 @@
 #include "diagon/index/Terms.h"
 #include "diagon/index/TermsEnum.h"
 #include "diagon/index/TieredMergePolicy.h"
+#include "diagon/store/CompoundFileWriter.h"
 #include "diagon/store/IndexOutput.h"
 #include "diagon/util/BitSet.h"
 
+#include <atomic>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -37,6 +39,7 @@ IndexWriterConfig::IndexWriterConfig() = default;
 IndexWriter::IndexWriter(Directory& dir, const IndexWriterConfig& config)
     : directory_(dir)
     , commitOnClose_(config.getCommitOnClose())
+    , useCompoundFile_(config.getUseCompoundFile())
     , openMode_(config.getOpenMode()) {
     // Obtain write lock
     try {
@@ -182,6 +185,22 @@ int64_t IndexWriter::commitInternal() {
     // Flush pending documents
     flush();
 
+    // Create compound files for newly flushed segments (if enabled)
+    // NOTE: createCompoundFile() writes .cfs/.cfe and updates SegmentInfo in-memory,
+    // but does NOT delete original files yet (crash-safety: originals survive until commit)
+    std::vector<std::vector<std::string>> pendingCompoundDeletes;
+    if (useCompoundFile_) {
+        for (int i = 0; i < segmentInfos_.size(); i++) {
+            auto segment = segmentInfos_.info(i);
+            if (!segment->getUseCompoundFile()) {
+                auto origFiles = createCompoundFile(segment);
+                if (!origFiles.empty()) {
+                    pendingCompoundDeletes.push_back(std::move(origFiles));
+                }
+            }
+        }
+    }
+
     // Check for segments with high deletions and merge them
     std::unique_ptr<MergeSpecification> deletesMerges(
         mergePolicy_->findForcedDeletesMerges(segmentInfos_));
@@ -189,11 +208,25 @@ int64_t IndexWriter::commitInternal() {
         executeMerges(deletesMerges.get());
     }
 
-    // Write segments_N file
+    // Write segments_N file — this is the atomic commit point
     writeSegmentsFile();
 
     // Sync directory metadata
     directory_.syncMetaData();
+
+    // Post-commit cleanup: now safe to delete original files replaced by compound
+    for (const auto& files : pendingCompoundDeletes) {
+        for (const auto& file : files) {
+            try {
+                directory_.deleteFile(file);
+            } catch (const std::exception&) {
+                // Best-effort — file might already be gone
+            }
+        }
+    }
+
+    // Delete old segments_N files (keep only the one we just wrote)
+    deleteOldSegmentsFiles(segmentInfos_.getGeneration());
 
     // Increment generation for next commit
     segmentInfos_.incrementGeneration();
@@ -300,6 +333,59 @@ void IndexWriter::deleteSegmentFiles(std::shared_ptr<SegmentInfo> segment) {
             // Ignore errors
         }
     }
+}
+
+void IndexWriter::deleteOldSegmentsFiles(int64_t currentGeneration) {
+    std::string currentFile = SegmentInfos::getSegmentsFileName(currentGeneration);
+
+    auto files = directory_.listAll();
+    for (const auto& file : files) {
+        if (file.find("segments_") == 0 && file != currentFile) {
+            try {
+                directory_.deleteFile(file);
+            } catch (const std::exception&) {
+                // Best-effort deletion — ignore failures
+            }
+        }
+    }
+}
+
+std::vector<std::string> IndexWriter::createCompoundFile(std::shared_ptr<SegmentInfo> segment) {
+    // Write .cfs/.cfe and update SegmentInfo in-memory.
+    // Returns list of original files to delete AFTER commit succeeds (crash-safety).
+
+    const auto& files = segment->files();
+    if (files.empty()) {
+        return {};
+    }
+
+    // Filter out .cfs/.cfe files (shouldn't be there, but be safe)
+    std::vector<std::string> filesToPack;
+    for (const auto& file : files) {
+        if (file.find(".cfs") == std::string::npos && file.find(".cfe") == std::string::npos) {
+            filesToPack.push_back(file);
+        }
+    }
+
+    if (filesToPack.empty()) {
+        return {};
+    }
+
+    // Write compound file
+    store::CompoundFileWriter::write(directory_, segment->name(), filesToPack);
+
+    // Do NOT delete originals here — caller deletes after commit succeeds
+
+    // Update SegmentInfo: replace file list with .cfs/.cfe
+    std::vector<std::string> compoundFiles;
+    compoundFiles.push_back(store::CompoundFileWriter::getDataFileName(segment->name()));
+    compoundFiles.push_back(store::CompoundFileWriter::getEntriesFileName(segment->name()));
+    segment->setFiles(compoundFiles);
+
+    // Mark segment as compound
+    segment->setUseCompoundFile(true);
+
+    return filesToPack;  // Caller deletes these after commit
 }
 
 void IndexWriter::waitForMerges() {
@@ -480,6 +566,9 @@ void IndexWriter::writeSegmentsFile() {
             output->writeByte(fieldInfo.storeTermVector ? 1 : 0);
             output->writeByte(fieldInfo.storePayloads ? 1 : 0);
         }
+
+        // Write compound file flag
+        output->writeByte(segmentInfo->getUseCompoundFile() ? 1 : 0);
     }
 
     // Close output
@@ -575,7 +664,7 @@ void IndexWriter::executeMerges(MergeSpecification* spec) {
     // Note: This is a synchronous implementation. Background merging would be added in Phase 4
     // with MergeScheduler and separate merge threads.
 
-    static int mergeCounter = 0;
+    static std::atomic<int> mergeCounter{0};
 
     for (const auto& oneMerge : spec->getMerges()) {
         // Get segments to merge (cast from SegmentCommitInfo* back to SegmentInfo*)
@@ -611,6 +700,19 @@ void IndexWriter::executeMerges(MergeSpecification* spec) {
                 if (segment->name() == toMerge->name()) {
                     segmentInfos_.remove(i);
                     break;
+                }
+            }
+        }
+
+        // Create compound file for merged segment (if enabled)
+        if (useCompoundFile_) {
+            auto origFiles = createCompoundFile(mergedSegment);
+            // Delete original merged segment files (safe — they're new, not yet committed)
+            for (const auto& file : origFiles) {
+                try {
+                    directory_.deleteFile(file);
+                } catch (const std::exception&) {
+                    // Best-effort
                 }
             }
         }

@@ -19,6 +19,54 @@ namespace lucene104 {
 // File extensions
 static const std::string DOC_EXTENSION = "doc";
 
+// Helper: read VInt from raw pointer (for mmap fast path)
+static inline uint32_t readVIntFromPtr(const uint8_t*& ptr) {
+    uint8_t b = *ptr++;
+    if ((b & 0x80) == 0) return b;
+    uint32_t val = b & 0x7F;
+    b = *ptr++;
+    val |= (b & 0x7F) << 7;
+    if ((b & 0x80) == 0) return val;
+    b = *ptr++;
+    val |= (b & 0x7F) << 14;
+    if ((b & 0x80) == 0) return val;
+    b = *ptr++;
+    val |= (b & 0x7F) << 21;
+    if ((b & 0x80) == 0) return val;
+    b = *ptr++;
+    val |= (b & 0x0F) << 28;
+    return val;
+}
+
+// Helper: unpack freq from low bit of doc deltas after StreamVByte decode.
+// Reads non-1 frequencies as VInts from the IndexInput stream.
+static inline void unpackFreqFromDocDeltas(uint32_t* docDeltaBuf, uint32_t* freqBuf,
+                                            int offset, int count,
+                                            store::IndexInput* docIn) {
+    for (int i = 0; i < count; i++) {
+        if (docDeltaBuf[offset + i] & 1) {
+            freqBuf[offset + i] = 1;
+        } else {
+            freqBuf[offset + i] = static_cast<uint32_t>(docIn->readVInt());
+        }
+        docDeltaBuf[offset + i] >>= 1;
+    }
+}
+
+// Helper: unpack freq from low bit of doc deltas using raw mmap pointer.
+static inline void unpackFreqFromDocDeltasPtr(uint32_t* docDeltaBuf, uint32_t* freqBuf,
+                                               int offset, int count,
+                                               const uint8_t*& ptr) {
+    for (int i = 0; i < count; i++) {
+        if (docDeltaBuf[offset + i] & 1) {
+            freqBuf[offset + i] = 1;
+        } else {
+            freqBuf[offset + i] = readVIntFromPtr(ptr);
+        }
+        docDeltaBuf[offset + i] >>= 1;
+    }
+}
+
 Lucene104PostingsReader::Lucene104PostingsReader(index::SegmentReadState& state)
     : docIn_(nullptr)
     , skipIn_(nullptr)
@@ -336,8 +384,8 @@ void Lucene104PostingsEnumWithImpacts::refillBuffer() {
 
     // Fast path: direct pointer into mmap'd memory (no virtual calls)
     if (mmapInput_ && numGroups > 0) {
-        // Max bytes per group: 1 control + 16 data (docs) + 1 control + 16 data (freqs) = 34
-        size_t maxBytes = static_cast<size_t>(numGroups) * (writeFreqs_ ? 34 : 17);
+        // Max bytes per group: 1 control + 16 data (docs) + 4*5 VInt freqs = 37
+        size_t maxBytes = static_cast<size_t>(numGroups) * (writeFreqs_ ? 37 : 17);
         const uint8_t* ptr;
         size_t avail;
 
@@ -345,7 +393,7 @@ void Lucene104PostingsEnumWithImpacts::refillBuffer() {
             const uint8_t* start = ptr;
 
             for (int g = 0; g < numGroups; g++) {
-                // Doc deltas: control byte + data
+                // Doc deltas: control byte + data (freq=1 packed in low bit)
                 uint8_t docEncoded[17];
                 uint8_t controlByte = *ptr++;
                 docEncoded[0] = controlByte;
@@ -357,18 +405,10 @@ void Lucene104PostingsEnumWithImpacts::refillBuffer() {
                 ptr += dataBytes;
                 util::StreamVByte::decode4(docEncoded, &docDeltaBuffer_[bufferIdx]);
 
-                // Frequencies: control byte + data
+                // Unpack freq from low bit; read non-1 freqs as VInts from ptr
                 if (writeFreqs_) {
-                    uint8_t freqEncoded[17];
-                    controlByte = *ptr++;
-                    freqEncoded[0] = controlByte;
-                    dataBytes = 0;
-                    for (int i = 0; i < 4; ++i) {
-                        dataBytes += ((controlByte >> (i * 2)) & 0x03) + 1;
-                    }
-                    std::memcpy(freqEncoded + 1, ptr, dataBytes);
-                    ptr += dataBytes;
-                    util::StreamVByte::decode4(freqEncoded, &freqBuffer_[bufferIdx]);
+                    unpackFreqFromDocDeltasPtr(docDeltaBuffer_, freqBuffer_,
+                                               bufferIdx, STREAMVBYTE_GROUP_SIZE, ptr);
                 }
 
                 bufferIdx += STREAMVBYTE_GROUP_SIZE;
@@ -393,15 +433,8 @@ void Lucene104PostingsEnumWithImpacts::refillBuffer() {
                 util::StreamVByte::decode4(docDeltaEncoded, &docDeltaBuffer_[bufferIdx]);
 
                 if (writeFreqs_) {
-                    uint8_t freqEncoded[17];
-                    controlByte = docIn_->readByte();
-                    freqEncoded[0] = controlByte;
-                    dataBytes = 0;
-                    for (int i = 0; i < 4; ++i) {
-                        dataBytes += ((controlByte >> (i * 2)) & 0x03) + 1;
-                    }
-                    docIn_->readBytes(freqEncoded + 1, dataBytes);
-                    util::StreamVByte::decode4(freqEncoded, &freqBuffer_[bufferIdx]);
+                    unpackFreqFromDocDeltas(docDeltaBuffer_, freqBuffer_,
+                                            bufferIdx, STREAMVBYTE_GROUP_SIZE, docIn_.get());
                 }
                 bufferIdx += STREAMVBYTE_GROUP_SIZE;
                 remaining -= STREAMVBYTE_GROUP_SIZE;
@@ -422,29 +455,29 @@ void Lucene104PostingsEnumWithImpacts::refillBuffer() {
             util::StreamVByte::decode4(docDeltaEncoded, &docDeltaBuffer_[bufferIdx]);
 
             if (writeFreqs_) {
-                uint8_t freqEncoded[17];
-                controlByte = docIn_->readByte();
-                freqEncoded[0] = controlByte;
-                dataBytes = 0;
-                for (int i = 0; i < 4; ++i) {
-                    dataBytes += ((controlByte >> (i * 2)) & 0x03) + 1;
-                }
-                docIn_->readBytes(freqEncoded + 1, dataBytes);
-                util::StreamVByte::decode4(freqEncoded, &freqBuffer_[bufferIdx]);
+                unpackFreqFromDocDeltas(docDeltaBuffer_, freqBuffer_,
+                                        bufferIdx, STREAMVBYTE_GROUP_SIZE, docIn_.get());
             }
             bufferIdx += STREAMVBYTE_GROUP_SIZE;
             remaining -= STREAMVBYTE_GROUP_SIZE;
         }
     }
 
-    // VInt tail for remaining < 4 docs
+    // VInt tail for remaining < 4 docs (same low-bit encoding)
     int spaceLeft = BUFFER_SIZE - bufferIdx;
     int docsToRead = std::min(remaining, spaceLeft);
     if (docsToRead > 0) {
         for (int i = 0; i < docsToRead; ++i) {
-            docDeltaBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+            uint32_t raw = static_cast<uint32_t>(docIn_->readVInt());
             if (writeFreqs_) {
-                freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+                if (raw & 1) {
+                    freqBuffer_[bufferIdx + i] = 1;
+                } else {
+                    freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+                }
+                docDeltaBuffer_[bufferIdx + i] = raw >> 1;
+            } else {
+                docDeltaBuffer_[bufferIdx + i] = raw;
             }
         }
         bufferIdx += docsToRead;
@@ -654,7 +687,7 @@ void Lucene104PostingsEnum::refillBuffer() {
     // Fill buffer with as many complete StreamVByte groups (4 docs each) as possible
     while (remaining >= STREAMVBYTE_GROUP_SIZE &&
            bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
-        // Read StreamVByte-encoded group of 4 docs
+        // Read StreamVByte-encoded group of 4 doc deltas (freq=1 packed in low bit)
         uint8_t docDeltaEncoded[17];  // Max: 1 control + 4*4 data bytes
         uint8_t controlByte = docIn_->readByte();
         docDeltaEncoded[0] = controlByte;
@@ -672,36 +705,32 @@ void Lucene104PostingsEnum::refillBuffer() {
         // Decode 4 doc deltas directly into buffer at current position
         util::StreamVByte::decode4(docDeltaEncoded, &docDeltaBuffer_[bufferIdx]);
 
-        // Read frequencies if present
+        // Unpack freq from low bit; read non-1 freqs as VInts
         if (writeFreqs_) {
-            uint8_t freqEncoded[17];
-            controlByte = docIn_->readByte();
-            freqEncoded[0] = controlByte;
-
-            // Calculate data bytes for frequencies
-            dataBytes = 0;
-            for (int i = 0; i < 4; ++i) {
-                int length = ((controlByte >> (i * 2)) & 0x03) + 1;
-                dataBytes += length;
-            }
-
-            docIn_->readBytes(freqEncoded + 1, dataBytes);
-            util::StreamVByte::decode4(freqEncoded, &freqBuffer_[bufferIdx]);
+            unpackFreqFromDocDeltas(docDeltaBuffer_, freqBuffer_,
+                                    bufferIdx, STREAMVBYTE_GROUP_SIZE, docIn_.get());
         }
 
         bufferIdx += STREAMVBYTE_GROUP_SIZE;
         remaining -= STREAMVBYTE_GROUP_SIZE;
     }
 
-    // Use VInt fallback for remaining docs (< 4), but only if there's buffer space
+    // VInt tail for remaining docs (< 4, same low-bit encoding)
     int spaceLeft = BUFFER_SIZE - bufferIdx;
     int docsToRead = std::min(remaining, spaceLeft);
 
     if (docsToRead > 0) {
         for (int i = 0; i < docsToRead; ++i) {
-            docDeltaBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+            uint32_t raw = static_cast<uint32_t>(docIn_->readVInt());
             if (writeFreqs_) {
-                freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+                if (raw & 1) {
+                    freqBuffer_[bufferIdx + i] = 1;
+                } else {
+                    freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+                }
+                docDeltaBuffer_[bufferIdx + i] = raw >> 1;
+            } else {
+                docDeltaBuffer_[bufferIdx + i] = raw;
             }
         }
         bufferIdx += docsToRead;
@@ -812,12 +841,11 @@ void Lucene104PostingsEnumWithPositions::skipPositions() {
 }
 
 void Lucene104PostingsEnumWithPositions::refillBuffer() {
-    // Same logic as Lucene104PostingsEnum::refillBuffer()
     bufferPos_ = 0;
     int remaining = docFreq_ - docsRead_;
     int bufferIdx = 0;
 
-    // Fill buffer with StreamVByte groups
+    // Fill buffer with StreamVByte groups (freq=1 packed in low bit)
     while (remaining >= STREAMVBYTE_GROUP_SIZE &&
            bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
         uint8_t docDeltaEncoded[17];
@@ -830,29 +858,30 @@ void Lucene104PostingsEnumWithPositions::refillBuffer() {
         docIn_->readBytes(docDeltaEncoded + 1, dataBytes);
         util::StreamVByte::decode4(docDeltaEncoded, &docDeltaBuffer_[bufferIdx]);
 
+        // Unpack freq from low bit; read non-1 freqs as VInts
         if (writeFreqs_) {
-            uint8_t freqEncoded[17];
-            controlByte = docIn_->readByte();
-            freqEncoded[0] = controlByte;
-            dataBytes = 0;
-            for (int i = 0; i < 4; ++i) {
-                dataBytes += ((controlByte >> (i * 2)) & 0x03) + 1;
-            }
-            docIn_->readBytes(freqEncoded + 1, dataBytes);
-            util::StreamVByte::decode4(freqEncoded, &freqBuffer_[bufferIdx]);
+            unpackFreqFromDocDeltas(docDeltaBuffer_, freqBuffer_,
+                                    bufferIdx, STREAMVBYTE_GROUP_SIZE, docIn_.get());
         }
         bufferIdx += STREAMVBYTE_GROUP_SIZE;
         remaining -= STREAMVBYTE_GROUP_SIZE;
     }
 
-    // VInt tail for remaining < 4 docs
+    // VInt tail for remaining < 4 docs (same low-bit encoding)
     int spaceLeft = BUFFER_SIZE - bufferIdx;
     int docsToRead = std::min(remaining, spaceLeft);
     if (docsToRead > 0) {
         for (int i = 0; i < docsToRead; ++i) {
-            docDeltaBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+            uint32_t raw = static_cast<uint32_t>(docIn_->readVInt());
             if (writeFreqs_) {
-                freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+                if (raw & 1) {
+                    freqBuffer_[bufferIdx + i] = 1;
+                } else {
+                    freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+                }
+                docDeltaBuffer_[bufferIdx + i] = raw >> 1;
+            } else {
+                docDeltaBuffer_[bufferIdx + i] = raw;
             }
         }
         bufferIdx += docsToRead;

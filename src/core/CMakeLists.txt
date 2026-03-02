@@ -28,6 +28,8 @@ set(DIAGON_CORE_SOURCES
     src/store/FSDirectory.cpp
     src/store/MMapDirectory.cpp
     src/store/MMapIndexInput.cpp
+    src/store/CompoundFileWriter.cpp
+    src/store/CompoundDirectory.cpp
 
     # Document (User-facing API for documents and fields)
     src/document/Field.cpp
@@ -155,6 +157,8 @@ set(DIAGON_CORE_HEADERS
     include/diagon/store/PosixMMapIndexInput.h
     include/diagon/store/WindowsMMapIndexInput.h
     include/diagon/store/Lock.h
+    include/diagon/store/CompoundFileWriter.h
+    include/diagon/store/CompoundDirectory.h
 
     # Document
     include/diagon/document/IndexableField.h

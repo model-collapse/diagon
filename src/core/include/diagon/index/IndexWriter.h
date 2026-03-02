@@ -278,6 +278,7 @@ private:
     // Configuration
     Directory& directory_;
     bool commitOnClose_;
+    bool useCompoundFile_;
     IndexWriterConfig::OpenMode openMode_;
     std::unique_ptr<Lock> writeLock_;
 
@@ -303,6 +304,8 @@ private:
     void writeSegmentsFile();
     void applyDeletes(const Term& term);
     void deleteSegmentFiles(std::shared_ptr<SegmentInfo> segment);
+    void deleteOldSegmentsFiles(int64_t currentGeneration);  // Remove stale segments_N files
+    std::vector<std::string> createCompoundFile(std::shared_ptr<SegmentInfo> segment);  // Pack segment into .cfs/.cfe
     int64_t commitInternal();                      // Internal commit (caller must hold commitLock_)
     void executeMerges(MergeSpecification* spec);  // Execute a set of merges
 };

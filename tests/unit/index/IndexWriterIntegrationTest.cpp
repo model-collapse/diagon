@@ -178,7 +178,7 @@ TEST_F(IndexWriterIntegrationTest, MultipleCommitsIncrementGeneration) {
             segmentsFileCount++;
         }
     }
-    EXPECT_GE(segmentsFileCount, 2);
+    EXPECT_EQ(segmentsFileCount, 1);
 
     writer.close();
 }

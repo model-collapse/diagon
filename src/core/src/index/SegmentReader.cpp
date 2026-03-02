@@ -5,6 +5,7 @@
 
 #include "diagon/codecs/Codec.h"
 #include "diagon/codecs/SegmentState.h"
+#include "diagon/store/CompoundDirectory.h"
 #include "diagon/util/Exceptions.h"
 
 #include <atomic>
@@ -35,7 +36,15 @@ std::shared_ptr<SegmentReader> SegmentReader::open(Directory& dir,
 SegmentReader::SegmentReader(Directory& dir, std::shared_ptr<SegmentInfo> si)
     : directory_(dir)
     , segmentInfo_(si) {
-    // Phase 4: Constructor completes immediately
+    // If segment uses compound file format, open CompoundDirectory
+    if (si->getUseCompoundFile()) {
+        try {
+            compoundDirectory_ = store::CompoundDirectory::open(dir, si->name());
+        } catch (const IOException&) {
+            // Compound files might not exist (e.g., old index or mid-migration)
+            // Fall back to raw directory
+        }
+    }
     // Fields producers are loaded lazily on first terms() call
 }
 
@@ -210,8 +219,11 @@ void SegmentReader::loadFieldsProducer() const {
         auto& codec = codecs::Codec::forName(codecName);
         auto& postingsFormat = codec.postingsFormat();
 
+        // Use compound directory if available, otherwise raw directory
+        auto& dir = getDirectory();
+
         // Create segment read state (using index::SegmentReadState)
-        SegmentReadState readState(&directory_, segmentName, segmentInfo_->maxDoc(),
+        SegmentReadState readState(&dir, segmentName, segmentInfo_->maxDoc(),
                                    segmentInfo_->fieldInfos(), "");
 
         // Create fields producer using codec
@@ -230,9 +242,10 @@ void SegmentReader::loadDocValuesReader() const {
 
     // Try to open doc values files
     try {
+        auto& dir = getDirectory();
         std::string segmentName = segmentInfo_->name();
-        auto dataInput = directory_.openInput(segmentName + ".dvd", IOContext::READ);
-        auto metaInput = directory_.openInput(segmentName + ".dvm", IOContext::READ);
+        auto dataInput = dir.openInput(segmentName + ".dvd", IOContext::READ);
+        auto metaInput = dir.openInput(segmentName + ".dvm", IOContext::READ);
 
         docValuesReader_ = std::make_unique<NumericDocValuesReader>(std::move(dataInput),
                                                                     std::move(metaInput));
@@ -250,9 +263,10 @@ void SegmentReader::loadStoredFieldsReader() const {
 
     // Try to open stored fields files
     try {
+        auto& dir = getDirectory();
         std::string segmentName = segmentInfo_->name();
         storedFieldsReader_ = std::make_unique<codecs::StoredFieldsReader>(
-            &directory_, segmentName, segmentInfo_->fieldInfos());
+            &dir, segmentName, segmentInfo_->fieldInfos());
     } catch (const std::exception& e) {
         // Stored fields files don't exist - that's OK
         // Leave storedFieldsReader_ as nullptr
@@ -274,6 +288,7 @@ void SegmentReader::loadLiveDocs() const {
     }
 
     // Load live docs from .liv file
+    // Note: .liv files are NOT stored in compound files (Lucene convention)
     try {
         std::string segmentName = segmentInfo_->name();
         int maxDoc = segmentInfo_->maxDoc();
@@ -299,9 +314,12 @@ void SegmentReader::loadNormsProducer() const {
         auto& codec = codecs::Codec::forName(codecName);
         auto& normsFormat = codec.normsFormat();
 
+        // Use compound directory if available
+        auto& dir = getDirectory();
+
         // Create segment read state
         std::string segmentName = segmentInfo_->name();
-        SegmentReadState readState(&directory_, segmentName, segmentInfo_->maxDoc(),
+        SegmentReadState readState(&dir, segmentName, segmentInfo_->maxDoc(),
                                    segmentInfo_->fieldInfos(), "");
 
         // Create norms producer
@@ -339,6 +357,12 @@ void SegmentReader::doClose() {
     // Clear live docs
     liveDocs_.reset();
     liveDocsLoaded_ = false;
+
+    // Close compound directory
+    if (compoundDirectory_) {
+        compoundDirectory_->close();
+        compoundDirectory_.reset();
+    }
 }
 
 }  // namespace index

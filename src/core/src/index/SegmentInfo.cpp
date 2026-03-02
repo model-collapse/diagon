@@ -211,6 +211,10 @@ SegmentInfos SegmentInfos::read(store::Directory& dir, const std::string& fileNa
         // Set FieldInfos on SegmentInfo
         segmentInfo->setFieldInfos(FieldInfos(std::move(fieldInfos)));
 
+        // Read compound file flag
+        bool isCompoundFile = (input->readByte() != 0);
+        segmentInfo->setUseCompoundFile(isCompoundFile);
+
         // Add to collection
         infos.segments_.push_back(segmentInfo);
     }

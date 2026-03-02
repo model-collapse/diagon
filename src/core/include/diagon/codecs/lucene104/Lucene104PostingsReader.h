@@ -24,9 +24,9 @@ namespace lucene104 {
  *
  * File format (.doc file):
  * - For each term (starting at TermState.docStartFP):
- *   - for each doc:
- *     - docDelta: VInt (delta from last doc ID)
- *     - freq: VInt (term frequency, if indexed)
+ *   - StreamVByte groups of 4 docs: docDelta with freq=1 in low bit
+ *     - low bit 1 = freq is 1, low bit 0 = freq follows as VInt
+ *   - VInt tail (< 4 docs): same low-bit encoding
  */
 class Lucene104PostingsReader {
 public:

@@ -150,6 +150,18 @@ public:
      */
     void setFieldInfos(FieldInfos&& fieldInfos) { fieldInfos_ = std::move(fieldInfos); }
 
+    /**
+     * Check if this segment is stored as a compound file
+     * Based on: org.apache.lucene.index.SegmentInfo.getUseCompoundFile()
+     */
+    bool getUseCompoundFile() const { return useCompoundFile_; }
+
+    /**
+     * Set whether this segment uses compound file format
+     * Based on: org.apache.lucene.index.SegmentInfo.setUseCompoundFile()
+     */
+    void setUseCompoundFile(bool useCompound) { useCompoundFile_ = useCompound; }
+
 private:
     std::string name_;                                // Segment name
     int maxDoc_;                                      // Document count (including deleted)
@@ -159,6 +171,7 @@ private:
     std::map<std::string, std::string> diagnostics_;  // Diagnostics
     int64_t sizeInBytes_{0};                          // Total size
     FieldInfos fieldInfos_;                           // Field metadata (Phase 4)
+    bool useCompoundFile_{false};                     // Whether stored as compound file
 };
 
 /**

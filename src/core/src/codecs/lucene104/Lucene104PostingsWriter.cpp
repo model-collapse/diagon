@@ -173,13 +173,19 @@ void Lucene104PostingsWriter::addPosition(int position) {
 }
 
 TermState Lucene104PostingsWriter::finishTerm() {
-    // Flush any remaining buffered data
+    // Flush any remaining buffered data (VInt tail for < 4 docs)
     if (bufferPos_ > 0) {
-        // If we have fewer than 4 docs remaining, use VInt fallback
         for (int i = 0; i < bufferPos_; ++i) {
-            docOut_->writeVInt(static_cast<int32_t>(docDeltaBuffer_[i]));
             if (writeFreqs_) {
-                docOut_->writeVInt(static_cast<int32_t>(freqBuffer_[i]));
+                // Pack freq=1 into low bit of doc delta (same encoding as StreamVByte blocks)
+                if (freqBuffer_[i] == 1) {
+                    docOut_->writeVInt(static_cast<int32_t>((docDeltaBuffer_[i] << 1) | 1));
+                } else {
+                    docOut_->writeVInt(static_cast<int32_t>(docDeltaBuffer_[i] << 1));
+                    docOut_->writeVInt(static_cast<int32_t>(freqBuffer_[i]));
+                }
+            } else {
+                docOut_->writeVInt(static_cast<int32_t>(docDeltaBuffer_[i]));
             }
         }
         bufferPos_ = 0;
@@ -216,16 +222,32 @@ void Lucene104PostingsWriter::flushBuffer() {
         return;  // Only flush when buffer is full (4 docs)
     }
 
-    // Encode doc deltas using StreamVByte
+    // Pack freq=1 into low bit of doc delta (Lucene-compatible encoding).
+    // For freq==1: docDelta = (docDelta << 1) | 1  (no separate freq needed)
+    // For freq>1:  docDelta = (docDelta << 1) | 0  (freq written as VInt after block)
+    // ~60-70% of postings have freq=1, so this eliminates most freq bytes.
+    if (writeFreqs_) {
+        for (int i = 0; i < BUFFER_SIZE; i++) {
+            if (freqBuffer_[i] == 1) {
+                docDeltaBuffer_[i] = (docDeltaBuffer_[i] << 1) | 1;
+            } else {
+                docDeltaBuffer_[i] = (docDeltaBuffer_[i] << 1);
+            }
+        }
+    }
+
+    // Encode doc deltas using StreamVByte (now includes freq=1 info in low bit)
     uint8_t docDeltaEncoded[17];  // Max: 1 control + 4*4 data bytes
     int docDeltaBytes = util::StreamVByte::encode(docDeltaBuffer_, BUFFER_SIZE, docDeltaEncoded);
     docOut_->writeBytes(docDeltaEncoded, docDeltaBytes);
 
-    // Encode frequencies using StreamVByte (if required)
+    // Write only non-1 frequencies as VInts (freq=1 is already encoded in doc delta low bit)
     if (writeFreqs_) {
-        uint8_t freqEncoded[17];
-        int freqBytes = util::StreamVByte::encode(freqBuffer_, BUFFER_SIZE, freqEncoded);
-        docOut_->writeBytes(freqEncoded, freqBytes);
+        for (int i = 0; i < BUFFER_SIZE; i++) {
+            if (freqBuffer_[i] != 1) {
+                docOut_->writeVInt(static_cast<int32_t>(freqBuffer_[i]));
+            }
+        }
     }
 
     bufferPos_ = 0;  // Reset buffer

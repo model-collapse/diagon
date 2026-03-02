@@ -151,7 +151,9 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        std::cout << "\nCommitting index...\n";
+        std::cout << "\nMerging segments...\n";
+        writer->forceMerge(1);  // Merge all segments into 1 to eliminate duplicate term dictionaries
+        std::cout << "Committing index...\n";
         writer->commit();
         writer.reset();
 

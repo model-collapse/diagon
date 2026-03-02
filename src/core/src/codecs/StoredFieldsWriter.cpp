@@ -6,12 +6,16 @@
 #include <algorithm>
 #include <stdexcept>
 
+#ifdef HAVE_LZ4
+#include <lz4.h>
+#endif
+
 namespace diagon {
 namespace codecs {
 
 // Codec constants
 static const std::string CODEC_NAME = "DiagonStoredFields";
-static const int VERSION = 1;
+static const int VERSION = 2;  // V2: LZ4 block compression
 
 // ==================== Constructor ====================
 
@@ -107,11 +111,11 @@ void StoredFieldsWriter::flush(store::IndexOutput& dataOut, store::IndexOutput& 
         throw std::runtime_error("Must call finish() before flush()");
     }
 
-    // Write data file and collect offsets
-    std::vector<int64_t> offsets = writeData(dataOut);
+    // Write data file and collect block entries
+    std::vector<BlockEntry> blocks = writeData(dataOut);
 
     // Write index file
-    writeIndex(indexOut, offsets);
+    writeIndex(indexOut, blocks);
 }
 
 // ==================== RAM Usage ====================
@@ -131,6 +135,72 @@ void StoredFieldsWriter::close() {
     bytesUsed_ = 0;
 }
 
+// ==================== VInt/VLong/String Encoding Helpers ====================
+
+void StoredFieldsWriter::encodeVInt(std::vector<uint8_t>& buf, int32_t i) {
+    auto value = static_cast<uint32_t>(i);
+    while (value > 0x7F) {
+        buf.push_back(static_cast<uint8_t>((value & 0x7F) | 0x80));
+        value >>= 7;
+    }
+    buf.push_back(static_cast<uint8_t>(value));
+}
+
+void StoredFieldsWriter::encodeVLong(std::vector<uint8_t>& buf, int64_t l) {
+    auto value = static_cast<uint64_t>(l);
+    while (value > 0x7F) {
+        buf.push_back(static_cast<uint8_t>((value & 0x7F) | 0x80));
+        value >>= 7;
+    }
+    buf.push_back(static_cast<uint8_t>(value));
+}
+
+void StoredFieldsWriter::encodeString(std::vector<uint8_t>& buf, const std::string& s) {
+    encodeVInt(buf, static_cast<int32_t>(s.size()));
+    buf.insert(buf.end(), s.begin(), s.end());
+}
+
+// ==================== Block Serialization ====================
+
+std::vector<uint8_t> StoredFieldsWriter::serializeBlock(int startDoc, int count) {
+    std::vector<uint8_t> raw;
+    // Reserve a reasonable amount to avoid frequent reallocations
+    raw.reserve(count * 128);
+
+    for (int i = 0; i < count; i++) {
+        const auto& doc = documents_[startDoc + i];
+
+        // Write number of fields
+        encodeVInt(raw, static_cast<int32_t>(doc.fields.size()));
+
+        // Write each field
+        for (const auto& field : doc.fields) {
+            // Write field number
+            encodeVInt(raw, field.fieldNumber);
+
+            // Write field type
+            raw.push_back(static_cast<uint8_t>(field.fieldType));
+
+            // Write field value based on type
+            switch (field.fieldType) {
+                case FieldType::STRING:
+                    encodeString(raw, field.stringValue);
+                    break;
+
+                case FieldType::INT:
+                    encodeVInt(raw, static_cast<int32_t>(field.numericValue));
+                    break;
+
+                case FieldType::LONG:
+                    encodeVLong(raw, field.numericValue);
+                    break;
+            }
+        }
+    }
+
+    return raw;
+}
+
 // ==================== Private Methods ====================
 
 void StoredFieldsWriter::writeHeader(store::IndexOutput& out) {
@@ -138,63 +208,78 @@ void StoredFieldsWriter::writeHeader(store::IndexOutput& out) {
     out.writeVInt(VERSION);
 }
 
-std::vector<int64_t> StoredFieldsWriter::writeData(store::IndexOutput& dataOut) {
+std::vector<StoredFieldsWriter::BlockEntry> StoredFieldsWriter::writeData(
+    store::IndexOutput& dataOut) {
     // Write header
     writeHeader(dataOut);
 
-    std::vector<int64_t> offsets;
-    offsets.reserve(documents_.size());
+    std::vector<BlockEntry> blocks;
+    int totalDocs = static_cast<int>(documents_.size());
+    int docIdx = 0;
 
-    // Write each document
-    for (const auto& doc : documents_) {
-        // Record offset for this document
-        offsets.push_back(dataOut.getFilePointer());
+    while (docIdx < totalDocs) {
+        int blockSize = std::min(BLOCK_SIZE, totalDocs - docIdx);
 
-        // Write number of fields
-        dataOut.writeVInt(static_cast<int>(doc.fields.size()));
+        // Record block start offset
+        BlockEntry entry;
+        entry.offset = dataOut.getFilePointer();
+        entry.numDocsInBlock = blockSize;
 
-        // Write each field
-        for (const auto& field : doc.fields) {
-            // Write field number
-            dataOut.writeVInt(field.fieldNumber);
+        // Serialize documents in this block to raw bytes
+        std::vector<uint8_t> raw = serializeBlock(docIdx, blockSize);
+        int rawLength = static_cast<int>(raw.size());
 
-            // Write field type
-            dataOut.writeByte(static_cast<uint8_t>(field.fieldType));
+#ifdef HAVE_LZ4
+        // Compress with LZ4
+        int maxCompressedSize = LZ4_compressBound(rawLength);
+        std::vector<uint8_t> compressed(maxCompressedSize);
 
-            // Write field value based on type
-            switch (field.fieldType) {
-                case FieldType::STRING:
-                    dataOut.writeString(field.stringValue);
-                    break;
+        int compressedSize = LZ4_compress_default(
+            reinterpret_cast<const char*>(raw.data()),
+            reinterpret_cast<char*>(compressed.data()),
+            rawLength, maxCompressedSize);
 
-                case FieldType::INT:
-                    dataOut.writeVInt(static_cast<int32_t>(field.numericValue));
-                    break;
-
-                case FieldType::LONG:
-                    dataOut.writeVLong(field.numericValue);
-                    break;
-
-                default:
-                    throw std::runtime_error("Unknown field type");
-            }
+        if (compressedSize <= 0) {
+            throw std::runtime_error("LZ4 compression failed");
         }
+
+        // Write block header
+        dataOut.writeVInt(blockSize);
+        dataOut.writeVInt(rawLength);
+        dataOut.writeVInt(compressedSize);
+
+        // Write compressed data
+        dataOut.writeBytes(compressed.data(), compressedSize);
+#else
+        // No LZ4 available: store uncompressed (compressedLength == rawLength signals this)
+        dataOut.writeVInt(blockSize);
+        dataOut.writeVInt(rawLength);
+        dataOut.writeVInt(rawLength);
+        dataOut.writeBytes(raw.data(), rawLength);
+#endif
+
+        blocks.push_back(entry);
+        docIdx += blockSize;
     }
 
-    return offsets;
+    return blocks;
 }
 
 void StoredFieldsWriter::writeIndex(store::IndexOutput& indexOut,
-                                    const std::vector<int64_t>& offsets) {
+                                    const std::vector<BlockEntry>& blocks) {
     // Write header
     writeHeader(indexOut);
 
-    // Write number of documents
-    indexOut.writeVInt(static_cast<int>(offsets.size()));
+    // Write total number of documents
+    indexOut.writeVInt(numDocs_);
 
-    // Write offset for each document
-    for (int64_t offset : offsets) {
-        indexOut.writeVLong(offset);
+    // Write number of blocks
+    indexOut.writeVInt(static_cast<int>(blocks.size()));
+
+    // Write each block entry
+    for (const auto& block : blocks) {
+        indexOut.writeVLong(block.offset);
+        indexOut.writeVInt(block.numDocsInBlock);
     }
 }
 

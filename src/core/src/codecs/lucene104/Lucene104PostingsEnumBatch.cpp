@@ -151,10 +151,10 @@ void Lucene104PostingsEnumBatch::refillBuffer() {
     int remaining = docFreq_ - docsRead_;
     int bufferIdx = 0;
 
-    // Fill buffer with StreamVByte groups (4 docs each)
+    // Fill buffer with StreamVByte groups (4 docs each, freq=1 packed in low bit)
     while (remaining >= STREAMVBYTE_GROUP_SIZE &&
            bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
-        // Read StreamVByte-encoded group of 4 docs
+        // Read StreamVByte-encoded group of 4 doc deltas
         uint8_t docDeltaEncoded[17];  // Max: 1 control + 4*4 data bytes
         uint8_t controlByte = docIn_->readByte();
         docDeltaEncoded[0] = controlByte;
@@ -169,39 +169,41 @@ void Lucene104PostingsEnumBatch::refillBuffer() {
         // Read data bytes
         docIn_->readBytes(docDeltaEncoded + 1, dataBytes);
 
-        // Decode 4 doc deltas using SIMD (from P0.4)
+        // Decode 4 doc deltas using SIMD
         util::StreamVByte::decode4(docDeltaEncoded, &docDeltaBuffer_[bufferIdx]);
 
-        // Read frequencies if present
+        // Unpack freq from low bit; read non-1 freqs as VInts
         if (writeFreqs_) {
-            uint8_t freqEncoded[17];
-            controlByte = docIn_->readByte();
-            freqEncoded[0] = controlByte;
-
-            // Calculate data bytes for frequencies
-            dataBytes = 0;
-            for (int i = 0; i < 4; ++i) {
-                int length = ((controlByte >> (i * 2)) & 0x03) + 1;
-                dataBytes += length;
+            for (int i = 0; i < STREAMVBYTE_GROUP_SIZE; i++) {
+                if (docDeltaBuffer_[bufferIdx + i] & 1) {
+                    freqBuffer_[bufferIdx + i] = 1;
+                } else {
+                    freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+                }
+                docDeltaBuffer_[bufferIdx + i] >>= 1;
             }
-
-            docIn_->readBytes(freqEncoded + 1, dataBytes);
-            util::StreamVByte::decode4(freqEncoded, &freqBuffer_[bufferIdx]);
         }
 
         bufferIdx += STREAMVBYTE_GROUP_SIZE;
         remaining -= STREAMVBYTE_GROUP_SIZE;
     }
 
-    // VInt fallback for remaining docs (< 4)
+    // VInt tail for remaining docs (< 4, same low-bit encoding)
     int spaceLeft = BUFFER_SIZE - bufferIdx;
     int docsToRead = std::min(remaining, spaceLeft);
 
     if (docsToRead > 0) {
         for (int i = 0; i < docsToRead; ++i) {
-            docDeltaBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+            uint32_t raw = static_cast<uint32_t>(docIn_->readVInt());
             if (writeFreqs_) {
-                freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+                if (raw & 1) {
+                    freqBuffer_[bufferIdx + i] = 1;
+                } else {
+                    freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+                }
+                docDeltaBuffer_[bufferIdx + i] = raw >> 1;
+            } else {
+                docDeltaBuffer_[bufferIdx + i] = raw;
             }
         }
         bufferIdx += docsToRead;

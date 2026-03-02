@@ -68,13 +68,13 @@ struct TermState {
  * Based on: org.apache.lucene.codecs.lucene912.Lucene912PostingsWriter
  *
  * File format:
- * - .doc file: Doc deltas and frequencies (StreamVByte encoded)
+ * - .doc file: Doc deltas with freq=1 packed in low bit
  *   - For each term:
  *     - for each group of 4 docs:
  *       - controlByte: uint8 (2 bits per integer length)
- *       - docDeltas: 4-16 bytes (delta-encoded doc IDs)
- *       - freqs: 4-16 bytes (term frequencies, if indexed)
- *     - remaining docs (< 4): VInt fallback
+ *       - docDeltas: 4-16 bytes (delta-encoded, low bit = freq==1 flag)
+ *       - non-1 freqs: 0-4 VInts (only for entries where low bit was 0)
+ *     - remaining docs (< 4): VInt fallback (same low-bit encoding)
  *
  * - .skp file (optional): Skip entries with impacts for Block-Max WAND
  *   - For each term (if docFreq >= 128):
@@ -212,9 +212,9 @@ private:
     int bufferPos_;
 
     // Block-Max WAND support
-    // Lowered from 256 to 64 to create more skip entries for tighter max score bounds
+    // Skip entry every 128 docs — matches Lucene's standard interval
     static constexpr int SKIP_INTERVAL =
-        64;  // Create skip entry every 64 docs (denser than Lucene)
+        128;  // Create skip entry every 128 docs
 
     // Block-level impact tracking (for next skip entry)
     int32_t blockMaxFreq_;       // Max frequency in current block

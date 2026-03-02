@@ -128,6 +128,11 @@ void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
     block.stats.clear();
 
     // Read all terms into flat arena - zero per-term allocations
+    // Delta-decoded file pointers (reset per block)
+    int64_t lastPostingsFP = 0;
+    int64_t lastPosStartFP = 0;
+    int64_t lastSkipStartFP = 0;
+
     for (int i = 0; i < termCount; i++) {
         int suffixLen = timIn_->readVInt();
         int termLen = prefixLen + suffixLen;
@@ -151,13 +156,16 @@ void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
             timIn_->readBytes(dest + prefixLen, suffixLen);
         }
 
-        // Read stats
+        // Read stats (delta-decoded FPs, matching writer order)
         BlockTreeTermsWriter::TermStats stats;
         stats.docFreq = timIn_->readVInt();
         stats.totalTermFreq = timIn_->readVLong();
-        stats.postingsFP = timIn_->readVLong();
-        stats.skipStartFP = timIn_->readVLong();  // Block-Max WAND support
-        stats.posStartFP = timIn_->readVLong();   // Position data support
+        stats.postingsFP = lastPostingsFP + timIn_->readVLong();
+        stats.posStartFP = lastPosStartFP + timIn_->readVLong();
+        stats.skipStartFP = lastSkipStartFP + timIn_->readVLong();
+        lastPostingsFP = stats.postingsFP;
+        lastPosStartFP = stats.posStartFP;
+        lastSkipStartFP = stats.skipStartFP;
         block.stats.push_back(stats);
     }
 

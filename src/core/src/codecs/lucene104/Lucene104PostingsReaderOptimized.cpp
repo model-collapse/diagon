@@ -74,24 +74,38 @@ void Lucene104PostingsEnumOptimized::refillBuffer() {
     int bufferIdx = 0;
 
 #if defined(__AVX2__)
-    // AVX2 fast path: Decode 8 docs at a time using two interleaved 4-wide decodes
-    // Writer format is interleaved: [4 doc deltas][4 freqs][4 doc deltas][4 freqs]
-    // So we must decode 4 deltas, then 4 freqs, then 4 deltas, then 4 freqs
+    // AVX2 fast path: Decode 8 docs at a time (two groups of 4)
+    // Format: [StreamVByte: 4 doc deltas with freq in low bit][VInt non-1 freqs] × 2
     constexpr int AVX2_GROUP_SIZE = 8;
     while (remaining >= AVX2_GROUP_SIZE && bufferIdx + AVX2_GROUP_SIZE <= BUFFER_SIZE) {
         // Prefetch next data for better cache performance
         __builtin_prefetch(&ioBatch_[ioBatchPos_ + 64], 0, 3);
 
-        // First group: 4 doc deltas then 4 freqs
+        // First group: 4 doc deltas (freq=1 packed in low bit)
         decodeStreamVByte4(&docDeltaBuffer_[bufferIdx]);
         if (writeFreqs_) {
-            decodeStreamVByte4(&freqBuffer_[bufferIdx]);
+            for (int i = 0; i < STREAMVBYTE_GROUP_SIZE; i++) {
+                if (docDeltaBuffer_[bufferIdx + i] & 1) {
+                    freqBuffer_[bufferIdx + i] = 1;
+                } else {
+                    freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(readVIntFromBatch());
+                }
+                docDeltaBuffer_[bufferIdx + i] >>= 1;
+            }
         }
 
-        // Second group: 4 doc deltas then 4 freqs
+        // Second group: 4 doc deltas
         decodeStreamVByte4(&docDeltaBuffer_[bufferIdx + STREAMVBYTE_GROUP_SIZE]);
         if (writeFreqs_) {
-            decodeStreamVByte4(&freqBuffer_[bufferIdx + STREAMVBYTE_GROUP_SIZE]);
+            for (int i = 0; i < STREAMVBYTE_GROUP_SIZE; i++) {
+                int idx = bufferIdx + STREAMVBYTE_GROUP_SIZE + i;
+                if (docDeltaBuffer_[idx] & 1) {
+                    freqBuffer_[idx] = 1;
+                } else {
+                    freqBuffer_[idx] = static_cast<uint32_t>(readVIntFromBatch());
+                }
+                docDeltaBuffer_[idx] >>= 1;
+            }
         }
 
         if (!writeFreqs_) {
@@ -108,12 +122,19 @@ void Lucene104PostingsEnumOptimized::refillBuffer() {
     // SSE/Scalar path: Decode 4 docs at a time
     while (remaining >= STREAMVBYTE_GROUP_SIZE &&
            bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
-        // Decode doc deltas (stores deltas, not absolute docIDs)
+        // Decode doc deltas (freq=1 packed in low bit)
         decodeStreamVByte4(&docDeltaBuffer_[bufferIdx]);
 
-        // Decode frequencies
+        // Unpack freq from low bit; read non-1 freqs as VInts
         if (writeFreqs_) {
-            decodeStreamVByte4(&freqBuffer_[bufferIdx]);
+            for (int i = 0; i < STREAMVBYTE_GROUP_SIZE; i++) {
+                if (docDeltaBuffer_[bufferIdx + i] & 1) {
+                    freqBuffer_[bufferIdx + i] = 1;
+                } else {
+                    freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(readVIntFromBatch());
+                }
+                docDeltaBuffer_[bufferIdx + i] >>= 1;
+            }
         } else {
 #if defined(__SSE4_2__) || defined(__AVX2__)
             // Set default frequencies using SIMD
@@ -131,17 +152,21 @@ void Lucene104PostingsEnumOptimized::refillBuffer() {
         remaining -= STREAMVBYTE_GROUP_SIZE;
     }
 
-    // Handle remainder (< 4 docs) with VInt fallback
+    // Handle remainder (< 4 docs) with VInt fallback (same low-bit encoding)
     int spaceLeft = BUFFER_SIZE - bufferIdx;
     int docsToRead = std::min(remaining, spaceLeft);
 
     for (int i = 0; i < docsToRead; ++i) {
-        // Store delta (not absolute docID - accumulation happens in nextDoc())
-        docDeltaBuffer_[bufferIdx + i] = static_cast<uint32_t>(readVIntFromBatch());
-
+        uint32_t raw = static_cast<uint32_t>(readVIntFromBatch());
         if (writeFreqs_) {
-            freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(readVIntFromBatch());
+            if (raw & 1) {
+                freqBuffer_[bufferIdx + i] = 1;
+            } else {
+                freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(readVIntFromBatch());
+            }
+            docDeltaBuffer_[bufferIdx + i] = raw >> 1;
         } else {
+            docDeltaBuffer_[bufferIdx + i] = raw;
             freqBuffer_[bufferIdx + i] = 1;
         }
     }

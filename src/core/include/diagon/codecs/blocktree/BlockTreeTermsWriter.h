@@ -29,7 +29,10 @@ namespace blocktree {
  * - No floor blocks (will add later)
  *
  * File format:
- * - .tim: Term blocks with shared prefix compression
+ * - .tim: Term blocks with shared prefix compression and delta-encoded FPs
+ *   - Per block: [prefixLen][prefix bytes][termCount]
+ *   - Per term: [suffixLen][suffix][docFreq][totalTermFreq][postingsFP delta][posStartFP delta][skipStartFP delta]
+ *   - FP deltas are relative to previous term within the block (reset per block)
  * - .tip: FST index mapping prefixes to block file pointers
  * - .tmd: Field metadata (optional for MVP)
  */

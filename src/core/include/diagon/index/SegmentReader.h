@@ -12,6 +12,7 @@
 #include "diagon/index/IndexReader.h"
 #include "diagon/index/SegmentInfo.h"
 #include "diagon/index/Terms.h"
+#include "diagon/store/CompoundDirectory.h"
 #include "diagon/store/Directory.h"
 
 #include <memory>
@@ -214,8 +215,19 @@ private:
      */
     void loadNormsProducer() const;
 
+    /**
+     * Get the effective directory for reading segment files.
+     * Returns CompoundDirectory if segment uses compound format, otherwise raw directory.
+     */
+    store::Directory& getDirectory() const {
+        return compoundDirectory_ ? *compoundDirectory_ : directory_;
+    }
+
     // Directory containing segment files
     store::Directory& directory_;
+
+    // Compound directory (owned, opened when segment uses compound format)
+    std::unique_ptr<store::CompoundDirectory> compoundDirectory_;
 
     // Segment metadata
     std::shared_ptr<SegmentInfo> segmentInfo_;

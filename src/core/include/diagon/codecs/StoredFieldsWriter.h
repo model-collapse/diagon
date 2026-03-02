@@ -16,33 +16,38 @@ namespace diagon {
 namespace codecs {
 
 /**
- * StoredFieldsWriter - Writes stored fields to disk
+ * StoredFieldsWriter - Writes stored fields to disk with LZ4 block compression
  *
- * Format (simplified binary format):
+ * Format (V2 - LZ4 compressed blocks):
  *
  * .fdx (index) file per segment:
- *   - Header (codec name, version)
+ *   - Header (codec name, version=2)
  *   - numDocs (vInt)
- *   - For each doc: offset in .fdt file (vLong)
+ *   - numBlocks (vInt)
+ *   - For each block:
+ *     - blockOffset (vLong): start offset of block in .fdt
+ *     - numDocsInBlock (vInt): number of docs in this block
  *
  * .fdt (data) file per segment:
- *   - Header (codec name, version)
- *   - For each doc:
- *     - numFields (vInt)
- *     - For each field:
- *       - fieldNumber (vInt)
- *       - fieldType (byte): 0=STRING, 1=INT, 2=LONG
- *       - value (type-dependent):
- *         - STRING: length (vInt) + UTF-8 bytes
- *         - INT: int32 (vInt)
- *         - LONG: int64 (vLong)
+ *   - Header (codec name, version=2)
+ *   - For each block:
+ *     - numDocsInBlock (vInt)
+ *     - rawLength (vInt): uncompressed size in bytes
+ *     - compressedLength (vInt): compressed size in bytes
+ *     - compressedData (bytes): LZ4-compressed block
  *
- * Based on: org.apache.lucene.codecs.StoredFieldsWriter
+ *   Within each block's decompressed data:
+ *     - For each doc:
+ *       - numFields (vInt)
+ *       - For each field:
+ *         - fieldNumber (vInt)
+ *         - fieldType (byte): 0=STRING, 1=INT, 2=LONG
+ *         - value (type-dependent):
+ *           - STRING: length (vInt) + UTF-8 bytes
+ *           - INT: int32 (vInt)
+ *           - LONG: int64 (vLong)
  *
- * Simplified vs Lucene90:
- * - No compression (yet)
- * - Only supports STRING, INT, LONG types
- * - No bulk copying optimizations
+ * Based on: org.apache.lucene.codecs.compressing.CompressingStoredFieldsWriter
  */
 class StoredFieldsWriter {
 public:
@@ -111,6 +116,9 @@ public:
      */
     void close();
 
+    /** Number of documents per compressed block */
+    static constexpr int BLOCK_SIZE = 16;
+
 private:
     /**
      * Stored field value
@@ -133,6 +141,14 @@ private:
         std::vector<StoredField> fields;
     };
 
+    /**
+     * Block index entry (offset + doc count) for .fdx
+     */
+    struct BlockEntry {
+        int64_t offset;       // Start offset of block in .fdt
+        int numDocsInBlock;   // Number of docs in this block
+    };
+
     std::string segmentName_;
 
     // Buffer for current document
@@ -150,7 +166,7 @@ private:
     // Whether finish() has been called
     bool finished_{false};
 
-    // Incremental RAM usage tracking (avoids O(n²) recomputation)
+    // Incremental RAM usage tracking (avoids O(n^2) recomputation)
     int64_t bytesUsed_{0};
 
     /**
@@ -159,14 +175,38 @@ private:
     void writeHeader(store::IndexOutput& out);
 
     /**
-     * Write index file (.fdx)
+     * Write index file (.fdx) with block-level entries
      */
-    void writeIndex(store::IndexOutput& indexOut, const std::vector<int64_t>& offsets);
+    void writeIndex(store::IndexOutput& indexOut, const std::vector<BlockEntry>& blocks);
 
     /**
-     * Write data file (.fdt) and collect offsets
+     * Write data file (.fdt) with LZ4-compressed blocks
+     * @return Block entries for .fdx index
      */
-    std::vector<int64_t> writeData(store::IndexOutput& dataOut);
+    std::vector<BlockEntry> writeData(store::IndexOutput& dataOut);
+
+    /**
+     * Serialize a range of documents into a raw byte buffer.
+     * @param startDoc First document index (in documents_)
+     * @param count Number of documents to serialize
+     * @return Raw serialized bytes
+     */
+    std::vector<uint8_t> serializeBlock(int startDoc, int count);
+
+    /**
+     * Encode a vInt into a byte buffer.
+     */
+    static void encodeVInt(std::vector<uint8_t>& buf, int32_t i);
+
+    /**
+     * Encode a vLong into a byte buffer.
+     */
+    static void encodeVLong(std::vector<uint8_t>& buf, int64_t l);
+
+    /**
+     * Encode a string (length-prefixed) into a byte buffer.
+     */
+    static void encodeString(std::vector<uint8_t>& buf, const std::string& s);
 };
 
 }  // namespace codecs
