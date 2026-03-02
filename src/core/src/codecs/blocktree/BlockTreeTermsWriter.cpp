@@ -6,12 +6,40 @@
 #include "diagon/util/Exceptions.h"
 
 #include <algorithm>
-#include <iostream>
 #include <stdexcept>
+
+#ifdef HAVE_LZ4
+#include <lz4.h>
+#endif
 
 namespace diagon {
 namespace codecs {
 namespace blocktree {
+
+namespace {
+
+// Buffer encoding helpers for column-stride section building.
+// These mirror IndexOutput::writeVInt/writeVLong but append to a byte vector.
+
+void bufEncodeVInt(std::vector<uint8_t>& buf, int32_t val) {
+    auto v = static_cast<uint32_t>(val);
+    while (v > 0x7F) {
+        buf.push_back(static_cast<uint8_t>((v & 0x7F) | 0x80));
+        v >>= 7;
+    }
+    buf.push_back(static_cast<uint8_t>(v));
+}
+
+void bufEncodeVLong(std::vector<uint8_t>& buf, int64_t val) {
+    auto v = static_cast<uint64_t>(val);
+    while (v > 0x7F) {
+        buf.push_back(static_cast<uint8_t>((v & 0x7F) | 0x80));
+        v >>= 7;
+    }
+    buf.push_back(static_cast<uint8_t>(v));
+}
+
+}  // anonymous namespace
 
 BlockTreeTermsWriter::BlockTreeTermsWriter(store::IndexOutput* timOut, store::IndexOutput* tipOut,
                                            const index::FieldInfo& fieldInfo, const Config& config)
@@ -78,8 +106,8 @@ void BlockTreeTermsWriter::finish() {
         writeBlock();
     }
 
-    // Write FST index to .tip file
-    writeFST();
+    // Write compact block index to .tip file
+    writeBlockIndex();
 
     finished_ = true;
 }
@@ -89,15 +117,7 @@ void BlockTreeTermsWriter::writeBlock() {
         return;
     }
 
-    // Record block file pointer
     int64_t blockFP = timOut_->getFilePointer();
-
-    // DEBUG: Show first term being written
-    if (!pendingTerms_.empty()) {
-        const auto& firstTerm = pendingTerms_[0].term;
-        std::string firstTermStr(reinterpret_cast<const char*>(firstTerm.data()),
-                                 firstTerm.length());
-    }
 
     // Compute common prefix for all terms in block
     util::BytesRef prefix = pendingTerms_[0].term;
@@ -110,66 +130,134 @@ void BlockTreeTermsWriter::writeBlock() {
         }
     }
 
-    // Write block header
-    // Format: [prefixLen][prefix bytes][termCount]
+    // Write block header: [prefixLen][prefix bytes][termCount]
     timOut_->writeVInt(prefixLen);
     if (prefixLen > 0) {
         timOut_->writeBytes(prefix.data(), prefixLen);
     }
     timOut_->writeVInt(static_cast<int>(pendingTerms_.size()));
 
-    // Write each term's suffix and stats (delta-encoded file pointers per block)
-    int64_t lastPostingsFP = 0;
-    int64_t lastPosStartFP = 0;
-    int64_t lastSkipStartFP = 0;
-
+    // === Section 1: Suffix data (with optional LZ4 compression) ===
+    // Collect all suffix lengths + suffix bytes into a flat buffer
+    std::vector<uint8_t> suffixBuf;
+    suffixBuf.reserve(pendingTerms_.size() * 10);
     for (const auto& pending : pendingTerms_) {
-        const util::BytesRef& term = pending.term;
-        const TermStats& stats = pending.stats;
-
-        // Write suffix
-        int suffixLen = static_cast<int>(term.length()) - prefixLen;
-        timOut_->writeVInt(suffixLen);
+        int suffixLen = static_cast<int>(pending.term.length()) - prefixLen;
+        bufEncodeVInt(suffixBuf, suffixLen);
         if (suffixLen > 0) {
-            timOut_->writeBytes(term.data() + prefixLen, suffixLen);
+            const uint8_t* suffixStart = pending.term.data() + prefixLen;
+            suffixBuf.insert(suffixBuf.end(), suffixStart, suffixStart + suffixLen);
         }
-
-        // Write stats (delta-encoded FPs for ~60-65% .tim size reduction)
-        timOut_->writeVInt(stats.docFreq);
-        timOut_->writeVLong(stats.totalTermFreq);
-        timOut_->writeVLong(stats.postingsFP - lastPostingsFP);
-        timOut_->writeVLong(stats.posStartFP - lastPosStartFP);
-        timOut_->writeVLong(stats.skipStartFP - lastSkipStartFP);
-        lastPostingsFP = stats.postingsFP;
-        lastPosStartFP = stats.posStartFP;
-        lastSkipStartFP = stats.skipStartFP;
     }
 
-    // Add block to FST
-    // Use first term as prefix (simplified - real Lucene uses more sophisticated logic)
-    util::BytesRef blockPrefix(prefix.data(), prefixLen);
-    fstBuilder_.add(pendingTerms_[0].term, blockFP);
+    // Write suffix section: VLong((uncompressedSize << 3) | flags)
+    // Bit 0: LZ4 compressed
+    bool compressed = false;
+#ifdef HAVE_LZ4
+    if (suffixBuf.size() >= 32) {
+        int srcSize = static_cast<int>(suffixBuf.size());
+        int maxDstSize = LZ4_compressBound(srcSize);
+        std::vector<uint8_t> compBuf(maxDstSize);
+        int compSize = LZ4_compress_default(
+            reinterpret_cast<const char*>(suffixBuf.data()),
+            reinterpret_cast<char*>(compBuf.data()),
+            srcSize, maxDstSize);
+        if (compSize > 0 && static_cast<size_t>(compSize) < suffixBuf.size() * 3 / 4) {
+            // Compressed saves >25%
+            timOut_->writeVLong(static_cast<int64_t>((suffixBuf.size() << 3) | 0x01));
+            timOut_->writeVInt(compSize);
+            timOut_->writeBytes(compBuf.data(), compSize);
+            compressed = true;
+        }
+    }
+#endif
+    if (!compressed) {
+        timOut_->writeVLong(static_cast<int64_t>((suffixBuf.size() << 3) | 0x00));
+        timOut_->writeBytes(suffixBuf.data(), suffixBuf.size());
+    }
+
+    // === Section 2: Stats (column-stride with singleton RLE) ===
+    // Singleton RLE: consecutive terms with docFreq=1 AND totalTermFreq=1
+    // are encoded as VInt(((runCount-1) << 1) | 1).
+    // Non-singleton: VInt((docFreq << 1) | 0) + VLong(totalTermFreq - docFreq).
+    std::vector<uint8_t> statsBuf;
+    statsBuf.reserve(pendingTerms_.size() * 3);
+    {
+        size_t i = 0;
+        size_t count = pendingTerms_.size();
+        while (i < count) {
+            if (pendingTerms_[i].stats.docFreq == 1 &&
+                pendingTerms_[i].stats.totalTermFreq == 1) {
+                // Count consecutive singletons
+                size_t runStart = i;
+                while (i < count &&
+                       pendingTerms_[i].stats.docFreq == 1 &&
+                       pendingTerms_[i].stats.totalTermFreq == 1) {
+                    i++;
+                }
+                int runCount = static_cast<int>(i - runStart);
+                bufEncodeVInt(statsBuf, ((runCount - 1) << 1) | 1);
+            } else {
+                bufEncodeVInt(statsBuf, (pendingTerms_[i].stats.docFreq << 1) | 0);
+                bufEncodeVLong(statsBuf,
+                    pendingTerms_[i].stats.totalTermFreq - pendingTerms_[i].stats.docFreq);
+                i++;
+            }
+        }
+    }
+    timOut_->writeVInt(static_cast<int>(statsBuf.size()));
+    timOut_->writeBytes(statsBuf.data(), statsBuf.size());
+
+    // === Section 3: Metadata (column-stride file pointer deltas) ===
+    // All postingsFP deltas, then all posStartFP deltas, then all skipStartFP deltas.
+    // Each column uses cumulative delta encoding (reset to 0 at block start).
+    std::vector<uint8_t> metaBuf;
+    metaBuf.reserve(pendingTerms_.size() * 9);
+    {
+        int64_t lastFP = 0;
+        for (const auto& pending : pendingTerms_) {
+            bufEncodeVLong(metaBuf, pending.stats.postingsFP - lastFP);
+            lastFP = pending.stats.postingsFP;
+        }
+        lastFP = 0;
+        for (const auto& pending : pendingTerms_) {
+            bufEncodeVLong(metaBuf, pending.stats.posStartFP - lastFP);
+            lastFP = pending.stats.posStartFP;
+        }
+        lastFP = 0;
+        for (const auto& pending : pendingTerms_) {
+            bufEncodeVLong(metaBuf, pending.stats.skipStartFP - lastFP);
+            lastFP = pending.stats.skipStartFP;
+        }
+    }
+    timOut_->writeVInt(static_cast<int>(metaBuf.size()));
+    timOut_->writeBytes(metaBuf.data(), metaBuf.size());
+
+    // Record block entry for compact .tip index
+    const auto& firstTerm = pendingTerms_[0].term;
+    blockEntries_.emplace_back(firstTerm.data(), firstTerm.length(), blockFP);
 
     // Clear pending terms
     pendingTerms_.clear();
 }
 
-void BlockTreeTermsWriter::writeFST() {
-    // Finish FST construction
-    auto fst = fstBuilder_.finish();
+void BlockTreeTermsWriter::writeBlockIndex() {
+    // Write compact block index to .tip file
+    // TIP3 format: flat block list (no FST trie overhead)
+    // Saves ~200 KB for Reuters vs TIP2 (which serialized the full packed FST trie)
 
-    // Write block index to .tip file
-    // Format: [magic][fieldName][startFP][numTerms][fstSize][fstData]
-
-    tipOut_->writeInt(0x54495032);          // "TIP2" magic (version 2 with FST)
+    tipOut_->writeInt(0x54495033);          // "TIP3" magic (compact block list)
     tipOut_->writeString(fieldInfo_.name);  // Field name
     tipOut_->writeVLong(termsStartFP_);     // Starting file pointer for this field's terms
     tipOut_->writeVLong(numTerms_);
 
-    // Serialize FST
-    auto fstData = fst->serialize();
-    tipOut_->writeVInt(static_cast<int>(fstData.size()));
-    tipOut_->writeBytes(fstData.data(), fstData.size());
+    // Write block entries
+    tipOut_->writeVInt(static_cast<int>(blockEntries_.size()));
+    for (const auto& entry : blockEntries_) {
+        tipOut_->writeVInt(static_cast<int>(entry.termData.size()));
+        tipOut_->writeBytes(entry.termData.data(), entry.termData.size());
+        tipOut_->writeVLong(entry.blockFP);
+    }
 }
 
 int BlockTreeTermsWriter::sharedPrefixLength(const util::BytesRef& a,

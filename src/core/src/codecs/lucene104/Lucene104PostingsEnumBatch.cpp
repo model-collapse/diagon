@@ -3,8 +3,8 @@
 
 #include "diagon/codecs/lucene104/Lucene104PostingsEnumBatch.h"
 
+#include "diagon/util/BitPacking.h"
 #include "diagon/util/SIMDPrefixSum.h"
-#include "diagon/util/StreamVByte.h"
 
 #include <algorithm>
 #include <cstring>
@@ -151,49 +151,38 @@ void Lucene104PostingsEnumBatch::refillBuffer() {
     int remaining = docFreq_ - docsRead_;
     int bufferIdx = 0;
 
-    // Fill buffer with StreamVByte groups (4 docs each, freq=1 packed in low bit)
-    while (remaining >= STREAMVBYTE_GROUP_SIZE &&
-           bufferIdx + STREAMVBYTE_GROUP_SIZE <= BUFFER_SIZE) {
-        // Read StreamVByte-encoded group of 4 doc deltas
-        uint8_t docDeltaEncoded[17];  // Max: 1 control + 4*4 data bytes
-        uint8_t controlByte = docIn_->readByte();
-        docDeltaEncoded[0] = controlByte;
+    static constexpr int BITPACK_BLOCK = 128;
 
-        // Calculate data bytes needed from control byte
-        int dataBytes = 0;
-        for (int i = 0; i < 4; ++i) {
-            int length = ((controlByte >> (i * 2)) & 0x03) + 1;
-            dataBytes += length;
+    // Read one BitPack128 block if we have >= 128 remaining docs
+    if (remaining >= BITPACK_BLOCK) {
+        // Read bitsPerValue header + packed data
+        uint8_t bpvByte = docIn_->readByte();
+        int bpv = bpvByte;
+        int dataBytes = (bpv == 0) ? 0 : (BITPACK_BLOCK * bpv + 7) / 8;
+
+        uint8_t encoded[1 + BITPACK_BLOCK * 4];
+        encoded[0] = bpvByte;
+        if (dataBytes > 0) {
+            docIn_->readBytes(encoded + 1, dataBytes);
         }
 
-        // Read data bytes
-        docIn_->readBytes(docDeltaEncoded + 1, dataBytes);
-
-        // Decode 4 doc deltas using SIMD
-        util::StreamVByte::decode4(docDeltaEncoded, &docDeltaBuffer_[bufferIdx]);
+        util::BitPacking::decode(encoded, BITPACK_BLOCK, docDeltaBuffer_);
 
         // Unpack freq from low bit; read non-1 freqs as VInts
         if (writeFreqs_) {
-            for (int i = 0; i < STREAMVBYTE_GROUP_SIZE; i++) {
-                if (docDeltaBuffer_[bufferIdx + i] & 1) {
-                    freqBuffer_[bufferIdx + i] = 1;
+            for (int i = 0; i < BITPACK_BLOCK; i++) {
+                if (docDeltaBuffer_[i] & 1) {
+                    freqBuffer_[i] = 1;
                 } else {
-                    freqBuffer_[bufferIdx + i] = static_cast<uint32_t>(docIn_->readVInt());
+                    freqBuffer_[i] = static_cast<uint32_t>(docIn_->readVInt());
                 }
-                docDeltaBuffer_[bufferIdx + i] >>= 1;
+                docDeltaBuffer_[i] >>= 1;
             }
         }
-
-        bufferIdx += STREAMVBYTE_GROUP_SIZE;
-        remaining -= STREAMVBYTE_GROUP_SIZE;
-    }
-
-    // VInt tail for remaining docs (< 4, same low-bit encoding)
-    int spaceLeft = BUFFER_SIZE - bufferIdx;
-    int docsToRead = std::min(remaining, spaceLeft);
-
-    if (docsToRead > 0) {
-        for (int i = 0; i < docsToRead; ++i) {
+        bufferIdx = BITPACK_BLOCK;
+    } else if (remaining > 0) {
+        // VInt tail for remaining < 128 docs (same low-bit encoding)
+        for (int i = 0; i < remaining; ++i) {
             uint32_t raw = static_cast<uint32_t>(docIn_->readVInt());
             if (writeFreqs_) {
                 if (raw & 1) {
@@ -206,7 +195,7 @@ void Lucene104PostingsEnumBatch::refillBuffer() {
                 docDeltaBuffer_[bufferIdx + i] = raw;
             }
         }
-        bufferIdx += docsToRead;
+        bufferIdx += remaining;
     }
 
     bufferLimit_ = bufferIdx;

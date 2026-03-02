@@ -8,8 +8,11 @@
 
 #include <algorithm>
 #include <cstring>
-#include <iostream>
 #include <stdexcept>
+
+#ifdef HAVE_LZ4
+#include <lz4.h>
+#endif
 
 namespace diagon {
 namespace codecs {
@@ -61,14 +64,13 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
                 }
                 fst_ = std::make_unique<util::FST>();
 
-            } else if (magic == 0x54495032) {  // "TIP2" - new format with FST
+            } else if (magic == 0x54495032) {  // "TIP2" - old format with FST
                 int fstSize = tipIn_->readVInt();
                 std::vector<uint8_t> fstData(fstSize);
                 tipIn_->readBytes(fstData.data(), fstSize);
                 fst_ = util::FST::deserialize(fstData);
 
                 // Extract block metadata from FST for compatibility with iteration code
-                // Use const reference to avoid copying 12,804 entries (~256 KB)
                 const auto& fstEntries = fst_->getAllEntries();
                 blockIndex_.reserve(fstEntries.size());
                 for (const auto& [termBytes, blockFP] : fstEntries) {
@@ -76,13 +78,27 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
                                              blockFP);
                 }
 
+            } else if (magic == 0x54495033) {  // "TIP3" - compact block list (no FST trie)
+                int numBlocks = tipIn_->readVInt();
+                blockIndex_.reserve(numBlocks);
+
+                for (int i = 0; i < numBlocks; i++) {
+                    int termLen = tipIn_->readVInt();
+                    std::vector<uint8_t> termData(termLen);
+                    tipIn_->readBytes(termData.data(), termLen);
+                    int64_t blockFP = tipIn_->readVLong();
+                    blockIndex_.emplace_back(util::BytesRef(termData.data(), termLen), blockFP);
+                }
+                fst_ = std::make_unique<util::FST>();
+
             } else {
                 throw IOException("Invalid .tip magic: " + std::to_string(magic));
             }
             break;
         } else {
             // Skip field data
-            if (magic == 0x54495031) {
+            if (magic == 0x54495031 || magic == 0x54495033) {
+                // TIP1 and TIP3: flat block list
                 int numBlocks = tipIn_->readVInt();
                 for (int i = 0; i < numBlocks; i++) {
                     int termLen = tipIn_->readVInt();
@@ -103,8 +119,6 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
 
 void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
     block.blockFP = blockFP;
-
-    // Seek to block
     timIn_->seek(blockFP);
 
     // Read block header
@@ -126,47 +140,118 @@ void BlockTreeTermsReader::loadBlock(int64_t blockFP, TermBlock& block) {
     block.termOffsets_.clear();
     block.termLengths_.clear();
     block.stats.clear();
+    block.stats.resize(termCount);
 
-    // Read all terms into flat arena - zero per-term allocations
-    // Delta-decoded file pointers (reset per block)
-    int64_t lastPostingsFP = 0;
-    int64_t lastPosStartFP = 0;
-    int64_t lastSkipStartFP = 0;
+    // === Section 1: Suffix data (with optional LZ4 decompression) ===
+    int64_t suffixHeader = timIn_->readVLong();
+    int suffixRawSize = static_cast<int>(static_cast<uint64_t>(suffixHeader) >> 3);
+    bool lz4Compressed = (suffixHeader & 0x01) != 0;
 
-    for (int i = 0; i < termCount; i++) {
-        int suffixLen = timIn_->readVInt();
-        int termLen = prefixLen + suffixLen;
-
-        // Record offset before appending
-        uint32_t offset = static_cast<uint32_t>(block.arena_.size());
-        block.termOffsets_.push_back(offset);
-        block.termLengths_.push_back(static_cast<uint16_t>(termLen));
-
-        // Grow arena and write term bytes in-place
-        block.arena_.resize(block.arena_.size() + termLen);
-        uint8_t* dest = block.arena_.data() + offset;
-
-        // Copy prefix
-        if (prefixLen > 0) {
-            std::memcpy(dest, block.prefixData.data(), prefixLen);
+    std::vector<uint8_t> suffixData(suffixRawSize);
+    if (lz4Compressed) {
+        int compressedSize = timIn_->readVInt();
+        std::vector<uint8_t> compBuf(compressedSize);
+        timIn_->readBytes(compBuf.data(), compressedSize);
+#ifdef HAVE_LZ4
+        int result = LZ4_decompress_safe(
+            reinterpret_cast<const char*>(compBuf.data()),
+            reinterpret_cast<char*>(suffixData.data()),
+            compressedSize, suffixRawSize);
+        if (result != suffixRawSize) {
+            throw IOException("LZ4 decompression failed in .tim block");
         }
+#else
+        throw IOException("LZ4 compressed .tim block but LZ4 not available");
+#endif
+    } else {
+        timIn_->readBytes(suffixData.data(), suffixRawSize);
+    }
 
-        // Read suffix directly into arena
-        if (suffixLen > 0) {
-            timIn_->readBytes(dest + prefixLen, suffixLen);
+    // Parse suffix data: [VInt(suffixLen) + suffix bytes] per term
+    {
+        int cursor = 0;
+        for (int i = 0; i < termCount; i++) {
+            // Decode VInt suffixLen from buffer
+            int suffixLen = 0;
+            {
+                uint8_t b = suffixData[cursor++];
+                suffixLen = b & 0x7F;
+                for (int shift = 7; (b & 0x80) != 0; shift += 7) {
+                    b = suffixData[cursor++];
+                    suffixLen |= (static_cast<int>(b & 0x7F)) << shift;
+                }
+            }
+            int termLen = prefixLen + suffixLen;
+
+            uint32_t offset = static_cast<uint32_t>(block.arena_.size());
+            block.termOffsets_.push_back(offset);
+            block.termLengths_.push_back(static_cast<uint16_t>(termLen));
+
+            block.arena_.resize(block.arena_.size() + termLen);
+            uint8_t* dest = block.arena_.data() + offset;
+
+            if (prefixLen > 0) {
+                std::memcpy(dest, block.prefixData.data(), prefixLen);
+            }
+            if (suffixLen > 0) {
+                std::memcpy(dest + prefixLen, &suffixData[cursor], suffixLen);
+                cursor += suffixLen;
+            }
         }
+    }
 
-        // Read stats (delta-decoded FPs, matching writer order)
-        BlockTreeTermsWriter::TermStats stats;
-        stats.docFreq = timIn_->readVInt();
-        stats.totalTermFreq = timIn_->readVLong();
-        stats.postingsFP = lastPostingsFP + timIn_->readVLong();
-        stats.posStartFP = lastPosStartFP + timIn_->readVLong();
-        stats.skipStartFP = lastSkipStartFP + timIn_->readVLong();
-        lastPostingsFP = stats.postingsFP;
-        lastPosStartFP = stats.posStartFP;
-        lastSkipStartFP = stats.skipStartFP;
-        block.stats.push_back(stats);
+    // === Section 2: Stats (column-stride with singleton RLE) ===
+    {
+        int statsSize = timIn_->readVInt();
+        int64_t statsEnd = timIn_->getFilePointer() + statsSize;
+
+        int termIdx = 0;
+        while (termIdx < termCount) {
+            int32_t val = timIn_->readVInt();
+            if (val & 1) {
+                // Singleton run: docFreq=1, totalTermFreq=1
+                int runCount = (val >> 1) + 1;
+                for (int j = 0; j < runCount && termIdx < termCount; j++) {
+                    block.stats[termIdx].docFreq = 1;
+                    block.stats[termIdx].totalTermFreq = 1;
+                    termIdx++;
+                }
+            } else {
+                block.stats[termIdx].docFreq = val >> 1;
+                int64_t delta = timIn_->readVLong();
+                block.stats[termIdx].totalTermFreq = block.stats[termIdx].docFreq + delta;
+                termIdx++;
+            }
+        }
+        // Seek to end of stats section for forward compatibility
+        timIn_->seek(statsEnd);
+    }
+
+    // === Section 3: Metadata (column-stride file pointer deltas) ===
+    {
+        int metaSize = timIn_->readVInt();
+        int64_t metaEnd = timIn_->getFilePointer() + metaSize;
+
+        // All postingsFP deltas
+        int64_t lastFP = 0;
+        for (int i = 0; i < termCount; i++) {
+            block.stats[i].postingsFP = lastFP + timIn_->readVLong();
+            lastFP = block.stats[i].postingsFP;
+        }
+        // All posStartFP deltas
+        lastFP = 0;
+        for (int i = 0; i < termCount; i++) {
+            block.stats[i].posStartFP = lastFP + timIn_->readVLong();
+            lastFP = block.stats[i].posStartFP;
+        }
+        // All skipStartFP deltas
+        lastFP = 0;
+        for (int i = 0; i < termCount; i++) {
+            block.stats[i].skipStartFP = lastFP + timIn_->readVLong();
+            lastFP = block.stats[i].skipStartFP;
+        }
+        // Seek to end of metadata section for forward compatibility
+        timIn_->seek(metaEnd);
     }
 
     // Build BytesRef pointers into arena (single pass, no allocation)

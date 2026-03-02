@@ -65,8 +65,10 @@ private:
      */
     struct FieldMetadata {
         int fieldNumber;
-        int64_t offset;  // Offset in .nvd file
-        int count;       // Number of documents
+        int64_t offset;   // Offset in .nvd file
+        int count;         // Number of documents
+        uint8_t encoding;  // 0=dense, 1=sparse (version 2+)
+        int8_t defaultNorm; // Default norm value (version 2+, sparse)
     };
 
     /**
@@ -149,6 +151,7 @@ private:
     [[maybe_unused]] index::SegmentReadState& state_;
     std::unique_ptr<store::IndexInput> data_;  // .nvd file
     std::unique_ptr<store::IndexInput> meta_;  // .nvm file
+    int metaVersion_{1};                        // Metadata format version
     bool closed_{false};
 
     // Field metadata map (fieldNumber → metadata)

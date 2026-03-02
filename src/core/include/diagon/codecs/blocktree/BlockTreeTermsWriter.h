@@ -7,8 +7,8 @@
 #include "diagon/index/FieldInfo.h"
 #include "diagon/store/IndexOutput.h"
 #include "diagon/util/BytesRef.h"
-#include "diagon/util/FST.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -28,13 +28,16 @@ namespace blocktree {
  * - Simple FST for term → block mapping
  * - No floor blocks (will add later)
  *
- * File format:
- * - .tim: Term blocks with shared prefix compression and delta-encoded FPs
- *   - Per block: [prefixLen][prefix bytes][termCount]
- *   - Per term: [suffixLen][suffix][docFreq][totalTermFreq][postingsFP delta][posStartFP delta][skipStartFP delta]
- *   - FP deltas are relative to previous term within the block (reset per block)
- * - .tip: FST index mapping prefixes to block file pointers
- * - .tmd: Field metadata (optional for MVP)
+ * File format (.tim):
+ *   Per block: [prefixLen][prefix bytes][termCount]
+ *   Section 1 - Suffixes: VLong((rawSize << 3) | flags) [+ VInt(compSize) if LZ4]
+ *     Contains: [VInt(suffixLen) + suffix bytes] per term, optionally LZ4 compressed
+ *   Section 2 - Stats:   VInt(statsSize) + singleton RLE encoded docFreq/totalTermFreq
+ *     Singleton run: VInt(((count-1) << 1) | 1)
+ *     Non-singleton: VInt((docFreq << 1) | 0) + VLong(totalTermFreq - docFreq)
+ *   Section 3 - Metadata: VInt(metaSize) + column-stride delta-encoded file pointers
+ *     [all postingsFP deltas][all posStartFP deltas][all skipStartFP deltas]
+ * - .tip: Compact block list mapping first terms to block file pointers
  */
 class BlockTreeTermsWriter {
 public:
@@ -167,10 +170,21 @@ private:
     int64_t sumDocFreq_;        // Sum of all document frequencies in field
     int docCount_;              // Number of documents with this field
 
-    util::FST::Builder fstBuilder_;
+    /** Compact block index: (firstTerm, blockFP) per block.
+     *  Replaces FST::Builder — we write a flat block list to .tip
+     *  instead of the full packed FST trie (~200 KB savings for Reuters). */
+    struct BlockEntry {
+        std::vector<uint8_t> termData;
+        int64_t blockFP;
+
+        BlockEntry(const uint8_t* data, size_t len, int64_t fp)
+            : termData(data, data + len)
+            , blockFP(fp) {}
+    };
+    std::vector<BlockEntry> blockEntries_;
 
     void writeBlock();
-    void writeFST();
+    void writeBlockIndex();
     int sharedPrefixLength(const util::BytesRef& a, const util::BytesRef& b) const;
 };
 

@@ -4,8 +4,8 @@
 #include "diagon/codecs/lucene104/Lucene104PostingsWriter.h"
 
 #include "diagon/store/ByteBuffersIndexOutput.h"
+#include "diagon/util/BitPacking.h"
 #include "diagon/util/Exceptions.h"
-#include "diagon/util/StreamVByte.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -39,6 +39,8 @@ Lucene104PostingsWriter::Lucene104PostingsWriter(index::SegmentWriteState& state
     , docDeltaBuffer_{}  // Zero-initialize
     , freqBuffer_{}      // Zero-initialize
     , bufferPos_(0)
+    , posDeltaBuffer_{}  // Zero-initialize
+    , posBufferPos_(0)
     , blockMaxFreq_(0)
     , blockMaxNorm_(0)
     , docsSinceLastSkip_(0)
@@ -97,7 +99,8 @@ void Lucene104PostingsWriter::startTerm() {
     lastDocID_ = 0;
     docCount_ = 0;
     totalTermFreq_ = 0;
-    bufferPos_ = 0;  // Reset StreamVByte buffer
+    bufferPos_ = 0;   // Reset doc buffer
+    posBufferPos_ = 0;  // Reset position buffer
 
     // Record position file pointer for this term
     posStartFP_ = writePositions_ ? posOut_->getFilePointer() : -1;
@@ -168,16 +171,21 @@ void Lucene104PostingsWriter::addPosition(int position) {
 
     // Delta-encode positions within a document
     int posDelta = position - lastPosition_;
-    posOut_->writeVInt(posDelta);
+    posDeltaBuffer_[posBufferPos_++] = static_cast<uint32_t>(posDelta);
     lastPosition_ = position;
+
+    // Flush when position buffer is full (128 positions)
+    if (posBufferPos_ >= BUFFER_SIZE) {
+        flushPositionBuffer();
+    }
 }
 
 TermState Lucene104PostingsWriter::finishTerm() {
-    // Flush any remaining buffered data (VInt tail for < 4 docs)
+    // Flush any remaining buffered doc data (VInt tail for < 128 docs)
     if (bufferPos_ > 0) {
         for (int i = 0; i < bufferPos_; ++i) {
             if (writeFreqs_) {
-                // Pack freq=1 into low bit of doc delta (same encoding as StreamVByte blocks)
+                // Pack freq=1 into low bit of doc delta (same encoding as BitPack blocks)
                 if (freqBuffer_[i] == 1) {
                     docOut_->writeVInt(static_cast<int32_t>((docDeltaBuffer_[i] << 1) | 1));
                 } else {
@@ -189,6 +197,14 @@ TermState Lucene104PostingsWriter::finishTerm() {
             }
         }
         bufferPos_ = 0;
+    }
+
+    // Flush any remaining buffered position data (VInt tail for < 128 positions)
+    if (posBufferPos_ > 0) {
+        for (int i = 0; i < posBufferPos_; ++i) {
+            posOut_->writeVInt(static_cast<int32_t>(posDeltaBuffer_[i]));
+        }
+        posBufferPos_ = 0;
     }
 
     // Flush final skip entry if there are remaining docs
@@ -219,7 +235,7 @@ TermState Lucene104PostingsWriter::finishTerm() {
 
 void Lucene104PostingsWriter::flushBuffer() {
     if (bufferPos_ != BUFFER_SIZE) {
-        return;  // Only flush when buffer is full (4 docs)
+        return;  // Only flush when buffer is full (128 docs)
     }
 
     // Pack freq=1 into low bit of doc delta (Lucene-compatible encoding).
@@ -236,10 +252,10 @@ void Lucene104PostingsWriter::flushBuffer() {
         }
     }
 
-    // Encode doc deltas using StreamVByte (now includes freq=1 info in low bit)
-    uint8_t docDeltaEncoded[17];  // Max: 1 control + 4*4 data bytes
-    int docDeltaBytes = util::StreamVByte::encode(docDeltaBuffer_, BUFFER_SIZE, docDeltaEncoded);
-    docOut_->writeBytes(docDeltaEncoded, docDeltaBytes);
+    // Encode 128 doc deltas using BitPacking (includes freq=1 info in low bit)
+    uint8_t encoded[util::BitPacking::maxBytesPerBlock(BUFFER_SIZE)];
+    int encodedBytes = util::BitPacking::encode(docDeltaBuffer_, BUFFER_SIZE, encoded);
+    docOut_->writeBytes(encoded, encodedBytes);
 
     // Write only non-1 frequencies as VInts (freq=1 is already encoded in doc delta low bit)
     if (writeFreqs_) {
@@ -251,6 +267,19 @@ void Lucene104PostingsWriter::flushBuffer() {
     }
 
     bufferPos_ = 0;  // Reset buffer
+}
+
+void Lucene104PostingsWriter::flushPositionBuffer() {
+    if (posBufferPos_ != BUFFER_SIZE) {
+        return;  // Only flush when buffer is full (128 positions)
+    }
+
+    // Encode 128 position deltas using BitPacking
+    uint8_t encoded[util::BitPacking::maxBytesPerBlock(BUFFER_SIZE)];
+    int encodedBytes = util::BitPacking::encode(posDeltaBuffer_, BUFFER_SIZE, encoded);
+    posOut_->writeBytes(encoded, encodedBytes);
+
+    posBufferPos_ = 0;  // Reset buffer
 }
 
 void Lucene104PostingsWriter::maybeFlushSkipEntry() {

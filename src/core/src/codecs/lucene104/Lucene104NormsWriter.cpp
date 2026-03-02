@@ -66,7 +66,7 @@ Lucene104NormsWriter::Lucene104NormsWriter(index::SegmentWriteState& state)
 
     // Write metadata header
     meta_->writeString("NORMS_META");
-    meta_->writeInt(1);  // Version
+    meta_->writeInt(2);  // Version 2: sparse norms encoding
 }
 
 Lucene104NormsWriter::~Lucene104NormsWriter() {
@@ -115,16 +115,64 @@ void Lucene104NormsWriter::addNormsField(const index::FieldInfo& field,
     writeNormsData(field, norms);
 }
 
+int8_t Lucene104NormsWriter::findDefaultNorm(const std::vector<int8_t>& norms) {
+    // Count occurrences of each norm value to find the most common
+    int counts[256] = {};
+    for (int8_t norm : norms) {
+        counts[static_cast<uint8_t>(norm)]++;
+    }
+
+    int bestCount = 0;
+    uint8_t bestValue = 0;
+    for (int i = 0; i < 256; i++) {
+        if (counts[i] > bestCount) {
+            bestCount = counts[i];
+            bestValue = static_cast<uint8_t>(i);
+        }
+    }
+    return static_cast<int8_t>(bestValue);
+}
+
 void Lucene104NormsWriter::writeNormsData(const index::FieldInfo& field,
                                           const std::vector<int8_t>& norms) {
-    // Write metadata: field number, offset, length
+    // Find the most common norm value (default)
+    int8_t defaultNorm = findDefaultNorm(norms);
+
+    // Count sparse entries (non-default values)
+    int numSparse = 0;
+    for (int8_t norm : norms) {
+        if (norm != defaultNorm) {
+            numSparse++;
+        }
+    }
+
+    // Decide encoding: sparse only if it saves space
+    // Dense: numDocs bytes
+    // Sparse: 1 (default) + VInt(numSparse) + numSparse * (VInt(docID) + 1 byte)
+    // For Reuters: ~19K docs, if 80% share default → sparse = 1 + 2 + 3800*4 ≈ 15.2K vs dense 19K
+    bool useSparse = (numSparse < static_cast<int>(norms.size()) / 2);
+
+    // Write metadata: field number, offset, count, encoding, defaultNorm
     meta_->writeInt(field.number);
     meta_->writeLong(data_->getFilePointer());
     meta_->writeInt(static_cast<int>(norms.size()));
+    meta_->writeByte(useSparse ? 1 : 0);  // encoding: 0=dense, 1=sparse
+    meta_->writeByte(static_cast<uint8_t>(defaultNorm));
 
-    // Write norms data (simple byte array)
-    for (int8_t norm : norms) {
-        data_->writeByte(static_cast<uint8_t>(norm));
+    if (useSparse) {
+        // Sparse format: VInt(numSparseEntries) + [VInt(docID) + byte(norm)] per entry
+        data_->writeVInt(numSparse);
+        for (int doc = 0; doc < static_cast<int>(norms.size()); doc++) {
+            if (norms[doc] != defaultNorm) {
+                data_->writeVInt(doc);
+                data_->writeByte(static_cast<uint8_t>(norms[doc]));
+            }
+        }
+    } else {
+        // Dense format: simple byte array (same as version 1)
+        for (int8_t norm : norms) {
+            data_->writeByte(static_cast<uint8_t>(norm));
+        }
     }
 }
 

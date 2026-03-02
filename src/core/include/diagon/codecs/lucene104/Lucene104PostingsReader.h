@@ -24,9 +24,9 @@ namespace lucene104 {
  *
  * File format (.doc file):
  * - For each term (starting at TermState.docStartFP):
- *   - StreamVByte groups of 4 docs: docDelta with freq=1 in low bit
- *     - low bit 1 = freq is 1, low bit 0 = freq follows as VInt
- *   - VInt tail (< 4 docs): same low-bit encoding
+ *   - BitPack blocks of 128 docs: [bitsPerValue byte] [packed doc deltas with freq in low bit]
+ *     - low bit 1 = freq is 1, low bit 0 = freq follows as VInt after block
+ *   - VInt tail (< 128 docs): same low-bit encoding
  */
 class Lucene104PostingsReader {
 public:
@@ -267,16 +267,15 @@ private:
     int currentSkipIndex_;  // Current position in skip list
     int shallowTarget_;     // Last target passed to advanceShallow()
 
-    // StreamVByte buffering
-    static constexpr int BUFFER_SIZE = 32;
-    static constexpr int STREAMVBYTE_GROUP_SIZE = 4;
+    // BitPack128 buffering
+    static constexpr int BUFFER_SIZE = 128;
     uint32_t docDeltaBuffer_[BUFFER_SIZE];
     uint32_t freqBuffer_[BUFFER_SIZE];
     int bufferPos_;
     int bufferLimit_;
 
     /**
-     * Refill buffer by reading multiple StreamVByte groups (up to 32 docs).
+     * Refill buffer by reading one BitPack128 block or VInt tail.
      */
     void refillBuffer();
 
@@ -290,9 +289,8 @@ private:
 /**
  * PostingsEnum implementation for Lucene104 format.
  *
- * Phase 2a Update: Reads StreamVByte-encoded doc deltas and frequencies for 2-3× speedup.
- * Optimized buffering: Buffers up to 32 docs (8 StreamVByte groups) to amortize decode overhead.
- * Serves docs one by one with minimal per-doc cost.
+ * Reads BitPack128-encoded doc deltas and frequencies.
+ * Buffers 128 docs per refill for efficient iteration.
  */
 class Lucene104PostingsEnum : public index::PostingsEnum {
 public:
@@ -330,19 +328,15 @@ private:
     int currentFreq_;
     int docsRead_;
 
-    // StreamVByte buffering (Phase 2a optimized)
-    // Buffer 32 docs (8 StreamVByte groups of 4) to amortize refill overhead
-    static constexpr int BUFFER_SIZE = 32;
-    static constexpr int STREAMVBYTE_GROUP_SIZE = 4;
+    // BitPack128 buffering
+    static constexpr int BUFFER_SIZE = 128;
     uint32_t docDeltaBuffer_[BUFFER_SIZE];
     uint32_t freqBuffer_[BUFFER_SIZE];
     int bufferPos_;
     int bufferLimit_;
 
     /**
-     * Refill buffer by reading multiple StreamVByte groups (up to 32 docs).
-     * Decodes groups of 4 docs each, filling up to BUFFER_SIZE.
-     * Falls back to VInt for remaining docs (< 4).
+     * Refill buffer by reading one BitPack128 block or VInt tail.
      */
     void refillBuffer();
 };
@@ -350,7 +344,7 @@ private:
 /**
  * PostingsEnum with position support for phrase queries.
  *
- * Reads doc/freq from .doc file (StreamVByte) and positions from .pos file (VInt delta).
+ * Reads doc/freq from .doc file (BitPack128) and positions from .pos file (BitPack128).
  * Supports nextPosition() for phrase matching.
  */
 class Lucene104PostingsEnumWithPositions : public index::PostingsEnum {
@@ -398,15 +392,22 @@ private:
     int positionsRemaining_;  // freq - positions consumed for current doc
     int lastPosition_;        // For delta decoding within a doc
 
-    // StreamVByte buffering for docs
-    static constexpr int BUFFER_SIZE = 32;
-    static constexpr int STREAMVBYTE_GROUP_SIZE = 4;
+    // BitPack128 buffering for docs
+    static constexpr int BUFFER_SIZE = 128;
     uint32_t docDeltaBuffer_[BUFFER_SIZE];
     uint32_t freqBuffer_[BUFFER_SIZE];
     int bufferPos_;
     int bufferLimit_;
 
+    // BitPack128 buffering for positions
+    uint32_t posBuffer_[BUFFER_SIZE];
+    int posBufPos_;
+    int posBufLimit_;
+    int64_t totalPosRead_;   // Total positions read so far
+    int64_t totalPosCount_;  // Total positions for this term (= totalTermFreq)
+
     void refillBuffer();
+    void refillPosBuffer();
 
     /**
      * Skip any unread positions from the previous document.

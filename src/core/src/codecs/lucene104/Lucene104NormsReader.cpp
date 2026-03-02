@@ -98,13 +98,27 @@ std::vector<int8_t> Lucene104NormsReader::loadNorms(const index::FieldInfo& fiel
     // Seek to field offset in data file
     data_->seek(metadata.offset);
 
-    // Read norms bytes
     std::vector<int8_t> norms;
-    norms.reserve(metadata.count);
 
-    for (int i = 0; i < metadata.count; i++) {
-        uint8_t byte = data_->readByte();
-        norms.push_back(static_cast<int8_t>(byte));
+    if (metadata.encoding == 1) {
+        // Sparse format: fill with default, then overwrite sparse entries
+        norms.resize(metadata.count, metadata.defaultNorm);
+
+        int numSparse = data_->readVInt();
+        for (int i = 0; i < numSparse; i++) {
+            int docID = data_->readVInt();
+            int8_t normValue = static_cast<int8_t>(data_->readByte());
+            if (docID >= 0 && docID < metadata.count) {
+                norms[docID] = normValue;
+            }
+        }
+    } else {
+        // Dense format: simple byte array
+        norms.reserve(metadata.count);
+        for (int i = 0; i < metadata.count; i++) {
+            uint8_t byte = data_->readByte();
+            norms.push_back(static_cast<int8_t>(byte));
+        }
     }
 
     return norms;
@@ -121,9 +135,9 @@ void Lucene104NormsReader::readMetadata() {
         throw IOException("Invalid norms metadata header: " + header);
     }
 
-    int version = meta_->readInt();
-    if (version != 1) {
-        throw IOException("Unsupported norms format version: " + std::to_string(version));
+    metaVersion_ = meta_->readInt();
+    if (metaVersion_ != 1 && metaVersion_ != 2) {
+        throw IOException("Unsupported norms format version: " + std::to_string(metaVersion_));
     }
 
     // Read field metadata entries
@@ -132,6 +146,16 @@ void Lucene104NormsReader::readMetadata() {
         metadata.fieldNumber = meta_->readInt();
         metadata.offset = meta_->readLong();
         metadata.count = meta_->readInt();
+
+        if (metaVersion_ >= 2) {
+            // Version 2: sparse encoding support
+            metadata.encoding = meta_->readByte();
+            metadata.defaultNorm = static_cast<int8_t>(meta_->readByte());
+        } else {
+            // Version 1: always dense
+            metadata.encoding = 0;
+            metadata.defaultNorm = 0;
+        }
 
         fieldMetadata_[metadata.fieldNumber] = metadata;
     }

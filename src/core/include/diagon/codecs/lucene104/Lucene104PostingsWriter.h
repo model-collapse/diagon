@@ -70,11 +70,10 @@ struct TermState {
  * File format:
  * - .doc file: Doc deltas with freq=1 packed in low bit
  *   - For each term:
- *     - for each group of 4 docs:
- *       - controlByte: uint8 (2 bits per integer length)
- *       - docDeltas: 4-16 bytes (delta-encoded, low bit = freq==1 flag)
- *       - non-1 freqs: 0-4 VInts (only for entries where low bit was 0)
- *     - remaining docs (< 4): VInt fallback (same low-bit encoding)
+ *     - for each block of 128 docs:
+ *       - BitPack block: [1 byte bitsPerValue] [packed doc deltas with freq in low bit]
+ *       - non-1 freqs: 0-128 VInts (only for entries where low bit was 0)
+ *     - remaining docs (< 128): VInt fallback (same low-bit encoding)
  *
  * - .skp file (optional): Skip entries with impacts for Block-Max WAND
  *   - For each term (if docFreq >= 128):
@@ -205,11 +204,15 @@ private:
     int64_t posStartFP_;  // File pointer at start of positions for current term
     int lastPosition_;    // Last position written (for delta encoding within a doc)
 
-    // StreamVByte buffering
-    static constexpr int BUFFER_SIZE = 4;  // StreamVByte processes 4 integers at a time
+    // BitPack128 buffering (128-doc blocks for bit-packed encoding)
+    static constexpr int BUFFER_SIZE = 128;
     uint32_t docDeltaBuffer_[BUFFER_SIZE];
     uint32_t freqBuffer_[BUFFER_SIZE];
     int bufferPos_;
+
+    // Position delta buffering (128-pos blocks for bit-packed encoding)
+    uint32_t posDeltaBuffer_[BUFFER_SIZE];
+    int posBufferPos_;
 
     // Block-Max WAND support
     // Skip entry every 128 docs — matches Lucene's standard interval
@@ -227,10 +230,16 @@ private:
     int32_t lastSkipDoc_;  // Doc ID of last skip entry (for delta encoding)
 
     /**
-     * Flush buffered doc deltas and frequencies using StreamVByte encoding.
-     * Called when buffer fills or at end of term.
+     * Flush buffered doc deltas and frequencies using BitPack128 encoding.
+     * Called when buffer fills (128 docs accumulated).
      */
     void flushBuffer();
+
+    /**
+     * Flush buffered position deltas using BitPack128 encoding.
+     * Called when position buffer fills (128 positions accumulated).
+     */
+    void flushPositionBuffer();
 
     /**
      * Check if we need to create a skip entry and do so if needed.

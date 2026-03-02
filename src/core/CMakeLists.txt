@@ -14,6 +14,7 @@ set(DIAGON_CORE_SOURCES
     src/util/ByteBlockPool.cpp
     src/util/IntBlockPool.cpp
     src/util/StreamVByte.cpp
+    src/util/BitPacking.cpp
     src/util/BloomFilter.cpp
     src/util/CityHash.cpp
     src/util/SearchProfiler.cpp
@@ -135,6 +136,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/util/Exceptions.h
     include/diagon/util/VByte.h
     include/diagon/util/StreamVByte.h
+    include/diagon/util/BitPacking.h
     include/diagon/util/SIMDUtils.h
     include/diagon/util/FST.h
     include/diagon/util/ByteBlockPool.h

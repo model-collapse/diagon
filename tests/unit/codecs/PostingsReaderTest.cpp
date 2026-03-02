@@ -7,7 +7,7 @@
 #include "diagon/index/SegmentWriteState.h"
 #include "diagon/store/ByteBuffersIndexInput.h"
 #include "diagon/store/ByteBuffersIndexOutput.h"
-#include "diagon/util/StreamVByte.h"
+#include "diagon/util/BitPacking.h"
 
 #include <gtest/gtest.h>
 
@@ -41,22 +41,21 @@ FieldInfo createField(const std::string& name, IndexOptions options) {
     return field;
 }
 
-// Helper: Write posting list in StreamVByte format with freq-in-docDelta encoding.
+// Helper: Write posting list using BitPack128 format with freq-in-docDelta encoding.
 // For freq==1: docDelta = (docDelta << 1) | 1 (no separate freq needed)
 // For freq>1:  docDelta = (docDelta << 1) | 0 (freq written as VInt after block)
-// Uses StreamVByte for groups of 4, VInt for remainder.
-void writePostingsStreamVByte(ByteBuffersIndexOutput& out, const std::vector<int>& docDeltas,
-                              const std::vector<int>& freqs, bool writeFreqs) {
+// Uses BitPack128 for groups of 128, VInt for remainder.
+void writePostingsBitPack(ByteBuffersIndexOutput& out, const std::vector<int>& docDeltas,
+                          const std::vector<int>& freqs, bool writeFreqs) {
     size_t numDocs = docDeltas.size();
     size_t pos = 0;
 
-    // Write full groups of 4 using StreamVByte
-    while (pos + 4 <= numDocs) {
-        uint32_t docGroup[4];
+    // Write full blocks of 128 using BitPacking
+    while (pos + 128 <= numDocs) {
+        uint32_t docGroup[128];
 
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < 128; ++i) {
             if (writeFreqs) {
-                // Pack freq=1 into low bit of doc delta
                 if (freqs[pos + i] == 1) {
                     docGroup[i] = (static_cast<uint32_t>(docDeltas[pos + i]) << 1) | 1;
                 } else {
@@ -67,24 +66,24 @@ void writePostingsStreamVByte(ByteBuffersIndexOutput& out, const std::vector<int
             }
         }
 
-        // Encode and write (modified) doc deltas
-        uint8_t docEncoded[17];
-        int docBytes = StreamVByte::encode(docGroup, 4, docEncoded);
-        out.writeBytes(docEncoded, docBytes);
+        // Encode and write BitPack block
+        uint8_t encoded[BitPacking::maxBytesPerBlock(128)];
+        int encodedBytes = BitPacking::encode(docGroup, 128, encoded);
+        out.writeBytes(encoded, encodedBytes);
 
         // Write only non-1 frequencies as VInts after the block
         if (writeFreqs) {
-            for (int i = 0; i < 4; ++i) {
+            for (int i = 0; i < 128; ++i) {
                 if (freqs[pos + i] != 1) {
                     out.writeVInt(freqs[pos + i]);
                 }
             }
         }
 
-        pos += 4;
+        pos += 128;
     }
 
-    // Write remaining docs (< 4) using VInt with freq-in-docDelta packing
+    // Write remaining docs (< 128) using VInt with freq-in-docDelta packing
     while (pos < numDocs) {
         if (writeFreqs) {
             if (freqs[pos] == 1) {
@@ -103,7 +102,7 @@ void writePostingsStreamVByte(ByteBuffersIndexOutput& out, const std::vector<int
 // ==================== Round-Trip Tests ====================
 
 TEST(PostingsReaderTest, RoundTripMultipleDocs) {
-    // Create buffer with 3 docs (< 4, so VInt fallback)
+    // Create buffer with 3 docs (< 128, so VInt fallback)
     ByteBuffersIndexOutput out("test.doc");
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
 
@@ -111,7 +110,7 @@ TEST(PostingsReaderTest, RoundTripMultipleDocs) {
     // Freqs: 1, 3, 2
     std::vector<int> docDeltas = {0, 5, 5};
     std::vector<int> freqs = {1, 3, 2};
-    writePostingsStreamVByte(out, docDeltas, freqs, true);
+    writePostingsBitPack(out, docDeltas, freqs, true);
 
     // Create reader with this buffer
     auto readState = createReadState();
@@ -146,30 +145,28 @@ TEST(PostingsReaderTest, RoundTripMultipleDocs) {
 }
 
 TEST(PostingsReaderTest, DocsOnlyMode) {
-    // Create buffer with docs only (no freqs) - 3 docs (< 4, so VInt fallback)
+    // Create buffer with docs only (no freqs) - 3 docs (< 128, so VInt fallback)
     ByteBuffersIndexOutput out("test.doc");
     auto field = createField("id", IndexOptions::DOCS);
 
     // Doc deltas: 0, 5, 5 (for docs 0, 5, 10)
-    // No freqs for DOCS_ONLY mode
     std::vector<int> docDeltas = {0, 5, 5};
-    std::vector<int> freqs = {1, 1, 1};                      // Dummy values, won't be written
-    writePostingsStreamVByte(out, docDeltas, freqs, false);  // writeFreqs=false
+    std::vector<int> freqs = {1, 1, 1};
+    writePostingsBitPack(out, docDeltas, freqs, false);
 
     // Create reader
     auto readState = createReadState();
     Lucene104PostingsReader reader(readState);
     reader.setInput(std::make_unique<ByteBuffersIndexInput>("test.doc", out.toArrayCopy()));
 
-    // Read postings (DOCS_ONLY - no frequencies)
+    // Read postings (DOCS_ONLY)
     TermState state;
     state.docStartFP = 0;
     state.docFreq = 3;
-    state.totalTermFreq = -1;  // Not tracked for DOCS_ONLY
+    state.totalTermFreq = -1;
 
     auto postings = reader.postings(field, state);
 
-    // Verify docs (freq should default to 1)
     EXPECT_EQ(0, postings->nextDoc());
     EXPECT_EQ(1, postings->freq());
 
@@ -183,7 +180,6 @@ TEST(PostingsReaderTest, DocsOnlyMode) {
 }
 
 TEST(PostingsReaderTest, EmptyPostings) {
-    // Create empty buffer
     ByteBuffersIndexOutput out("test.doc");
 
     auto readState = createReadState();
@@ -193,25 +189,22 @@ TEST(PostingsReaderTest, EmptyPostings) {
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
     TermState state;
     state.docStartFP = 0;
-    state.docFreq = 0;  // No docs
+    state.docFreq = 0;
     state.totalTermFreq = 0;
 
     auto postings = reader.postings(field, state);
 
-    // Should immediately return NO_MORE_DOCS
     EXPECT_EQ(DocIdSetIterator::NO_MORE_DOCS, postings->nextDoc());
 }
 
 TEST(PostingsReaderTest, LargeDocIDs) {
-    // Create buffer with large doc IDs - 3 docs (< 4, so VInt fallback)
+    // 3 docs with large deltas (< 128, so VInt fallback)
     ByteBuffersIndexOutput out("test.doc");
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
 
-    // Doc deltas: 1000000, 1000000, 1000000 (for docs 1000000, 2000000, 3000000)
-    // Freqs: 1, 2, 3
     std::vector<int> docDeltas = {1000000, 1000000, 1000000};
     std::vector<int> freqs = {1, 2, 3};
-    writePostingsStreamVByte(out, docDeltas, freqs, true);
+    writePostingsBitPack(out, docDeltas, freqs, true);
 
     auto readState = createReadState();
     Lucene104PostingsReader reader(readState);
@@ -235,7 +228,7 @@ TEST(PostingsReaderTest, LargeDocIDs) {
 }
 
 TEST(PostingsReaderTest, ManyDocs) {
-    // Create buffer with many docs - 1000 docs (250 StreamVByte groups of 4)
+    // 1000 docs (7 full BitPack128 blocks + VInt tail of 104)
     ByteBuffersIndexOutput out("test.doc");
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
 
@@ -245,14 +238,14 @@ TEST(PostingsReaderTest, ManyDocs) {
 
     for (int i = 0; i < docCount; i++) {
         if (i == 0) {
-            docDeltas.push_back(0);  // first doc absolute
+            docDeltas.push_back(0);
         } else {
-            docDeltas.push_back(1);  // delta = 1
+            docDeltas.push_back(1);
         }
-        freqs.push_back((i % 10) + 1);  // freq varies
+        freqs.push_back((i % 10) + 1);
     }
 
-    writePostingsStreamVByte(out, docDeltas, freqs, true);
+    writePostingsBitPack(out, docDeltas, freqs, true);
 
     auto readState = createReadState();
     Lucene104PostingsReader reader(readState);
@@ -261,7 +254,7 @@ TEST(PostingsReaderTest, ManyDocs) {
     TermState state;
     state.docStartFP = 0;
     state.docFreq = docCount;
-    state.totalTermFreq = 5500;  // sum of freqs
+    state.totalTermFreq = 5500;
 
     auto postings = reader.postings(field, state);
 
@@ -278,15 +271,13 @@ TEST(PostingsReaderTest, ManyDocs) {
 // ==================== Advance Tests ====================
 
 TEST(PostingsReaderTest, AdvanceBasic) {
-    // Create buffer with 5 docs (1 StreamVByte group of 4 + 1 VInt)
+    // 5 docs (< 128, so VInt tail)
     ByteBuffersIndexOutput out("test.doc");
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
 
-    // Docs: 0, 5, 10, 20, 30 with freqs: 1, 2, 3, 4, 5
-    // Doc deltas: 0, 5, 5, 10, 10
     std::vector<int> docDeltas = {0, 5, 5, 10, 10};
     std::vector<int> freqs = {1, 2, 3, 4, 5};
-    writePostingsStreamVByte(out, docDeltas, freqs, true);
+    writePostingsBitPack(out, docDeltas, freqs, true);
 
     auto readState = createReadState();
     Lucene104PostingsReader reader(readState);
@@ -299,30 +290,24 @@ TEST(PostingsReaderTest, AdvanceBasic) {
 
     auto postings = reader.postings(field, state);
 
-    // Advance to doc >= 10
     EXPECT_EQ(10, postings->advance(10));
     EXPECT_EQ(10, postings->docID());
     EXPECT_EQ(3, postings->freq());
 
-    // Continue iteration (should get doc 20 with freq 4)
     EXPECT_EQ(20, postings->nextDoc());
     EXPECT_EQ(4, postings->freq());
 
-    // Next doc should be 30 with freq 5
     EXPECT_EQ(30, postings->nextDoc());
     EXPECT_EQ(5, postings->freq());
 }
 
 TEST(PostingsReaderTest, AdvancePastEnd) {
-    // 2 docs (< 4, so VInt fallback)
     ByteBuffersIndexOutput out("test.doc");
     auto field = createField("content", IndexOptions::DOCS_AND_FREQS);
 
-    // Docs: 0, 5 with freqs: 1, 2
-    // Doc deltas: 0, 5
     std::vector<int> docDeltas = {0, 5};
     std::vector<int> freqs = {1, 2};
-    writePostingsStreamVByte(out, docDeltas, freqs, true);
+    writePostingsBitPack(out, docDeltas, freqs, true);
 
     auto readState = createReadState();
     Lucene104PostingsReader reader(readState);
@@ -335,7 +320,6 @@ TEST(PostingsReaderTest, AdvancePastEnd) {
 
     auto postings = reader.postings(field, state);
 
-    // Advance past all docs
     EXPECT_EQ(DocIdSetIterator::NO_MORE_DOCS, postings->advance(1000));
 }
 
@@ -356,6 +340,5 @@ TEST(PostingsReaderTest, Cost) {
 
     auto postings = reader.postings(field, state);
 
-    // Cost should equal doc frequency
     EXPECT_EQ(42, postings->cost());
 }

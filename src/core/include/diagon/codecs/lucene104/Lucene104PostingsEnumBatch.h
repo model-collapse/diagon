@@ -88,19 +88,15 @@ private:
     int currentFreq_;
     int docsRead_;
 
-    // StreamVByte buffering (32 docs = 8 groups of 4)
-    static constexpr int BUFFER_SIZE = 32;
-    static constexpr int STREAMVBYTE_GROUP_SIZE = 4;
+    // BitPack128 buffering
+    static constexpr int BUFFER_SIZE = 128;
     uint32_t docDeltaBuffer_[BUFFER_SIZE];
     uint32_t freqBuffer_[BUFFER_SIZE];
     int bufferPos_;
     int bufferLimit_;
 
     /**
-     * Refill buffer by reading StreamVByte groups
-     *
-     * Decodes up to 32 docs (8 groups of 4) in one shot.
-     * Uses existing StreamVByte SIMD decode from P0.4.
+     * Refill buffer by reading one BitPack128 block or VInt tail.
      */
     void refillBuffer();
 };
