@@ -75,10 +75,8 @@ static std::vector<std::string> generateJsonStrings(int n) {
     jsons.reserve(n);
     for (int i = 0; i < n; i++) {
         // Matches task spec: {"title":"Doc N","body":"...","count":N,"price":9.99,"active":true}
-        std::string json = R"({"title":"Doc )" + std::to_string(i) +
-                           R"(","body":")" + kBodyText +
-                           R"(","count":)" + std::to_string(i) +
-                           R"(,"price":9.99,"active":true})";
+        std::string json = R"({"title":"Doc )" + std::to_string(i) + R"(","body":")" + kBodyText +
+                           R"(","count":)" + std::to_string(i) + R"(,"price":9.99,"active":true})";
         jsons.push_back(std::move(json));
     }
     return jsons;
@@ -146,11 +144,10 @@ static void BM_JsonParseBatch(benchmark::State& state) {
     // Build one big JSON array: [{"title":"Doc 0",...}, {"title":"Doc 1",...}, ...]
     std::string batchJson = "[";
     for (int i = 0; i < kNumDocs; i++) {
-        if (i > 0) batchJson += ",";
-        batchJson += R"({"title":"Doc )" + std::to_string(i) +
-                     R"(","body":")" + kBodyText +
-                     R"(","count":)" + std::to_string(i) +
-                     R"(,"price":9.99,"active":true})";
+        if (i > 0)
+            batchJson += ",";
+        batchJson += R"({"title":"Doc )" + std::to_string(i) + R"(","body":")" + kBodyText +
+                     R"(","count":)" + std::to_string(i) + R"(,"price":9.99,"active":true})";
     }
     batchJson += "]";
 

@@ -76,8 +76,7 @@ void addValue(Document& doc, const std::string& fieldName, const nlohmann::json&
     if (val.is_string()) {
         doc.add(std::make_unique<TextField>(fieldName, val.get<std::string>(), true));
     } else if (val.is_boolean()) {
-        doc.add(
-            std::make_unique<StringField>(fieldName, val.get<bool>() ? "true" : "false", true));
+        doc.add(std::make_unique<StringField>(fieldName, val.get<bool>() ? "true" : "false", true));
     } else if (val.is_number_unsigned()) {
         // Must check before is_number_integer(): unsigned values > INT64_MAX
         // are stored as uint64_t by nlohmann and would be silently dropped otherwise.
