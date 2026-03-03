@@ -74,7 +74,8 @@ void printResults(const BenchmarkResult& result) {
               << " docs/sec\n";
     std::cout << "  Index size: " << (result.indexSizeBytes / (1024 * 1024)) << " MB\n";
     if (result.docsIndexed > 0) {
-        std::cout << "  Storage: " << (result.indexSizeBytes / result.docsIndexed) << " bytes/doc\n";
+        std::cout << "  Storage: " << (result.indexSizeBytes / result.docsIndexed)
+                  << " bytes/doc\n";
     }
     std::cout << "\n";
 
@@ -131,12 +132,12 @@ CliArgs parseArgs(int argc, char* argv[]) {
             args.indexPath = argv[++i];
         } else if (std::strcmp(argv[i], "--help") == 0 || std::strcmp(argv[i], "-h") == 0) {
             std::cout << "Usage: ClickBenchBenchmark [options]\n"
-                      << "  --data-path PATH   Path to hits.tsv (default: "
-                      << args.dataPath << ")\n"
-                      << "  --max-docs N       Max documents to index (default: "
-                      << args.maxDocs << ")\n"
-                      << "  --index-path PATH  Index directory (default: "
-                      << args.indexPath << ")\n";
+                      << "  --data-path PATH   Path to hits.tsv (default: " << args.dataPath
+                      << ")\n"
+                      << "  --max-docs N       Max documents to index (default: " << args.maxDocs
+                      << ")\n"
+                      << "  --index-path PATH  Index directory (default: " << args.indexPath
+                      << ")\n";
             std::exit(0);
         }
     }
@@ -266,8 +267,8 @@ int main(int argc, char* argv[]) {
         widthReader.open(colPath, "ResolutionWidth");
         counterReader.open(colPath, "CounterID");
 
-        std::cout << "Columnar store: " << regionReader.granulesTotal()
-                  << " granules per column (" << regionReader.totalDocs() << " docs)\n";
+        std::cout << "Columnar store: " << regionReader.granulesTotal() << " granules per column ("
+                  << regionReader.totalDocs() << " docs)\n";
 
         // ---- Lucene queries (Q1-Q8, Q11-Q13, Q15) ----
         struct TestQuery {
@@ -286,11 +287,10 @@ int main(int argc, char* argv[]) {
             {"Q2  AdvEngineID <> 0",
              []() {
                  search::BooleanQuery::Builder builder;
-                 builder.add(std::make_shared<search::MatchAllQuery>(),
-                             search::Occur::MUST);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("AdvEngineID_s", "0")),
-                             search::Occur::MUST_NOT);
+                 builder.add(std::make_shared<search::MatchAllQuery>(), search::Occur::MUST);
+                 builder.add(
+                     std::make_shared<search::TermQuery>(search::Term("AdvEngineID_s", "0")),
+                     search::Occur::MUST_NOT);
                  return builder.build();
              }},
 
@@ -304,26 +304,23 @@ int main(int argc, char* argv[]) {
             // Q4: WHERE URL LIKE '%google%' — text search (tokenized)
             {"Q4  URL contains 'google'",
              []() {
-                 return std::make_unique<search::TermQuery>(
-                     search::Term("URL", "google"));
+                 return std::make_unique<search::TermQuery>(search::Term("URL", "google"));
              }},
 
             // Q5: CounterID=62 AND EventDate range AND flags — multi-filter AND
             {"Q5  CounterID=62 AND date AND flags",
              []() {
                  search::BooleanQuery::Builder builder;
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("CounterID_s", "62")),
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("CounterID_s", "62")),
                              search::Occur::MUST);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("EventDate", "2013-07-15")),
+                 builder.add(
+                     std::make_shared<search::TermQuery>(search::Term("EventDate", "2013-07-15")),
+                     search::Occur::MUST);
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("IsRefresh", "0")),
                              search::Occur::MUST);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("IsRefresh", "0")),
-                             search::Occur::MUST);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("DontCountHits", "0")),
-                             search::Occur::MUST);
+                 builder.add(
+                     std::make_shared<search::TermQuery>(search::Term("DontCountHits", "0")),
+                     search::Occur::MUST);
                  return builder.build();
              }},
 
@@ -331,18 +328,16 @@ int main(int argc, char* argv[]) {
             {"Q6  CounterID=62 AND date=2013-07-01",
              []() {
                  search::BooleanQuery::Builder builder;
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("CounterID_s", "62")),
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("CounterID_s", "62")),
                              search::Occur::MUST);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("EventDate", "2013-07-01")),
+                 builder.add(
+                     std::make_shared<search::TermQuery>(search::Term("EventDate", "2013-07-01")),
+                     search::Occur::MUST);
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("IsRefresh", "0")),
                              search::Occur::MUST);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("IsRefresh", "0")),
-                             search::Occur::MUST);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("DontCountHits", "0")),
-                             search::Occur::MUST);
+                 builder.add(
+                     std::make_shared<search::TermQuery>(search::Term("DontCountHits", "0")),
+                     search::Occur::MUST);
                  return builder.build();
              }},
 
@@ -350,24 +345,20 @@ int main(int argc, char* argv[]) {
             {"Q7  Complex: CID=62 AND flags (6 clauses)",
              []() {
                  search::BooleanQuery::Builder builder;
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("CounterID_s", "62")),
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("CounterID_s", "62")),
                              search::Occur::MUST);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("EventDate", "2013-07-15")),
+                 builder.add(
+                     std::make_shared<search::TermQuery>(search::Term("EventDate", "2013-07-15")),
+                     search::Occur::MUST);
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("IsRefresh", "0")),
                              search::Occur::MUST);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("IsRefresh", "0")),
-                             search::Occur::MUST);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("DontCountHits", "0")),
-                             search::Occur::MUST);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("IsDownload", "0")),
+                 builder.add(
+                     std::make_shared<search::TermQuery>(search::Term("DontCountHits", "0")),
+                     search::Occur::MUST);
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("IsDownload", "0")),
                              search::Occur::MUST);
                  // IsLink <> 0 — MUST_NOT on "0" won't work alone, use MatchAll+MUST_NOT
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("IsLink", "0")),
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("IsLink", "0")),
                              search::Occur::MUST_NOT);
                  return builder.build();
              }},
@@ -388,12 +379,11 @@ int main(int argc, char* argv[]) {
             {"Q11 URL='google' AND AdvEngineID<>0",
              []() {
                  search::BooleanQuery::Builder builder;
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("URL", "google")),
+                 builder.add(std::make_shared<search::TermQuery>(search::Term("URL", "google")),
                              search::Occur::MUST);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("AdvEngineID_s", "0")),
-                             search::Occur::MUST_NOT);
+                 builder.add(
+                     std::make_shared<search::TermQuery>(search::Term("AdvEngineID_s", "0")),
+                     search::Occur::MUST_NOT);
                  return builder.build();
              }},
 
@@ -401,11 +391,10 @@ int main(int argc, char* argv[]) {
             {"Q12 SearchPhrase <> '' (non-empty)",
              []() {
                  search::BooleanQuery::Builder builder;
-                 builder.add(std::make_shared<search::MatchAllQuery>(),
-                             search::Occur::MUST);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("SearchPhrase_s", "")),
-                             search::Occur::MUST_NOT);
+                 builder.add(std::make_shared<search::MatchAllQuery>(), search::Occur::MUST);
+                 builder.add(
+                     std::make_shared<search::TermQuery>(search::Term("SearchPhrase_s", "")),
+                     search::Occur::MUST_NOT);
                  return builder.build();
              }},
 
@@ -420,15 +409,15 @@ int main(int argc, char* argv[]) {
             {"Q15 AdvEngineID IN (2,3,4)",
              []() {
                  search::BooleanQuery::Builder builder;
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("AdvEngineID_s", "2")),
-                             search::Occur::SHOULD);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("AdvEngineID_s", "3")),
-                             search::Occur::SHOULD);
-                 builder.add(std::make_shared<search::TermQuery>(
-                                 search::Term("AdvEngineID_s", "4")),
-                             search::Occur::SHOULD);
+                 builder.add(
+                     std::make_shared<search::TermQuery>(search::Term("AdvEngineID_s", "2")),
+                     search::Occur::SHOULD);
+                 builder.add(
+                     std::make_shared<search::TermQuery>(search::Term("AdvEngineID_s", "3")),
+                     search::Occur::SHOULD);
+                 builder.add(
+                     std::make_shared<search::TermQuery>(search::Term("AdvEngineID_s", "4")),
+                     search::Occur::SHOULD);
                  return builder.build();
              }},
         };
@@ -445,16 +434,14 @@ int main(int argc, char* argv[]) {
 
         std::vector<ColumnarQuery> columnarQueries = {
             // Q9: RegionID BETWEEN 200 AND 300
-            {"Q9  RegionID BETWEEN 200 AND 300 [COLUMNAR]",
-             &regionReader, 200, 300, true, true},
+            {"Q9  RegionID BETWEEN 200 AND 300 [COLUMNAR]", &regionReader, 200, 300, true, true},
 
             // Q10: ResolutionWidth >= 1900 (open upper bound)
-            {"Q10 ResolutionWidth >= 1900 [COLUMNAR]",
-             &widthReader, 1900, std::numeric_limits<int64_t>::max(), true, true},
+            {"Q10 ResolutionWidth >= 1900 [COLUMNAR]", &widthReader, 1900,
+             std::numeric_limits<int64_t>::max(), true, true},
 
             // Q14: CounterID BETWEEN 0 AND 100
-            {"Q14 CounterID BETWEEN 0 AND 100 [COLUMNAR]",
-             &counterReader, 0, 100, true, true},
+            {"Q14 CounterID BETWEEN 0 AND 100 [COLUMNAR]", &counterReader, 0, 100, true, true},
         };
 
         const int NUM_ITERATIONS = 100;
@@ -518,8 +505,8 @@ int main(int argc, char* argv[]) {
 
             for (int i = 0; i < NUM_ITERATIONS; i++) {
                 auto start = high_resolution_clock::now();
-                int count = cq.reader->rangeCount(cq.lower, cq.upper,
-                                                  cq.includeLower, cq.includeUpper);
+                int count = cq.reader->rangeCount(cq.lower, cq.upper, cq.includeLower,
+                                                  cq.includeUpper);
                 auto end = high_resolution_clock::now();
 
                 latencies.push_back(duration_cast<microseconds>(end - start).count());

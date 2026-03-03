@@ -415,10 +415,10 @@ BENCHMARK(BM_IndexMultiFieldDocuments)
 
 // Batch vs single document (mutex amortization)
 BENCHMARK(BM_IndexBatchDocuments)
-    ->Arg(1)     // Single-document baseline
-    ->Arg(50)    // Small batch
-    ->Arg(200)   // Medium batch
-    ->Arg(500)   // Large batch (Issue #6 target)
+    ->Arg(1)    // Single-document baseline
+    ->Arg(50)   // Small batch
+    ->Arg(200)  // Medium batch
+    ->Arg(500)  // Large batch (Issue #6 target)
     ->Unit(benchmark::kMillisecond);
 
 BENCHMARK_MAIN();

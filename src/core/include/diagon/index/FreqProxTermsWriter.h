@@ -135,9 +135,7 @@ public:
     /**
      * Get field name for a given field ID
      */
-    const std::string& getFieldName(int fieldId) const {
-        return idToFieldName_[fieldId];
-    }
+    const std::string& getFieldName(int fieldId) const { return idToFieldName_[fieldId]; }
 
     /**
      * Get number of registered fields
@@ -147,16 +145,12 @@ public:
     /**
      * Get field lengths by field ID (for flush)
      */
-    const FieldLengthData& getFieldLengthData(int fieldId) const {
-        return fieldLengths_[fieldId];
-    }
+    const FieldLengthData& getFieldLengthData(int fieldId) const { return fieldLengths_[fieldId]; }
 
     /**
      * Get field stats by field ID
      */
-    const FieldStats& getFieldStatsById(int fieldId) const {
-        return fieldStats_[fieldId];
-    }
+    const FieldStats& getFieldStatsById(int fieldId) const { return fieldStats_[fieldId]; }
 
     /**
      * Get per-field posting map by field ID (for flush, getPostingList, etc.)
@@ -177,9 +171,8 @@ public:
      * Get field lengths for norm computation (backward-compatible interface for DWPT flush)
      * Returns pairs of (fieldName, fieldLengthData) for all fields.
      */
-    void forEachFieldLength(
-        const std::function<void(const std::string& fieldName, const FieldLengthData& data)>& fn)
-        const {
+    void forEachFieldLength(const std::function<void(const std::string& fieldName,
+                                                     const FieldLengthData& data)>& fn) const {
         for (int i = 0; i < nextFieldId_; i++) {
             fn(idToFieldName_[i], fieldLengths_[i]);
         }
@@ -220,7 +213,6 @@ private:
 
     // Pre-sizing hint
     size_t expectedTermsPerField_;
-
 };
 
 }  // namespace index

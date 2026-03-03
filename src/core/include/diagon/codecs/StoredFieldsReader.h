@@ -97,9 +97,9 @@ private:
      * Block index entry read from .fdx
      */
     struct BlockEntry {
-        int64_t offset;       // Start offset of block in .fdt
-        int firstDocID;       // First document ID in this block
-        int numDocsInBlock;   // Number of docs in this block
+        int64_t offset;      // Start offset of block in .fdt
+        int firstDocID;      // First document ID in this block
+        int numDocsInBlock;  // Number of docs in this block
     };
 
     /**

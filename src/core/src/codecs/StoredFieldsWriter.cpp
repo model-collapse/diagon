@@ -7,7 +7,7 @@
 #include <stdexcept>
 
 #ifdef HAVE_LZ4
-#include <lz4.h>
+#    include <lz4.h>
 #endif
 
 namespace diagon {
@@ -208,8 +208,8 @@ void StoredFieldsWriter::writeHeader(store::IndexOutput& out) {
     out.writeVInt(VERSION);
 }
 
-std::vector<StoredFieldsWriter::BlockEntry> StoredFieldsWriter::writeData(
-    store::IndexOutput& dataOut) {
+std::vector<StoredFieldsWriter::BlockEntry>
+StoredFieldsWriter::writeData(store::IndexOutput& dataOut) {
     // Write header
     writeHeader(dataOut);
 
@@ -234,10 +234,9 @@ std::vector<StoredFieldsWriter::BlockEntry> StoredFieldsWriter::writeData(
         int maxCompressedSize = LZ4_compressBound(rawLength);
         std::vector<uint8_t> compressed(maxCompressedSize);
 
-        int compressedSize = LZ4_compress_default(
-            reinterpret_cast<const char*>(raw.data()),
-            reinterpret_cast<char*>(compressed.data()),
-            rawLength, maxCompressedSize);
+        int compressedSize = LZ4_compress_default(reinterpret_cast<const char*>(raw.data()),
+                                                  reinterpret_cast<char*>(compressed.data()),
+                                                  rawLength, maxCompressedSize);
 
         if (compressedSize <= 0) {
             throw std::runtime_error("LZ4 compression failed");

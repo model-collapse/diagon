@@ -108,10 +108,10 @@ TEST(BitPackPostingsRoundTripTest, OneBitPackBlockPlusVIntTail) {
     // No non-1 freqs to write
 
     // VInt tail: 2 more docs (128, 129) with freq > 1
-    docOut->writeVInt(1 << 1);   // delta=1, low bit=0 (freq > 1)
-    docOut->writeVInt(50);       // freq=50
-    docOut->writeVInt(1 << 1);   // delta=1, low bit=0 (freq > 1)
-    docOut->writeVInt(60);       // freq=60
+    docOut->writeVInt(1 << 1);  // delta=1, low bit=0 (freq > 1)
+    docOut->writeVInt(50);      // freq=50
+    docOut->writeVInt(1 << 1);  // delta=1, low bit=0 (freq > 1)
+    docOut->writeVInt(60);      // freq=60
 
     // Create reader
     auto readState = createReadState();
@@ -184,10 +184,11 @@ TEST(BitPackPFORTest, ExceptionHandling) {
     // 128 values: 125 values fit in 3 bits, 3 outliers need 10 bits
     uint32_t values[128];
     uint32_t original[128];
-    for (int i = 0; i < 125; i++) values[i] = i % 7;  // 0-6, fits in 3 bits
-    values[125] = 500;   // needs 9 bits
-    values[126] = 700;   // needs 10 bits
-    values[127] = 1000;  // needs 10 bits
+    for (int i = 0; i < 125; i++)
+        values[i] = i % 7;  // 0-6, fits in 3 bits
+    values[125] = 500;      // needs 9 bits
+    values[126] = 700;      // needs 10 bits
+    values[127] = 1000;     // needs 10 bits
     std::memcpy(original, values, sizeof(values));
 
     uint8_t encoded[BitPacking::maxBytesPerBlock(128)];
@@ -197,8 +198,8 @@ TEST(BitPackPFORTest, ExceptionHandling) {
     uint8_t token = encoded[0];
     int bitsPerValue = token & 0x1F;
     int numExceptions = token >> 5;
-    EXPECT_LT(bitsPerValue, 10);   // Should be < 10 (not worst case)
-    EXPECT_GT(numExceptions, 0);   // Should have exceptions
+    EXPECT_LT(bitsPerValue, 10);  // Should be < 10 (not worst case)
+    EXPECT_GT(numExceptions, 0);  // Should have exceptions
 
     // Verify smaller than plain BitPacking would be
     // Plain BitPack128 with max=1000 needs 10 bits: 1 + ceil(128*10/8) = 161 bytes
@@ -232,7 +233,8 @@ TEST(BitPackPFORTest, AllZeros) {
 
 TEST(BitPackPFORTest, AllSameNonZero) {
     uint32_t values[128];
-    for (int i = 0; i < 128; i++) values[i] = 42;
+    for (int i = 0; i < 128; i++)
+        values[i] = 42;
 
     uint8_t encoded[BitPacking::maxBytesPerBlock(128)];
     int encBytes = BitPacking::encode(values, 128, encoded);
@@ -252,7 +254,8 @@ TEST(BitPackPFORTest, AllSameNonZero) {
 TEST(BitPackPFORTest, NoExceptions) {
     // All values fit in same bit width — no exceptions expected
     uint32_t values[128];
-    for (int i = 0; i < 128; i++) values[i] = i;  // 0-127, needs 7 bits
+    for (int i = 0; i < 128; i++)
+        values[i] = i;  // 0-127, needs 7 bits
     uint32_t original[128];
     std::memcpy(original, values, sizeof(values));
 

@@ -37,7 +37,7 @@ static constexpr uint32_t DEFAULT_GRANULE_SIZE = 8192;
 struct GranuleInfo {
     int64_t minValue;
     int64_t maxValue;
-    uint64_t fileOffset;      // offset into data section of .col file
+    uint64_t fileOffset;  // offset into data section of .col file
     uint32_t compressedSize;
     uint32_t numRows;
     uint32_t startDocId;
@@ -49,25 +49,27 @@ struct GranuleInfo {
 
 class ColumnarWriter {
 public:
-    explicit ColumnarWriter(const std::string& basePath, uint32_t granuleSize = DEFAULT_GRANULE_SIZE)
+    explicit ColumnarWriter(const std::string& basePath,
+                            uint32_t granuleSize = DEFAULT_GRANULE_SIZE)
         : basePath_(basePath)
         , granuleSize_(granuleSize)
         , currentDocId_(0) {}
 
-    void defineColumn(const std::string& name) {
-        columns_[name] = ColumnState{};
-    }
+    void defineColumn(const std::string& name) { columns_[name] = ColumnState{}; }
 
     void addValue(const std::string& name, int64_t value) {
         auto it = columns_.find(name);
-        if (it == columns_.end()) return;
+        if (it == columns_.end())
+            return;
 
         auto& col = it->second;
         col.buffer.push_back(value);
 
         // Track min/max for current granule
-        if (value < col.currentMin) col.currentMin = value;
-        if (value > col.currentMax) col.currentMax = value;
+        if (value < col.currentMin)
+            col.currentMin = value;
+        if (value > col.currentMax)
+            col.currentMax = value;
     }
 
     void endDocument() {
@@ -104,9 +106,9 @@ public:
 
 private:
     struct ColumnState {
-        std::vector<int64_t> buffer;                // current granule accumulator
-        std::vector<GranuleInfo> granules;           // completed granule metadata
-        std::vector<char> compressedData;            // accumulated compressed bytes
+        std::vector<int64_t> buffer;        // current granule accumulator
+        std::vector<GranuleInfo> granules;  // completed granule metadata
+        std::vector<char> compressedData;   // accumulated compressed bytes
         int64_t currentMin = std::numeric_limits<int64_t>::max();
         int64_t currentMax = std::numeric_limits<int64_t>::min();
         uint32_t granuleStartDocId = 0;
@@ -121,11 +123,8 @@ private:
         size_t maxCompressed = codec->getMaxCompressedSize(rawSize);
         std::vector<char> compBuf(maxCompressed);
 
-        size_t compressedSize = codec->compress(
-            reinterpret_cast<const char*>(col.buffer.data()),
-            rawSize,
-            compBuf.data(),
-            maxCompressed);
+        size_t compressedSize = codec->compress(reinterpret_cast<const char*>(col.buffer.data()),
+                                                rawSize, compBuf.data(), maxCompressed);
 
         // Record granule info
         GranuleInfo info;
@@ -138,8 +137,8 @@ private:
         col.granules.push_back(info);
 
         // Append compressed data
-        col.compressedData.insert(col.compressedData.end(),
-                                  compBuf.data(), compBuf.data() + compressedSize);
+        col.compressedData.insert(col.compressedData.end(), compBuf.data(),
+                                  compBuf.data() + compressedSize);
 
         // Reset buffer and min/max
         col.buffer.clear();
@@ -153,7 +152,8 @@ private:
         {
             std::string colPath = basePath_ + "/" + name + ".col";
             std::ofstream ofs(colPath, std::ios::binary);
-            if (!ofs) throw std::runtime_error("Cannot create " + colPath);
+            if (!ofs)
+                throw std::runtime_error("Cannot create " + colPath);
 
             // Header (24 bytes)
             uint32_t magic = DCOL_MAGIC;
@@ -177,7 +177,8 @@ private:
         {
             std::string metaPath = basePath_ + "/" + name + ".meta";
             std::ofstream ofs(metaPath, std::ios::binary);
-            if (!ofs) throw std::runtime_error("Cannot create " + metaPath);
+            if (!ofs)
+                throw std::runtime_error("Cannot create " + metaPath);
 
             uint32_t numGranules = static_cast<uint32_t>(col.granules.size());
             ofs.write(reinterpret_cast<const char*>(&numGranules), 4);
@@ -214,7 +215,8 @@ public:
         {
             std::string metaPath = basePath + "/" + columnName + ".meta";
             std::ifstream ifs(metaPath, std::ios::binary);
-            if (!ifs) throw std::runtime_error("Cannot open " + metaPath);
+            if (!ifs)
+                throw std::runtime_error("Cannot open " + metaPath);
 
             uint32_t numGranules = 0;
             ifs.read(reinterpret_cast<char*>(&numGranules), 4);
@@ -235,7 +237,8 @@ public:
         {
             std::string colPath = basePath + "/" + columnName + ".col";
             std::ifstream ifs(colPath, std::ios::binary | std::ios::ate);
-            if (!ifs) throw std::runtime_error("Cannot open " + colPath);
+            if (!ifs)
+                throw std::runtime_error("Cannot open " + colPath);
 
             auto fileSize = ifs.tellg();
             if (fileSize <= 24) {
@@ -306,11 +309,8 @@ public:
             size_t rawSize = g.numRows * sizeof(int64_t);
             std::vector<int64_t> values(g.numRows);
 
-            codec->decompress(
-                data_.data() + g.fileOffset,
-                g.compressedSize,
-                reinterpret_cast<char*>(values.data()),
-                rawSize);
+            codec->decompress(data_.data() + g.fileOffset, g.compressedSize,
+                              reinterpret_cast<char*>(values.data()), rawSize);
 
             for (uint32_t i = 0; i < g.numRows; i++) {
                 int64_t v = values[i];

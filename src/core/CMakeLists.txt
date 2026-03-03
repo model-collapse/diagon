@@ -452,8 +452,28 @@ foreach(_target ${_DIAGON_TARGETS})
     endif()
 
     # Link nlohmann-json (header-only, for JSON document parsing)
-    find_package(nlohmann_json 3.11 REQUIRED)
-    target_link_libraries(${_target} PUBLIC nlohmann_json::nlohmann_json)
+    # Try system/conda install first, fall back to FetchContent
+    find_package(nlohmann_json 3.11 QUIET)
+    if(NOT nlohmann_json_FOUND)
+        include(FetchContent)
+        FetchContent_Declare(
+            nlohmann_json
+            URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+            SYSTEM
+        )
+        FetchContent_MakeAvailable(nlohmann_json)
+        # Mark as SYSTEM to suppress -Werror warnings from nlohmann headers
+        # (e.g. -Wnan-infinity-disabled on macOS Apple Clang with -ffast-math)
+        get_target_property(_nlohmann_inc nlohmann_json INTERFACE_INCLUDE_DIRECTORIES)
+        if(_nlohmann_inc)
+            set_target_properties(nlohmann_json PROPERTIES
+                INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_nlohmann_inc}")
+        endif()
+        message(STATUS "nlohmann_json: fetched via FetchContent")
+    else()
+        message(STATUS "nlohmann_json: found ${nlohmann_json_VERSION}")
+    endif()
+    target_link_libraries(${_target} PRIVATE nlohmann_json::nlohmann_json)
 
     # Link jemalloc for optimized memory allocation (17%+ of ingestion CPU is malloc/free)
     find_library(JEMALLOC_LIB NAMES jemalloc)

@@ -78,8 +78,7 @@ void addFields(Document& doc, const nlohmann::json& j, const std::string& prefix
                     continue;
                 }
                 if (elem.is_string()) {
-                    doc.add(
-                        std::make_unique<TextField>(fieldName, elem.get<std::string>(), true));
+                    doc.add(std::make_unique<TextField>(fieldName, elem.get<std::string>(), true));
                 } else if (elem.is_boolean()) {
                     doc.add(std::make_unique<StringField>(
                         fieldName, elem.get<bool>() ? "true" : "false", true));
@@ -108,8 +107,7 @@ std::unique_ptr<Document> JsonDocumentParser::parse(const char* json, size_t len
         throw std::runtime_error("Invalid JSON: parse failed");
     }
     if (!j.is_object()) {
-        throw std::runtime_error("JSON must be an object, got " +
-                                 std::string(j.type_name()));
+        throw std::runtime_error("JSON must be an object, got " + std::string(j.type_name()));
     }
 
     auto doc = std::make_unique<Document>();

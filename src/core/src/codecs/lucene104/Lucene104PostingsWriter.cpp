@@ -99,7 +99,7 @@ void Lucene104PostingsWriter::startTerm() {
     lastDocID_ = 0;
     docCount_ = 0;
     totalTermFreq_ = 0;
-    bufferPos_ = 0;   // Reset doc buffer
+    bufferPos_ = 0;     // Reset doc buffer
     posBufferPos_ = 0;  // Reset position buffer
 
     // Record position file pointer for this term

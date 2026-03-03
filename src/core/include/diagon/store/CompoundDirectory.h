@@ -48,8 +48,7 @@ public:
      * @return CompoundDirectory instance
      * @throws IOException if .cfs or .cfe files don't exist or are corrupted
      */
-    static std::unique_ptr<CompoundDirectory> open(Directory& dir,
-                                                   const std::string& segmentName);
+    static std::unique_ptr<CompoundDirectory> open(Directory& dir, const std::string& segmentName);
 
     /**
      * @brief Construct CompoundDirectory.

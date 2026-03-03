@@ -39,7 +39,6 @@ public:
 private:
     std::unique_ptr<store::IndexInput> docIn_;
     int docFreq_;
-    int64_t totalTermFreq_;
     bool writeFreqs_;
 
     int currentDoc_;
@@ -102,17 +101,21 @@ private:
 
     inline int32_t readVIntFromBatch() {
         uint8_t b = readByteFromBatch();
-        if ((b & 0x80) == 0) return b;
+        if ((b & 0x80) == 0)
+            return b;
         int32_t i = b & 0x7F;
         b = readByteFromBatch();
         i |= (b & 0x7F) << 7;
-        if ((b & 0x80) == 0) return i;
+        if ((b & 0x80) == 0)
+            return i;
         b = readByteFromBatch();
         i |= (b & 0x7F) << 14;
-        if ((b & 0x80) == 0) return i;
+        if ((b & 0x80) == 0)
+            return i;
         b = readByteFromBatch();
         i |= (b & 0x7F) << 21;
-        if ((b & 0x80) == 0) return i;
+        if ((b & 0x80) == 0)
+            return i;
         b = readByteFromBatch();
         i |= (b & 0x0F) << 28;
         return i;

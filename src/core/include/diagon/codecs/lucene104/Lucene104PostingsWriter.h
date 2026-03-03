@@ -216,8 +216,7 @@ private:
 
     // Block-Max WAND support
     // Skip entry every 128 docs — matches Lucene's standard interval
-    static constexpr int SKIP_INTERVAL =
-        128;  // Create skip entry every 128 docs
+    static constexpr int SKIP_INTERVAL = 128;  // Create skip entry every 128 docs
 
     // Block-level impact tracking (for next skip entry)
     int32_t blockMaxFreq_;       // Max frequency in current block

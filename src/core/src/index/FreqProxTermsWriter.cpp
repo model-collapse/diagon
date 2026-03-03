@@ -81,8 +81,7 @@ void FreqProxTermsWriter::addField(const document::IndexableField& field, int do
     }
     fld.set(docID, static_cast<int>(tokens.size()));
 
-    bool storePositions = (fieldType.indexOptions >=
-                           IndexOptions::DOCS_AND_FREQS_AND_POSITIONS);
+    bool storePositions = (fieldType.indexOptions >= IndexOptions::DOCS_AND_FREQS_AND_POSITIONS);
 
     // Direct-to-posting token processing: eliminates the intermediate termPositionsCache_.
     // Each token does ONE hash lookup in fieldPostings_ instead of TWO (cache + postings).
@@ -102,7 +101,8 @@ void FreqProxTermsWriter::addField(const document::IndexableField& field, int do
             data.postings.push_back(docID);
             data.pendingFreqIndex = static_cast<int>(data.postings.size());
             data.postings.push_back(1);  // freq starts at 1
-            if (storePositions) data.postings.push_back(pos);
+            if (storePositions)
+                data.postings.push_back(pos);
 
             bytesUsed_ += term.capacity() + 100 * sizeof(int) + 64;
             stats.sumDocFreq++;
@@ -114,9 +114,11 @@ void FreqProxTermsWriter::addField(const document::IndexableField& field, int do
             data.postings.push_back(docID);
             data.pendingFreqIndex = static_cast<int>(data.postings.size());
             data.postings.push_back(1);
-            if (storePositions) data.postings.push_back(pos);
+            if (storePositions)
+                data.postings.push_back(pos);
             size_t newCap = data.postings.capacity();
-            if (newCap > oldCap) bytesUsed_ += (newCap - oldCap) * sizeof(int);
+            if (newCap > oldCap)
+                bytesUsed_ += (newCap - oldCap) * sizeof(int);
 
             stats.sumDocFreq++;
             stats.sumTotalTermFreq++;
@@ -124,9 +126,11 @@ void FreqProxTermsWriter::addField(const document::IndexableField& field, int do
             // Same term, same document — increment freq in-place, append position
             size_t oldCap = data.postings.capacity();
             data.postings[data.pendingFreqIndex]++;
-            if (storePositions) data.postings.push_back(pos);
+            if (storePositions)
+                data.postings.push_back(pos);
             size_t newCap = data.postings.capacity();
-            if (newCap > oldCap) bytesUsed_ += (newCap - oldCap) * sizeof(int);
+            if (newCap > oldCap)
+                bytesUsed_ += (newCap - oldCap) * sizeof(int);
 
             stats.sumTotalTermFreq++;
         }

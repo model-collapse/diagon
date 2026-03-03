@@ -16,7 +16,6 @@ Lucene104PostingsEnumOptimized::Lucene104PostingsEnumOptimized(
     std::unique_ptr<store::IndexInput> docIn, const TermState& termState, bool writeFreqs)
     : docIn_(std::move(docIn))
     , docFreq_(termState.docFreq)
-    , totalTermFreq_(termState.totalTermFreq)
     , writeFreqs_(writeFreqs)
     , currentDoc_(-1)
     , currentFreq_(1)
@@ -75,7 +74,8 @@ void Lucene104PostingsEnumOptimized::refillBuffer() {
             while (true) {
                 uint8_t b = readByteFromBatch();
                 encoded[encodedPos++] = b;
-                if ((b & 0x80) == 0) break;
+                if ((b & 0x80) == 0)
+                    break;
             }
         } else {
             int dataBytes = (bpv == 0) ? 0 : (BITPACK_BLOCK * bpv + 7) / 8;

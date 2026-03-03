@@ -170,7 +170,8 @@ public:
         bool found = false;
 
         for (size_t i = 0; i < entries_.size(); i++) {
-            if (!entries_[i].hasMore) continue;
+            if (!entries_[i].hasMore)
+                continue;
 
             util::BytesRef t = entries_[i].termsEnum->term();
             if (!found || t < minTerm) {
@@ -179,14 +180,16 @@ public:
             }
         }
 
-        if (!found) return false;
+        if (!found)
+            return false;
 
         // Deep copy the minimum term (BytesRef may borrow from TermsEnum internals)
         currentTerm_ = minTerm.deepCopy();
 
         // Collect all segments that have this term
         for (size_t i = 0; i < entries_.size(); i++) {
-            if (!entries_[i].hasMore) continue;
+            if (!entries_[i].hasMore)
+                continue;
             util::BytesRef t = entries_[i].termsEnum->term();
             if (t == currentTerm_) {
                 currentSegments_.push_back(static_cast<int>(i));
@@ -317,8 +320,7 @@ private:
 class MergedFields : public Fields {
 public:
     MergedFields(const std::vector<std::shared_ptr<SegmentReader>>& readers,
-                 const std::vector<SegmentDocMap>& docMaps,
-                 const FieldInfos& mergedFieldInfos)
+                 const std::vector<SegmentDocMap>& docMaps, const FieldInfos& mergedFieldInfos)
         : readers_(readers)
         , docMaps_(docMaps)
         , mergedFieldInfos_(mergedFieldInfos) {
@@ -346,7 +348,8 @@ public:
             }
         }
 
-        if (refs.empty()) return nullptr;
+        if (refs.empty())
+            return nullptr;
 
         return std::make_unique<MergedTerms>(std::move(refs));
     }
@@ -377,8 +380,7 @@ public:
         normsMap_[fieldNumber] = std::move(norms);
     }
 
-    std::unique_ptr<index::NumericDocValues>
-    getNorms(const index::FieldInfo& field) override {
+    std::unique_ptr<index::NumericDocValues> getNorms(const index::FieldInfo& field) override {
         auto it = normsMap_.find(field.number);
         if (it == normsMap_.end()) {
             return nullptr;
@@ -566,7 +568,8 @@ int SegmentMerger::mergePostings(const FieldInfos& mergedFieldInfos) {
     auto& postingsFormat = codec.postingsFormat();
 
     // Create write state for the output segment
-    SegmentWriteState writeState(&directory_, segmentName_, docMapping_.newMaxDoc, mergedFieldInfos);
+    SegmentWriteState writeState(&directory_, segmentName_, docMapping_.newMaxDoc,
+                                 mergedFieldInfos);
 
     // Step 5: Write merged postings using the codec's normal write path
     auto consumer = postingsFormat.fieldsConsumer(writeState);
@@ -740,7 +743,8 @@ void SegmentMerger::mergeNorms(const FieldInfos& mergedFieldInfos) {
     }
 
     // Create write state and norms consumer via codec
-    SegmentWriteState writeState(&directory_, segmentName_, docMapping_.newMaxDoc, mergedFieldInfos);
+    SegmentWriteState writeState(&directory_, segmentName_, docMapping_.newMaxDoc,
+                                 mergedFieldInfos);
 
     std::string codecName = sourceSegments_[0]->codecName();
     auto& codec = codecs::Codec::forName(codecName);

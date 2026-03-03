@@ -10,7 +10,8 @@ namespace diagon {
 namespace util {
 
 int BitPacking::bitsRequired(uint32_t maxValue) {
-    if (maxValue == 0) return 0;
+    if (maxValue == 0)
+        return 0;
     // Count leading zeros, subtract from 32
     return 32 - __builtin_clz(maxValue);
 }
@@ -30,16 +31,20 @@ static inline int writeVInt(uint32_t v, uint8_t* output) {
 static inline uint32_t readVInt(const uint8_t* input, int& pos) {
     uint8_t b = input[pos++];
     uint32_t v = b & 0x7F;
-    if ((b & 0x80) == 0) return v;
+    if ((b & 0x80) == 0)
+        return v;
     b = input[pos++];
     v |= static_cast<uint32_t>(b & 0x7F) << 7;
-    if ((b & 0x80) == 0) return v;
+    if ((b & 0x80) == 0)
+        return v;
     b = input[pos++];
     v |= static_cast<uint32_t>(b & 0x7F) << 14;
-    if ((b & 0x80) == 0) return v;
+    if ((b & 0x80) == 0)
+        return v;
     b = input[pos++];
     v |= static_cast<uint32_t>(b & 0x7F) << 21;
-    if ((b & 0x80) == 0) return v;
+    if ((b & 0x80) == 0)
+        return v;
     b = input[pos++];
     v |= static_cast<uint32_t>(b & 0x0F) << 28;
     return v;
@@ -125,24 +130,22 @@ int BitPacking::encode(uint32_t* values, int count, uint8_t* output) {
     int numExceptions = 0;
 
     for (int b = maxBitsRequired; b >= minBits; b--) {
-        if (cumulativeExceptions > MAX_EXCEPTIONS) break;
+        if (cumulativeExceptions > MAX_EXCEPTIONS)
+            break;
         patchedBitsRequired = b;
         numExceptions = cumulativeExceptions;
         cumulativeExceptions += histogram[b];
     }
 
     // --- Extract exceptions and mask values ---
-    uint32_t maxUnpatched = (patchedBitsRequired == 0)
-                                ? 0
-                                : ((1u << patchedBitsRequired) - 1);
+    uint32_t maxUnpatched = (patchedBitsRequired == 0) ? 0 : ((1u << patchedBitsRequired) - 1);
     uint8_t exceptions[MAX_EXCEPTIONS * 2];
     int exCount = 0;
 
     for (int i = 0; i < count && exCount < numExceptions; i++) {
         if (values[i] > maxUnpatched) {
             exceptions[exCount * 2] = static_cast<uint8_t>(i);
-            exceptions[exCount * 2 + 1] =
-                static_cast<uint8_t>(values[i] >> patchedBitsRequired);
+            exceptions[exCount * 2 + 1] = static_cast<uint8_t>(values[i] >> patchedBitsRequired);
             values[i] &= maxUnpatched;
             exCount++;
         }

@@ -11,7 +11,7 @@
 #include <stdexcept>
 
 #ifdef HAVE_LZ4
-#include <lz4.h>
+#    include <lz4.h>
 #endif
 
 namespace diagon {
@@ -145,10 +145,9 @@ void BlockTreeTermsReader::loadBlock(int64_t blockFP, const util::BytesRef& bloc
         std::vector<uint8_t> compBuf(compressedSize);
         timIn_->readBytes(compBuf.data(), compressedSize);
 #ifdef HAVE_LZ4
-        int result = LZ4_decompress_safe(
-            reinterpret_cast<const char*>(compBuf.data()),
-            reinterpret_cast<char*>(suffixData.data()),
-            compressedSize, suffixRawSize);
+        int result = LZ4_decompress_safe(reinterpret_cast<const char*>(compBuf.data()),
+                                         reinterpret_cast<char*>(suffixData.data()), compressedSize,
+                                         suffixRawSize);
         if (result != suffixRawSize) {
             throw IOException("LZ4 decompression failed in .tim block");
         }
@@ -192,7 +191,8 @@ void BlockTreeTermsReader::loadBlock(int64_t blockFP, const util::BytesRef& bloc
         int prefixLen = 0;
         if (termCount > 0) {
             prefixLen = static_cast<int>(blockFirstTerm.length()) - suffixLens[0];
-            if (prefixLen < 0) prefixLen = 0;
+            if (prefixLen < 0)
+                prefixLen = 0;
         }
 
         if (prefixLen > 0) {
@@ -261,7 +261,7 @@ void BlockTreeTermsReader::loadBlock(int64_t blockFP, const util::BytesRef& bloc
 
         // Read flags byte
         uint8_t flags = timIn_->readByte();
-        bool hasPosFP  = (flags & 0x02) != 0;
+        bool hasPosFP = (flags & 0x02) != 0;
         bool hasSkipFP = (flags & 0x04) != 0;
 
         // Column 1: postingsFP (always present)

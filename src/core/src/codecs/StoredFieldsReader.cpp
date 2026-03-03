@@ -9,7 +9,7 @@
 #include <stdexcept>
 
 #ifdef HAVE_LZ4
-#include <lz4.h>
+#    include <lz4.h>
 #endif
 
 namespace diagon {
@@ -164,15 +164,14 @@ const std::vector<uint8_t>& StoredFieldsReader::decompressBlock(int blockIdx) {
         std::memcpy(cachedBlockData_.data(), compressed.data(), rawLength);
     } else {
 #ifdef HAVE_LZ4
-        int decompressedSize = LZ4_decompress_safe(
-            reinterpret_cast<const char*>(compressed.data()),
-            reinterpret_cast<char*>(cachedBlockData_.data()),
-            compressedLength, rawLength);
+        int decompressedSize = LZ4_decompress_safe(reinterpret_cast<const char*>(compressed.data()),
+                                                   reinterpret_cast<char*>(cachedBlockData_.data()),
+                                                   compressedLength, rawLength);
 
         if (decompressedSize != rawLength) {
-            throw std::runtime_error(
-                "LZ4 decompression failed: expected " + std::to_string(rawLength) +
-                " bytes, got " + std::to_string(decompressedSize));
+            throw std::runtime_error("LZ4 decompression failed: expected " +
+                                     std::to_string(rawLength) + " bytes, got " +
+                                     std::to_string(decompressedSize));
         }
 #else
         throw std::runtime_error("LZ4 compressed data but HAVE_LZ4 not defined");
@@ -230,19 +229,18 @@ std::string StoredFieldsReader::decodeString(const uint8_t* data, int dataLen, i
 }
 
 StoredFieldsReader::DocumentFields StoredFieldsReader::parseDocument(const uint8_t* data,
-                                                                      int dataLen,
-                                                                      int skipCount) {
+                                                                     int dataLen, int skipCount) {
     int pos = 0;
 
     // Skip over previous documents in this block
     for (int i = 0; i < skipCount; i++) {
         int32_t numFields = decodeVInt(data, dataLen, pos);
         for (int32_t f = 0; f < numFields; f++) {
-            decodeVInt(data, dataLen, pos);   // fieldNumber
+            decodeVInt(data, dataLen, pos);  // fieldNumber
             if (pos >= dataLen) {
                 throw std::runtime_error("Unexpected end of block data");
             }
-            uint8_t typeCode = data[pos++];   // fieldType
+            uint8_t typeCode = data[pos++];  // fieldType
             FieldType fieldType = static_cast<FieldType>(typeCode);
 
             switch (fieldType) {

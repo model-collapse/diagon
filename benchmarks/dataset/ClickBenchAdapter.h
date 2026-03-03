@@ -70,7 +70,8 @@ public:
 
         std::string line;
         while (std::getline(ifs_, line)) {
-            if (line.empty()) continue;
+            if (line.empty())
+                continue;
 
             // Split by tabs
             std::vector<std::string> cols;
@@ -78,7 +79,8 @@ public:
             splitTSV(line, cols);
 
             // hits.tsv has 105 columns; skip malformed lines
-            if (cols.size() < 62) continue;
+            if (cols.size() < 62)
+                continue;
 
             // TextField field type: tokenized, positions for phrase queries
             static const document::FieldType ftText = []() {
@@ -154,9 +156,9 @@ private:
         out.emplace_back(line, start);
     }
 
-    void addNumericField(document::Document& doc, const std::string& name,
-                         const std::string& val) {
-        if (val.empty()) return;
+    void addNumericField(document::Document& doc, const std::string& name, const std::string& val) {
+        if (val.empty())
+            return;
         try {
             int64_t v = std::stoll(val);
             doc.add(std::make_unique<document::NumericDocValuesField>(name, v));

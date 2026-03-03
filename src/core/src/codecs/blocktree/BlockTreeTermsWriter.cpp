@@ -9,7 +9,7 @@
 #include <stdexcept>
 
 #ifdef HAVE_LZ4
-#include <lz4.h>
+#    include <lz4.h>
 #endif
 
 namespace diagon {
@@ -184,10 +184,9 @@ void BlockTreeTermsWriter::writeBlock() {
         int srcSize = static_cast<int>(suffixBuf.size());
         int maxDstSize = LZ4_compressBound(srcSize);
         std::vector<uint8_t> compBuf(maxDstSize);
-        int compSize = LZ4_compress_default(
-            reinterpret_cast<const char*>(suffixBuf.data()),
-            reinterpret_cast<char*>(compBuf.data()),
-            srcSize, maxDstSize);
+        int compSize = LZ4_compress_default(reinterpret_cast<const char*>(suffixBuf.data()),
+                                            reinterpret_cast<char*>(compBuf.data()), srcSize,
+                                            maxDstSize);
         if (compSize > 0 && static_cast<size_t>(compSize) < suffixBuf.size() * 3 / 4) {
             // Compressed saves >25%
             timOut_->writeVLong(static_cast<int64_t>((suffixBuf.size() << 3) | 0x01));
@@ -212,12 +211,10 @@ void BlockTreeTermsWriter::writeBlock() {
         size_t i = 0;
         size_t count = pendingTerms_.size();
         while (i < count) {
-            if (pendingTerms_[i].stats.docFreq == 1 &&
-                pendingTerms_[i].stats.totalTermFreq == 1) {
+            if (pendingTerms_[i].stats.docFreq == 1 && pendingTerms_[i].stats.totalTermFreq == 1) {
                 // Count consecutive singletons
                 size_t runStart = i;
-                while (i < count &&
-                       pendingTerms_[i].stats.docFreq == 1 &&
+                while (i < count && pendingTerms_[i].stats.docFreq == 1 &&
                        pendingTerms_[i].stats.totalTermFreq == 1) {
                     i++;
                 }
@@ -225,8 +222,8 @@ void BlockTreeTermsWriter::writeBlock() {
                 bufEncodeVInt(statsBuf, ((runCount - 1) << 1) | 1);
             } else {
                 bufEncodeVInt(statsBuf, (pendingTerms_[i].stats.docFreq << 1) | 0);
-                bufEncodeVLong(statsBuf,
-                    pendingTerms_[i].stats.totalTermFreq - pendingTerms_[i].stats.docFreq);
+                bufEncodeVLong(statsBuf, pendingTerms_[i].stats.totalTermFreq -
+                                             pendingTerms_[i].stats.docFreq);
                 i++;
             }
         }
@@ -244,14 +241,18 @@ void BlockTreeTermsWriter::writeBlock() {
     {
         bool blockHasSkip = false, blockHasPos = false;
         for (const auto& pending : pendingTerms_) {
-            if (pending.stats.skipStartFP >= 0) blockHasSkip = true;
-            if (pending.stats.posStartFP >= 0) blockHasPos = true;
+            if (pending.stats.skipStartFP >= 0)
+                blockHasSkip = true;
+            if (pending.stats.posStartFP >= 0)
+                blockHasPos = true;
         }
 
         // Write flags byte
         uint8_t flags = 0x01;  // bit0: postingsFP always present
-        if (blockHasPos)  flags |= 0x02;
-        if (blockHasSkip) flags |= 0x04;
+        if (blockHasPos)
+            flags |= 0x02;
+        if (blockHasSkip)
+            flags |= 0x04;
         metaBuf.push_back(flags);
 
         // Column 1: postingsFP (always present)

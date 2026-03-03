@@ -145,8 +145,8 @@ private:
      * Block index entry (offset + doc count) for .fdx
      */
     struct BlockEntry {
-        int64_t offset;       // Start offset of block in .fdt
-        int numDocsInBlock;   // Number of docs in this block
+        int64_t offset;      // Start offset of block in .fdt
+        int numDocsInBlock;  // Number of docs in this block
     };
 
     std::string segmentName_;

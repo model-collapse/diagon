@@ -99,7 +99,8 @@ private:
      */
     static bool isAscii(const std::string& text) {
         for (unsigned char c : text) {
-            if (c >= 128) return false;
+            if (c >= 128)
+                return false;
         }
         return true;
     }
@@ -120,8 +121,7 @@ private:
         while (i < len) {
             // Skip non-alphanumeric
             unsigned char c = static_cast<unsigned char>(data[i]);
-            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                  (c >= '0' && c <= '9'))) {
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) {
                 i++;
                 continue;
             }
@@ -131,8 +131,8 @@ private:
             i++;
             while (i < len) {
                 c = static_cast<unsigned char>(data[i]);
-                if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                      (c >= '0' && c <= '9') || c == '\'')) {
+                if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                      c == '\'')) {
                     break;
                 }
                 i++;
@@ -184,9 +184,12 @@ private:
              start = end, end = bi->next()) {
             utext.extractBetween(start, end, scratchToken);
 
-            if (scratchToken.isEmpty()) continue;
-            if (isWhitespaceOnly(scratchToken)) continue;
-            if (isPunctuationOnly(scratchToken)) continue;
+            if (scratchToken.isEmpty())
+                continue;
+            if (isWhitespaceOnly(scratchToken))
+                continue;
+            if (isPunctuationOnly(scratchToken))
+                continue;
 
             scratchToken.toLower();
             scratchUtf8.clear();

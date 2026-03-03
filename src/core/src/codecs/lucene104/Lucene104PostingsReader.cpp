@@ -24,9 +24,8 @@ static constexpr int BITPACK_BLOCK_SIZE = 128;
 
 // Helper: unpack freq from low bit of doc deltas after BitPack decode.
 // Reads non-1 frequencies as VInts from the IndexInput stream.
-static inline void unpackFreqFromDocDeltas(uint32_t* docDeltaBuf, uint32_t* freqBuf,
-                                            int offset, int count,
-                                            store::IndexInput* docIn) {
+static inline void unpackFreqFromDocDeltas(uint32_t* docDeltaBuf, uint32_t* freqBuf, int offset,
+                                           int count, store::IndexInput* docIn) {
     for (int i = 0; i < count; i++) {
         if (docDeltaBuf[offset + i] & 1) {
             freqBuf[offset + i] = 1;
@@ -40,8 +39,7 @@ static inline void unpackFreqFromDocDeltas(uint32_t* docDeltaBuf, uint32_t* freq
 // Helper: read a PFOR-Delta block from IndexInput into docDeltaBuffer at given offset.
 // Token format: (numExceptions << 5) | patchedBitsRequired
 static inline void readBitPackBlock(store::IndexInput* docIn, uint32_t* docDeltaBuf,
-                                     uint32_t* freqBuf, int offset, int blockSize,
-                                     bool writeFreqs) {
+                                    uint32_t* freqBuf, int offset, int blockSize, bool writeFreqs) {
     // Read token byte: (numExceptions << 5) | bitsPerValue
     uint8_t token = docIn->readByte();
     int bpv = token & 0x1F;
@@ -57,7 +55,8 @@ static inline void readBitPackBlock(store::IndexInput* docIn, uint32_t* docDelta
         while (true) {
             uint8_t b = docIn->readByte();
             encoded[encodedPos++] = b;
-            if ((b & 0x80) == 0) break;
+            if ((b & 0x80) == 0)
+                break;
         }
     } else {
         // Read packed data + exception pairs
@@ -392,8 +391,8 @@ void Lucene104PostingsEnumWithImpacts::refillBuffer() {
 
     // Read one BitPack128 block if we have >= 128 remaining docs
     if (remaining >= BITPACK_BLOCK_SIZE) {
-        readBitPackBlock(docIn_.get(), docDeltaBuffer_, freqBuffer_,
-                         bufferIdx, BITPACK_BLOCK_SIZE, writeFreqs_);
+        readBitPackBlock(docIn_.get(), docDeltaBuffer_, freqBuffer_, bufferIdx, BITPACK_BLOCK_SIZE,
+                         writeFreqs_);
         bufferIdx += BITPACK_BLOCK_SIZE;
     } else if (remaining > 0) {
         // VInt tail for remaining < 128 docs (same low-bit encoding)
@@ -616,8 +615,8 @@ void Lucene104PostingsEnum::refillBuffer() {
 
     // Read one BitPack128 block if we have >= 128 remaining docs
     if (remaining >= BITPACK_BLOCK_SIZE) {
-        readBitPackBlock(docIn_.get(), docDeltaBuffer_, freqBuffer_,
-                         bufferIdx, BITPACK_BLOCK_SIZE, writeFreqs_);
+        readBitPackBlock(docIn_.get(), docDeltaBuffer_, freqBuffer_, bufferIdx, BITPACK_BLOCK_SIZE,
+                         writeFreqs_);
         bufferIdx += BITPACK_BLOCK_SIZE;
     } else if (remaining > 0) {
         // VInt tail for remaining < 128 docs (same low-bit encoding)
@@ -778,7 +777,8 @@ void Lucene104PostingsEnumWithPositions::refillPosBuffer() {
             while (true) {
                 uint8_t b = posIn_->readByte();
                 encoded[encodedPos++] = b;
-                if ((b & 0x80) == 0) break;
+                if ((b & 0x80) == 0)
+                    break;
             }
         } else {
             int dataBytes = (bpv == 0) ? 0 : (BITPACK_BLOCK_SIZE * bpv + 7) / 8;
@@ -809,8 +809,8 @@ void Lucene104PostingsEnumWithPositions::refillBuffer() {
 
     // Read one BitPack128 block if we have >= 128 remaining docs
     if (remaining >= BITPACK_BLOCK_SIZE) {
-        readBitPackBlock(docIn_.get(), docDeltaBuffer_, freqBuffer_,
-                         bufferIdx, BITPACK_BLOCK_SIZE, writeFreqs_);
+        readBitPackBlock(docIn_.get(), docDeltaBuffer_, freqBuffer_, bufferIdx, BITPACK_BLOCK_SIZE,
+                         writeFreqs_);
         bufferIdx += BITPACK_BLOCK_SIZE;
     } else if (remaining > 0) {
         // VInt tail for remaining < 128 docs (same low-bit encoding)

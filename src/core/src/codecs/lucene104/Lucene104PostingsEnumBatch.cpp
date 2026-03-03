@@ -169,7 +169,8 @@ void Lucene104PostingsEnumBatch::refillBuffer() {
             while (true) {
                 uint8_t b = docIn_->readByte();
                 encoded[encodedPos++] = b;
-                if ((b & 0x80) == 0) break;
+                if ((b & 0x80) == 0)
+                    break;
             }
         } else {
             int dataBytes = (bpv == 0) ? 0 : (BITPACK_BLOCK * bpv + 7) / 8;

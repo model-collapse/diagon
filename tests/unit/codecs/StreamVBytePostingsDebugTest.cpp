@@ -50,14 +50,14 @@ TEST(BitPackPostingsDebugTest, VIntTailFourDocs) {
     ByteBuffersIndexOutput out("test.doc");
 
     // All freqs > 1: writeVInt(delta << 1), writeVInt(freq)
-    out.writeVInt(0 << 1);   // doc 0 delta=0, low bit=0
-    out.writeVInt(10);       // freq
-    out.writeVInt(5 << 1);   // doc 1 delta=5, low bit=0
-    out.writeVInt(20);       // freq
-    out.writeVInt(5 << 1);   // doc 2 delta=5, low bit=0
-    out.writeVInt(30);       // freq
-    out.writeVInt(5 << 1);   // doc 3 delta=5, low bit=0
-    out.writeVInt(40);       // freq
+    out.writeVInt(0 << 1);  // doc 0 delta=0, low bit=0
+    out.writeVInt(10);      // freq
+    out.writeVInt(5 << 1);  // doc 1 delta=5, low bit=0
+    out.writeVInt(20);      // freq
+    out.writeVInt(5 << 1);  // doc 2 delta=5, low bit=0
+    out.writeVInt(30);      // freq
+    out.writeVInt(5 << 1);  // doc 3 delta=5, low bit=0
+    out.writeVInt(40);      // freq
 
     std::cout << "Total bytes written: " << out.getFilePointer() << std::endl;
 
@@ -151,7 +151,8 @@ TEST(BitPackPostingsDebugTest, BitPackBlockRoundTrip) {
     termState.docStartFP = 0;
     termState.docFreq = 128;
     termState.totalTermFreq = 0;
-    for (int i = 0; i < 128; ++i) termState.totalTermFreq += freqs[i];
+    for (int i = 0; i < 128; ++i)
+        termState.totalTermFreq += freqs[i];
     termState.skipStartFP = -1;
 
     auto field = createTestField("content", IndexOptions::DOCS_AND_FREQS);

@@ -81,8 +81,8 @@ std::unique_ptr<IndexInput> CompoundDirectory::openInput(const std::string& name
     std::string id = stripSegmentName(name, segmentName_);
     auto it = entries_.find(id);
     if (it == entries_.end()) {
-        throw FileNotFoundException("No sub-file '" + id + "' found in compound file '"
-                                    + segmentName_ + ".cfs' (fileName=" + name + ")");
+        throw FileNotFoundException("No sub-file '" + id + "' found in compound file '" +
+                                    segmentName_ + ".cfs' (fileName=" + name + ")");
     }
 
     const FileEntry& entry = it->second;
@@ -134,8 +134,8 @@ void CompoundDirectory::close() {
 // ==================== Utilities ====================
 
 std::string CompoundDirectory::toString() const {
-    return "CompoundDirectory(segment=\"" + segmentName_ + "\" in dir=" + directory_.toString()
-           + ")";
+    return "CompoundDirectory(segment=\"" + segmentName_ + "\" in dir=" + directory_.toString() +
+           ")";
 }
 
 std::string CompoundDirectory::stripSegmentName(const std::string& fileName,
@@ -167,8 +167,8 @@ CompoundDirectory::readEntries(Directory& dir, const std::string& entriesFile) {
         int64_t length = input->readLong();
 
         if (offset < 0 || length < 0) {
-            throw IOException("Corrupt compound entries file: negative offset/length for '"
-                              + name + "'");
+            throw IOException("Corrupt compound entries file: negative offset/length for '" + name +
+                              "'");
         }
 
         auto [it, inserted] = entries.emplace(std::move(name), FileEntry{offset, length});

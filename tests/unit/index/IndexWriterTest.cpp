@@ -513,8 +513,7 @@ TEST_F(IndexWriterTest, CommitDeletesOldSegmentsFiles) {
 
     // Only 1 segments_N file should remain (the latest generation)
     EXPECT_EQ(1, segmentsFileCount)
-        << "Expected exactly 1 segments_N file after multiple commits, found "
-        << segmentsFileCount;
+        << "Expected exactly 1 segments_N file after multiple commits, found " << segmentsFileCount;
 }
 
 TEST_F(IndexWriterTest, ReopenAfterClose) {

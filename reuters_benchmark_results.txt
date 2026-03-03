@@ -1,0 +1,18 @@
+Documents: 19043
+Indexing time (ms): 3694
+Throughput (docs/sec): 5155.12
+Index size (bytes): 6977984
+Query: Single term: 'dollar' | P50 (us): 20 | P90 (us): 21 | P99 (us): 606 | Hits: 983
+Query: Single term: 'oil' | P50 (us): 29 | P90 (us): 30 | P99 (us): 51 | Hits: 1368
+Query: Single term: 'trade' | P50 (us): 36 | P90 (us): 37 | P99 (us): 59 | Hits: 1868
+Query: Boolean AND: 'oil AND price' | P50 (us): 38 | P90 (us): 39 | P99 (us): 51 | Hits: 332
+Query: Boolean OR 2-term: 'trade OR export' | P50 (us): 41 | P90 (us): 41 | P99 (us): 54 | Hits: 937
+Query: Boolean OR 5-term: 'oil OR trade OR market OR price OR dollar' | P50 (us): 78 | P90 (us): 82 | P99 (us): 93 | Hits: 1426
+Query: Boolean OR 10-term | P50 (us): 147 | P90 (us): 159 | P99 (us): 165 | Hits: 1853
+Query: Boolean OR 20-term | P50 (us): 165 | P90 (us): 176 | P99 (us): 186 | Hits: 452
+Query: Boolean OR 50-term | P50 (us): 332 | P90 (us): 343 | P99 (us): 351 | Hits: 226
+Query: Phrase: 'oil price' | P50 (us): 52 | P90 (us): 55 | P99 (us): 86 | Hits: 55
+Query: Phrase: 'trade deficit' | P50 (us): 46 | P90 (us): 48 | P99 (us): 59 | Hits: 220
+Query: Phrase: 'interest rate' | P50 (us): 56 | P90 (us): 57 | P99 (us): 70 | Hits: 233
+Query: Phrase: 'stock market' | P50 (us): 89 | P90 (us): 94 | P99 (us): 102 | Hits: 167
+Query: Phrase 3-term: 'federal reserve bank' | P50 (us): 65 | P90 (us): 67 | P99 (us): 78 | Hits: 25
