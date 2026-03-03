@@ -91,6 +91,7 @@ add_diagon_benchmark(LuceneComparisonBenchmark LuceneComparisonBenchmark.cpp)
 add_diagon_benchmark(ScaleComparisonBenchmark ScaleComparisonBenchmark.cpp)
 add_diagon_benchmark(TokenizerBenchmark TokenizerBenchmark.cpp)
 add_diagon_benchmark(FSTEfficiencyGate FSTEfficiencyGate.cpp)
+add_diagon_benchmark(JsonIngestionBenchmark JsonIngestionBenchmark.cpp)
 
 # ==================== Standalone Benchmarks ====================
 

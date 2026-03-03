@@ -429,9 +429,17 @@ void diagon_bool_query_set_minimum_should_match(DiagonQuery bool_query, int mini
 DiagonQuery diagon_bool_query_build(DiagonQuery bool_query_builder);
 
 /**
- * Free Query
+ * Free Query (must NOT be used on BooleanQuery builder handles)
  */
 void diagon_free_query(DiagonQuery query);
+
+/**
+ * Free a BooleanQuery builder that was NOT built via diagon_bool_query_build().
+ * Use this to clean up if you call diagon_create_bool_query() but decide not to
+ * build. After diagon_bool_query_build() succeeds, the builder is already freed
+ * and you should use diagon_free_query() on the returned query instead.
+ */
+void diagon_free_bool_query_builder(DiagonQuery builder);
 
 // ==================== Search Results ====================
 

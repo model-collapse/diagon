@@ -42,59 +42,63 @@ FieldType makeIndexedDoubleType() {
 static const FieldType INDEXED_LONG_TYPE = makeIndexedLongType();
 static const FieldType INDEXED_DOUBLE_TYPE = makeIndexedDoubleType();
 
+// Maximum nesting depth to prevent stack overflow from malicious input.
+// 64 levels is generous for real-world JSON while keeping stack usage bounded.
+static constexpr int kMaxNestingDepth = 64;
+
+// Forward declaration
+void addValue(Document& doc, const std::string& fieldName, const nlohmann::json& val, int depth);
+
 /**
- * Add fields from a JSON value to a document, handling nested objects via
+ * Add fields from a JSON object to a document, handling nested objects via
  * dot-path flattening and arrays via multi-value fields.
  */
-void addFields(Document& doc, const nlohmann::json& j, const std::string& prefix) {
+void addFields(Document& doc, const nlohmann::json& j, const std::string& prefix, int depth = 0) {
+    if (depth > kMaxNestingDepth) {
+        throw std::runtime_error("JSON nesting depth exceeds limit (" +
+                                 std::to_string(kMaxNestingDepth) + ")");
+    }
     for (auto it = j.begin(); it != j.end(); ++it) {
         std::string fieldName = prefix.empty() ? it.key() : prefix + "." + it.key();
-        const auto& val = it.value();
+        addValue(doc, fieldName, it.value(), depth);
+    }
+}
 
-        if (val.is_null()) {
-            // Skip null values
-            continue;
-        }
+/**
+ * Add a single JSON value as a document field.
+ * Handles all JSON types uniformly — used by both top-level objects and array elements.
+ */
+void addValue(Document& doc, const std::string& fieldName, const nlohmann::json& val, int depth) {
+    if (val.is_null()) {
+        return;
+    }
 
-        if (val.is_string()) {
-            doc.add(std::make_unique<TextField>(fieldName, val.get<std::string>(), true));
-        } else if (val.is_boolean()) {
-            doc.add(
-                std::make_unique<StringField>(fieldName, val.get<bool>() ? "true" : "false", true));
-        } else if (val.is_number_integer()) {
-            int64_t longVal = val.get<int64_t>();
-            doc.add(std::make_unique<Field>(fieldName, longVal, INDEXED_LONG_TYPE));
-        } else if (val.is_number_float()) {
-            double dblVal = val.get<double>();
-            int64_t longBits = std::bit_cast<int64_t>(dblVal);
-            doc.add(std::make_unique<Field>(fieldName, longBits, INDEXED_DOUBLE_TYPE));
-        } else if (val.is_object()) {
-            // Recurse into nested object with dot-path prefix
-            addFields(doc, val, fieldName);
-        } else if (val.is_array()) {
-            // Array: add one field per element (Lucene multi-value pattern)
-            for (const auto& elem : val) {
-                if (elem.is_null()) {
-                    continue;
-                }
-                if (elem.is_string()) {
-                    doc.add(std::make_unique<TextField>(fieldName, elem.get<std::string>(), true));
-                } else if (elem.is_boolean()) {
-                    doc.add(std::make_unique<StringField>(
-                        fieldName, elem.get<bool>() ? "true" : "false", true));
-                } else if (elem.is_number_integer()) {
-                    int64_t longVal = elem.get<int64_t>();
-                    doc.add(std::make_unique<Field>(fieldName, longVal, INDEXED_LONG_TYPE));
-                } else if (elem.is_number_float()) {
-                    double dblVal = elem.get<double>();
-                    int64_t longBits = std::bit_cast<int64_t>(dblVal);
-                    doc.add(std::make_unique<Field>(fieldName, longBits, INDEXED_DOUBLE_TYPE));
-                } else if (elem.is_object()) {
-                    // Nested object inside array: flatten with same prefix
-                    addFields(doc, elem, fieldName);
-                }
-                // Nested arrays are silently skipped (no standard mapping)
-            }
+    if (val.is_string()) {
+        doc.add(std::make_unique<TextField>(fieldName, val.get<std::string>(), true));
+    } else if (val.is_boolean()) {
+        doc.add(
+            std::make_unique<StringField>(fieldName, val.get<bool>() ? "true" : "false", true));
+    } else if (val.is_number_unsigned()) {
+        // Must check before is_number_integer(): unsigned values > INT64_MAX
+        // are stored as uint64_t by nlohmann and would be silently dropped otherwise.
+        // We reinterpret as int64_t (bit pattern preserved, Lucene convention).
+        uint64_t uval = val.get<uint64_t>();
+        int64_t longVal = static_cast<int64_t>(uval);
+        doc.add(std::make_unique<Field>(fieldName, longVal, INDEXED_LONG_TYPE));
+    } else if (val.is_number_integer()) {
+        int64_t longVal = val.get<int64_t>();
+        doc.add(std::make_unique<Field>(fieldName, longVal, INDEXED_LONG_TYPE));
+    } else if (val.is_number_float()) {
+        double dblVal = val.get<double>();
+        int64_t longBits = std::bit_cast<int64_t>(dblVal);
+        doc.add(std::make_unique<Field>(fieldName, longBits, INDEXED_DOUBLE_TYPE));
+    } else if (val.is_object()) {
+        addFields(doc, val, fieldName, depth + 1);
+    } else if (val.is_array()) {
+        // Array: add one field per element (Lucene multi-value pattern)
+        // Nested arrays are flattened into the same field name.
+        for (const auto& elem : val) {
+            addValue(doc, fieldName, elem, depth);
         }
     }
 }

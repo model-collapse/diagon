@@ -58,6 +58,11 @@ void diagon_clear_error() {
 // ==================== Directory Management ====================
 
 DiagonDirectory diagon_open_fs_directory(const char* path) {
+    if (!path) {
+        set_error("Invalid path");
+        return nullptr;
+    }
+
     try {
         auto dir = std::make_unique<diagon::store::FSDirectory>(path);
         return static_cast<DiagonDirectory>(dir.release());
@@ -68,6 +73,11 @@ DiagonDirectory diagon_open_fs_directory(const char* path) {
 }
 
 DiagonDirectory diagon_open_mmap_directory(const char* path) {
+    if (!path) {
+        set_error("Invalid path");
+        return nullptr;
+    }
+
     try {
         auto dir = std::make_unique<diagon::store::MMapDirectory>(path);
         return static_cast<DiagonDirectory>(dir.release());
@@ -375,10 +385,10 @@ DiagonField diagon_create_double_field(const char* name, double value) {
     }
 
     try {
-        // Cast double to int64 for NumericDocValuesField
-        // TODO: Add proper double field support
-        auto field = std::make_unique<diagon::document::NumericDocValuesField>(
-            name, static_cast<int64_t>(value));
+        // Store double as bit_cast int64_t to preserve full precision (Lucene convention).
+        // static_cast<int64_t> would silently truncate fractional parts (e.g., 3.14 -> 3).
+        int64_t longBits = std::bit_cast<int64_t>(value);
+        auto field = std::make_unique<diagon::document::NumericDocValuesField>(name, longBits);
         return static_cast<DiagonField>(field.release());
     } catch (const std::exception& e) {
         set_error(e);
@@ -607,12 +617,10 @@ DiagonQuery diagon_create_numeric_range_query(const char* field_name, double low
     }
 
     try {
-        // Convert double to int64_t using bit_cast to preserve full precision
-        // This allows the same function to work for both LONG and DOUBLE fields:
-        // - For LONG fields: Pass integers as doubles (e.g., 100.0), they'll be
-        //   converted and match int64_t comparisons
-        // - For DOUBLE fields: Pass doubles (e.g., 150.5), bit representation is
-        //   preserved and matches double comparisons
+        // WARNING: bit_cast stores the IEEE 754 bit pattern, NOT the numeric value.
+        // bit_cast<int64_t>(100.0) == 4636737291354636288, NOT 100.
+        // This function only works correctly for DOUBLE fields indexed via bit_cast.
+        // For LONG fields, use a dedicated long range query API (not yet implemented).
         int64_t lower = std::bit_cast<int64_t>(lower_value);
         int64_t upper = std::bit_cast<int64_t>(upper_value);
 
@@ -772,9 +780,13 @@ DiagonQuery diagon_bool_query_build(DiagonQuery bool_query_builder) {
 
 void diagon_free_query(DiagonQuery query) {
     if (query) {
-        // Note: This could be either a Query or a Builder
-        // For safety, we cast to Query (which is the base class)
         delete static_cast<diagon::search::Query*>(query);
+    }
+}
+
+void diagon_free_bool_query_builder(DiagonQuery builder) {
+    if (builder) {
+        delete static_cast<diagon::search::BooleanQuery::Builder*>(builder);
     }
 }
 
@@ -848,148 +860,69 @@ void diagon_free_top_docs(DiagonTopDocs top_docs) {
 // ==================== Document Retrieval ====================
 
 DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) {
-    fprintf(stderr, "[C API] diagon_reader_get_document called for doc_id=%d\n", doc_id);
-    fflush(stderr);
-
     if (!reader) {
         set_error("Invalid reader");
-        fprintf(stderr, "[C API] Invalid reader\n");
-        fflush(stderr);
         return nullptr;
     }
 
     try {
-        fprintf(stderr, "[C API] Starting document retrieval, reader=%p\n", reader);
-        fflush(stderr);
-
-        if (!reader) {
-            fprintf(stderr, "[C API] ERROR: reader is NULL!\n");
-            fflush(stderr);
-            set_error("Reader is NULL");
-            return nullptr;
-        }
-
-        // CRITICAL FIX: diagon_open_index_reader returns std::shared_ptr<DirectoryReader>*
-        // We need to dereference the shared_ptr to get the actual DirectoryReader*
-        fprintf(stderr, "[C API] Casting to shared_ptr\n");
-        fflush(stderr);
         auto* reader_ptr = static_cast<std::shared_ptr<diagon::index::DirectoryReader>*>(reader);
-        auto* dir_reader = reader_ptr->get();  // Get raw pointer from shared_ptr
-
-        fprintf(stderr, "[C API] Got DirectoryReader=%p from shared_ptr\n",
-                static_cast<void*>(dir_reader));
-        fflush(stderr);
+        auto* dir_reader = reader_ptr->get();
 
         if (!dir_reader) {
-            fprintf(stderr, "[C API] ERROR: DirectoryReader is NULL!\n");
-            fflush(stderr);
             set_error("DirectoryReader is NULL");
             return nullptr;
         }
 
-        // Get leaf readers from the composite reader
-        fprintf(stderr, "[C API] Calling leaves()\n");
-        fflush(stderr);
         auto leaves = dir_reader->leaves();
-        fprintf(stderr, "[C API] Got %zu leaves\n", leaves.size());
-        fflush(stderr);
 
         if (leaves.empty()) {
             set_error("No leaves in directory reader");
             return nullptr;
         }
 
-        // Find the correct segment containing the global doc_id
-        // Lucene/Diagon use two-level document IDs:
-        // 1. Global ID: 0-based across entire index
-        // 2. Segment-local ID: 0-based within each segment
-        // Each segment has docBase (starting global ID) and maxDoc (document count)
-
+        // Find the correct segment containing the global doc_id.
+        // Each segment has docBase (starting global ID) and maxDoc (document count).
         diagon::index::LeafReader* leaf_reader = nullptr;
         int segment_local_doc_id = -1;
-
-        fprintf(stderr, "[C API] Finding segment for global doc_id=%d\n", doc_id);
-        fflush(stderr);
 
         for (const auto& ctx : leaves) {
             int maxDoc = ctx.reader->maxDoc();
             int docBase = ctx.docBase;
 
-            fprintf(stderr,
-                    "[C API] Checking segment ord=%d, docBase=%d, maxDoc=%d, range=[%d, %d)\n",
-                    ctx.ord, docBase, maxDoc, docBase, docBase + maxDoc);
-            fflush(stderr);
-
-            // Check if global doc_id falls within this segment's range
             if (doc_id >= docBase && doc_id < docBase + maxDoc) {
                 leaf_reader = ctx.reader;
-
-                // Convert global ID to segment-local ID
                 segment_local_doc_id = doc_id - docBase;
-
-                fprintf(stderr,
-                        "[C API] Found! Segment ord=%d contains global doc_id=%d (local_id=%d)\n",
-                        ctx.ord, doc_id, segment_local_doc_id);
-                fflush(stderr);
                 break;
             }
         }
 
         if (!leaf_reader) {
-            char error_msg[256];
-            snprintf(error_msg, sizeof(error_msg),
-                     "Document ID %d not found in any segment (total segments: %zu)", doc_id,
-                     leaves.size());
-            set_error(error_msg);
-            fprintf(stderr, "[C API] ERROR: %s\n", error_msg);
-            fflush(stderr);
+            set_error("Document ID " + std::to_string(doc_id) +
+                      " not found in any segment (total segments: " +
+                      std::to_string(leaves.size()) + ")");
             return nullptr;
         }
 
-        fprintf(stderr, "[C API] Got leaf_reader=%p for segment\n",
-                static_cast<void*>(leaf_reader));
-        fflush(stderr);
-
-        // Get stored fields reader from the leaf reader
-        fprintf(stderr, "[C API] Getting stored fields reader\n");
-        fflush(stderr);
         auto* stored_fields_reader = leaf_reader->storedFieldsReader();
-
-        fprintf(stderr, "[C API] Got stored_fields_reader=%p\n",
-                static_cast<void*>(stored_fields_reader));
-        fflush(stderr);
 
         if (!stored_fields_reader) {
             set_error("No stored fields reader available (no stored fields in index)");
-            fprintf(stderr, "[C API] No stored fields reader available\n");
-            fflush(stderr);
             return nullptr;
         }
 
-        // Read document fields using SEGMENT-LOCAL doc_id
-        fprintf(stderr,
-                "[C API] Reading document fields for global_doc_id=%d, segment_local_doc_id=%d\n",
-                doc_id, segment_local_doc_id);
-        fflush(stderr);
         auto fields = stored_fields_reader->document(segment_local_doc_id);
-        fprintf(stderr, "[C API] Got %zu fields\n", fields.size());
-        fflush(stderr);
 
-        // Create Diagon document and populate with stored fields
-        fprintf(stderr, "[C API] Creating Document object\n");
-        fflush(stderr);
         auto* doc = new diagon::document::Document();
 
         for (const auto& [field_name, field_value] : fields) {
             if (std::holds_alternative<std::string>(field_value)) {
                 const auto& str_val = std::get<std::string>(field_value);
-                // Create TextField with STORED type
                 auto field = std::make_unique<diagon::document::TextField>(
                     field_name, str_val, diagon::document::TextField::TYPE_STORED);
                 doc->add(std::move(field));
             } else if (std::holds_alternative<int32_t>(field_value)) {
                 auto int_val = std::get<int32_t>(field_value);
-                // Store as TextField with string representation
                 auto field = std::make_unique<diagon::document::TextField>(
                     field_name, std::to_string(int_val), diagon::document::TextField::TYPE_STORED);
                 doc->add(std::move(field));
@@ -1001,12 +934,8 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
             }
         }
 
-        fprintf(stderr, "[C API] Document created successfully with fields\n");
-        fflush(stderr);
         return doc;
     } catch (const std::exception& e) {
-        fprintf(stderr, "[C API] Exception caught: %s\n", e.what());
-        fflush(stderr);
         set_error(e);
         return nullptr;
     }
@@ -1014,7 +943,7 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
 
 bool diagon_document_get_field_value(DiagonDocument doc, const char* field_name, char* out_value,
                                      size_t out_value_len) {
-    if (!doc || !field_name || !out_value) {
+    if (!doc || !field_name || !out_value || out_value_len == 0) {
         return false;
     }
 
