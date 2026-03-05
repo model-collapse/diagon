@@ -74,8 +74,10 @@ double TieredMergePolicy::computeSkew(const std::vector<SegmentSize*>& segments)
         maxSize = std::max(maxSize, size);
     }
 
-    if (minSize == 0)
-        return 1e9;  // Very high skew if one segment is empty
+    if (minSize == 0) {
+        // If all segments are zero-size (sizeInBytes not yet computed), treat as equal
+        return (maxSize == 0) ? 1.0 : 1e9;
+    }
 
     return (double)maxSize / minSize;
 }
@@ -111,10 +113,12 @@ OneMerge* TieredMergePolicy::findBestMerge(const std::vector<SegmentSize>& eligi
                 continue;
             }
 
-            // Compute score: skew + normalized size penalty
+            // Compute score: skew/mergeSize + normalized size penalty
+            // Dividing by mergeSize prefers larger merges (less write amplification),
+            // matching Lucene's TieredMergePolicy behavior
             double skew = computeSkew(mergeSegments);
             double sizePenalty = (double)totalSize / maxBytes;  // 0..1
-            double score = skew + sizePenalty;
+            double score = skew / mergeSize + sizePenalty;
 
             if (score < bestScore) {
                 bestScore = score;

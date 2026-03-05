@@ -173,8 +173,15 @@ std::unique_ptr<index::Terms> Lucene104FieldsProducer::terms(const std::string& 
     auto tipInputClone = tipInput_->clone();
 
     // Create new BlockTreeTermsReader for this field with cloned inputs
-    auto reader = std::make_shared<blocktree::BlockTreeTermsReader>(
-        timInputClone.get(), tipInputClone.get(), *fieldInfo);
+    // Note: Field may exist in FieldInfos but have no postings on disk
+    // (e.g., "_all" field registered in metadata but never written)
+    std::shared_ptr<blocktree::BlockTreeTermsReader> reader;
+    try {
+        reader = std::make_shared<blocktree::BlockTreeTermsReader>(
+            timInputClone.get(), tipInputClone.get(), *fieldInfo);
+    } catch (const std::exception&) {
+        return nullptr;  // Field has no postings data on disk
+    }
 
     // Cache the reader along with its input clones (to keep them alive)
     FieldReaderHolder holder;

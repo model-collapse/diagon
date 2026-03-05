@@ -297,6 +297,12 @@ private:
     mutable std::mutex commitLock_;
     mutable std::mutex closeLock_;
 
+    // Merge support
+    mutable std::mutex mergeLock_;
+    size_t collectedSegmentCount_{0};  // How many segments from documentsWriter_ already collected
+    void maybeMerge(MergeTrigger trigger);
+    void collectNewSegments();
+
     // Helper methods
     void ensureOpen() const;
     int64_t nextSequenceNumber();

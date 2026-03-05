@@ -90,21 +90,10 @@ int64_t IndexWriter::addDocument(const document::Document& doc) {
     // Returns number of segments created (0 or 1 for auto-flush)
     int segmentsCreated = documentsWriter_->addDocument(doc);
 
-    // If segments were created, add them to SegmentInfos
+    // If segments were created, collect them and maybe merge
     if (segmentsCreated > 0) {
-        for (const auto& segmentInfo : documentsWriter_->getSegmentInfos()) {
-            // Check if this segment is new (not already in segmentInfos_)
-            bool isNew = true;
-            for (int i = 0; i < segmentInfos_.size(); i++) {
-                if (segmentInfos_.info(i)->name() == segmentInfo->name()) {
-                    isNew = false;
-                    break;
-                }
-            }
-            if (isNew) {
-                segmentInfos_.add(segmentInfo);
-            }
-        }
+        collectNewSegments();
+        maybeMerge(MergeTrigger::SEGMENT_FLUSH);
     }
 
     return nextSequenceNumber();
@@ -116,18 +105,8 @@ int64_t IndexWriter::addDocuments(const std::vector<const document::Document*>& 
     int segmentsCreated = documentsWriter_->addDocuments(docs);
 
     if (segmentsCreated > 0) {
-        for (const auto& segmentInfo : documentsWriter_->getSegmentInfos()) {
-            bool isNew = true;
-            for (int i = 0; i < segmentInfos_.size(); i++) {
-                if (segmentInfos_.info(i)->name() == segmentInfo->name()) {
-                    isNew = false;
-                    break;
-                }
-            }
-            if (isNew) {
-                segmentInfos_.add(segmentInfo);
-            }
-        }
+        collectNewSegments();
+        maybeMerge(MergeTrigger::SEGMENT_FLUSH);
     }
 
     return nextSequenceNumber();
@@ -151,21 +130,10 @@ int64_t IndexWriter::updateDocument(const Term& term, const document::Document& 
     // Add new document
     int segmentsCreated = documentsWriter_->addDocument(doc);
 
-    // If segments were created, add them to SegmentInfos
+    // If segments were created, collect them and maybe merge
     if (segmentsCreated > 0) {
-        for (const auto& segmentInfo : documentsWriter_->getSegmentInfos()) {
-            // Check if this segment is new (not already in segmentInfos_)
-            bool isNew = true;
-            for (int i = 0; i < segmentInfos_.size(); i++) {
-                if (segmentInfos_.info(i)->name() == segmentInfo->name()) {
-                    isNew = false;
-                    break;
-                }
-            }
-            if (isNew) {
-                segmentInfos_.add(segmentInfo);
-            }
-        }
+        collectNewSegments();
+        maybeMerge(MergeTrigger::SEGMENT_FLUSH);
     }
 
     return nextSequenceNumber();
@@ -200,6 +168,9 @@ int64_t IndexWriter::commitInternal() {
             }
         }
     }
+
+    // Size-based tiered merge at commit time
+    maybeMerge(MergeTrigger::COMMIT);
 
     // Check for segments with high deletions and merge them
     std::unique_ptr<MergeSpecification> deletesMerges(
@@ -240,21 +211,35 @@ void IndexWriter::flush() {
     // Flush DocumentsWriter (creates segment files)
     int segmentsCreated = documentsWriter_->flush();
 
-    // Add new segments to SegmentInfos
+    // Add new segments to SegmentInfos (no merge — matches Lucene flush behavior)
     if (segmentsCreated > 0) {
-        for (const auto& segmentInfo : documentsWriter_->getSegmentInfos()) {
-            // Check if this segment is new
-            bool isNew = true;
-            for (int i = 0; i < segmentInfos_.size(); i++) {
-                if (segmentInfos_.info(i)->name() == segmentInfo->name()) {
-                    isNew = false;
-                    break;
-                }
-            }
-            if (isNew) {
-                segmentInfos_.add(segmentInfo);
-            }
+        collectNewSegments();
+    }
+}
+
+void IndexWriter::collectNewSegments() {
+    auto allSegments = documentsWriter_->getSegmentInfos();
+    for (size_t i = collectedSegmentCount_; i < allSegments.size(); i++) {
+        segmentInfos_.add(allSegments[i]);
+    }
+    collectedSegmentCount_ = allSegments.size();
+}
+
+void IndexWriter::maybeMerge(MergeTrigger trigger) {
+    // try_lock: skip if a merge is already running (avoids blocking the indexing thread)
+    std::unique_lock<std::mutex> lock(mergeLock_, std::try_to_lock);
+    if (!lock.owns_lock()) {
+        return;
+    }
+
+    // Loop up to 10 iterations — each merge may create a segment eligible for cascading merge
+    for (int i = 0; i < 10; i++) {
+        std::unique_ptr<MergeSpecification> spec(
+            mergePolicy_->findMerges(trigger, segmentInfos_));
+        if (!spec || spec->empty()) {
+            break;
         }
+        executeMerges(spec.get());
     }
 }
 

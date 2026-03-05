@@ -106,6 +106,7 @@ add_diagon_test(ReaderReopenTest unit/index/ReaderReopenTest.cpp)
 add_diagon_test(CacheHelperTest unit/index/CacheHelperTest.cpp)
 add_diagon_test(IndexWriterRollbackTest unit/index/IndexWriterRollbackTest.cpp)
 add_diagon_test(ForceMergeTest unit/index/ForceMergeTest.cpp)
+add_diagon_test(MaybeMergeTest unit/index/MaybeMergeTest.cpp)
 add_diagon_test(ForceMergeDebugTest unit/index/ForceMergeDebugTest.cpp)
 add_diagon_test(NormsIntegrationTest unit/index/NormsIntegrationTest.cpp)
 
