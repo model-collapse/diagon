@@ -4,6 +4,7 @@
 #pragma once
 
 #include "diagon/document/Document.h"
+#include "diagon/index/ConcurrentMergeScheduler.h"
 #include "diagon/index/DocumentsWriter.h"
 #include "diagon/index/MergePolicy.h"
 #include "diagon/index/SegmentInfo.h"
@@ -14,6 +15,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 
 namespace diagon {
@@ -297,9 +299,12 @@ private:
     mutable std::mutex commitLock_;
     mutable std::mutex closeLock_;
 
-    // Merge support
-    mutable std::mutex mergeLock_;
-    size_t collectedSegmentCount_{0};  // How many segments from documentsWriter_ already collected
+    // Background merge support
+    ConcurrentMergeScheduler mergeScheduler_;
+    mutable std::mutex segmentLock_;          // Protects segmentInfos_ and mergingSegments_
+    std::set<std::string> mergingSegments_;   // Segments currently being merged in background
+    std::atomic<int> mergeCounter_{0};        // Unique name counter for merged segments
+    size_t collectedSegmentCount_{0};         // How many segments from documentsWriter_ already collected
     void maybeMerge(MergeTrigger trigger);
     void collectNewSegments();
 

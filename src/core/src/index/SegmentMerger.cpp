@@ -452,23 +452,25 @@ std::shared_ptr<SegmentInfo> SegmentMerger::merge() {
     auto mergedInfo = std::make_shared<SegmentInfo>(segmentName_, docMapping_.newMaxDoc,
                                                     sourceSegments_[0]->codecName());
 
+    // Discover output files by listing directory and matching segment prefix.
+    // This mirrors Lucene's approach and handles codec-specific files correctly
+    // (e.g., .pos only exists when fields have positions, .skp only with skip data).
+    std::string prefix = segmentName_ + ".";
+    int64_t totalSize = 0;
+    for (const auto& file : directory_.listAll()) {
+        if (file.size() > prefix.size() && file.compare(0, prefix.size(), prefix) == 0) {
+            mergedInfo->addFile(file);
+            totalSize += directory_.fileLength(file);
+        }
+    }
+    mergedInfo->setSizeInBytes(totalSize);
+
     // Set FieldInfos
     mergedInfo->setFieldInfos(std::move(mergedFieldInfos));
 
     // Set diagnostics
     mergedInfo->setDiagnostic("source", "merge");
     mergedInfo->setDiagnostic("mergeMaxNumSegments", std::to_string(sourceSegments_.size()));
-
-    // Calculate size (sum of source segments, adjusted for deletions)
-    int64_t totalSize = 0;
-    for (const auto& seg : sourceSegments_) {
-        if (seg->maxDoc() == 0)
-            continue;
-        // Adjust size for deletion ratio
-        double liveRatio = (double)(seg->maxDoc() - seg->delCount()) / seg->maxDoc();
-        totalSize += (int64_t)(seg->sizeInBytes() * liveRatio);
-    }
-    mergedInfo->setSizeInBytes(totalSize);
 
     // No deletions in merged segment (all deleted docs were skipped)
     mergedInfo->setDelCount(0);

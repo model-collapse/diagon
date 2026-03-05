@@ -52,6 +52,7 @@ set(DIAGON_CORE_SOURCES
     src/index/DirectoryReader.cpp
     src/index/TieredMergePolicy.cpp
     src/index/SegmentMerger.cpp
+    src/index/ConcurrentMergeScheduler.cpp
     src/index/skipindex/MergeTreeIndexBloomFilter.cpp
     src/index/BlockMaxQuantizedIndex.cpp
 
@@ -192,6 +193,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/index/MergeScheduler.h
     include/diagon/index/TieredMergePolicy.h
     include/diagon/index/SegmentMerger.h
+    include/diagon/index/ConcurrentMergeScheduler.h
     include/diagon/index/FreqProxTermsWriter.h
     include/diagon/index/DocumentsWriterPerThread.h
     include/diagon/index/DocumentsWriter.h

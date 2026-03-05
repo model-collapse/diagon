@@ -90,9 +90,12 @@ int64_t IndexWriter::addDocument(const document::Document& doc) {
     // Returns number of segments created (0 or 1 for auto-flush)
     int segmentsCreated = documentsWriter_->addDocument(doc);
 
-    // If segments were created, collect them and maybe merge
+    // If segments were created, collect them and maybe merge (background)
     if (segmentsCreated > 0) {
-        collectNewSegments();
+        {
+            std::lock_guard<std::mutex> lock(segmentLock_);
+            collectNewSegments();
+        }
         maybeMerge(MergeTrigger::SEGMENT_FLUSH);
     }
 
@@ -105,7 +108,10 @@ int64_t IndexWriter::addDocuments(const std::vector<const document::Document*>& 
     int segmentsCreated = documentsWriter_->addDocuments(docs);
 
     if (segmentsCreated > 0) {
-        collectNewSegments();
+        {
+            std::lock_guard<std::mutex> lock(segmentLock_);
+            collectNewSegments();
+        }
         maybeMerge(MergeTrigger::SEGMENT_FLUSH);
     }
 
@@ -130,9 +136,12 @@ int64_t IndexWriter::updateDocument(const Term& term, const document::Document& 
     // Add new document
     int segmentsCreated = documentsWriter_->addDocument(doc);
 
-    // If segments were created, collect them and maybe merge
+    // If segments were created, collect them and maybe merge (background)
     if (segmentsCreated > 0) {
-        collectNewSegments();
+        {
+            std::lock_guard<std::mutex> lock(segmentLock_);
+            collectNewSegments();
+        }
         maybeMerge(MergeTrigger::SEGMENT_FLUSH);
     }
 
@@ -153,34 +162,63 @@ int64_t IndexWriter::commitInternal() {
     // Flush pending documents
     flush();
 
-    // Create compound files for newly flushed segments (if enabled)
-    // NOTE: createCompoundFile() writes .cfs/.cfe and updates SegmentInfo in-memory,
-    // but does NOT delete original files yet (crash-safety: originals survive until commit)
+    // Wait for any in-flight background merges to complete before committing.
+    // After this, no background merges are running, so segmentInfos_ is stable.
+    mergeScheduler_.waitForMerges();
+
+    // Create compound files for newly flushed segments (if enabled).
+    // Snapshot segments under lock, then do I/O without lock.
     std::vector<std::vector<std::string>> pendingCompoundDeletes;
     if (useCompoundFile_) {
-        for (int i = 0; i < segmentInfos_.size(); i++) {
-            auto segment = segmentInfos_.info(i);
-            if (!segment->getUseCompoundFile()) {
-                auto origFiles = createCompoundFile(segment);
-                if (!origFiles.empty()) {
-                    pendingCompoundDeletes.push_back(std::move(origFiles));
+        std::vector<std::shared_ptr<SegmentInfo>> needCompound;
+        {
+            std::lock_guard<std::mutex> lock(segmentLock_);
+            for (int i = 0; i < segmentInfos_.size(); i++) {
+                auto segment = segmentInfos_.info(i);
+                if (!segment->getUseCompoundFile()) {
+                    needCompound.push_back(segment);
                 }
+            }
+        }
+        for (auto& segment : needCompound) {
+            auto origFiles = createCompoundFile(segment);
+            if (!origFiles.empty()) {
+                pendingCompoundDeletes.push_back(std::move(origFiles));
             }
         }
     }
 
-    // Size-based tiered merge at commit time
-    maybeMerge(MergeTrigger::COMMIT);
+    // Size-based tiered merge at commit time (synchronous — must complete before segments_N).
+    // findMerges reads segmentInfos_ under lock; executeMerges has its own locking.
+    for (int i = 0; i < 10; i++) {
+        std::unique_ptr<MergeSpecification> spec;
+        {
+            std::lock_guard<std::mutex> lock(segmentLock_);
+            spec.reset(mergePolicy_->findMerges(MergeTrigger::COMMIT, segmentInfos_));
+        }
+        if (!spec || spec->empty()) {
+            break;
+        }
+        executeMerges(spec.get());
+    }
 
     // Check for segments with high deletions and merge them
-    std::unique_ptr<MergeSpecification> deletesMerges(
-        mergePolicy_->findForcedDeletesMerges(segmentInfos_));
-    if (deletesMerges && !deletesMerges->empty()) {
-        executeMerges(deletesMerges.get());
+    {
+        std::unique_ptr<MergeSpecification> deletesMerges;
+        {
+            std::lock_guard<std::mutex> lock(segmentLock_);
+            deletesMerges.reset(mergePolicy_->findForcedDeletesMerges(segmentInfos_));
+        }
+        if (deletesMerges && !deletesMerges->empty()) {
+            executeMerges(deletesMerges.get());
+        }
     }
 
     // Write segments_N file — this is the atomic commit point
-    writeSegmentsFile();
+    {
+        std::lock_guard<std::mutex> lock(segmentLock_);
+        writeSegmentsFile();
+    }
 
     // Sync directory metadata
     directory_.syncMetaData();
@@ -213,6 +251,7 @@ void IndexWriter::flush() {
 
     // Add new segments to SegmentInfos (no merge — matches Lucene flush behavior)
     if (segmentsCreated > 0) {
+        std::lock_guard<std::mutex> lock(segmentLock_);
         collectNewSegments();
     }
 }
@@ -226,20 +265,108 @@ void IndexWriter::collectNewSegments() {
 }
 
 void IndexWriter::maybeMerge(MergeTrigger trigger) {
-    // try_lock: skip if a merge is already running (avoids blocking the indexing thread)
-    std::unique_lock<std::mutex> lock(mergeLock_, std::try_to_lock);
-    if (!lock.owns_lock()) {
+    // Build a filtered SegmentInfos that excludes segments currently being merged.
+    // findMerges() is called on this filtered view so it won't select segments that
+    // are already being merged in the background.
+    SegmentInfos filteredInfos;
+    {
+        std::lock_guard<std::mutex> lock(segmentLock_);
+        for (int i = 0; i < segmentInfos_.size(); i++) {
+            auto seg = segmentInfos_.info(i);
+            if (mergingSegments_.find(seg->name()) == mergingSegments_.end()) {
+                filteredInfos.add(seg);
+            }
+        }
+    }
+
+    // Find merges (no lock — filteredInfos is a local copy)
+    std::unique_ptr<MergeSpecification> spec(
+        mergePolicy_->findMerges(trigger, filteredInfos));
+    if (!spec || spec->empty()) {
         return;
     }
 
-    // Loop up to 10 iterations — each merge may create a segment eligible for cascading merge
-    for (int i = 0; i < 10; i++) {
-        std::unique_ptr<MergeSpecification> spec(
-            mergePolicy_->findMerges(trigger, segmentInfos_));
-        if (!spec || spec->empty()) {
-            break;
+    for (const auto& oneMerge : spec->getMerges()) {
+        // Resolve segments under lock, skip if any are already merging
+        std::vector<std::shared_ptr<SegmentInfo>> segmentsToMerge;
+        {
+            std::lock_guard<std::mutex> lock(segmentLock_);
+            bool skip = false;
+            for (auto* segCommit : oneMerge->getSegments()) {
+                auto* segInfo = reinterpret_cast<SegmentInfo*>(segCommit);
+                if (mergingSegments_.count(segInfo->name())) {
+                    skip = true;
+                    break;
+                }
+                for (int i = 0; i < segmentInfos_.size(); i++) {
+                    if (segmentInfos_.info(i)->name() == segInfo->name()) {
+                        segmentsToMerge.push_back(segmentInfos_.info(i));
+                        break;
+                    }
+                }
+            }
+
+            if (skip || segmentsToMerge.size() < 2) {
+                continue;
+            }
+
+            // Mark segments as merging
+            for (auto& s : segmentsToMerge) {
+                mergingSegments_.insert(s->name());
+            }
         }
-        executeMerges(spec.get());
+
+        std::string mergedName = "_merged_" + std::to_string(mergeCounter_.fetch_add(1));
+        bool useCompound = useCompoundFile_;
+
+        // Submit merge to background thread
+        mergeScheduler_.submit([this, segmentsToMerge, mergedName, useCompound]() {
+            // Heavy I/O — no lock held
+            SegmentMerger merger(directory_, mergedName, segmentsToMerge);
+            auto mergedSegment = merger.merge();
+
+            // Compound file (also no lock — just I/O)
+            if (useCompound) {
+                auto origFiles = createCompoundFile(mergedSegment);
+                for (auto& f : origFiles) {
+                    try {
+                        directory_.deleteFile(f);
+                    } catch (...) {
+                    }
+                }
+            }
+
+            // Quick bookkeeping under lock
+            {
+                std::lock_guard<std::mutex> lock(segmentLock_);
+                // Remove old segments from segmentInfos_
+                for (int i = segmentInfos_.size() - 1; i >= 0; i--) {
+                    for (auto& s : segmentsToMerge) {
+                        if (segmentInfos_.info(i)->name() == s->name()) {
+                            segmentInfos_.remove(i);
+                            break;
+                        }
+                    }
+                }
+                segmentInfos_.add(mergedSegment);
+
+                // Unmark from mergingSegments_
+                for (auto& s : segmentsToMerge) {
+                    mergingSegments_.erase(s->name());
+                }
+            }
+
+            // Delete old segment files (outside lock)
+            for (auto& s : segmentsToMerge) {
+                deleteSegmentFiles(s);
+            }
+
+            // Trigger cascading: the merged segment may now be eligible
+            // for further merging with other segments.  This self-submits
+            // to the scheduler, maintaining the cascade loop that the old
+            // synchronous maybeMerge() had (up to 10 iterations).
+            maybeMerge(MergeTrigger::SEGMENT_FLUSH);
+        });
     }
 }
 
@@ -248,20 +375,21 @@ void IndexWriter::rollback() {
 
     std::lock_guard<std::mutex> lock(commitLock_);
 
+    // Stop background merges before modifying state
+    mergeScheduler_.shutdown();
+
     // 1. Discard all pending documents in DocumentsWriter
     documentsWriter_->reset();
 
     // 2. Reset to last committed state (if exists)
-    try {
-        // Try to read the latest commit from disk
-        auto committedInfos = SegmentInfos::readLatestCommit(directory_);
-
-        // Replace in-memory segment list with committed state
-        segmentInfos_ = committedInfos;
-    } catch (const IOException&) {
-        // No committed state exists - this is a new index
-        // Clear all segments and start fresh
-        segmentInfos_.clear();
+    {
+        std::lock_guard<std::mutex> slock(segmentLock_);
+        try {
+            auto committedInfos = SegmentInfos::readLatestCommit(directory_);
+            segmentInfos_ = committedInfos;
+        } catch (const IOException&) {
+            segmentInfos_.clear();
+        }
     }
 
     // 3. Close without committing
@@ -283,19 +411,25 @@ void IndexWriter::forceMerge(int maxNumSegments) {
 
     std::lock_guard<std::mutex> lock(commitLock_);
 
-    // 1. Flush all pending documents first
+    // 1. Wait for any in-flight background merges
+    mergeScheduler_.waitForMerges();
+
+    // 2. Flush all pending documents first
     flush();
 
-    // 2. Use TieredMergePolicy to find forced merges
-    std::unique_ptr<MergeSpecification> spec(
-        mergePolicy_->findForcedMerges(segmentInfos_, maxNumSegments, {}));
+    // 3. Use TieredMergePolicy to find forced merges (synchronous)
+    std::unique_ptr<MergeSpecification> spec;
+    {
+        std::lock_guard<std::mutex> slock(segmentLock_);
+        spec.reset(mergePolicy_->findForcedMerges(segmentInfos_, maxNumSegments, {}));
+    }
 
-    // 3. Execute merges if any were found
+    // 4. Execute merges if any were found
     if (spec && !spec->empty()) {
         executeMerges(spec.get());
     }
 
-    // 4. Commit the merged index (use internal method since we already hold the lock)
+    // 5. Commit the merged index (use internal method since we already hold the lock)
     commitInternal();
 }
 
@@ -375,10 +509,7 @@ std::vector<std::string> IndexWriter::createCompoundFile(std::shared_ptr<Segment
 
 void IndexWriter::waitForMerges() {
     ensureOpen();
-
-    // Phase 2 implementation: All merges are synchronous (via forceMerge)
-    // This method is a no-op until background merging is implemented in Phase 4
-    // with MergeScheduler and asynchronous merge threads
+    mergeScheduler_.waitForMerges();
 }
 
 void IndexWriter::close() {
@@ -387,6 +518,9 @@ void IndexWriter::close() {
     if (closed_.load(std::memory_order_acquire)) {
         return;  // Already closed
     }
+
+    // Shut down merge scheduler (drains pending merges, joins thread)
+    mergeScheduler_.shutdown();
 
     // Release write lock
     if (writeLock_) {
@@ -564,9 +698,17 @@ void IndexWriter::writeSegmentsFile() {
 }
 
 void IndexWriter::applyDeletes(const Term& term) {
+    // Snapshot segments under lock (slow I/O follows, don't hold lock)
+    std::vector<std::shared_ptr<SegmentInfo>> segments;
+    {
+        std::lock_guard<std::mutex> lock(segmentLock_);
+        for (int i = 0; i < segmentInfos_.size(); i++) {
+            segments.push_back(segmentInfos_.info(i));
+        }
+    }
+
     // Apply deletions to all existing segments
-    for (int i = 0; i < segmentInfos_.size(); i++) {
-        auto segmentInfo = segmentInfos_.info(i);
+    for (auto& segmentInfo : segments) {
 
         try {
             // Open segment reader
@@ -645,67 +787,61 @@ void IndexWriter::applyDeletes(const Term& term) {
 }
 
 void IndexWriter::executeMerges(MergeSpecification* spec) {
-    // Execute each merge in the specification
-    // Note: This is a synchronous implementation. Background merging would be added in Phase 4
-    // with MergeScheduler and separate merge threads.
-
-    static std::atomic<int> mergeCounter{0};
+    // Execute each merge in the specification synchronously.
+    // Used by forceMerge() and commit-time merges. Background merging uses maybeMerge().
 
     for (const auto& oneMerge : spec->getMerges()) {
-        // Get segments to merge (cast from SegmentCommitInfo* back to SegmentInfo*)
+        // Resolve segments under lock (segmentInfos_ may be modified by collectNewSegments)
         std::vector<std::shared_ptr<SegmentInfo>> segmentsToMerge;
-        for (auto* segCommit : oneMerge->getSegments()) {
-            // Cast back to SegmentInfo* (temporary until SegmentCommitInfo is implemented)
-            auto* segInfo = reinterpret_cast<SegmentInfo*>(segCommit);
-
-            // Find the matching segment in segmentInfos_
-            for (int i = 0; i < segmentInfos_.size(); i++) {
-                if (segmentInfos_.info(i)->name() == segInfo->name()) {
-                    segmentsToMerge.push_back(segmentInfos_.info(i));
-                    break;
+        {
+            std::lock_guard<std::mutex> lock(segmentLock_);
+            for (auto* segCommit : oneMerge->getSegments()) {
+                auto* segInfo = reinterpret_cast<SegmentInfo*>(segCommit);
+                for (int i = 0; i < segmentInfos_.size(); i++) {
+                    if (segmentInfos_.info(i)->name() == segInfo->name()) {
+                        segmentsToMerge.push_back(segmentInfos_.info(i));
+                        break;
+                    }
                 }
             }
         }
 
         if (segmentsToMerge.size() < 2) {
-            continue;  // Need at least 2 segments to merge
+            continue;
         }
 
-        // Generate name for merged segment
-        std::string mergedName = "_merged_" + std::to_string(mergeCounter++);
+        std::string mergedName = "_merged_" + std::to_string(mergeCounter_.fetch_add(1));
 
-        // Perform merge using SegmentMerger
+        // Heavy I/O — no lock held
         SegmentMerger merger(directory_, mergedName, segmentsToMerge);
         auto mergedSegment = merger.merge();
 
-        // Remove old segments from list (iterate backwards to avoid index shifts)
-        for (int i = segmentInfos_.size() - 1; i >= 0; i--) {
-            auto segment = segmentInfos_.info(i);
-            for (const auto& toMerge : segmentsToMerge) {
-                if (segment->name() == toMerge->name()) {
-                    segmentInfos_.remove(i);
-                    break;
-                }
-            }
-        }
-
-        // Create compound file for merged segment (if enabled)
+        // Compound file — no lock held (just I/O)
         if (useCompoundFile_) {
             auto origFiles = createCompoundFile(mergedSegment);
-            // Delete original merged segment files (safe — they're new, not yet committed)
             for (const auto& file : origFiles) {
                 try {
                     directory_.deleteFile(file);
                 } catch (const std::exception&) {
-                    // Best-effort
                 }
             }
         }
 
-        // Add merged segment to list
-        segmentInfos_.add(mergedSegment);
+        // Update segmentInfos_ under lock
+        {
+            std::lock_guard<std::mutex> lock(segmentLock_);
+            for (int i = segmentInfos_.size() - 1; i >= 0; i--) {
+                for (const auto& toMerge : segmentsToMerge) {
+                    if (segmentInfos_.info(i)->name() == toMerge->name()) {
+                        segmentInfos_.remove(i);
+                        break;
+                    }
+                }
+            }
+            segmentInfos_.add(mergedSegment);
+        }
 
-        // Delete old segment files
+        // Delete old segment files — no lock needed
         for (const auto& segment : segmentsToMerge) {
             deleteSegmentFiles(segment);
         }

@@ -52,6 +52,9 @@ TEST_F(MaybeMergeTest, SegmentsBoundedDuringBulkIndexing) {
         writer.addDocument(doc);
     }
 
+    // Wait for background merges to finish before checking
+    writer.waitForMerges();
+
     int segmentCount = writer.getSegmentInfos().size();
     EXPECT_LE(segmentCount, 40)
         << "Segment count should be bounded by maybeMerge(), got " << segmentCount;
