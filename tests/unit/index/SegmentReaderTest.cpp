@@ -167,37 +167,30 @@ TEST_F(SegmentReaderTest, CloseSegmentReader) {
     // Should be able to access before close
     EXPECT_EQ(reader->maxDoc(), 5);
 
-    // Close by decrementing ref count
-    reader->decRef();
+    // Close the reader
+    reader->close();
 
     // After close, operations should throw
     EXPECT_THROW(reader->maxDoc(), AlreadyClosedException);
 }
 
-TEST_F(SegmentReaderTest, RefCounting) {
+TEST_F(SegmentReaderTest, Lifecycle) {
     writeTestIndex(5);
 
     auto infos = SegmentInfos::readLatestCommit(*dir);
     auto reader = SegmentReader::open(*dir, infos.info(0));
 
-    // Initial ref count should be 1
-    EXPECT_EQ(reader->getRefCount(), 1);
+    // Initially open
+    EXPECT_FALSE(reader->isClosed());
 
-    // Increment
-    reader->incRef();
-    EXPECT_EQ(reader->getRefCount(), 2);
-
-    // Can still access
+    // Can access
     EXPECT_EQ(reader->maxDoc(), 5);
 
-    // Decrement
-    reader->decRef();
-    EXPECT_EQ(reader->getRefCount(), 1);
+    // Close
+    reader->close();
+    EXPECT_TRUE(reader->isClosed());
 
-    // Still accessible
-    EXPECT_EQ(reader->maxDoc(), 5);
-
-    // Final decrement closes
-    reader->decRef();
-    EXPECT_EQ(reader->getRefCount(), 0);
+    // Close is idempotent
+    reader->close();
+    EXPECT_TRUE(reader->isClosed());
 }

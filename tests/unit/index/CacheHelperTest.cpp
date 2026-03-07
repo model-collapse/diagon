@@ -117,7 +117,7 @@ TEST_F(CacheHelperTest, SegmentReaderCacheHelpers) {
     auto leaves = dirReader->leaves();
     ASSERT_EQ(1, leaves.size());
 
-    LeafReader* leafReader = leaves[0].reader;
+    LeafReader* leafReader = leaves[0].reader.get();
     ASSERT_NE(nullptr, leafReader);
 
     // Get cache helpers
@@ -226,7 +226,7 @@ TEST_F(CacheHelperTest, CoreVsReaderCache) {
     auto leaves = dirReader->leaves();
     ASSERT_EQ(1, leaves.size());
 
-    LeafReader* leafReader = leaves[0].reader;
+    LeafReader* leafReader = leaves[0].reader.get();
 
     // Get both helpers
     CacheHelper* coreHelper = leafReader->getCoreCacheHelper();
@@ -272,7 +272,7 @@ TEST_F(CacheHelperTest, MultipleSegments) {
     std::unordered_map<CacheKey*, int> readerKeys;
 
     for (const auto& leaf : leaves) {
-        LeafReader* reader = leaf.reader;
+        LeafReader* reader = leaf.reader.get();
 
         CacheHelper* coreHelper = reader->getCoreCacheHelper();
         CacheHelper* readerHelper = reader->getReaderCacheHelper();

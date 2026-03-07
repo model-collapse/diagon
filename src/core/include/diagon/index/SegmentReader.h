@@ -58,31 +58,39 @@ public:
      * Get Terms for a field
      * Returns nullptr if field doesn't exist
      */
-    Terms* terms(const std::string& field) const override;
+    [[nodiscard]] Terms* terms(const std::string& field) const override;
 
     // ==================== Doc Values ====================
 
-    NumericDocValues* getNumericDocValues(const std::string& field) const override;
+    [[nodiscard]] NumericDocValues* getNumericDocValues(const std::string& field) const override;
 
-    BinaryDocValues* getBinaryDocValues(const std::string& field) const override { return nullptr; }
-
-    SortedDocValues* getSortedDocValues(const std::string& field) const override { return nullptr; }
-
-    SortedSetDocValues* getSortedSetDocValues(const std::string& field) const override {
+    [[nodiscard]] BinaryDocValues* getBinaryDocValues(const std::string& field) const override {
+        ensureOpen();
         return nullptr;
     }
 
-    SortedNumericDocValues* getSortedNumericDocValues(const std::string& field) const override {
+    [[nodiscard]] SortedDocValues* getSortedDocValues(const std::string& field) const override {
+        ensureOpen();
+        return nullptr;
+    }
+
+    [[nodiscard]] SortedSetDocValues* getSortedSetDocValues(const std::string& field) const override {
+        ensureOpen();
+        return nullptr;
+    }
+
+    [[nodiscard]] SortedNumericDocValues* getSortedNumericDocValues(const std::string& field) const override {
+        ensureOpen();
         return nullptr;
     }
 
     // ==================== Stored Fields ====================
 
-    codecs::StoredFieldsReader* storedFieldsReader() const override;
+    [[nodiscard]] codecs::StoredFieldsReader* storedFieldsReader() const override;
 
     // ==================== Norms ====================
 
-    NumericDocValues* getNormValues(const std::string& field) const override;
+    [[nodiscard]] NumericDocValues* getNormValues(const std::string& field) const override;
 
     // ==================== Field Metadata ====================
 
@@ -98,11 +106,14 @@ public:
      * Get live docs (deleted docs bitmap)
      * Returns nullptr if no deletions, otherwise BitSet (1 = live, 0 = deleted)
      */
-    const util::Bits* getLiveDocs() const override;
+    [[nodiscard]] const util::Bits* getLiveDocs() const override;
 
     // ==================== Points (Not implemented in Phase 4) ====================
 
-    PointValues* getPointValues(const std::string& field) const override { return nullptr; }
+    [[nodiscard]] PointValues* getPointValues(const std::string& field) const override {
+        ensureOpen();
+        return nullptr;
+    }
 
     // ==================== Caching (Phase 5) ====================
 
@@ -177,6 +188,20 @@ public:
         ensureOpen();
         return segmentInfo_->name();
     }
+
+    // ==================== Cache Memory Budget ====================
+
+    /**
+     * Set cache memory budget in bytes.
+     * Default: 64 MB. Caches are bounded by field count (~5-20 fields),
+     * so this is a safety net, not an LRU eviction mechanism.
+     */
+    void setCacheMemoryBudget(size_t bytes) { cacheMemoryBudget_ = bytes; }
+
+    /**
+     * Get approximate memory used by internal caches.
+     */
+    size_t getCacheMemoryUsed() const { return cacheMemoryUsed_.load(std::memory_order_relaxed); }
 
 protected:
     /**
@@ -267,6 +292,10 @@ private:
 
     // Reader cache helper: invalidated when deletions change
     CacheHelper readerCacheHelper_;
+
+    // Cache memory budget (Phase 3 memory safety)
+    size_t cacheMemoryBudget_ = 64 * 1024 * 1024;  // 64 MB default
+    mutable std::atomic<size_t> cacheMemoryUsed_{0};
 };
 
 }  // namespace index

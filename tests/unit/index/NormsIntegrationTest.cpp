@@ -90,7 +90,7 @@ TEST_F(NormsIntegrationTest, WriteAndReadNorms) {
         ASSERT_EQ(1, leaves.size()) << "Should have one segment";
 
         auto& leafContext = leaves[0];
-        auto* leafReader = dynamic_cast<SegmentReader*>(leafContext.reader);
+        auto* leafReader = dynamic_cast<SegmentReader*>(leafContext.reader.get());
         ASSERT_NE(nullptr, leafReader);
 
         // Get norms for "content" field
@@ -187,7 +187,7 @@ TEST_F(NormsIntegrationTest, EmptyFieldNorms) {
         auto reader = DirectoryReader::open(*dir);
         auto leaves = reader->leaves();
         auto& leafContext = leaves[0];
-        auto* leafReader = dynamic_cast<SegmentReader*>(leafContext.reader);
+        auto* leafReader = dynamic_cast<SegmentReader*>(leafContext.reader.get());
         auto* norms = leafReader->getNormValues("content");
         ASSERT_NE(nullptr, norms);
 
@@ -221,7 +221,7 @@ TEST_F(NormsIntegrationTest, NoNormsForNonExistentField) {
         auto reader = DirectoryReader::open(*dir);
         auto leaves = reader->leaves();
         auto& leafContext = leaves[0];
-        auto* leafReader = dynamic_cast<SegmentReader*>(leafContext.reader);
+        auto* leafReader = dynamic_cast<SegmentReader*>(leafContext.reader.get());
 
         // Non-existent field should not have norms
         auto* normsNonExistent = leafReader->getNormValues("non_existent");
@@ -264,7 +264,7 @@ TEST_F(NormsIntegrationTest, NormsAcrossMultipleSegments) {
 
         // Verify norms in each segment
         for (const auto& leafContext : leaves) {
-            auto* leafReader = dynamic_cast<SegmentReader*>(leafContext.reader);
+            auto* leafReader = dynamic_cast<SegmentReader*>(leafContext.reader.get());
             auto* norms = leafReader->getNormValues("content");
             ASSERT_NE(nullptr, norms) << "Each segment should have norms";
         }

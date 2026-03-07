@@ -8,11 +8,11 @@ namespace index {
 
 // ==================== LeafReaderContextWrapper ====================
 
-LeafReaderContextWrapper::LeafReaderContextWrapper(LeafReader* reader)
-    : ctx_(reader, 0, 0) {}
+LeafReaderContextWrapper::LeafReaderContextWrapper(std::shared_ptr<LeafReader> reader)
+    : ctx_(std::move(reader), 0, 0) {}
 
 IndexReader* LeafReaderContextWrapper::reader() const {
-    return ctx_.reader;
+    return ctx_.reader.get();
 }
 
 std::vector<LeafReaderContext> LeafReaderContextWrapper::leaves() const {

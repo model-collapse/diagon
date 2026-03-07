@@ -10,6 +10,7 @@
 
 #include <atomic>
 #include <cassert>
+#include <cstdio>
 #include <iostream>
 
 namespace diagon {
@@ -25,10 +26,6 @@ std::shared_ptr<SegmentReader> SegmentReader::open(Directory& dir,
                                                    std::shared_ptr<SegmentInfo> si) {
     // Constructor is private, use std::shared_ptr constructor hack
     auto reader = std::shared_ptr<SegmentReader>(new SegmentReader(dir, si));
-
-    // Increment ref count (starts at 1 from IndexReader)
-    // No need to incRef() - already at 1 from constructor
-
     return reader;
 }
 
@@ -50,10 +47,7 @@ SegmentReader::SegmentReader(Directory& dir, std::shared_ptr<SegmentInfo> si)
 }
 
 SegmentReader::~SegmentReader() {
-    // Ensure proper cleanup
-    if (getRefCount() > 0) {
-        doClose();
-    }
+    // close() is called by ~IndexReader() if not already closed
 }
 
 // ==================== Terms Access ====================
@@ -85,8 +79,14 @@ Terms* SegmentReader::terms(const std::string& field) const {
         auto terms = fieldsProducer_->terms(field);
         if (terms) {
             Terms* termsPtr = terms.get();
+            size_t approxBytes = sizeof(Terms) + field.size();
             termsCache_[field] = std::move(terms);
+            cacheMemoryUsed_.fetch_add(approxBytes, std::memory_order_relaxed);
             assert(termsCache_.size() <= 1000 && "termsCache_ growing unbounded — possible leak");
+            if (cacheMemoryUsed_.load(std::memory_order_relaxed) > cacheMemoryBudget_) {
+                fprintf(stderr, "WARNING: SegmentReader cache memory %zu exceeds budget %zu\n",
+                        cacheMemoryUsed_.load(std::memory_order_relaxed), cacheMemoryBudget_);
+            }
             return termsPtr;
         } else {
         }
@@ -120,7 +120,12 @@ NumericDocValues* SegmentReader::getNumericDocValues(const std::string& field) c
         auto dv = docValuesReader_->getNumeric(field);
         if (dv) {
             NumericDocValues* dvPtr = dv.get();
+            bool isNew = (numericDocValuesCache_.find(field) == numericDocValuesCache_.end());
             numericDocValuesCache_[field] = std::move(dv);
+            if (isNew) {
+                cacheMemoryUsed_.fetch_add(sizeof(NumericDocValues) + field.size(),
+                                           std::memory_order_relaxed);
+            }
             assert(numericDocValuesCache_.size() <= 1000
                    && "numericDocValuesCache_ growing unbounded — possible leak");
             return dvPtr;
@@ -162,6 +167,8 @@ NumericDocValues* SegmentReader::getNormValues(const std::string& field) const {
             if (norms) {
                 NumericDocValues* normsPtr = norms.get();
                 normsCache_[field] = std::move(norms);
+                cacheMemoryUsed_.fetch_add(sizeof(NumericDocValues) + field.size(),
+                                           std::memory_order_relaxed);
                 assert(normsCache_.size() <= 1000
                        && "normsCache_ growing unbounded — possible leak");
                 return normsPtr;
@@ -327,9 +334,6 @@ void SegmentReader::loadNormsProducer() const {
 // ==================== Lifecycle ====================
 
 void SegmentReader::doClose() {
-    // Mark as closed
-    setClosed();
-
     // Clear fields producer and cache
     if (fieldsProducer_) {
         fieldsProducer_->close();
@@ -357,6 +361,9 @@ void SegmentReader::doClose() {
         compoundDirectory_->close();
         compoundDirectory_.reset();
     }
+
+    // Reset memory tracking
+    cacheMemoryUsed_.store(0, std::memory_order_relaxed);
 }
 
 }  // namespace index

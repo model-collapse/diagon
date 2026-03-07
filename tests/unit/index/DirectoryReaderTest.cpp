@@ -202,38 +202,31 @@ TEST_F(DirectoryReaderTest, CloseDirectoryReader) {
     // Should be able to access before close
     EXPECT_EQ(reader->maxDoc(), 5);
 
-    // Close by decrementing ref count
-    reader->decRef();
+    // Close the reader
+    reader->close();
 
     // After close, operations should throw
     EXPECT_THROW(reader->maxDoc(), AlreadyClosedException);
 }
 
-TEST_F(DirectoryReaderTest, RefCounting) {
+TEST_F(DirectoryReaderTest, Lifecycle) {
     writeTestIndex(5, 1);
 
     auto reader = DirectoryReader::open(*dir);
 
-    // Initial ref count should be 1
-    EXPECT_EQ(reader->getRefCount(), 1);
+    // Initially open
+    EXPECT_FALSE(reader->isClosed());
 
-    // Increment
-    reader->incRef();
-    EXPECT_EQ(reader->getRefCount(), 2);
-
-    // Still accessible
+    // Accessible
     EXPECT_EQ(reader->maxDoc(), 5);
 
-    // Decrement
-    reader->decRef();
-    EXPECT_EQ(reader->getRefCount(), 1);
+    // Close
+    reader->close();
+    EXPECT_TRUE(reader->isClosed());
 
-    // Still accessible
-    EXPECT_EQ(reader->maxDoc(), 5);
-
-    // Final decrement closes
-    reader->decRef();
-    EXPECT_EQ(reader->getRefCount(), 0);
+    // Close is idempotent
+    reader->close();
+    EXPECT_TRUE(reader->isClosed());
 }
 
 TEST_F(DirectoryReaderTest, SegmentReadersAreClosedOnDirectoryReaderClose) {
@@ -241,7 +234,7 @@ TEST_F(DirectoryReaderTest, SegmentReadersAreClosedOnDirectoryReaderClose) {
 
     auto reader = DirectoryReader::open(*dir);
 
-    // Get a leaf reader
+    // Get a leaf reader (shared_ptr keeps it alive)
     auto leaves = reader->leaves();
     ASSERT_GT(leaves.size(), 0);
     auto leafReader = leaves[0].reader;
@@ -249,9 +242,9 @@ TEST_F(DirectoryReaderTest, SegmentReadersAreClosedOnDirectoryReaderClose) {
     // Leaf should be accessible
     EXPECT_GT(leafReader->maxDoc(), 0);
 
-    // Close directory reader
-    reader->decRef();
+    // Close directory reader — closes all segment readers
+    reader->close();
 
-    // Leaf reader should also be closed
+    // Leaf reader should also be closed (shared_ptr keeps it alive but closed)
     EXPECT_THROW(leafReader->maxDoc(), AlreadyClosedException);
 }

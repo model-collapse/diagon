@@ -28,13 +28,7 @@ public:
         fieldInfos_ = std::make_unique<FieldInfos>(std::move(infos));
     }
 
-    // Context methods (from IndexReader base)
-    std::vector<LeafReaderContext> leaves() const override {
-        return {LeafReaderContext(const_cast<MockLeafReader*>(this), 0, 0)};
-    }
-    std::unique_ptr<IndexReaderContext> getContext() const override {
-        return std::make_unique<LeafReaderContextWrapper>(const_cast<MockLeafReader*>(this));
-    }
+    // leaves() and getContext() inherited from LeafReader (use shared_from_this)
 
     // Statistics
     int maxDoc() const override { return maxDoc_; }
@@ -81,41 +75,7 @@ public:
     explicit MockCompositeReader(std::vector<std::shared_ptr<IndexReader>> subReaders)
         : subReaders_(std::move(subReaders)) {}
 
-    // Context methods (from IndexReader base)
-    std::vector<LeafReaderContext> leaves() const override {
-        std::vector<LeafReaderContext> result;
-        int docBase = 0;
-        for (const auto& subReader : subReaders_) {
-            // Recursively get leaves from sub-readers
-            auto subLeaves = subReader->leaves();
-            for (const auto& leafCtx : subLeaves) {
-                // Adjust docBase and add to result with correct ordinal
-                result.emplace_back(leafCtx.reader, docBase + leafCtx.docBase,
-                                    static_cast<int>(result.size()));
-            }
-            docBase += subReader->maxDoc();
-        }
-        return result;
-    }
-    std::unique_ptr<IndexReaderContext> getContext() const override {
-        // Return a simple context wrapper for MockCompositeReader
-        class MockCompositeContext : public IndexReaderContext {
-        public:
-            explicit MockCompositeContext(const MockCompositeReader* reader)
-                : reader_(reader) {}
-
-            IndexReader* reader() const override {
-                return const_cast<MockCompositeReader*>(reader_);
-            }
-            std::vector<LeafReaderContext> leaves() const override { return reader_->leaves(); }
-            bool isTopLevel() const override { return true; }
-
-        private:
-            const MockCompositeReader* reader_;
-        };
-
-        return std::make_unique<MockCompositeContext>(this);
-    }
+    // leaves() and getContext() inherited from CompositeReader base
 
     std::vector<std::shared_ptr<IndexReader>> getSequentialSubReaders() const override {
         return subReaders_;
@@ -135,74 +95,50 @@ protected:
     void TearDown() override {}
 };
 
-// ==================== Reference Counting Tests ====================
+// ==================== Lifecycle Tests ====================
 
-TEST_F(IndexReaderTest, InitialRefCount) {
+TEST_F(IndexReaderTest, InitialState) {
     auto reader = std::make_shared<MockLeafReader>(100, 100);
-    EXPECT_EQ(1, reader->getRefCount());
+    EXPECT_FALSE(reader->isClosed());
 }
 
-TEST_F(IndexReaderTest, IncRef) {
+TEST_F(IndexReaderTest, CloseReader) {
     auto reader = std::make_shared<MockLeafReader>(100, 100);
+    EXPECT_FALSE(reader->isClosed());
 
-    reader->incRef();
-    EXPECT_EQ(2, reader->getRefCount());
-
-    reader->incRef();
-    EXPECT_EQ(3, reader->getRefCount());
+    reader->close();
+    EXPECT_TRUE(reader->isClosed());
 }
 
-TEST_F(IndexReaderTest, DecRef) {
+TEST_F(IndexReaderTest, CloseIsIdempotent) {
     auto reader = std::make_shared<MockLeafReader>(100, 100);
 
-    reader->incRef();
-    EXPECT_EQ(2, reader->getRefCount());
+    reader->close();
+    EXPECT_TRUE(reader->isClosed());
 
-    reader->decRef();
-    EXPECT_EQ(1, reader->getRefCount());
+    // Second close is a no-op, does not throw
+    reader->close();
+    EXPECT_TRUE(reader->isClosed());
 }
 
-TEST_F(IndexReaderTest, DecRefToZero) {
+TEST_F(IndexReaderTest, SharedPtrKeepsAliveAfterClose) {
     auto reader = std::make_shared<MockLeafReader>(100, 100);
-    EXPECT_EQ(1, reader->getRefCount());
+    reader->close();
 
-    // This will call doClose() when refCount reaches 0
-    // Reader should be closed but not destroyed (shared_ptr still holds it)
-    reader->decRef();
-    EXPECT_EQ(0, reader->getRefCount());
+    // Object is closed but shared_ptr keeps it alive
+    EXPECT_TRUE(reader->isClosed());
+    EXPECT_EQ(1, reader.use_count());
 }
 
-TEST_F(IndexReaderTest, TryIncRef) {
-    auto reader = std::make_shared<MockLeafReader>(100, 100);
-
-    // Should succeed
-    EXPECT_TRUE(reader->tryIncRef());
-    EXPECT_EQ(2, reader->getRefCount());
-
-    // Decrement back to 1
-    reader->decRef();
-    EXPECT_EQ(1, reader->getRefCount());
-}
-
-TEST_F(IndexReaderTest, TryIncRefAfterClose) {
-    auto reader = std::make_shared<MockLeafReader>(100, 100);
-
-    // Close by decrementing to 0
-    reader->decRef();
-    EXPECT_EQ(0, reader->getRefCount());
-
-    // tryIncRef should fail on closed reader
-    EXPECT_FALSE(reader->tryIncRef());
-    EXPECT_EQ(0, reader->getRefCount());
-}
-
-TEST_F(IndexReaderTest, RefCountUnderflowThrows) {
-    auto reader = std::make_shared<MockLeafReader>(100, 100);
-
-    reader->decRef();  // Goes to 0, closes reader
-
-    // Second decRef should throw
-    EXPECT_THROW(reader->decRef(), std::runtime_error);
+TEST_F(IndexReaderTest, DestructorCallsClose) {
+    std::weak_ptr<MockLeafReader> weakRef;
+    {
+        auto reader = std::make_shared<MockLeafReader>(100, 100);
+        weakRef = reader;
+        // reader goes out of scope — destructor calls close()
+    }
+    // Object is destroyed
+    EXPECT_TRUE(weakRef.expired());
 }
 
 // ==================== LeafReader Tests ====================
@@ -228,7 +164,7 @@ TEST_F(IndexReaderTest, LeafReaderLeaves) {
 
     auto leaves = reader->leaves();
     EXPECT_EQ(1, leaves.size());
-    EXPECT_EQ(reader.get(), leaves[0].reader);
+    EXPECT_EQ(reader.get(), leaves[0].reader.get());
     EXPECT_EQ(0, leaves[0].docBase);
     EXPECT_EQ(0, leaves[0].ord);
 }
@@ -241,7 +177,7 @@ TEST_F(IndexReaderTest, LeafReaderContext) {
 
     auto leaves = context->leaves();
     EXPECT_EQ(1, leaves.size());
-    EXPECT_EQ(reader.get(), leaves[0].reader);
+    EXPECT_EQ(reader.get(), leaves[0].reader.get());
 }
 
 // ==================== CompositeReader Tests ====================
@@ -361,9 +297,9 @@ TEST_F(IndexReaderTest, NestedCompositeReader) {
 TEST_F(IndexReaderTest, LeafReaderContextConstruction) {
     auto reader = std::make_shared<MockLeafReader>(100, 100);
 
-    LeafReaderContext ctx(reader.get(), 50, 2);
+    LeafReaderContext ctx(reader, 50, 2);
 
-    EXPECT_EQ(reader.get(), ctx.reader);
+    EXPECT_EQ(reader.get(), ctx.reader.get());
     EXPECT_EQ(50, ctx.docBase);
     EXPECT_EQ(2, ctx.ord);
 }
@@ -371,9 +307,9 @@ TEST_F(IndexReaderTest, LeafReaderContextConstruction) {
 TEST_F(IndexReaderTest, LeafReaderContextDefaults) {
     auto reader = std::make_shared<MockLeafReader>(100, 100);
 
-    LeafReaderContext ctx(reader.get());
+    LeafReaderContext ctx(reader);
 
-    EXPECT_EQ(reader.get(), ctx.reader);
+    EXPECT_EQ(reader.get(), ctx.reader.get());
     EXPECT_EQ(0, ctx.docBase);
     EXPECT_EQ(0, ctx.ord);
 }
@@ -393,22 +329,19 @@ TEST_F(IndexReaderTest, CompositeReaderContextCreation) {
     EXPECT_EQ(2, leaves.size());
 }
 
-// ==================== Reference Counting with Composite ====================
+// ==================== Lifecycle with Composite ====================
 
-TEST_F(IndexReaderTest, CompositeReaderRefCount) {
+TEST_F(IndexReaderTest, CompositeReaderClose) {
     std::vector<std::shared_ptr<IndexReader>> subReaders;
     subReaders.push_back(std::make_shared<MockLeafReader>(100, 100));
     subReaders.push_back(std::make_shared<MockLeafReader>(200, 200));
 
     auto composite = std::make_shared<MockCompositeReader>(subReaders);
 
-    EXPECT_EQ(1, composite->getRefCount());
+    EXPECT_FALSE(composite->isClosed());
 
-    composite->incRef();
-    EXPECT_EQ(2, composite->getRefCount());
-
-    composite->decRef();
-    EXPECT_EQ(1, composite->getRefCount());
+    composite->close();
+    EXPECT_TRUE(composite->isClosed());
 }
 
 // ==================== Edge Cases ====================
@@ -461,20 +394,18 @@ TEST_F(IndexReaderTest, LargeCompositeReader) {
     EXPECT_EQ(99000, leaves[99].docBase);
 }
 
-TEST_F(IndexReaderTest, MultipleIncDecCycles) {
+TEST_F(IndexReaderTest, SharedPtrLifecycle) {
     auto reader = std::make_shared<MockLeafReader>(100, 100);
 
-    for (int i = 0; i < 10; i++) {
-        reader->incRef();
-        EXPECT_EQ(i + 2, reader->getRefCount());
-    }
+    // Multiple shared_ptr copies keep the reader alive
+    auto copy1 = reader;
+    auto copy2 = reader;
+    EXPECT_EQ(3, reader.use_count());
 
-    for (int i = 0; i < 10; i++) {
-        reader->decRef();
-        EXPECT_EQ(11 - i - 1, reader->getRefCount());
-    }
-
-    EXPECT_EQ(1, reader->getRefCount());
+    copy1.reset();
+    copy2.reset();
+    EXPECT_EQ(1, reader.use_count());
+    EXPECT_FALSE(reader->isClosed());
 }
 
 TEST_F(IndexReaderTest, CompositeWithMixedDeletions) {

@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 namespace diagon {
 namespace index {
@@ -17,13 +18,18 @@ class LeafReader;
  * Provides the document ID base offset for mapping local doc IDs
  * to global doc IDs.
  *
+ * Lifetime: The shared_ptr<LeafReader> keeps the segment reader alive
+ * for as long as any context referencing it exists.
+ *
  * Based on: org.apache.lucene.index.LeafReaderContext
  */
 struct LeafReaderContext {
     /**
-     * The reader for this leaf
+     * The reader for this leaf (shared ownership).
+     * Callers may use reader->method() directly; the shared_ptr keeps
+     * the LeafReader alive for the lifetime of this context.
      */
-    LeafReader* reader;
+    std::shared_ptr<LeafReader> reader;
 
     /**
      * The doc base for this leaf.
@@ -39,8 +45,8 @@ struct LeafReaderContext {
     /**
      * Constructor
      */
-    LeafReaderContext(LeafReader* r, int base = 0, int ordinal = 0)
-        : reader(r)
+    LeafReaderContext(std::shared_ptr<LeafReader> r, int base = 0, int ordinal = 0)
+        : reader(std::move(r))
         , docBase(base)
         , ord(ordinal) {}
 };

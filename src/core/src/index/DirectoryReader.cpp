@@ -52,21 +52,13 @@ std::vector<std::shared_ptr<IndexReader>> DirectoryReader::getSequentialSubReade
 // ==================== Lifecycle ====================
 
 void DirectoryReader::doClose() {
-    // Close all segment readers (decrement their refCount)
-    // This marks them as closed, but leaves the objects alive
-    // until the DirectoryReader is destroyed
+    // Close all segment readers. shared_ptr keeps them alive until
+    // all LeafReaderContext references are dropped.
     for (auto& reader : segmentReaders_) {
-        if (reader && reader->getRefCount() > 0) {
-            reader->decRef();
+        if (reader) {
+            reader->close();
         }
     }
-
-    // Note: We do NOT clear segmentReaders_ here because raw pointers
-    // from leaves() might still be in use. The vector will be cleared
-    // when the DirectoryReader is destroyed.
-
-    // Call parent doClose to set closed flag
-    IndexReader::doClose();
 }
 
 // ==================== Helper Methods ====================
@@ -147,10 +139,8 @@ std::vector<std::shared_ptr<SegmentReader>> DirectoryReader::createSegmentReader
             if (newSegInfo->name() == oldSegInfo->name() &&
                 newSegInfo->delCount() == oldSegInfo->delCount() &&
                 newSegInfo->maxDoc() == oldSegInfo->maxDoc()) {
-                // Segment unchanged - reuse reader
-                auto reusedReader = oldReaders[oldIdx];
-                reusedReader->incRef();  // Increment ref count for new reader
-                readers.push_back(reusedReader);
+                // Segment unchanged - reuse reader (shared_ptr copy is sufficient)
+                readers.push_back(oldReaders[oldIdx]);
                 continue;
             }
         }

@@ -9,35 +9,23 @@ namespace index {
 class IndexReader;
 
 /**
- * RAII guard for IndexReader reference counting.
+ * @deprecated shared_ptr manages IndexReader lifecycle now.
+ * Keep a shared_ptr<IndexReader> instead of using RefCountGuard.
  *
- * Increments refCount on construction, decrements on destruction.
- * Prevents ref-count leaks in exception paths.
- *
- * Usage:
- *   auto guard = RefCountGuard(reader.get());
- *   // reader guaranteed alive until guard goes out of scope
+ * Previously: RAII guard for IndexReader reference counting.
+ * Now: No-op wrapper (incRef/decRef are deprecated no-ops).
  */
-class RefCountGuard {
+class [[deprecated("Use shared_ptr<IndexReader> instead of RefCountGuard")]] RefCountGuard {
 public:
-    explicit RefCountGuard(IndexReader* reader) : reader_(reader) {
-        if (reader_) reader_->incRef();
-    }
+    explicit RefCountGuard(IndexReader* /*reader*/) {}
 
-    ~RefCountGuard() {
-        if (reader_) reader_->decRef();
-    }
+    ~RefCountGuard() = default;
 
-    RefCountGuard(RefCountGuard&& other) noexcept : reader_(other.reader_) {
-        other.reader_ = nullptr;
-    }
+    RefCountGuard(RefCountGuard&& other) noexcept = default;
 
     RefCountGuard(const RefCountGuard&) = delete;
     RefCountGuard& operator=(const RefCountGuard&) = delete;
     RefCountGuard& operator=(RefCountGuard&&) = delete;
-
-private:
-    IndexReader* reader_;
 };
 
 }  // namespace index

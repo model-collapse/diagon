@@ -95,7 +95,7 @@ TEST_F(MaybeMergeTest, MergedSegmentsSearchable) {
     auto reader = DirectoryReader::open(*dir);
     EXPECT_EQ(numDocs, reader->numDocs())
         << "All " << numDocs << " documents should be searchable after merge";
-    reader->decRef();
+    reader->close();
 }
 
 /**

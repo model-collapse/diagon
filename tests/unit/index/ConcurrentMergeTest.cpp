@@ -160,7 +160,7 @@ TEST_F(ConcurrentMergeTest, WaitForMergesBeforeCommit) {
     auto reader = DirectoryReader::open(*dir);
     EXPECT_EQ(numDocs, reader->numDocs())
         << "All documents should be readable after commit with background merges";
-    reader->decRef();
+    reader->close();
 }
 
 /**
@@ -202,7 +202,7 @@ TEST_F(ConcurrentMergeTest, ConcurrentIndexingAndMerging) {
     auto reader = DirectoryReader::open(*dir);
     EXPECT_EQ(numThreads * docsPerThread, reader->numDocs())
         << "All documents from all threads should be present";
-    reader->decRef();
+    reader->close();
 
     writer->close();
 }
@@ -279,5 +279,5 @@ TEST_F(ConcurrentMergeTest, AllDocsSearchableAfterBackgroundMerge) {
     EXPECT_EQ(numDocs, reader->numDocs())
         << "All " << numDocs
         << " documents should be searchable after background merges + commit";
-    reader->decRef();
+    reader->close();
 }

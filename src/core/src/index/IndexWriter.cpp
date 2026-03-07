@@ -784,7 +784,7 @@ void IndexWriter::applyDeletes(const Term& term) {
             }
 
             // Close reader
-            reader->decRef();
+            reader->close();
 
         } catch (const std::exception& e) {
             // Segment might be corrupted or missing - skip it

@@ -130,7 +130,7 @@ TEST_F(MemoryLeakTest, RepeatedQueriesStableRSS) {
         << "Warmup RSS: " << (rssAfterWarmup / (1024 * 1024))
         << " MB, Final RSS: " << (rssAfterQueries / (1024 * 1024)) << " MB";
 
-    reader->decRef();
+    reader->close();
 }
 
 /**
@@ -174,7 +174,7 @@ TEST_F(MemoryLeakTest, MultiFieldAccessStableRSS) {
         << "RSS grew by " << (growth / (1024 * 1024))
         << " MB after 4000 multi-field queries — possible cache leak";
 
-    reader->decRef();
+    reader->close();
 }
 
 /**
@@ -239,7 +239,7 @@ TEST_F(MemoryLeakTest, ReaderReopenCycleStable) {
     {
         auto dir = MMapDirectory::open(indexDir_.string());
         auto reader = DirectoryReader::open(*dir);
-        reader->decRef();
+        reader->close();
     }
 
     size_t rssAfterWarmup = getCurrentRSSBytes();
@@ -255,7 +255,7 @@ TEST_F(MemoryLeakTest, ReaderReopenCycleStable) {
         TermQuery query(term);
         searcher.search(query, 10);
 
-        reader->decRef();
+        reader->close();
     }
 
     size_t rssAfterCycles = getCurrentRSSBytes();
@@ -291,5 +291,5 @@ TEST_F(MemoryLeakTest, CacheSizesBounded) {
     // if any cache exceeds 1000 entries.
     SUCCEED() << "All cache size assertions passed across 1000 queries";
 
-    reader->decRef();
+    reader->close();
 }

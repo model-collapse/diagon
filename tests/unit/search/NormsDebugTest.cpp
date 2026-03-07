@@ -50,7 +50,7 @@ TEST(NormsDebugTest, CheckNormsValues) {
         auto reader = DirectoryReader::open(*dir);
         auto leaves = reader->leaves();
         auto& leafContext = leaves[0];
-        auto* leafReader = dynamic_cast<SegmentReader*>(leafContext.reader);
+        auto* leafReader = dynamic_cast<SegmentReader*>(leafContext.reader.get());
 
         auto* norms = leafReader->getNormValues("content");
         ASSERT_NE(nullptr, norms);

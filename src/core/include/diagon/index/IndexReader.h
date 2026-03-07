@@ -58,7 +58,7 @@ public:
  */
 class LeafReaderContextWrapper : public IndexReaderContext {
 public:
-    explicit LeafReaderContextWrapper(LeafReader* reader);
+    explicit LeafReaderContextWrapper(std::shared_ptr<LeafReader> reader);
 
     IndexReader* reader() const override;
     std::vector<LeafReaderContext> leaves() const override;
@@ -106,9 +106,9 @@ private:
  *
  * Based on: org.apache.lucene.index.IndexReader
  */
-class IndexReader {
+class IndexReader : public std::enable_shared_from_this<IndexReader> {
 public:
-    virtual ~IndexReader() = default;
+    virtual ~IndexReader() { close(); }
 
     // ==================== Context Access ====================
 
@@ -148,45 +148,43 @@ public:
      */
     virtual CacheHelper* getReaderCacheHelper() const = 0;
 
-    // ==================== Lifecycle (Reference Counting) ====================
+    // ==================== Lifecycle ====================
 
     /**
-     * Increment reference count
+     * Close this reader and release resources.
+     * Idempotent: safe to call multiple times.
+     * Subclasses override doClose() to release specific resources.
      */
-    void incRef() { refCount_.fetch_add(1, std::memory_order_relaxed); }
-
-    /**
-     * Try to increment reference count
-     * Returns false if reader is already closed
-     */
-    bool tryIncRef() {
-        int count = refCount_.load(std::memory_order_relaxed);
-        while (count > 0) {
-            if (refCount_.compare_exchange_weak(count, count + 1, std::memory_order_relaxed)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Decrement reference count
-     * Closes reader when count reaches 0
-     */
-    void decRef() {
-        int count = refCount_.fetch_sub(1, std::memory_order_acq_rel);
-        if (count == 1) {
-            // Last reference, close the reader
+    void close() {
+        bool expected = false;
+        if (closed_.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
             doClose();
-        } else if (count <= 0) {
-            throw std::runtime_error("IndexReader refCount underflow");
         }
     }
 
     /**
-     * Get current reference count
+     * Check if this reader has been closed.
      */
-    int getRefCount() const { return refCount_.load(std::memory_order_relaxed); }
+    bool isClosed() const { return closed_.load(std::memory_order_acquire); }
+
+    // ==================== Deprecated Ref-Counting Shims ====================
+    // These exist only for migration. shared_ptr handles lifecycle now.
+
+    /** @deprecated No-op. shared_ptr manages lifecycle. */
+    [[deprecated("shared_ptr manages lifecycle — incRef() is a no-op")]]
+    void incRef() {}
+
+    /** @deprecated Calls close(). Use close() directly. */
+    [[deprecated("Use close() instead of decRef()")]]
+    void decRef() { close(); }
+
+    /** @deprecated Returns 0 if closed, 1 if open. Use isClosed(). */
+    [[deprecated("Use isClosed() instead of getRefCount()")]]
+    int getRefCount() const { return closed_.load(std::memory_order_acquire) ? 0 : 1; }
+
+    /** @deprecated Always returns !isClosed(). */
+    [[deprecated("shared_ptr manages lifecycle — tryIncRef() is deprecated")]]
+    bool tryIncRef() { return !isClosed(); }
 
 protected:
     /**
@@ -204,14 +202,14 @@ protected:
     void setClosed() { closed_.store(true, std::memory_order_release); }
 
     /**
-     * Called when closing (refCount reaches 0)
-     * Subclasses should override to release resources
+     * Called when closing.
+     * Subclasses should override to release resources.
+     * Note: setClosed() is NOT called here — close() handles the flag.
      */
-    virtual void doClose() { setClosed(); }
+    virtual void doClose() {}
 
 private:
     std::atomic<bool> closed_{false};
-    std::atomic<int> refCount_{1};
 };
 
 // ==================== LeafReader (Abstract, Atomic Segment Reader) ====================
@@ -234,52 +232,60 @@ public:
     // ==================== Terms & Postings ====================
 
     /**
-     * Get Terms for a field
+     * Get Terms for a field.
+     * Lifetime: returned pointer valid while this LeafReader is open.
      * @return Terms or nullptr if field doesn't exist/has no terms
      */
-    virtual Terms* terms(const std::string& field) const = 0;
+    [[nodiscard]] virtual Terms* terms(const std::string& field) const = 0;
 
     // ==================== Doc Values (Column Access) ====================
 
     /**
-     * Numeric doc values (single numeric value per doc)
+     * Numeric doc values (single numeric value per doc).
+     * Lifetime: returned pointer valid while this LeafReader is open.
      */
-    virtual NumericDocValues* getNumericDocValues(const std::string& field) const = 0;
+    [[nodiscard]] virtual NumericDocValues* getNumericDocValues(const std::string& field) const = 0;
 
     /**
-     * Binary doc values (single byte[] per doc)
+     * Binary doc values (single byte[] per doc).
+     * Lifetime: returned pointer valid while this LeafReader is open.
      */
-    virtual BinaryDocValues* getBinaryDocValues(const std::string& field) const = 0;
+    [[nodiscard]] virtual BinaryDocValues* getBinaryDocValues(const std::string& field) const = 0;
 
     /**
-     * Sorted doc values (sorted set of byte[] values, doc→ord mapping)
+     * Sorted doc values (sorted set of byte[] values, doc→ord mapping).
+     * Lifetime: returned pointer valid while this LeafReader is open.
      */
-    virtual SortedDocValues* getSortedDocValues(const std::string& field) const = 0;
+    [[nodiscard]] virtual SortedDocValues* getSortedDocValues(const std::string& field) const = 0;
 
     /**
-     * Sorted set doc values (doc→multiple ords mapping)
+     * Sorted set doc values (doc→multiple ords mapping).
+     * Lifetime: returned pointer valid while this LeafReader is open.
      */
-    virtual SortedSetDocValues* getSortedSetDocValues(const std::string& field) const = 0;
+    [[nodiscard]] virtual SortedSetDocValues* getSortedSetDocValues(const std::string& field) const = 0;
 
     /**
-     * Sorted numeric doc values (doc→multiple numeric values)
+     * Sorted numeric doc values (doc→multiple numeric values).
+     * Lifetime: returned pointer valid while this LeafReader is open.
      */
-    virtual SortedNumericDocValues* getSortedNumericDocValues(const std::string& field) const = 0;
+    [[nodiscard]] virtual SortedNumericDocValues* getSortedNumericDocValues(const std::string& field) const = 0;
 
     // ==================== Stored Fields ====================
 
     /**
-     * Get stored fields reader
+     * Get stored fields reader.
+     * Lifetime: returned pointer valid while this LeafReader is open.
      */
-    virtual codecs::StoredFieldsReader* storedFieldsReader() const = 0;
+    [[nodiscard]] virtual codecs::StoredFieldsReader* storedFieldsReader() const = 0;
 
     // ==================== Norms ====================
 
     /**
-     * Get normalization values for field
-     * Returns nullptr if field doesn't have norms
+     * Get normalization values for field.
+     * Lifetime: returned pointer valid while this LeafReader is open.
+     * Returns nullptr if field doesn't have norms.
      */
-    virtual NumericDocValues* getNormValues(const std::string& field) const = 0;
+    [[nodiscard]] virtual NumericDocValues* getNormValues(const std::string& field) const = 0;
 
     // ==================== Field Metadata ====================
 
@@ -289,17 +295,19 @@ public:
     virtual const FieldInfos& getFieldInfos() const = 0;
 
     /**
-     * Get live docs (deleted docs bitmap)
-     * Returns nullptr if no deletions
+     * Get live docs (deleted docs bitmap).
+     * Lifetime: returned pointer valid while this LeafReader is open.
+     * Returns nullptr if no deletions.
      */
-    virtual const util::Bits* getLiveDocs() const = 0;
+    [[nodiscard]] virtual const util::Bits* getLiveDocs() const = 0;
 
     // ==================== Points (Numeric/Geo Indexes) ====================
 
     /**
-     * Point values for field (if indexed with PointsFormat)
+     * Point values for field (if indexed with PointsFormat).
+     * Lifetime: returned pointer valid while this LeafReader is open.
      */
-    virtual PointValues* getPointValues(const std::string& field) const = 0;
+    [[nodiscard]] virtual PointValues* getPointValues(const std::string& field) const = 0;
 
     // ==================== Caching ====================
 
@@ -317,11 +325,21 @@ public:
     // ==================== Context ====================
 
     std::unique_ptr<IndexReaderContext> getContext() const override {
-        return std::make_unique<LeafReaderContextWrapper>(const_cast<LeafReader*>(this));
+        return std::make_unique<LeafReaderContextWrapper>(sharedLeafPtr());
     }
 
     std::vector<LeafReaderContext> leaves() const override {
-        return {LeafReaderContext(const_cast<LeafReader*>(this), 0, 0)};
+        return {LeafReaderContext(sharedLeafPtr(), 0, 0)};
+    }
+
+protected:
+    /**
+     * Get a shared_ptr<LeafReader> to this object.
+     * Requires this object to be managed by a shared_ptr.
+     */
+    std::shared_ptr<LeafReader> sharedLeafPtr() const {
+        return std::static_pointer_cast<LeafReader>(
+            std::const_pointer_cast<IndexReader>(shared_from_this()));
     }
 };
 

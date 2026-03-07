@@ -447,7 +447,7 @@ TEST_F(Lucene104QueryTest, CodecDetection) {
     // Get SegmentReader
     const auto& leaves = reader->leaves();
     ASSERT_EQ(1, leaves.size());
-    auto* segmentReader = dynamic_cast<SegmentReader*>(leaves[0].reader);
+    auto* segmentReader = dynamic_cast<SegmentReader*>(leaves[0].reader.get());
     ASSERT_NE(nullptr, segmentReader);
 
     // Verify segment info matches

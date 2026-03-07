@@ -107,8 +107,7 @@ TEST(StoredFieldsIntegrationTest, DWPTToSegmentReader) {
             EXPECT_EQ(std::get<int64_t>(fields["score"]), 1000 + i * 100);
         }
 
-        // Release reader (decRef)
-        reader->decRef();
+        reader->close();
     }
 
     // Clean up
@@ -154,7 +153,7 @@ TEST(StoredFieldsIntegrationTest, OnlyIndexedFields) {
         auto storedFieldsReader = reader->storedFieldsReader();
         EXPECT_EQ(storedFieldsReader, nullptr);
 
-        reader->decRef();
+        reader->close();
     }
 
     directory->close();
@@ -217,7 +216,7 @@ TEST(StoredFieldsIntegrationTest, MixedStoredAndIndexed) {
         EXPECT_EQ(std::get<std::string>(fields["summary"]), "This is a summary");
         EXPECT_EQ(std::get<std::string>(fields["title"]), "Important Document");
 
-        reader->decRef();
+        reader->close();
     }
 
     directory->close();
@@ -283,7 +282,7 @@ TEST(StoredFieldsIntegrationTest, MultipleDocuments) {
         EXPECT_EQ(std::get<int64_t>(doc9["id"]), 9);
         EXPECT_EQ(std::get<std::string>(doc9["value"]), "Document 9");
 
-        reader->decRef();
+        reader->close();
     }
 
     directory->close();

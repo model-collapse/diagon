@@ -34,15 +34,16 @@ Issue #12 exposed a cache leak pattern (unbounded map growth via unique keys) th
 | `SegmentReader::getNormValues()` | `NumericDocValues*` | `normsCache_[field]` | `doClose()` clears cache |
 | `SegmentReader::storedFieldsReader()` | `StoredFieldsReader*` | `storedFieldsReader_` | `doClose()` resets |
 | `SegmentReader::getLiveDocs()` | `const Bits*` | `liveDocs_` | `doClose()` resets |
-| `LeafReaderContext::reader` | `LeafReader*` | parent DirectoryReader | parent `decRef()` to 0 |
+| `LeafReaderContext::reader` | `shared_ptr<LeafReader>` | shared ownership | **FIXED** (Phase 2b) |
 
-**Assessment**: These are the highest-risk sites. A user who holds a `Terms*` across a reader close gets a crash. Currently "safe" because our search path consumes pointers within a single query scope, but fragile.
+**Assessment**: LeafReaderContext now holds `shared_ptr<LeafReader>` (Phase 2b), eliminating the dangling context risk. Raw `T*` returns from cache methods are documented with `[[nodiscard]]` and lifetime comments (Phase 2a). All methods call `ensureOpen()` which throws `AlreadyClosedException` on use-after-close.
 
-### Tier 3: Ownership Model Confusion
+### Tier 3: Ownership Model Confusion — **RESOLVED** (Phase 3)
 
-- `DirectoryReader` holds `shared_ptr<SegmentReader>` but also calls manual `incRef()/decRef()`
-- `SegmentReader` has both `shared_ptr` semantics (from DirectoryReader) and `refCount_` (from IndexReader base)
-- No RAII guard for `incRef()/decRef()` — exception-unsafe
+- ~~`DirectoryReader` holds `shared_ptr<SegmentReader>` but also calls manual `incRef()/decRef()`~~ → Now uses `close()` only
+- ~~`SegmentReader` has both `shared_ptr` semantics and `refCount_`~~ → `refCount_` removed, unified on `shared_ptr` + `close()`
+- ~~No RAII guard for `incRef()/decRef()`~~ → `RefCountGuard` deprecated; `shared_ptr` is the RAII guard
+- `IndexReader` now uses `enable_shared_from_this<IndexReader>` for safe `shared_ptr` recovery
 
 ## Strategy: 3-Phase Plan
 
@@ -241,15 +242,15 @@ endif()
 
 ## Priority Order
 
-| Phase | Item | Effort | Impact | When |
-|-------|------|--------|--------|------|
-| 1a | Cache size assertions | 1 hour | Catches future Issue #12 variants | Now |
-| 1b | DocumentsWriter pruning | 2 hours | Fixes long-session leak | Now |
-| 1c | RefCountGuard | 2 hours | Prevents ref-count errors | Now |
-| 2a | shared_ptr cache returns | 1-2 days | Eliminates dangling pointers | Next milestone |
-| 2b | LeafReaderContext safe ref | 2 hours | Eliminates context dangling | Next milestone |
-| 3a | Remove manual ref-counting | 3-5 days | Clean ownership model | Future |
-| 3b | Memory budget | 2-3 days | Defense-in-depth | Future |
+| Phase | Item | Effort | Impact | Status |
+|-------|------|--------|--------|--------|
+| 1a | Cache size assertions | 1 hour | Catches future Issue #12 variants | **DONE** |
+| 1b | DocumentsWriter pruning | 2 hours | Fixes long-session leak | **DONE** |
+| 1c | RefCountGuard | 2 hours | Prevents ref-count errors | **DONE** (now deprecated) |
+| 2a | `[[nodiscard]]` + lifetime docs + `ensureOpen()` guards | 2 hours | Compile-time safety | **DONE** |
+| 2b | LeafReaderContext `shared_ptr<LeafReader>` | 2 hours | Eliminates context dangling | **DONE** |
+| 3a | Remove manual ref-counting, unified `close()` | 3 hours | Clean ownership model | **DONE** |
+| 3b | Cache memory budget tracking | 1 hour | Defense-in-depth | **DONE** |
 | CI | ASan/LSan in CI | 2 hours | Catches all leaks automatically | Now |
 
 ## References

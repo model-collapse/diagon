@@ -68,7 +68,7 @@ TEST(DeletionIntegrationTest, DeleteDocumentsByTerm) {
     auto reader = DirectoryReader::open(*directory);
     EXPECT_EQ(reader->numDocs(), 5);
     EXPECT_EQ(reader->maxDoc(), 5);
-    reader->decRef();
+    reader->close();
 
     // Delete document with id=2
     Term term("id", "2");
@@ -81,7 +81,7 @@ TEST(DeletionIntegrationTest, DeleteDocumentsByTerm) {
     EXPECT_EQ(reader->maxDoc(), 5);   // MaxDoc unchanged
     EXPECT_TRUE(reader->hasDeletions());
 
-    reader->decRef();
+    reader->close();
     writer.close();
     removeDir(tempDir);
 }
@@ -105,7 +105,7 @@ TEST(DeletionIntegrationTest, UpdateDocument) {
     // Verify initial state
     auto reader = DirectoryReader::open(*directory);
     EXPECT_EQ(reader->numDocs(), 1);
-    reader->decRef();
+    reader->close();
 
     // Update document (delete old, add new)
     Document doc2;
@@ -121,7 +121,7 @@ TEST(DeletionIntegrationTest, UpdateDocument) {
     EXPECT_EQ(reader->maxDoc(), 2);   // But maxDoc increased (old + new)
     EXPECT_TRUE(reader->hasDeletions());
 
-    reader->decRef();
+    reader->close();
     writer.close();
     removeDir(tempDir);
 }
@@ -156,7 +156,7 @@ TEST(DeletionIntegrationTest, MultipleDeletesInSameSegment) {
     EXPECT_EQ(reader->numDocs(), 5);  // 5 odd numbers left
     EXPECT_EQ(reader->maxDoc(), 10);
 
-    reader->decRef();
+    reader->close();
     writer.close();
     removeDir(tempDir);
 }
@@ -193,7 +193,7 @@ TEST(DeletionIntegrationTest, DeleteAcrossMultipleSegments) {
     EXPECT_EQ(reader->numDocs(), 9);
     EXPECT_EQ(reader->maxDoc(), 10);
 
-    reader->decRef();
+    reader->close();
     writer.close();
     removeDir(tempDir);
 }
@@ -282,7 +282,7 @@ TEST(DeletionIntegrationTest, DeleteNonExistentTerm) {
     EXPECT_EQ(reader->maxDoc(), 5);
     EXPECT_FALSE(reader->hasDeletions());
 
-    reader->decRef();
+    reader->close();
     writer.close();
     removeDir(tempDir);
 }
@@ -315,7 +315,7 @@ TEST(DeletionIntegrationTest, DeleteAllDocuments) {
     EXPECT_EQ(reader->maxDoc(), 5);
     EXPECT_TRUE(reader->hasDeletions());
 
-    reader->decRef();
+    reader->close();
     writer.close();
     removeDir(tempDir);
 }
@@ -346,7 +346,7 @@ TEST(DeletionIntegrationTest, IncrementalDeletes) {
         auto reader = DirectoryReader::open(*directory);
         EXPECT_EQ(reader->numDocs(), 10 - (i + 1));
         EXPECT_EQ(reader->maxDoc(), 10);
-        reader->decRef();
+        reader->close();
     }
 
     writer.close();

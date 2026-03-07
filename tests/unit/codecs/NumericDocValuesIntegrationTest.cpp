@@ -71,7 +71,7 @@ TEST_F(NumericDocValuesIntegrationTest, WriteAndReadSingleField) {
         auto leaves = reader->leaves();
         ASSERT_EQ(leaves.size(), 1);  // Should have one segment
 
-        auto* leafReader = leaves[0].reader;
+        auto* leafReader = leaves[0].reader.get();
         ASSERT_NE(leafReader, nullptr);
 
         // Get numeric doc values
@@ -118,7 +118,7 @@ TEST_F(NumericDocValuesIntegrationTest, WriteAndReadMultipleFields) {
         auto leaves = reader->leaves();
         ASSERT_EQ(leaves.size(), 1);
 
-        auto* leafReader = leaves[0].reader;
+        auto* leafReader = leaves[0].reader.get();
 
         // Verify price field
         auto* priceDv = leafReader->getNumericDocValues("price");
@@ -176,7 +176,7 @@ TEST_F(NumericDocValuesIntegrationTest, SparseValues) {
     {
         auto reader = DirectoryReader::open(*dir);
         auto leaves = reader->leaves();
-        auto* leafReader = leaves[0].reader;
+        auto* leafReader = leaves[0].reader.get();
 
         auto* dv = leafReader->getNumericDocValues("price");
         ASSERT_NE(dv, nullptr);
@@ -219,7 +219,7 @@ TEST_F(NumericDocValuesIntegrationTest, Iteration) {
     {
         auto reader = DirectoryReader::open(*dir);
         auto leaves = reader->leaves();
-        auto* leafReader = leaves[0].reader;
+        auto* leafReader = leaves[0].reader.get();
 
         auto* dv = leafReader->getNumericDocValues("score");
         ASSERT_NE(dv, nullptr);
@@ -274,7 +274,7 @@ TEST_F(NumericDocValuesIntegrationTest, MultipleSegments) {
         // Verify we can read from all segments
         int totalDocs = 0;
         for (const auto& ctx : leaves) {
-            auto* leafReader = ctx.reader;
+            auto* leafReader = ctx.reader.get();
             ASSERT_NE(leafReader, nullptr);
 
             auto* dv = leafReader->getNumericDocValues("value");
@@ -313,7 +313,7 @@ TEST_F(NumericDocValuesIntegrationTest, NonExistentField) {
     {
         auto reader = DirectoryReader::open(*dir);
         auto leaves = reader->leaves();
-        auto* leafReader = leaves[0].reader;
+        auto* leafReader = leaves[0].reader.get();
 
         // Request non-existent field - should return nullptr
         auto* dv = leafReader->getNumericDocValues("nonexistent");
@@ -350,7 +350,7 @@ TEST_F(NumericDocValuesIntegrationTest, LargeValues) {
     {
         auto reader = DirectoryReader::open(*dir);
         auto leaves = reader->leaves();
-        auto* leafReader = leaves[0].reader;
+        auto* leafReader = leaves[0].reader.get();
 
         auto* posDv = leafReader->getNumericDocValues("big_positive");
         ASSERT_NE(posDv, nullptr);

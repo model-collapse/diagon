@@ -891,7 +891,7 @@ DiagonDocument diagon_reader_get_document(DiagonIndexReader reader, int doc_id) 
             int docBase = ctx.docBase;
 
             if (doc_id >= docBase && doc_id < docBase + maxDoc) {
-                leaf_reader = ctx.reader;
+                leaf_reader = ctx.reader.get();
                 segment_local_doc_id = doc_id - docBase;
                 break;
             }

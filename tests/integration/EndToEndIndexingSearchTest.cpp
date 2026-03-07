@@ -452,7 +452,7 @@ TEST_F(EndToEndIndexingSearchTest, StoredFieldsRetrieval) {
 
         // Get stored fields reader
         auto* storedFieldsReader =
-            dynamic_cast<SegmentReader*>(leafContext.reader)->storedFieldsReader();
+            dynamic_cast<SegmentReader*>(leafContext.reader.get())->storedFieldsReader();
         ASSERT_TRUE(storedFieldsReader != nullptr) << "Should have stored fields reader";
 
         // Read stored fields for document 5
