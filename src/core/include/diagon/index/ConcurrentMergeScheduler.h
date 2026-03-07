@@ -66,8 +66,8 @@ private:
 
     std::thread mergeThread_;
     mutable std::mutex queueMutex_;
-    std::condition_variable queueCV_;   // Signaled when task enqueued or shutdown
-    std::condition_variable doneCV_;    // Signaled when a task completes
+    std::condition_variable queueCV_;  // Signaled when task enqueued or shutdown
+    std::condition_variable doneCV_;   // Signaled when a task completes
     std::queue<MergeTask> pendingMerges_;
     std::atomic<bool> shutdown_{false};
     std::atomic<int> activeMerges_{0};  // Running + queued count

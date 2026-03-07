@@ -17,11 +17,11 @@ class IndexReader;
  */
 class [[deprecated("Use shared_ptr<IndexReader> instead of RefCountGuard")]] RefCountGuard {
 public:
-    explicit RefCountGuard(IndexReader* /*reader*/) {}
+    explicit RefCountGuard(IndexReader * /*reader*/) {}
 
     ~RefCountGuard() = default;
 
-    RefCountGuard(RefCountGuard&& other) noexcept = default;
+    RefCountGuard(RefCountGuard && other) noexcept = default;
 
     RefCountGuard(const RefCountGuard&) = delete;
     RefCountGuard& operator=(const RefCountGuard&) = delete;

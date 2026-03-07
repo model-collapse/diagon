@@ -54,7 +54,8 @@ TEST_F(ConcurrentMergeTest, BackgroundMergeDoesNotBlockIndexing) {
 
     for (int i = 0; i < 1000; i++) {
         Document doc;
-        doc.add(std::make_unique<TextField>("content", "background merge test doc " + std::to_string(i)));
+        doc.add(std::make_unique<TextField>("content",
+                                            "background merge test doc " + std::to_string(i)));
 
         auto start = std::chrono::high_resolution_clock::now();
         writer.addDocument(doc);
@@ -73,9 +74,8 @@ TEST_F(ConcurrentMergeTest, BackgroundMergeDoesNotBlockIndexing) {
     // With sync merging, P99 could be >10ms due to merge I/O.
     // With background merging, P99 should be bounded by flush cost only.
     // We use a generous 5ms threshold to avoid flakiness.
-    EXPECT_LT(p99, 5000.0)
-        << "P99 addDocument latency " << p99 << " µs is too high — "
-        << "background merge may be blocking. P50=" << p50 << " µs";
+    EXPECT_LT(p99, 5000.0) << "P99 addDocument latency " << p99 << " µs is too high — "
+                           << "background merge may be blocking. P50=" << p50 << " µs";
 
     writer.close();
 }
@@ -120,8 +120,7 @@ TEST_F(ConcurrentMergeTest, MergedFilesCleanedUp) {
             continue;
         }
         // Every non-metadata file should be referenced by a segment
-        EXPECT_TRUE(referencedFiles.count(file) > 0)
-            << "Orphaned file found: " << file;
+        EXPECT_TRUE(referencedFiles.count(file) > 0) << "Orphaned file found: " << file;
     }
 
     writer.close();
@@ -182,11 +181,11 @@ TEST_F(ConcurrentMergeTest, ConcurrentIndexingAndMerging) {
     std::vector<std::thread> threads;
 
     for (int t = 0; t < numThreads; t++) {
-        threads.emplace_back([&writer, t, docsPerThread]() {
+        threads.emplace_back([&writer, t]() {
             for (int i = 0; i < docsPerThread; i++) {
                 Document doc;
-                doc.add(std::make_unique<TextField>(
-                    "content", "thread" + std::to_string(t) + "_doc" + std::to_string(i)));
+                doc.add(std::make_unique<TextField>("content", "thread" + std::to_string(t) +
+                                                                   "_doc" + std::to_string(i)));
                 writer->addDocument(doc);
             }
         });
@@ -225,7 +224,8 @@ TEST_F(ConcurrentMergeTest, ShutdownWaitsForPendingMerge) {
 
         for (int i = 0; i < 500; i++) {
             Document doc;
-            doc.add(std::make_unique<TextField>("content", "shutdown test doc " + std::to_string(i)));
+            doc.add(
+                std::make_unique<TextField>("content", "shutdown test doc " + std::to_string(i)));
             writer.addDocument(doc);
         }
 
@@ -264,8 +264,7 @@ TEST_F(ConcurrentMergeTest, AllDocsSearchableAfterBackgroundMerge) {
 
         for (int i = 0; i < numDocs; i++) {
             Document doc;
-            doc.add(
-                std::make_unique<TextField>("content", "searchable doc " + std::to_string(i)));
+            doc.add(std::make_unique<TextField>("content", "searchable doc " + std::to_string(i)));
             writer.addDocument(doc);
         }
 
@@ -277,7 +276,6 @@ TEST_F(ConcurrentMergeTest, AllDocsSearchableAfterBackgroundMerge) {
     auto dir = FSDirectory::open(testDir_.string());
     auto reader = DirectoryReader::open(*dir);
     EXPECT_EQ(numDocs, reader->numDocs())
-        << "All " << numDocs
-        << " documents should be searchable after background merges + commit";
+        << "All " << numDocs << " documents should be searchable after background merges + commit";
     reader->close();
 }

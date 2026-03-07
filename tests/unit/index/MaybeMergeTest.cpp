@@ -56,8 +56,8 @@ TEST_F(MaybeMergeTest, SegmentsBoundedDuringBulkIndexing) {
     writer.waitForMerges();
 
     int segmentCount = writer.getSegmentInfos().size();
-    EXPECT_LE(segmentCount, 40)
-        << "Segment count should be bounded by maybeMerge(), got " << segmentCount;
+    EXPECT_LE(segmentCount, 40) << "Segment count should be bounded by maybeMerge(), got "
+                                << segmentCount;
     EXPECT_GT(segmentCount, 0) << "Should have at least one segment";
 
     writer.close();
@@ -153,8 +153,8 @@ TEST_F(MaybeMergeTest, CommitTimeMerge) {
     writer.commit();
 
     int segmentCount = writer.getSegmentInfos().size();
-    EXPECT_LE(segmentCount, 40)
-        << "Commit-time merge should keep segments bounded, got " << segmentCount;
+    EXPECT_LE(segmentCount, 40) << "Commit-time merge should keep segments bounded, got "
+                                << segmentCount;
 
     writer.close();
 }

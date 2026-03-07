@@ -126,8 +126,8 @@ NumericDocValues* SegmentReader::getNumericDocValues(const std::string& field) c
                 cacheMemoryUsed_.fetch_add(sizeof(NumericDocValues) + field.size(),
                                            std::memory_order_relaxed);
             }
-            assert(numericDocValuesCache_.size() <= 1000
-                   && "numericDocValuesCache_ growing unbounded — possible leak");
+            assert(numericDocValuesCache_.size() <= 1000 &&
+                   "numericDocValuesCache_ growing unbounded — possible leak");
             return dvPtr;
         }
     }
@@ -169,8 +169,8 @@ NumericDocValues* SegmentReader::getNormValues(const std::string& field) const {
                 normsCache_[field] = std::move(norms);
                 cacheMemoryUsed_.fetch_add(sizeof(NumericDocValues) + field.size(),
                                            std::memory_order_relaxed);
-                assert(normsCache_.size() <= 1000
-                       && "normsCache_ growing unbounded — possible leak");
+                assert(normsCache_.size() <= 1000 &&
+                       "normsCache_ growing unbounded — possible leak");
                 return normsPtr;
             }
         } catch (const std::exception& e) {

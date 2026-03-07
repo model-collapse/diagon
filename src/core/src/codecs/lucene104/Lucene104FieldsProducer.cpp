@@ -177,8 +177,8 @@ std::unique_ptr<index::Terms> Lucene104FieldsProducer::terms(const std::string& 
     // (e.g., "_all" field registered in metadata but never written)
     std::shared_ptr<blocktree::BlockTreeTermsReader> reader;
     try {
-        reader = std::make_shared<blocktree::BlockTreeTermsReader>(
-            timInputClone.get(), tipInputClone.get(), *fieldInfo);
+        reader = std::make_shared<blocktree::BlockTreeTermsReader>(timInputClone.get(),
+                                                                   tipInputClone.get(), *fieldInfo);
     } catch (const std::exception&) {
         return nullptr;  // Field has no postings data on disk
     }

@@ -74,12 +74,14 @@ public:
         return nullptr;
     }
 
-    [[nodiscard]] SortedSetDocValues* getSortedSetDocValues(const std::string& field) const override {
+    [[nodiscard]] SortedSetDocValues*
+    getSortedSetDocValues(const std::string& field) const override {
         ensureOpen();
         return nullptr;
     }
 
-    [[nodiscard]] SortedNumericDocValues* getSortedNumericDocValues(const std::string& field) const override {
+    [[nodiscard]] SortedNumericDocValues*
+    getSortedNumericDocValues(const std::string& field) const override {
         ensureOpen();
         return nullptr;
     }

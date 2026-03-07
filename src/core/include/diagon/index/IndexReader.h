@@ -171,20 +171,20 @@ public:
     // These exist only for migration. shared_ptr handles lifecycle now.
 
     /** @deprecated No-op. shared_ptr manages lifecycle. */
-    [[deprecated("shared_ptr manages lifecycle — incRef() is a no-op")]]
-    void incRef() {}
+    [[deprecated("shared_ptr manages lifecycle — incRef() is a no-op")]] void incRef() {}
 
     /** @deprecated Calls close(). Use close() directly. */
-    [[deprecated("Use close() instead of decRef()")]]
-    void decRef() { close(); }
+    [[deprecated("Use close() instead of decRef()")]] void decRef() { close(); }
 
     /** @deprecated Returns 0 if closed, 1 if open. Use isClosed(). */
-    [[deprecated("Use isClosed() instead of getRefCount()")]]
-    int getRefCount() const { return closed_.load(std::memory_order_acquire) ? 0 : 1; }
+    [[deprecated("Use isClosed() instead of getRefCount()")]] int getRefCount() const {
+        return closed_.load(std::memory_order_acquire) ? 0 : 1;
+    }
 
     /** @deprecated Always returns !isClosed(). */
-    [[deprecated("shared_ptr manages lifecycle — tryIncRef() is deprecated")]]
-    bool tryIncRef() { return !isClosed(); }
+    [[deprecated("shared_ptr manages lifecycle — tryIncRef() is deprecated")]] bool tryIncRef() {
+        return !isClosed();
+    }
 
 protected:
     /**
@@ -262,13 +262,15 @@ public:
      * Sorted set doc values (doc→multiple ords mapping).
      * Lifetime: returned pointer valid while this LeafReader is open.
      */
-    [[nodiscard]] virtual SortedSetDocValues* getSortedSetDocValues(const std::string& field) const = 0;
+    [[nodiscard]] virtual SortedSetDocValues*
+    getSortedSetDocValues(const std::string& field) const = 0;
 
     /**
      * Sorted numeric doc values (doc→multiple numeric values).
      * Lifetime: returned pointer valid while this LeafReader is open.
      */
-    [[nodiscard]] virtual SortedNumericDocValues* getSortedNumericDocValues(const std::string& field) const = 0;
+    [[nodiscard]] virtual SortedNumericDocValues*
+    getSortedNumericDocValues(const std::string& field) const = 0;
 
     // ==================== Stored Fields ====================
 

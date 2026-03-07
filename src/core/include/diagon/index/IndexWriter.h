@@ -301,10 +301,10 @@ private:
 
     // Background merge support
     ConcurrentMergeScheduler mergeScheduler_;
-    mutable std::mutex segmentLock_;          // Protects segmentInfos_ and mergingSegments_
-    std::set<std::string> mergingSegments_;   // Segments currently being merged in background
-    std::atomic<int> mergeCounter_{0};        // Unique name counter for merged segments
-    size_t collectedSegmentCount_{0};         // How many segments from documentsWriter_ already collected
+    mutable std::mutex segmentLock_;         // Protects segmentInfos_ and mergingSegments_
+    std::set<std::string> mergingSegments_;  // Segments currently being merged in background
+    std::atomic<int> mergeCounter_{0};       // Unique name counter for merged segments
+    size_t collectedSegmentCount_{0};  // How many segments from documentsWriter_ already collected
     void maybeMerge(MergeTrigger trigger);
     void collectNewSegments();
 

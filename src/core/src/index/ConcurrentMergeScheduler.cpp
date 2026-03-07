@@ -24,9 +24,7 @@ void ConcurrentMergeScheduler::submit(std::function<void()> work) {
 
 void ConcurrentMergeScheduler::waitForMerges() {
     std::unique_lock<std::mutex> lock(queueMutex_);
-    doneCV_.wait(lock, [this] {
-        return activeMerges_.load(std::memory_order_relaxed) == 0;
-    });
+    doneCV_.wait(lock, [this] { return activeMerges_.load(std::memory_order_relaxed) == 0; });
 }
 
 void ConcurrentMergeScheduler::shutdown() {

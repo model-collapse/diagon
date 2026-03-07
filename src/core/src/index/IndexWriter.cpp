@@ -287,8 +287,7 @@ void IndexWriter::maybeMerge(MergeTrigger trigger) {
     }
 
     // Find merges (no lock — filteredInfos is a local copy)
-    std::unique_ptr<MergeSpecification> spec(
-        mergePolicy_->findMerges(trigger, filteredInfos));
+    std::unique_ptr<MergeSpecification> spec(mergePolicy_->findMerges(trigger, filteredInfos));
     if (!spec || spec->empty()) {
         return;
     }
@@ -338,8 +337,7 @@ void IndexWriter::maybeMerge(MergeTrigger trigger) {
                 for (auto& f : origFiles) {
                     try {
                         directory_.deleteFile(f);
-                    } catch (...) {
-                    }
+                    } catch (...) {}
                 }
             }
 
@@ -716,7 +714,6 @@ void IndexWriter::applyDeletes(const Term& term) {
 
     // Apply deletions to all existing segments
     for (auto& segmentInfo : segments) {
-
         try {
             // Open segment reader
             auto reader = SegmentReader::open(directory_, segmentInfo);
@@ -829,8 +826,7 @@ void IndexWriter::executeMerges(MergeSpecification* spec) {
             for (const auto& file : origFiles) {
                 try {
                     directory_.deleteFile(file);
-                } catch (const std::exception&) {
-                }
+                } catch (const std::exception&) {}
             }
         }
 
