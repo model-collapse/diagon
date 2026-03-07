@@ -155,6 +155,20 @@ public:
     }
 
     /**
+     * Prune segments already collected by IndexWriter.
+     * Prevents unbounded growth of segments_ during long indexing sessions.
+     */
+    void pruneCollectedSegments(size_t collectedCount) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (collectedCount > 0 && collectedCount <= segments_.size()) {
+            segments_.erase(segments_.begin(),
+                            segments_.begin() + static_cast<ptrdiff_t>(collectedCount));
+            segmentNames_.erase(segmentNames_.begin(),
+                                segmentNames_.begin() + static_cast<ptrdiff_t>(collectedCount));
+        }
+    }
+
+    /**
      * Reset for reuse
      * Clears all state including segment list
      */

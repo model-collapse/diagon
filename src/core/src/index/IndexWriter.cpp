@@ -261,7 +261,14 @@ void IndexWriter::collectNewSegments() {
     for (size_t i = collectedSegmentCount_; i < allSegments.size(); i++) {
         segmentInfos_.add(allSegments[i]);
     }
-    collectedSegmentCount_ = allSegments.size();
+    size_t newCount = allSegments.size();
+
+    // Prune already-collected segments from DocumentsWriter to prevent
+    // unbounded growth during long indexing sessions (Phase 1b).
+    if (newCount > 0) {
+        documentsWriter_->pruneCollectedSegments(newCount);
+    }
+    collectedSegmentCount_ = 0;  // Reset after prune — DocumentsWriter vector was trimmed
 }
 
 void IndexWriter::maybeMerge(MergeTrigger trigger) {

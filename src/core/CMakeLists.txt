@@ -180,6 +180,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/index/FreqProxFields.h
     include/diagon/index/IndexMapping.h
     include/diagon/index/IndexReader.h
+    include/diagon/index/RefCountGuard.h
     include/diagon/index/SegmentWriteState.h
     include/diagon/index/PostingsEnum.h
     include/diagon/index/TermsEnum.h

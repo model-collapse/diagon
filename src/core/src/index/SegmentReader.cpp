@@ -9,6 +9,7 @@
 #include "diagon/util/Exceptions.h"
 
 #include <atomic>
+#include <cassert>
 #include <iostream>
 
 namespace diagon {
@@ -85,6 +86,7 @@ Terms* SegmentReader::terms(const std::string& field) const {
         if (terms) {
             Terms* termsPtr = terms.get();
             termsCache_[field] = std::move(terms);
+            assert(termsCache_.size() <= 1000 && "termsCache_ growing unbounded — possible leak");
             return termsPtr;
         } else {
         }
@@ -119,6 +121,8 @@ NumericDocValues* SegmentReader::getNumericDocValues(const std::string& field) c
         if (dv) {
             NumericDocValues* dvPtr = dv.get();
             numericDocValuesCache_[field] = std::move(dv);
+            assert(numericDocValuesCache_.size() <= 1000
+                   && "numericDocValuesCache_ growing unbounded — possible leak");
             return dvPtr;
         }
     }
@@ -158,6 +162,8 @@ NumericDocValues* SegmentReader::getNormValues(const std::string& field) const {
             if (norms) {
                 NumericDocValues* normsPtr = norms.get();
                 normsCache_[field] = std::move(norms);
+                assert(normsCache_.size() <= 1000
+                       && "normsCache_ growing unbounded — possible leak");
                 return normsPtr;
             }
         } catch (const std::exception& e) {
