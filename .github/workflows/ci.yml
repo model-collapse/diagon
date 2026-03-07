@@ -181,6 +181,50 @@ jobs:
         working-directory: build
         run: ctest --output-on-failure -j1
 
+  # ==================== Memory Leak Detection ====================
+  # Catches logical leaks (unbounded cache growth) that ASan/LSan miss.
+  # ASan detects lost pointers; this job detects Issue #12-class bugs where
+  # caches hold all pointers but grow without bound per operation.
+  memory-leak:
+    name: Memory Leak Detection (RSS Monitoring)
+    runs-on: ubuntu-22.04
+    env:
+      CC: gcc-13
+      CXX: g++-13
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            gcc-13 \
+            g++-13 \
+            liblz4-dev \
+            libzstd-dev \
+            zlib1g-dev \
+            libgtest-dev
+
+      - name: Configure CMake (Release for accurate RSS)
+        run: |
+          cmake -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DDIAGON_BUILD_TESTS=ON \
+            -DDIAGON_BUILD_BENCHMARKS=OFF
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run memory leak tests
+        working-directory: build
+        run: ctest -R MemoryLeak --output-on-failure -j1
+
   # ==================== Coverage ====================
   coverage:
     name: Code Coverage
