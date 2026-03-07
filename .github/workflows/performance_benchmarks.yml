@@ -84,7 +84,7 @@ jobs:
 
       - name: Download baseline results
         id: baseline
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: baseline_results.json
           key: perf-baseline-${{ github.base_ref || 'main' }}
@@ -137,7 +137,7 @@ jobs:
           EOF
 
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: benchmark-results-${{ github.sha }}
           path: |
