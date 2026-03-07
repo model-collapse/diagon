@@ -251,7 +251,7 @@ endif()
 | 2b | LeafReaderContext `shared_ptr<LeafReader>` | 2 hours | Eliminates context dangling | **DONE** |
 | 3a | Remove manual ref-counting, unified `close()` | 3 hours | Clean ownership model | **DONE** |
 | 3b | Cache memory budget tracking | 1 hour | Defense-in-depth | **DONE** |
-| CI | ASan/LSan in CI | 2 hours | Catches all leaks automatically | Now |
+| CI | ASan/LSan in CI | 2 hours | Catches all leaks automatically | **DONE** |
 
 ## References
 
