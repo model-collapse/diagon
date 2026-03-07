@@ -32,7 +32,9 @@ DirectoryReader::DirectoryReader(store::Directory& dir,
     , segmentInfos_(segmentInfos) {}
 
 DirectoryReader::~DirectoryReader() {
-    // Destructor - resources cleaned up in doClose()
+    // Must call close() here — virtual dispatch in ~IndexReader() would call
+    // IndexReader::doClose() (empty), not DirectoryReader::doClose().
+    close();
 }
 
 // ==================== CompositeReader Implementation ====================

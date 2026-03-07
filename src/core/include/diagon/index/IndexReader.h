@@ -108,7 +108,7 @@ private:
  */
 class IndexReader : public std::enable_shared_from_this<IndexReader> {
 public:
-    virtual ~IndexReader() { close(); }
+    virtual ~IndexReader() = default;
 
     // ==================== Context Access ====================
 

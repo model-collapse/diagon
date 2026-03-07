@@ -47,7 +47,9 @@ SegmentReader::SegmentReader(Directory& dir, std::shared_ptr<SegmentInfo> si)
 }
 
 SegmentReader::~SegmentReader() {
-    // close() is called by ~IndexReader() if not already closed
+    // Must call close() here — virtual dispatch in ~IndexReader() would call
+    // IndexReader::doClose() (empty), not SegmentReader::doClose().
+    close();
 }
 
 // ==================== Terms Access ====================

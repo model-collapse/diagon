@@ -64,13 +64,16 @@ private:
 
     void mergeLoop();
 
-    std::thread mergeThread_;
+    // IMPORTANT: mergeThread_ MUST be declared LAST. C++ initializes members in
+    // declaration order, and the thread immediately accesses the mutex/condvar/atomics.
+    // If mergeThread_ were first, those members wouldn't be constructed yet (UB).
     mutable std::mutex queueMutex_;
     std::condition_variable queueCV_;  // Signaled when task enqueued or shutdown
     std::condition_variable doneCV_;   // Signaled when a task completes
     std::queue<MergeTask> pendingMerges_;
     std::atomic<bool> shutdown_{false};
     std::atomic<int> activeMerges_{0};  // Running + queued count
+    std::thread mergeThread_;           // Must be last — see comment above
 };
 
 }  // namespace index
