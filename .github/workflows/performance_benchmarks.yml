@@ -57,7 +57,7 @@ jobs:
           ./IndexingBenchmark 2>&1 | tee $GITHUB_WORKSPACE/indexing_results.txt
 
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-results-${{ github.sha }}
           path: |
