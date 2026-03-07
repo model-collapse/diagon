@@ -24,6 +24,18 @@
 #    include <unistd.h>
 #endif
 
+// Detect AddressSanitizer (GCC uses __SANITIZE_ADDRESS__, Clang uses __has_feature)
+#if defined(__SANITIZE_ADDRESS__)
+#    define DIAGON_ASAN_ENABLED 1
+#elif defined(__has_feature)
+#    if __has_feature(address_sanitizer)
+#        define DIAGON_ASAN_ENABLED 1
+#    endif
+#endif
+#ifndef DIAGON_ASAN_ENABLED
+#    define DIAGON_ASAN_ENABLED 0
+#endif
+
 using namespace diagon;
 using namespace diagon::index;
 using namespace diagon::document;
@@ -141,6 +153,9 @@ TEST_F(MemoryLeakTest, MultiFieldAccessStableRSS) {
     if (getCurrentRSSBytes() == 0) {
         GTEST_SKIP() << "RSS monitoring not available on this platform";
     }
+#if DIAGON_ASAN_ENABLED
+    GTEST_SKIP() << "RSS-based test unreliable under AddressSanitizer (2-3x memory overhead)";
+#endif
 
     const int numFields = 20;
     buildIndex(1000, numFields);
@@ -185,6 +200,9 @@ TEST_F(MemoryLeakTest, LongIndexingSessionStableRSS) {
     if (getCurrentRSSBytes() == 0) {
         GTEST_SKIP() << "RSS monitoring not available on this platform";
     }
+#if DIAGON_ASAN_ENABLED
+    GTEST_SKIP() << "RSS-based test unreliable under AddressSanitizer (2-3x memory overhead)";
+#endif
 
     auto dir = FSDirectory::open(indexDir_.string());
     IndexWriterConfig config;
