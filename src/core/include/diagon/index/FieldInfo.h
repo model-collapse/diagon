@@ -385,6 +385,13 @@ public:
     int32_t getFieldNumber(const std::string& fieldName) const;
 
     /**
+     * Update field point dimensions
+     * Creates field if it doesn't exist
+     */
+    void updatePointDimensions(const std::string& fieldName, int32_t dimCount,
+                               int32_t indexDimCount, int32_t numBytes);
+
+    /**
      * Get field count
      */
     int32_t getFieldCount() const { return static_cast<int32_t>(byName_.size()); }

@@ -50,5 +50,29 @@ FieldType NumericDocValuesField::TYPE = []() {
     return ft;
 }();
 
+// LongPointField field type
+FieldType LongPointField::TYPE = []() {
+    FieldType ft;
+    ft.indexOptions = index::IndexOptions::NONE;  // Not indexed in inverted index
+    ft.stored = false;
+    ft.tokenized = false;
+    ft.pointDimensionCount = 1;
+    ft.pointIndexDimensionCount = 1;
+    ft.pointNumBytes = 8;  // sizeof(int64_t)
+    return ft;
+}();
+
+// DoublePointField field type
+FieldType DoublePointField::TYPE = []() {
+    FieldType ft;
+    ft.indexOptions = index::IndexOptions::NONE;
+    ft.stored = false;
+    ft.tokenized = false;
+    ft.pointDimensionCount = 1;
+    ft.pointIndexDimensionCount = 1;
+    ft.pointNumBytes = 8;  // sizeof(double) as sortable long
+    return ft;
+}();
+
 }  // namespace document
 }  // namespace diagon

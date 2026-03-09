@@ -65,6 +65,9 @@ set(DIAGON_CORE_SOURCES
     src/codecs/NumericDocValuesReader.cpp
     src/codecs/StoredFieldsWriter.cpp
     src/codecs/StoredFieldsReader.cpp
+    src/codecs/PointValuesWriter.cpp
+    src/codecs/BKDWriter.cpp
+    src/codecs/BKDReader.cpp
     src/codecs/LiveDocsFormat.cpp
     src/codecs/SimpleFieldsConsumer.cpp
     src/codecs/SimpleFieldsProducer.cpp
@@ -88,6 +91,7 @@ set(DIAGON_CORE_SOURCES
     src/search/TopScoreDocCollector.cpp
     src/search/TermQuery.cpp
     src/search/NumericRangeQuery.cpp
+    src/search/PointRangeQuery.cpp
     src/search/DoubleRangeQuery.cpp
     src/search/BooleanQuery.cpp
     src/search/MatchAllDocsQuery.cpp
@@ -182,6 +186,8 @@ set(DIAGON_CORE_HEADERS
     include/diagon/index/IndexReader.h
     include/diagon/index/RefCountGuard.h
     include/diagon/index/SegmentWriteState.h
+    include/diagon/index/PointValues.h
+    include/diagon/index/BKDConfig.h
     include/diagon/index/PostingsEnum.h
     include/diagon/index/TermsEnum.h
     include/diagon/index/Terms.h
@@ -221,6 +227,9 @@ set(DIAGON_CORE_HEADERS
     include/diagon/codecs/NumericDocValuesReader.h
     include/diagon/codecs/StoredFieldsWriter.h
     include/diagon/codecs/StoredFieldsReader.h
+    include/diagon/codecs/PointValuesWriter.h
+    include/diagon/codecs/BKDWriter.h
+    include/diagon/codecs/BKDReader.h
     include/diagon/codecs/LiveDocsFormat.h
     include/diagon/codecs/NormsFormat.h
     include/diagon/codecs/OtherFormats.h
@@ -283,6 +292,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/search/TotalHitCountCollector.h
     include/diagon/search/TermQuery.h
     include/diagon/search/NumericRangeQuery.h
+    include/diagon/search/PointRangeQuery.h
     include/diagon/search/DoubleRangeQuery.h
     include/diagon/search/MatchAllDocsQuery.h
     include/diagon/search/BulkScorer.h

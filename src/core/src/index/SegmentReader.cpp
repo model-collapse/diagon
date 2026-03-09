@@ -205,6 +205,28 @@ const util::Bits* SegmentReader::getLiveDocs() const {
     return liveDocs_.get();
 }
 
+// ==================== Points Access ====================
+
+PointValues* SegmentReader::getPointValues(const std::string& field) const {
+    ensureOpen();
+
+    // Check if field exists and has point values
+    const FieldInfo* fieldInfo = segmentInfo_->fieldInfos().fieldInfo(field);
+    if (!fieldInfo || fieldInfo->pointDimensionCount == 0) {
+        return nullptr;
+    }
+
+    // Load points readers if not already loaded
+    loadPointsReader();
+
+    auto it = pointsReaders_.find(field);
+    if (it != pointsReaders_.end()) {
+        return it->second.get();
+    }
+
+    return nullptr;
+}
+
 // ==================== Internal Methods ====================
 
 void SegmentReader::loadFieldsProducer() const {
@@ -333,6 +355,27 @@ void SegmentReader::loadNormsProducer() const {
     }
 }
 
+void SegmentReader::loadPointsReader() const {
+    if (pointsLoaded_) {
+        return;
+    }
+    pointsLoaded_ = true;
+
+    try {
+        auto& dir = getDirectory();
+        std::string segmentName = segmentInfo_->name();
+
+        auto kdmInput = dir.openInput(segmentName + ".kdm", IOContext::READ);
+        auto kdiInput = dir.openInput(segmentName + ".kdi", IOContext::READ);
+        auto kddInput = dir.openInput(segmentName + ".kdd", IOContext::READ);
+
+        pointsReaders_ =
+            codecs::BKDReader::loadFields(*kdmInput, *kdiInput, *kddInput);
+    } catch (const std::exception&) {
+        // Points files don't exist — that's OK
+    }
+}
+
 // ==================== Lifecycle ====================
 
 void SegmentReader::doClose() {
@@ -353,6 +396,10 @@ void SegmentReader::doClose() {
     // Clear norms
     normsProducer_.reset();
     normsCache_.clear();
+
+    // Clear points
+    pointsReaders_.clear();
+    pointsLoaded_ = false;
 
     // Clear live docs
     liveDocs_.reset();

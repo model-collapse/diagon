@@ -74,6 +74,11 @@ private:
      */
     void mergeNorms(const FieldInfos& mergedFieldInfos);
 
+    /**
+     * Merge point values (BKD trees) from source segments into merged segment
+     */
+    void mergePoints(const FieldInfos& mergedFieldInfos);
+
     // ==================== Members ====================
 
     store::Directory& directory_;

@@ -689,6 +689,11 @@ void IndexWriter::writeSegmentsFile() {
             output->writeByte(fieldInfo.omitNorms ? 1 : 0);
             output->writeByte(fieldInfo.storeTermVector ? 1 : 0);
             output->writeByte(fieldInfo.storePayloads ? 1 : 0);
+
+            // Write point dimensions (BKD tree)
+            output->writeInt(fieldInfo.pointDimensionCount);
+            output->writeInt(fieldInfo.pointIndexDimensionCount);
+            output->writeInt(fieldInfo.pointNumBytes);
         }
 
         // Write compound file flag

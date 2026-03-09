@@ -4,6 +4,7 @@
 #pragma once
 
 #include "diagon/codecs/NumericDocValuesWriter.h"
+#include "diagon/codecs/PointValuesWriter.h"
 #include "diagon/codecs/StoredFieldsWriter.h"
 #include "diagon/document/Document.h"
 #include "diagon/index/FieldInfo.h"
@@ -152,6 +153,9 @@ private:
 
     // Stored fields writer (lazy initialized)
     std::unique_ptr<codecs::StoredFieldsWriter> storedFieldsWriter_;
+
+    // Point values writer (lazy initialized, for BKD tree)
+    std::unique_ptr<codecs::PointValuesWriter> pointValuesWriter_;
 
     // Document count in RAM
     int numDocsInRAM_{0};

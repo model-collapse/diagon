@@ -239,6 +239,32 @@ void FieldInfosBuilder::setAttribute(const std::string& fieldName, const std::st
     }
 }
 
+void FieldInfosBuilder::updatePointDimensions(const std::string& fieldName, int32_t dimCount,
+                                               int32_t indexDimCount, int32_t numBytes) {
+    if (dimCount <= 0) {
+        return;
+    }
+
+    // Get or create field
+    getOrAdd(fieldName);
+
+    auto it = byName_.find(fieldName);
+    FieldInfo& info = it->second;
+
+    // Check for conflicts
+    if (info.pointDimensionCount > 0) {
+        if (info.pointDimensionCount != dimCount || info.pointIndexDimensionCount != indexDimCount ||
+            info.pointNumBytes != numBytes) {
+            throw std::invalid_argument("Cannot change point dimensions for field: " + fieldName);
+        }
+        return;  // Already set consistently
+    }
+
+    info.pointDimensionCount = dimCount;
+    info.pointIndexDimensionCount = indexDimCount;
+    info.pointNumBytes = numBytes;
+}
+
 int32_t FieldInfosBuilder::getFieldNumber(const std::string& fieldName) const {
     auto it = byName_.find(fieldName);
     if (it == byName_.end()) {

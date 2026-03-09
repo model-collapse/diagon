@@ -5,10 +5,13 @@
 
 #include "diagon/document/IndexableField.h"
 #include "diagon/util/FastTokenizer.h"
+#include "diagon/util/NumericUtils.h"
 #include "diagon/util/StandardTokenizer.h"
 
+#include <cstring>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace diagon {
 namespace document {
@@ -24,6 +27,7 @@ protected:
     FieldType type_;
     std::string stringValue_;
     std::optional<int64_t> numericValue_;
+    std::vector<uint8_t> binaryValue_;  // For point values (BKD tree)
 
     // Protected constructor for subclasses
     Field(std::string name, FieldType type)
@@ -65,7 +69,9 @@ public:
     std::optional<int64_t> numericValue() const override { return numericValue_; }
 
     std::optional<util::BytesRef> binaryValue() const override {
-        // Phase 2: not supporting binary fields yet
+        if (!binaryValue_.empty()) {
+            return util::BytesRef(binaryValue_);
+        }
         return std::nullopt;
     }
 
@@ -161,6 +167,50 @@ public:
         // Doc values fields are not tokenized for inverted index
         return {};
     }
+};
+
+/**
+ * LongPointField - A field indexing a 64-bit long value as a BKD tree point
+ *
+ * Based on: org.apache.lucene.document.LongPoint
+ *
+ * Enables O(log N) range queries via PointRangeQuery.
+ * The value is stored as big-endian sortable bytes in binaryValue_.
+ */
+class LongPointField : public Field {
+public:
+    static FieldType TYPE;
+
+    LongPointField(std::string name, int64_t value)
+        : Field(std::move(name), TYPE) {
+        numericValue_ = value;
+        binaryValue_.resize(8);
+        util::NumericUtils::longToBytesBE(value, binaryValue_.data());
+    }
+
+    std::vector<std::string> tokenize() const override { return {}; }
+};
+
+/**
+ * DoublePointField - A field indexing a double value as a BKD tree point
+ *
+ * Based on: org.apache.lucene.document.DoublePoint
+ *
+ * Enables O(log N) range queries via PointRangeQuery.
+ * The double is converted to sortable long then to big-endian bytes.
+ */
+class DoublePointField : public Field {
+public:
+    static FieldType TYPE;
+
+    DoublePointField(std::string name, double value)
+        : Field(std::move(name), TYPE) {
+        numericValue_ = util::NumericUtils::doubleToSortableLong(value);
+        binaryValue_.resize(8);
+        util::NumericUtils::longToBytesBE(*numericValue_, binaryValue_.data());
+    }
+
+    std::vector<std::string> tokenize() const override { return {}; }
 };
 
 }  // namespace document

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "diagon/codecs/BKDReader.h"
 #include "diagon/codecs/LiveDocsFormat.h"
 #include "diagon/codecs/NormsFormat.h"
 #include "diagon/codecs/NumericDocValuesReader.h"
@@ -10,6 +11,7 @@
 #include "diagon/codecs/StoredFieldsReader.h"
 #include "diagon/index/FieldInfo.h"
 #include "diagon/index/IndexReader.h"
+#include "diagon/index/PointValues.h"
 #include "diagon/index/SegmentInfo.h"
 #include "diagon/index/Terms.h"
 #include "diagon/store/CompoundDirectory.h"
@@ -110,12 +112,9 @@ public:
      */
     [[nodiscard]] const util::Bits* getLiveDocs() const override;
 
-    // ==================== Points (Not implemented in Phase 4) ====================
+    // ==================== Points (BKD Tree) ====================
 
-    [[nodiscard]] PointValues* getPointValues(const std::string& field) const override {
-        ensureOpen();
-        return nullptr;
-    }
+    [[nodiscard]] PointValues* getPointValues(const std::string& field) const override;
 
     // ==================== Caching (Phase 5) ====================
 
@@ -243,6 +242,11 @@ private:
     void loadNormsProducer() const;
 
     /**
+     * Load points reader (lazy initialization)
+     */
+    void loadPointsReader() const;
+
+    /**
      * Get the effective directory for reading segment files.
      * Returns CompoundDirectory if segment uses compound format, otherwise raw directory.
      */
@@ -281,6 +285,10 @@ private:
 
     // Cached norms objects
     mutable std::unordered_map<std::string, std::unique_ptr<NumericDocValues>> normsCache_;
+
+    // Points readers (lazy loaded, per-field BKD tree readers)
+    mutable bool pointsLoaded_{false};
+    mutable std::unordered_map<std::string, std::unique_ptr<codecs::BKDReader>> pointsReaders_;
 
     // Live docs (lazy loaded) - nullptr if no deletions
     mutable std::unique_ptr<util::BitSet> liveDocs_;

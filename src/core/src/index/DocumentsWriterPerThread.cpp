@@ -5,6 +5,7 @@
 
 #include "diagon/codecs/Codec.h"
 #include "diagon/codecs/NormsFormat.h"
+#include "diagon/codecs/PointValuesWriter.h"
 #include "diagon/codecs/SegmentState.h"
 #include "diagon/codecs/SimpleFieldsConsumer.h"
 #include "diagon/codecs/lucene104/Lucene104FieldsConsumer.h"
@@ -232,6 +233,31 @@ bool DocumentsWriterPerThread::addDocument(const document::Document& doc) {
                 }
             }
         }
+
+        // Pass 4: Point values (BKD tree)
+        if (fieldType.hasPointValues()) {
+            auto binaryVal = field->binaryValue();
+            if (binaryVal) {
+                // Register field with point dimensions
+                fieldInfosBuilder_.getOrAdd(field->name());
+                fieldInfosBuilder_.updatePointDimensions(
+                    field->name(), fieldType.pointDimensionCount,
+                    fieldType.pointIndexDimensionCount, fieldType.pointNumBytes);
+
+                // Lazy initialize point values writer
+                if (!pointValuesWriter_ && directory_) {
+                    pointValuesWriter_ = std::make_unique<codecs::PointValuesWriter>(
+                        "_temp", config_.maxBufferedDocs);
+                }
+
+                if (pointValuesWriter_) {
+                    FieldInfo* fieldInfo = fieldInfosBuilder_.getFieldInfo(field->name());
+                    if (fieldInfo) {
+                        pointValuesWriter_->addPoint(*fieldInfo, nextDocID_, binaryVal->data());
+                    }
+                }
+            }
+        }
     }
 
     // Finalize stored fields for this document
@@ -259,6 +285,11 @@ int64_t DocumentsWriterPerThread::bytesUsed() const {
     // Add RAM from stored fields writer
     if (storedFieldsWriter_) {
         bytes += storedFieldsWriter_->ramBytesUsed();
+    }
+
+    // Add RAM from point values writer
+    if (pointValuesWriter_) {
+        bytes += pointValuesWriter_->ramBytesUsed();
     }
 
     // Add field metadata overhead (approximate)
@@ -487,6 +518,26 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
             segmentInfo->addFile(segmentName + ".dvm");
         }
 
+        // Write point values (BKD tree) if present
+        if (pointValuesWriter_ && pointValuesWriter_->hasPoints()) {
+            auto kdmOut = directory_->createOutput(segmentName + ".kdm",
+                                                    store::IOContext::DEFAULT);
+            auto kdiOut = directory_->createOutput(segmentName + ".kdi",
+                                                    store::IOContext::DEFAULT);
+            auto kddOut = directory_->createOutput(segmentName + ".kdd",
+                                                    store::IOContext::DEFAULT);
+
+            pointValuesWriter_->flush(*kdmOut, *kdiOut, *kddOut);
+
+            kdmOut->close();
+            kdiOut->close();
+            kddOut->close();
+
+            segmentInfo->addFile(segmentName + ".kdm");
+            segmentInfo->addFile(segmentName + ".kdi");
+            segmentInfo->addFile(segmentName + ".kdd");
+        }
+
         // Write norms for indexed fields
         bool hasNorms = false;
         for (const auto& fieldInfo : segmentInfo->fieldInfos()) {
@@ -549,6 +600,9 @@ void DocumentsWriterPerThread::reset() {
 
     // Clear stored fields writer
     storedFieldsWriter_.reset();
+
+    // Clear point values writer
+    pointValuesWriter_.reset();
 
     // Clear field infos
     fieldInfosBuilder_.reset();

@@ -205,6 +205,11 @@ SegmentInfos SegmentInfos::read(store::Directory& dir, const std::string& fileNa
             fieldInfo.storeTermVector = (input->readByte() != 0);
             fieldInfo.storePayloads = (input->readByte() != 0);
 
+            // Read point dimensions (BKD tree)
+            fieldInfo.pointDimensionCount = input->readInt();
+            fieldInfo.pointIndexDimensionCount = input->readInt();
+            fieldInfo.pointNumBytes = input->readInt();
+
             fieldInfos.push_back(std::move(fieldInfo));
         }
 

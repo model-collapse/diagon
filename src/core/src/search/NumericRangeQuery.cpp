@@ -7,11 +7,16 @@
 #include "diagon/index/FieldInfo.h"
 #include "diagon/index/IndexReader.h"
 #include "diagon/index/LeafReaderContext.h"
+#include "diagon/index/PointValues.h"
 #include "diagon/search/IndexSearcher.h"
+#include "diagon/search/PointRangeQuery.h"
 #include "diagon/search/Scorer.h"
+#include "diagon/util/BitSet.h"
+#include "diagon/util/NumericUtils.h"
 
 #include <bit>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <sstream>
 
@@ -203,10 +208,22 @@ public:
         , constantScore_(boost) {}
 
     std::unique_ptr<Scorer> scorer(const index::LeafReaderContext& context) const override {
-        // Get numeric doc values for field (raw pointer, non-owning)
+        // Try BKD tree first (O(log N)) — much faster for selective ranges
+        auto* pointValues = context.reader->getPointValues(query_.getField());
+        if (pointValues) {
+            // Create a PointRangeQuery and delegate to it
+            auto prq = search::PointRangeQuery::newLongRange(
+                query_.getField(),
+                query_.getIncludeLower() ? query_.getLowerValue() : query_.getLowerValue() + 1,
+                query_.getIncludeUpper() ? query_.getUpperValue() : query_.getUpperValue() - 1);
+            auto prWeight = prq->createWeight(searcher_, ScoreMode::COMPLETE_NO_SCORES,
+                                               constantScore_);
+            return prWeight->scorer(context);
+        }
+
+        // Fall back to doc values scan (O(N))
         auto* values = context.reader->getNumericDocValues(query_.getField());
         if (!values) {
-            // Field doesn't exist or has no values in this segment
             return nullptr;
         }
 

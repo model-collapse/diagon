@@ -3,15 +3,18 @@
 
 #include "diagon/index/SegmentMerger.h"
 
+#include "diagon/codecs/BKDWriter.h"
 #include "diagon/codecs/Codec.h"
 #include "diagon/codecs/LiveDocsFormat.h"
 #include "diagon/codecs/NormsFormat.h"
 #include "diagon/codecs/NumericDocValuesReader.h"
 #include "diagon/codecs/NumericDocValuesWriter.h"
+#include "diagon/codecs/PointValuesWriter.h"
 #include "diagon/codecs/PostingsFormat.h"
 #include "diagon/codecs/StoredFieldsReader.h"
 #include "diagon/codecs/StoredFieldsWriter.h"
 #include "diagon/index/Fields.h"
+#include "diagon/index/PointValues.h"
 #include "diagon/index/PostingsEnum.h"
 #include "diagon/index/SegmentReader.h"
 #include "diagon/index/SegmentWriteState.h"
@@ -448,6 +451,11 @@ std::shared_ptr<SegmentInfo> SegmentMerger::merge() {
         mergeNorms(mergedFieldInfos);
     }
 
+    // Merge point values (BKD trees)
+    if (docMapping_.newMaxDoc > 0) {
+        mergePoints(mergedFieldInfos);
+    }
+
     // Create merged SegmentInfo
     auto mergedInfo = std::make_shared<SegmentInfo>(segmentName_, docMapping_.newMaxDoc,
                                                     sourceSegments_[0]->codecName());
@@ -510,6 +518,13 @@ FieldInfos SegmentMerger::buildMergedFieldInfos() {
                 if (fieldInfo.docValuesType != DocValuesType::NONE &&
                     existing.docValuesType == DocValuesType::NONE) {
                     existing.docValuesType = fieldInfo.docValuesType;
+                }
+
+                // Merge point dimensions
+                if (fieldInfo.pointDimensionCount > 0 && existing.pointDimensionCount == 0) {
+                    existing.pointDimensionCount = fieldInfo.pointDimensionCount;
+                    existing.pointIndexDimensionCount = fieldInfo.pointIndexDimensionCount;
+                    existing.pointNumBytes = fieldInfo.pointNumBytes;
                 }
 
                 // Merge boolean flags (if any segment has it, enable it)
@@ -788,6 +803,125 @@ void SegmentMerger::mergeNorms(const FieldInfos& mergedFieldInfos) {
     }
 
     normsConsumer->close();
+}
+
+void SegmentMerger::mergePoints(const FieldInfos& mergedFieldInfos) {
+    // Check if any field has point values
+    bool hasPoints = false;
+    for (const auto& fi : mergedFieldInfos) {
+        if (fi.pointDimensionCount > 0) {
+            hasPoints = true;
+            break;
+        }
+    }
+    if (!hasPoints) {
+        return;
+    }
+
+    // Open readers for all source segments
+    std::vector<std::shared_ptr<SegmentReader>> readers;
+    readers.reserve(sourceSegments_.size());
+    for (const auto& segInfo : sourceSegments_) {
+        readers.push_back(SegmentReader::open(directory_, segInfo));
+    }
+
+    // Create point values writer for the merged segment
+    codecs::PointValuesWriter pvWriter(segmentName_, docMapping_.newMaxDoc);
+
+    for (const auto& fi : mergedFieldInfos) {
+        if (fi.pointDimensionCount == 0) {
+            continue;
+        }
+
+        int newDocID = 0;
+        for (size_t segIdx = 0; segIdx < readers.size(); segIdx++) {
+            auto* pointValues = readers[segIdx]->getPointValues(fi.name);
+            const util::Bits* liveDocs = readers[segIdx]->getLiveDocs();
+            int maxDoc = sourceSegments_[segIdx]->maxDoc();
+            int segBase = docMapping_.segmentBases[segIdx];
+
+            if (!pointValues) {
+                // Skip docs without points, but still advance newDocID
+                for (int doc = 0; doc < maxDoc; doc++) {
+                    if (liveDocs == nullptr || liveDocs->get(doc)) {
+                        newDocID++;
+                    }
+                }
+                continue;
+            }
+
+            // Collect all points from this segment with doc ID remapping
+            struct CollectVisitor : public PointValues::IntersectVisitor {
+                codecs::PointValuesWriter& writer;
+                const FieldInfo& fieldInfo;
+                const util::Bits* liveDocs;
+                const std::vector<int>& oldToNew;
+
+                CollectVisitor(codecs::PointValuesWriter& w, const FieldInfo& fi,
+                               const util::Bits* ld, const std::vector<int>& mapping)
+                    : writer(w)
+                    , fieldInfo(fi)
+                    , liveDocs(ld)
+                    , oldToNew(mapping) {}
+
+                void visit(int docID) override {
+                    // This shouldn't be called since we always use CELL_CROSSES_QUERY
+                }
+
+                void visit(int docID, const uint8_t* packedValue) override {
+                    if (liveDocs != nullptr && !liveDocs->get(docID)) {
+                        return;  // Deleted doc
+                    }
+                    int newDoc = oldToNew[docID];
+                    if (newDoc >= 0) {
+                        writer.addPoint(fieldInfo, newDoc, packedValue);
+                    }
+                }
+
+                PointValues::Relation compare(const uint8_t* /*minPacked*/,
+                                               const uint8_t* /*maxPacked*/) override {
+                    // Accept everything — we want all points
+                    return PointValues::Relation::CELL_CROSSES_QUERY;
+                }
+            };
+
+            // Build doc ID mapping for this segment
+            std::vector<int> oldToNew(maxDoc);
+            int mappedID = segBase;
+            for (int doc = 0; doc < maxDoc; doc++) {
+                if (liveDocs == nullptr || liveDocs->get(doc)) {
+                    oldToNew[doc] = mappedID++;
+                } else {
+                    oldToNew[doc] = -1;
+                }
+            }
+
+            CollectVisitor visitor(pvWriter, fi, liveDocs, oldToNew);
+            pointValues->intersect(visitor);
+
+            // Advance newDocID for all live docs in this segment
+            for (int doc = 0; doc < maxDoc; doc++) {
+                if (liveDocs == nullptr || liveDocs->get(doc)) {
+                    newDocID++;
+                }
+            }
+        }
+    }
+
+    if (!pvWriter.hasPoints()) {
+        return;
+    }
+
+    // Flush merged points to disk
+    auto kdmOut = directory_.createOutput(segmentName_ + ".kdm", store::IOContext::DEFAULT);
+    auto kdiOut = directory_.createOutput(segmentName_ + ".kdi", store::IOContext::DEFAULT);
+    auto kddOut = directory_.createOutput(segmentName_ + ".kdd", store::IOContext::DEFAULT);
+
+    pvWriter.flush(*kdmOut, *kdiOut, *kddOut);
+
+    kdmOut->close();
+    kdiOut->close();
+    kddOut->close();
 }
 
 }  // namespace index

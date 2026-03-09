@@ -44,7 +44,15 @@ struct FieldType {
     bool tokenized = false;                       // Apply analysis/tokenization
     bool omitNorms = false;                       // Omit length normalization
 
+    // Point values (BKD tree) configuration
+    int32_t pointDimensionCount = 0;       // Number of dimensions (0 if no points)
+    int32_t pointIndexDimensionCount = 0;  // Dimensions used for indexing
+    int32_t pointNumBytes = 0;             // Bytes per dimension
+
     FieldType() = default;
+
+    /** Does this field have point values? */
+    bool hasPointValues() const { return pointDimensionCount > 0; }
 
     // Helper constructors
     static FieldType notIndexed() { return FieldType{}; }
