@@ -162,12 +162,15 @@ int64_t IndexWriter::commitInternal() {
     // Flush pending documents
     flush();
 
-    // Wait for any in-flight background merges to complete before committing.
-    // After this, no background merges are running, so segmentInfos_ is stable.
-    mergeScheduler_.waitForMerges();
+    // NOTE: We do NOT call waitForMerges() here. Background merges run concurrently
+    // with commit. This avoids blocking indexing for 20-120s during BKD merge I/O.
+    // File safety is maintained by deferred deletion: background merges add replaced
+    // segments to pendingDeleteSegments_ instead of deleting files immediately.
+    // Files are only deleted below, after writeSegmentsFile() ensures the new
+    // segments_N no longer references them.
 
     // Create compound files for newly flushed segments (if enabled).
-    // Snapshot segments under lock, then do I/O without lock.
+    // Skip segments currently being merged — their files are in use.
     std::vector<std::vector<std::string>> pendingCompoundDeletes;
     if (useCompoundFile_) {
         std::vector<std::shared_ptr<SegmentInfo>> needCompound;
@@ -175,7 +178,8 @@ int64_t IndexWriter::commitInternal() {
             std::lock_guard<std::mutex> lock(segmentLock_);
             for (int i = 0; i < segmentInfos_.size(); i++) {
                 auto segment = segmentInfos_.info(i);
-                if (!segment->getUseCompoundFile()) {
+                if (!segment->getUseCompoundFile() &&
+                    mergingSegments_.find(segment->name()) == mergingSegments_.end()) {
                     needCompound.push_back(segment);
                 }
             }
@@ -188,33 +192,12 @@ int64_t IndexWriter::commitInternal() {
         }
     }
 
-    // Size-based tiered merge at commit time (synchronous — must complete before segments_N).
-    // findMerges reads segmentInfos_ under lock; executeMerges has its own locking.
-    for (int i = 0; i < 10; i++) {
-        std::unique_ptr<MergeSpecification> spec;
-        {
-            std::lock_guard<std::mutex> lock(segmentLock_);
-            spec.reset(mergePolicy_->findMerges(MergeTrigger::COMMIT, segmentInfos_));
-        }
-        if (!spec || spec->empty()) {
-            break;
-        }
-        executeMerges(spec.get());
-    }
+    // Submit merges to background scheduler (non-blocking).
+    maybeMerge(MergeTrigger::COMMIT);
 
-    // Check for segments with high deletions and merge them
-    {
-        std::unique_ptr<MergeSpecification> deletesMerges;
-        {
-            std::lock_guard<std::mutex> lock(segmentLock_);
-            deletesMerges.reset(mergePolicy_->findForcedDeletesMerges(segmentInfos_));
-        }
-        if (deletesMerges && !deletesMerges->empty()) {
-            executeMerges(deletesMerges.get());
-        }
-    }
-
-    // Write segments_N file — this is the atomic commit point
+    // Write segments_N file — this is the atomic commit point.
+    // segmentInfos_ reflects the current state: background merges that completed
+    // have already swapped out their source segments (under segmentLock_).
     {
         std::lock_guard<std::mutex> lock(segmentLock_);
         writeSegmentsFile();
@@ -231,6 +214,20 @@ int64_t IndexWriter::commitInternal() {
             } catch (const std::exception&) {
                 // Best-effort — file might already be gone
             }
+        }
+    }
+
+    // Deferred deletion: delete segment files from completed background merges.
+    // Safe because writeSegmentsFile() above committed a segments_N that no longer
+    // references these segments (the merge lambda already removed them from segmentInfos_).
+    {
+        std::vector<std::shared_ptr<SegmentInfo>> toDelete;
+        {
+            std::lock_guard<std::mutex> lock(segmentLock_);
+            toDelete.swap(pendingDeleteSegments_);
+        }
+        for (const auto& seg : toDelete) {
+            deleteSegmentFiles(seg);
         }
     }
 
@@ -359,11 +356,12 @@ void IndexWriter::maybeMerge(MergeTrigger trigger) {
                 for (auto& s : segmentsToMerge) {
                     mergingSegments_.erase(s->name());
                 }
-            }
 
-            // Delete old segment files (outside lock)
-            for (auto& s : segmentsToMerge) {
-                deleteSegmentFiles(s);
+                // Defer file deletion — files are deleted in commitInternal() after
+                // a new segments_N is written that no longer references them.
+                for (auto& s : segmentsToMerge) {
+                    pendingDeleteSegments_.push_back(s);
+                }
             }
 
             // Trigger cascading: the merged segment may now be eligible

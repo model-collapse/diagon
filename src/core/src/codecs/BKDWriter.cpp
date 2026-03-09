@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <cstring>
-#include <set>
 #include <stdexcept>
 
 namespace diagon {
@@ -19,7 +18,7 @@ BKDWriter::BKDWriter(const index::BKDConfig& config)
 void BKDWriter::writeField(const std::string& fieldName, int32_t fieldNumber,
                            std::vector<int32_t>& docIDs, std::vector<uint8_t>& packedValues,
                            store::IndexOutput& kdmOut, store::IndexOutput& kdiOut,
-                           store::IndexOutput& kddOut) {
+                           store::IndexOutput& kddOut, bool preSorted) {
     int numPoints = static_cast<int>(docIDs.size());
     if (numPoints == 0) {
         return;
@@ -27,8 +26,10 @@ void BKDWriter::writeField(const std::string& fieldName, int32_t fieldNumber,
 
     int packedLen = config_.packedBytesLength;
 
-    // Sort by packed value
-    sortPoints(0, numPoints, docIDs.data(), packedValues.data());
+    // Sort by packed value (skip if caller already merged sorted runs)
+    if (!preSorted) {
+        sortPoints(0, numPoints, docIDs.data(), packedValues.data());
+    }
 
     // Compute min/max packed values
     std::vector<uint8_t> minPacked(packedLen);
@@ -36,17 +37,28 @@ void BKDWriter::writeField(const std::string& fieldName, int32_t fieldNumber,
     std::memcpy(minPacked.data(), packedValues.data(), packedLen);
     std::memcpy(maxPacked.data(), packedValues.data() + (numPoints - 1) * packedLen, packedLen);
 
-    // Count unique doc IDs
-    std::set<int32_t> uniqueDocs(docIDs.begin(), docIDs.end());
-    int docCount = static_cast<int>(uniqueDocs.size());
+    // Count unique doc IDs using a bitvector (14.5MB for 116M docs)
+    // instead of std::set which uses ~48 bytes/node (5.6GB for 116M docs).
+    int32_t maxDocID = *std::max_element(docIDs.begin(), docIDs.end());
+    size_t wordCount = (static_cast<size_t>(maxDocID) + 64) / 64;
+    std::vector<uint64_t> seenBits(wordCount, 0);
+    int docCount = 0;
+    for (int i = 0; i < numPoints; i++) {
+        uint64_t& word = seenBits[docIDs[i] / 64];
+        uint64_t bit = 1ULL << (docIDs[i] % 64);
+        if (!(word & bit)) {
+            docCount++;
+            word |= bit;
+        }
+    }
 
-    // Record starting offsets
+    // Record starting offsets — used to convert absolute FPs to relative
     int64_t kdiStartFP = kdiOut.getFilePointer();
     int64_t kddStartFP = kddOut.getFilePointer();
 
-    // Build tree recursively
+    // Build tree recursively (stores relative file pointers within kdi/kdd)
     buildTree(0, numPoints, docIDs.data(), packedValues.data(), minPacked.data(), maxPacked.data(),
-              kdiOut, kddOut);
+              kdiOut, kddOut, kdiStartFP, kddStartFP);
 
     // Write metadata to .kdm
     kdmOut.writeString(fieldName);
@@ -68,12 +80,13 @@ void BKDWriter::writeField(const std::string& fieldName, int32_t fieldNumber,
 
 int64_t BKDWriter::buildTree(int from, int to, int32_t* docIDs, uint8_t* packedValues,
                              const uint8_t* minPacked, const uint8_t* maxPacked,
-                             store::IndexOutput& kdiOut, store::IndexOutput& kddOut) {
+                             store::IndexOutput& kdiOut, store::IndexOutput& kddOut,
+                             int64_t kdiBaseFP, int64_t kddBaseFP) {
     int count = to - from;
 
     if (count <= config_.maxPointsPerLeaf) {
-        // Leaf node — write to .kdd
-        return writeLeafBlock(from, to, docIDs, packedValues, kddOut);
+        // Leaf node — write to .kdd, return RELATIVE file pointer
+        return writeLeafBlock(from, to, docIDs, packedValues, kddOut) - kddBaseFP;
     }
 
     // Inner node — median split
@@ -87,23 +100,23 @@ int64_t BKDWriter::buildTree(int from, int to, int32_t* docIDs, uint8_t* packedV
     // Left child: [from, mid) has min=minPacked, max=splitPacked
     // Right child: [mid, to) has min=splitPacked, max=maxPacked
 
-    // Recurse left
+    // Recurse left — returns RELATIVE file pointer
     int64_t leftFP = buildTree(from, mid, docIDs, packedValues, minPacked, splitPacked, kdiOut,
-                               kddOut);
+                               kddOut, kdiBaseFP, kddBaseFP);
     bool leftIsLeaf = (mid - from) <= config_.maxPointsPerLeaf;
 
-    // Recurse right
+    // Recurse right — returns RELATIVE file pointer
     int64_t rightFP = buildTree(mid, to, docIDs, packedValues, splitPacked, maxPacked, kdiOut,
-                                kddOut);
+                                kddOut, kdiBaseFP, kddBaseFP);
     bool rightIsLeaf = (to - mid) <= config_.maxPointsPerLeaf;
 
-    // Write inner node to .kdi
-    int64_t nodeFP = kdiOut.getFilePointer();
+    // Write inner node to .kdi — compute RELATIVE file pointer
+    int64_t nodeFP = kdiOut.getFilePointer() - kdiBaseFP;
 
     // Write split value
     kdiOut.writeBytes(splitPacked, config_.bytesPerDim);
 
-    // Write child info: flags byte + file pointers
+    // Write child info: flags byte + RELATIVE file pointers
     uint8_t flags = 0;
     if (leftIsLeaf)
         flags |= 0x01;

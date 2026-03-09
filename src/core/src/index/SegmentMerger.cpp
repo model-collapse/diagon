@@ -24,6 +24,8 @@
 #include "diagon/util/BytesRef.h"
 
 #include <algorithm>
+#include <cstring>
+#include <queue>
 #include <set>
 #include <stdexcept>
 #include <variant>
@@ -680,8 +682,12 @@ void SegmentMerger::mergeStoredFields(const FieldInfos& mergedFieldInfos) {
         return;  // No source segments have stored fields
     }
 
-    // Create writer for the merged segment
-    codecs::StoredFieldsWriter writer(segmentName_);
+    // Open output files first — streaming mode writes blocks incrementally
+    auto dataOut = directory_.createOutput(segmentName_ + ".fdt", store::IOContext::DEFAULT);
+    auto indexOut = directory_.createOutput(segmentName_ + ".fdx", store::IOContext::DEFAULT);
+
+    // Create writer in streaming mode: O(BLOCK_SIZE) RAM instead of O(N)
+    codecs::StoredFieldsWriter writer(segmentName_, *dataOut, *indexOut);
 
     // Iterate source segments in order, copying live documents
     for (size_t segIdx = 0; segIdx < sourceSegments_.size(); segIdx++) {
@@ -724,11 +730,10 @@ void SegmentMerger::mergeStoredFields(const FieldInfos& mergedFieldInfos) {
         }
     }
 
-    // Finish and flush to output files
+    // Finish writes remaining partial block + index to disk
     writer.finish(docMapping_.newMaxDoc);
 
-    auto dataOut = directory_.createOutput(segmentName_ + ".fdt", store::IOContext::DEFAULT);
-    auto indexOut = directory_.createOutput(segmentName_ + ".fdx", store::IOContext::DEFAULT);
+    // flush() is a no-op in streaming mode (data already on disk)
     writer.flush(*dataOut, *indexOut);
     dataOut->close();
     indexOut->close();
@@ -825,13 +830,72 @@ void SegmentMerger::mergePoints(const FieldInfos& mergedFieldInfos) {
         readers.push_back(SegmentReader::open(directory_, segInfo));
     }
 
-    // Create point values writer for the merged segment
-    codecs::PointValuesWriter pvWriter(segmentName_, docMapping_.newMaxDoc);
+    // Build doc ID mappings for all segments (once, reused across fields)
+    std::vector<std::vector<int>> allOldToNew(readers.size());
+    for (size_t segIdx = 0; segIdx < readers.size(); segIdx++) {
+        const util::Bits* liveDocs = readers[segIdx]->getLiveDocs();
+        int maxDoc = sourceSegments_[segIdx]->maxDoc();
+        int segBase = docMapping_.segmentBases[segIdx];
+        allOldToNew[segIdx].resize(maxDoc);
+        int mappedID = segBase;
+        for (int doc = 0; doc < maxDoc; doc++) {
+            if (liveDocs == nullptr || liveDocs->get(doc)) {
+                allOldToNew[segIdx][doc] = mappedID++;
+            } else {
+                allOldToNew[segIdx][doc] = -1;
+            }
+        }
+    }
+
+    // Per-segment sorted run for a single field
+    struct SortedRun {
+        std::vector<int32_t> docIDs;
+        std::vector<uint8_t> packedValues;
+    };
+
+    // Collect per-field, per-segment sorted runs, then K-way merge.
+    // BKD intersect traverses left→right (ascending by packed value),
+    // so each segment's output is already sorted. K-way merge is O(N log K)
+    // instead of the previous O(N log N) full re-sort.
+
+    // Pre-count fields with actual point data to write the header field count.
+    // We process each field independently to cap peak memory at O(single_field * N)
+    // instead of O(all_fields * N). This prevents OOM during forceMerge of large indices.
+    int32_t pointFieldCount = 0;
+    for (const auto& fi : mergedFieldInfos) {
+        if (fi.pointDimensionCount > 0) {
+            // Check if any source segment has point data for this field
+            for (size_t segIdx = 0; segIdx < readers.size(); segIdx++) {
+                if (readers[segIdx]->getPointValues(fi.name) != nullptr) {
+                    pointFieldCount++;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (pointFieldCount == 0) {
+        return;
+    }
+
+    // Open output files once, stream-write each field independently
+    auto kdmOut = directory_.createOutput(segmentName_ + ".kdm", store::IOContext::DEFAULT);
+    auto kdiOut = directory_.createOutput(segmentName_ + ".kdi", store::IOContext::DEFAULT);
+    auto kddOut = directory_.createOutput(segmentName_ + ".kdd", store::IOContext::DEFAULT);
+
+    kdmOut->writeVInt(pointFieldCount);
 
     for (const auto& fi : mergedFieldInfos) {
         if (fi.pointDimensionCount == 0) {
             continue;
         }
+
+        int packedLen = fi.pointDimensionCount * fi.pointNumBytes;
+        index::BKDConfig config(fi.pointDimensionCount, fi.pointIndexDimensionCount,
+                                fi.pointNumBytes);
+
+        // Collect sorted runs from each segment for this field
+        std::vector<SortedRun> runs;
 
         for (size_t segIdx = 0; segIdx < readers.size(); segIdx++) {
             auto* pointValues = readers[segIdx]->getPointValues(fi.name);
@@ -839,70 +903,150 @@ void SegmentMerger::mergePoints(const FieldInfos& mergedFieldInfos) {
                 continue;
             }
             const util::Bits* liveDocs = readers[segIdx]->getLiveDocs();
-            int maxDoc = sourceSegments_[segIdx]->maxDoc();
-            int segBase = docMapping_.segmentBases[segIdx];
+            const std::vector<int>& oldToNew = allOldToNew[segIdx];
 
-            // Collect all points from this segment with doc ID remapping
-            struct CollectVisitor : public PointValues::IntersectVisitor {
-                codecs::PointValuesWriter& writer;
-                const FieldInfo& fieldInfo;
+            // Pre-count points for this segment+field to avoid repeated vector reallocation.
+            // intersect() visits every point, so we count first, then collect.
+            struct CountVisitor : public PointValues::IntersectVisitor {
+                int count = 0;
                 const util::Bits* liveDocs;
                 const std::vector<int>& oldToNew;
 
-                CollectVisitor(codecs::PointValuesWriter& w, const FieldInfo& fi,
-                               const util::Bits* ld, const std::vector<int>& mapping)
-                    : writer(w)
-                    , fieldInfo(fi)
-                    , liveDocs(ld)
-                    , oldToNew(mapping) {}
+                CountVisitor(const util::Bits* ld, const std::vector<int>& mapping)
+                    : liveDocs(ld), oldToNew(mapping) {}
 
-                void visit(int docID) override {
-                    // This shouldn't be called since we always use CELL_CROSSES_QUERY
+                void visit(int /*docID*/) override {}
+                void visit(int docID, const uint8_t* /*packedValue*/) override {
+                    if (liveDocs != nullptr && !liveDocs->get(docID)) return;
+                    if (oldToNew[docID] >= 0) count++;
                 }
+                PointValues::Relation compare(const uint8_t*, const uint8_t*) override {
+                    return PointValues::Relation::CELL_CROSSES_QUERY;
+                }
+            };
+
+            CountVisitor counter(liveDocs, oldToNew);
+            pointValues->intersect(counter);
+
+            if (counter.count == 0) {
+                continue;
+            }
+
+            SortedRun run;
+            run.docIDs.reserve(counter.count);
+            run.packedValues.reserve(static_cast<size_t>(counter.count) * packedLen);
+
+            // Visitor that collects points in BKD sorted order
+            struct SortedCollectVisitor : public PointValues::IntersectVisitor {
+                SortedRun& run;
+                int packedLen;
+                const util::Bits* liveDocs;
+                const std::vector<int>& oldToNew;
+
+                SortedCollectVisitor(SortedRun& r, int pl, const util::Bits* ld,
+                                     const std::vector<int>& mapping)
+                    : run(r), packedLen(pl), liveDocs(ld), oldToNew(mapping) {}
+
+                void visit(int /*docID*/) override {}
 
                 void visit(int docID, const uint8_t* packedValue) override {
                     if (liveDocs != nullptr && !liveDocs->get(docID)) {
-                        return;  // Deleted doc
+                        return;
                     }
                     int newDoc = oldToNew[docID];
                     if (newDoc >= 0) {
-                        writer.addPoint(fieldInfo, newDoc, packedValue);
+                        run.docIDs.push_back(newDoc);
+                        size_t oldSize = run.packedValues.size();
+                        run.packedValues.resize(oldSize + packedLen);
+                        std::memcpy(run.packedValues.data() + oldSize, packedValue, packedLen);
                     }
                 }
 
                 PointValues::Relation compare(const uint8_t* /*minPacked*/,
                                               const uint8_t* /*maxPacked*/) override {
-                    // Accept everything — we want all points
                     return PointValues::Relation::CELL_CROSSES_QUERY;
                 }
             };
 
-            // Build doc ID mapping for this segment
-            std::vector<int> oldToNew(maxDoc);
-            int mappedID = segBase;
-            for (int doc = 0; doc < maxDoc; doc++) {
-                if (liveDocs == nullptr || liveDocs->get(doc)) {
-                    oldToNew[doc] = mappedID++;
-                } else {
-                    oldToNew[doc] = -1;
+            SortedCollectVisitor visitor(run, packedLen, liveDocs, oldToNew);
+            pointValues->intersect(visitor);
+
+            if (!run.docIDs.empty()) {
+                runs.push_back(std::move(run));
+            }
+        }
+
+        if (runs.empty()) {
+            continue;
+        }
+
+        // Merge runs and write BKD for this field immediately, then free memory.
+        std::vector<int32_t> mergedDocIDs;
+        std::vector<uint8_t> mergedPackedValues;
+
+        if (runs.size() == 1) {
+            // Single segment — no merge needed, already sorted
+            mergedDocIDs = std::move(runs[0].docIDs);
+            mergedPackedValues = std::move(runs[0].packedValues);
+            runs.clear();  // Free source memory
+        } else {
+            // K-way merge of sorted runs using min-heap
+            size_t totalPoints = 0;
+            for (const auto& r : runs) {
+                totalPoints += r.docIDs.size();
+            }
+            mergedDocIDs.reserve(totalPoints);
+            mergedPackedValues.reserve(totalPoints * packedLen);
+
+            struct HeapEntry {
+                int segIdx;
+                int pos;
+            };
+
+            // Min-heap comparator: smallest packed value has highest priority
+            auto heapCmp = [&](const HeapEntry& a, const HeapEntry& b) {
+                const uint8_t* va = runs[a.segIdx].packedValues.data() + (size_t)a.pos * packedLen;
+                const uint8_t* vb = runs[b.segIdx].packedValues.data() + (size_t)b.pos * packedLen;
+                int c = std::memcmp(va, vb, packedLen);
+                if (c != 0) return c > 0;  // min-heap: greater = lower priority
+                return runs[a.segIdx].docIDs[a.pos] > runs[b.segIdx].docIDs[b.pos];
+            };
+
+            std::priority_queue<HeapEntry, std::vector<HeapEntry>, decltype(heapCmp)> heap(heapCmp);
+
+            // Seed heap with first element from each run
+            for (int i = 0; i < static_cast<int>(runs.size()); i++) {
+                heap.push({i, 0});
+            }
+
+            while (!heap.empty()) {
+                auto entry = heap.top();
+                heap.pop();
+
+                mergedDocIDs.push_back(runs[entry.segIdx].docIDs[entry.pos]);
+                const uint8_t* val =
+                    runs[entry.segIdx].packedValues.data() + (size_t)entry.pos * packedLen;
+                size_t oldSize = mergedPackedValues.size();
+                mergedPackedValues.resize(oldSize + packedLen);
+                std::memcpy(mergedPackedValues.data() + oldSize, val, packedLen);
+
+                if (entry.pos + 1 < static_cast<int>(runs[entry.segIdx].docIDs.size())) {
+                    heap.push({entry.segIdx, entry.pos + 1});
                 }
             }
 
-            CollectVisitor visitor(pvWriter, fi, liveDocs, oldToNew);
-            pointValues->intersect(visitor);
+            // Free source runs before building BKD tree (halves peak memory)
+            runs.clear();
+            runs.shrink_to_fit();
         }
+
+        // Write BKD for this field immediately
+        codecs::BKDWriter writer(config);
+        writer.writeField(fi.name, fi.number, mergedDocIDs, mergedPackedValues, *kdmOut,
+                          *kdiOut, *kddOut, /*preSorted=*/true);
+
+        // Memory for mergedDocIDs/mergedPackedValues is freed at end of this loop iteration
     }
-
-    if (!pvWriter.hasPoints()) {
-        return;
-    }
-
-    // Flush merged points to disk
-    auto kdmOut = directory_.createOutput(segmentName_ + ".kdm", store::IOContext::DEFAULT);
-    auto kdiOut = directory_.createOutput(segmentName_ + ".kdi", store::IOContext::DEFAULT);
-    auto kddOut = directory_.createOutput(segmentName_ + ".kdd", store::IOContext::DEFAULT);
-
-    pvWriter.flush(*kdmOut, *kdiOut, *kddOut);
 
     kdmOut->close();
     kdiOut->close();

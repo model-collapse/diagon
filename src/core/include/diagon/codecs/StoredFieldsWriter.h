@@ -18,6 +18,17 @@ namespace codecs {
 /**
  * StoredFieldsWriter - Writes stored fields to disk with LZ4 block compression
  *
+ * Supports two modes:
+ *
+ * 1. **Buffered mode** (DWPT flush): Constructor takes segment name only.
+ *    All documents buffered in RAM. Call finish() then flush(dataOut, indexOut).
+ *    Suitable for small segments (1K-5K docs).
+ *
+ * 2. **Streaming mode** (merge): Constructor takes segment name + output streams.
+ *    Documents flushed to disk in BLOCK_SIZE increments as they're added.
+ *    RAM usage is O(BLOCK_SIZE) regardless of total docs. Call finish() at end.
+ *    Required for large merges (100M+ docs) to prevent OOM.
+ *
  * Format (V2 - LZ4 compressed blocks):
  *
  * .fdx (index) file per segment:
@@ -61,20 +72,31 @@ public:
     };
 
     /**
-     * Constructor
+     * Constructor (buffered mode — for DWPT flush of small segments)
      * @param segmentName Segment name (e.g., "_0")
      */
     explicit StoredFieldsWriter(const std::string& segmentName);
 
     /**
+     * Constructor (streaming mode — for merge of large segments)
+     * Documents are flushed to disk in BLOCK_SIZE increments.
+     * RAM usage: O(BLOCK_SIZE * avg_doc_size) ≈ 8KB instead of O(N * avg_doc_size).
+     * @param segmentName Segment name
+     * @param dataOut Output stream for .fdt file (must remain valid until finish())
+     * @param indexOut Output stream for .fdx file (must remain valid until finish())
+     */
+    StoredFieldsWriter(const std::string& segmentName,
+                       store::IndexOutput& dataOut,
+                       store::IndexOutput& indexOut);
+
+    /**
      * Start writing a document
-     * Must be called before writing any fields for this document
      */
     void startDocument();
 
     /**
-     * Finish writing a document
-     * Called after all fields for this document have been written
+     * Finish writing a document.
+     * In streaming mode, may flush a completed block to disk.
      */
     void finishDocument();
 
@@ -94,13 +116,15 @@ public:
     void writeField(const index::FieldInfo& fieldInfo, int64_t value);
 
     /**
-     * Finish writing all documents
+     * Finish writing all documents.
+     * In streaming mode: flushes remaining partial block + writes index.
      * @param numDocs Total number of documents written (for validation)
      */
     void finish(int numDocs);
 
     /**
-     * Flush to output streams
+     * Flush to output streams (buffered mode only).
+     * In streaming mode, data is already on disk — this is a no-op.
      * @param dataOut Output stream for .fdt file
      * @param indexOut Output stream for .fdx file
      */
@@ -151,11 +175,24 @@ private:
 
     std::string segmentName_;
 
-    // Buffer for current document
+    // Buffer for current document's fields
     std::vector<StoredField> currentDocument_;
 
-    // All documents buffered in RAM
+    // Buffered mode: all documents held in RAM until flush()
     std::vector<DocumentBuffer> documents_;
+
+    // Streaming mode: block buffer (max BLOCK_SIZE docs)
+    std::vector<DocumentBuffer> blockBuffer_;
+
+    // Streaming mode: output streams (non-owning, null in buffered mode)
+    store::IndexOutput* dataOut_{nullptr};
+    store::IndexOutput* indexOut_{nullptr};
+
+    // Block entries accumulated during streaming (small: ~20 bytes per 16 docs)
+    std::vector<BlockEntry> streamBlocks_;
+
+    // Whether we're in streaming mode
+    bool streaming_{false};
 
     // Number of documents written
     int numDocs_{0};
@@ -166,8 +203,11 @@ private:
     // Whether finish() has been called
     bool finished_{false};
 
-    // Incremental RAM usage tracking (avoids O(n^2) recomputation)
+    // Incremental RAM usage tracking
     int64_t bytesUsed_{0};
+
+    // Whether the data header has been written (streaming mode)
+    bool headerWritten_{false};
 
     /**
      * Write header to output stream
@@ -180,16 +220,29 @@ private:
     void writeIndex(store::IndexOutput& indexOut, const std::vector<BlockEntry>& blocks);
 
     /**
-     * Write data file (.fdt) with LZ4-compressed blocks
+     * Write data file (.fdt) with LZ4-compressed blocks (buffered mode)
      * @return Block entries for .fdx index
      */
     std::vector<BlockEntry> writeData(store::IndexOutput& dataOut);
 
     /**
-     * Serialize a range of documents into a raw byte buffer.
-     * @param startDoc First document index (in documents_)
+     * Flush current block buffer to disk (streaming mode).
+     * Serializes + compresses + writes to dataOut_, records BlockEntry.
+     */
+    void flushBlockToDisk();
+
+    /**
+     * Serialize documents from a vector into a raw byte buffer.
+     * @param docs Documents to serialize
+     * @param startIdx Start index in docs
      * @param count Number of documents to serialize
      * @return Raw serialized bytes
+     */
+    std::vector<uint8_t> serializeDocs(const std::vector<DocumentBuffer>& docs,
+                                        int startIdx, int count);
+
+    /**
+     * Serialize a range of documents from documents_ (buffered mode compat).
      */
     std::vector<uint8_t> serializeBlock(int startDoc, int count);
 
@@ -207,6 +260,14 @@ private:
      * Encode a string (length-prefixed) into a byte buffer.
      */
     static void encodeString(std::vector<uint8_t>& buf, const std::string& s);
+
+    /**
+     * Write a compressed block to an output stream.
+     * @return BlockEntry with offset and doc count
+     */
+    BlockEntry writeCompressedBlock(store::IndexOutput& out,
+                                     const std::vector<DocumentBuffer>& docs,
+                                     int startIdx, int count);
 };
 
 }  // namespace codecs
