@@ -217,7 +217,7 @@ public:
                 query_.getIncludeLower() ? query_.getLowerValue() : query_.getLowerValue() + 1,
                 query_.getIncludeUpper() ? query_.getUpperValue() : query_.getUpperValue() - 1);
             auto prWeight = prq->createWeight(searcher_, ScoreMode::COMPLETE_NO_SCORES,
-                                               constantScore_);
+                                              constantScore_);
             return prWeight->scorer(context);
         }
 

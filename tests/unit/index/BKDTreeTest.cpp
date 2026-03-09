@@ -1,8 +1,6 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include <gtest/gtest.h>
-
 #include "diagon/codecs/BKDReader.h"
 #include "diagon/codecs/BKDWriter.h"
 #include "diagon/codecs/PointValuesWriter.h"
@@ -12,6 +10,8 @@
 #include "diagon/store/FSDirectory.h"
 #include "diagon/store/IOContext.h"
 #include "diagon/util/NumericUtils.h"
+
+#include <gtest/gtest.h>
 
 #include <algorithm>
 #include <cstring>
@@ -172,7 +172,7 @@ TEST_F(BKDTreeTest, IntersectFullRange) {
         }
 
         index::PointValues::Relation compare(const uint8_t* minPacked,
-                                              const uint8_t* maxPacked) override {
+                                             const uint8_t* maxPacked) override {
             if (std::memcmp(maxPacked, lower, 8) < 0)
                 return index::PointValues::Relation::CELL_OUTSIDE_QUERY;
             if (std::memcmp(minPacked, upper, 8) > 0)
@@ -397,7 +397,7 @@ TEST_F(BKDTreeTest, LargeDataset) {
         }
 
         index::PointValues::Relation compare(const uint8_t* minPacked,
-                                              const uint8_t* maxPacked) override {
+                                             const uint8_t* maxPacked) override {
             if (std::memcmp(maxPacked, lo, 8) < 0)
                 return index::PointValues::Relation::CELL_OUTSIDE_QUERY;
             if (std::memcmp(minPacked, hi, 8) > 0)
@@ -468,7 +468,7 @@ TEST_F(BKDTreeTest, NoPruningForOutOfRangeQuery) {
                 docs.insert(docID);
         }
         index::PointValues::Relation compare(const uint8_t* minPacked,
-                                              const uint8_t* maxPacked) override {
+                                             const uint8_t* maxPacked) override {
             if (std::memcmp(maxPacked, lo, 8) < 0)
                 return index::PointValues::Relation::CELL_OUTSIDE_QUERY;
             if (std::memcmp(minPacked, hi, 8) > 0)

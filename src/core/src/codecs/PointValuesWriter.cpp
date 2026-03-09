@@ -11,9 +11,8 @@
 namespace diagon {
 namespace codecs {
 
-PointValuesWriter::PointValuesWriter(const std::string& segmentName, int maxDoc)
-    : segmentName_(segmentName)
-    , maxDoc_(maxDoc) {}
+PointValuesWriter::PointValuesWriter(const std::string& segmentName, int /*maxDoc*/)
+    : segmentName_(segmentName) {}
 
 void PointValuesWriter::addPoint(const index::FieldInfo& fieldInfo, int docID,
                                  const uint8_t* packedValue) {
@@ -26,7 +25,7 @@ void PointValuesWriter::addPoint(const index::FieldInfo& fieldInfo, int docID,
         buf->fieldName = fieldInfo.name;
         buf->fieldNumber = fieldNum;
         buf->config = index::BKDConfig(fieldInfo.pointDimensionCount,
-                                        fieldInfo.pointIndexDimensionCount, fieldInfo.pointNumBytes);
+                                       fieldInfo.pointIndexDimensionCount, fieldInfo.pointNumBytes);
         it = fieldBuffers_.emplace(fieldNum, std::move(buf)).first;
     }
 
@@ -40,7 +39,7 @@ void PointValuesWriter::addPoint(const index::FieldInfo& fieldInfo, int docID,
 }
 
 void PointValuesWriter::flush(store::IndexOutput& kdmOut, store::IndexOutput& kdiOut,
-                               store::IndexOutput& kddOut) {
+                              store::IndexOutput& kddOut) {
     // Write number of fields
     kdmOut.writeVInt(static_cast<int32_t>(fieldBuffers_.size()));
 

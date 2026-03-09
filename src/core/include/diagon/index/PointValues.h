@@ -57,8 +57,7 @@ public:
          * @param maxPackedValue maximum packed value in the cell
          * @return Relation indicating how to proceed
          */
-        virtual Relation compare(const uint8_t* minPackedValue,
-                                 const uint8_t* maxPackedValue) = 0;
+        virtual Relation compare(const uint8_t* minPackedValue, const uint8_t* maxPackedValue) = 0;
     };
 
     /**

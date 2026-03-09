@@ -114,7 +114,7 @@ public:
             }
 
             index::PointValues::Relation compare(const uint8_t* minPackedValue,
-                                                  const uint8_t* maxPackedValue) override {
+                                                 const uint8_t* maxPackedValue) override {
                 // For 1D: check if cell [min, max] overlaps query [lower, upper]
                 // Cell is outside if: cellMax < lower OR cellMin > upper
                 if (std::memcmp(maxPackedValue, lower, bytesPerDim) < 0) {
@@ -161,7 +161,7 @@ private:
 // ==================== PointRangeQuery ====================
 
 PointRangeQuery::PointRangeQuery(std::string field, std::vector<uint8_t> lowerPoint,
-                                   std::vector<uint8_t> upperPoint, int numDims, int bytesPerDim)
+                                 std::vector<uint8_t> upperPoint, int numDims, int bytesPerDim)
     : field_(std::move(field))
     , lowerPoint_(std::move(lowerPoint))
     , upperPoint_(std::move(upperPoint))
@@ -169,17 +169,17 @@ PointRangeQuery::PointRangeQuery(std::string field, std::vector<uint8_t> lowerPo
     , bytesPerDim_(bytesPerDim) {}
 
 std::unique_ptr<PointRangeQuery> PointRangeQuery::newLongRange(const std::string& field,
-                                                                int64_t lower, int64_t upper) {
+                                                               int64_t lower, int64_t upper) {
     std::vector<uint8_t> lowerBytes(8);
     std::vector<uint8_t> upperBytes(8);
     util::NumericUtils::longToBytesBE(lower, lowerBytes.data());
     util::NumericUtils::longToBytesBE(upper, upperBytes.data());
     return std::make_unique<PointRangeQuery>(field, std::move(lowerBytes), std::move(upperBytes), 1,
-                                              8);
+                                             8);
 }
 
 std::unique_ptr<PointRangeQuery> PointRangeQuery::newDoubleRange(const std::string& field,
-                                                                  double lower, double upper) {
+                                                                 double lower, double upper) {
     int64_t lowerSortable = util::NumericUtils::doubleToSortableLong(lower);
     int64_t upperSortable = util::NumericUtils::doubleToSortableLong(upper);
     std::vector<uint8_t> lowerBytes(8);
@@ -187,11 +187,11 @@ std::unique_ptr<PointRangeQuery> PointRangeQuery::newDoubleRange(const std::stri
     util::NumericUtils::longToBytesBE(lowerSortable, lowerBytes.data());
     util::NumericUtils::longToBytesBE(upperSortable, upperBytes.data());
     return std::make_unique<PointRangeQuery>(field, std::move(lowerBytes), std::move(upperBytes), 1,
-                                              8);
+                                             8);
 }
 
 std::unique_ptr<Weight> PointRangeQuery::createWeight(IndexSearcher& /*searcher*/,
-                                                       ScoreMode /*scoreMode*/, float boost) const {
+                                                      ScoreMode /*scoreMode*/, float boost) const {
     return std::make_unique<PointRangeWeight>(*this, boost);
 }
 
@@ -237,7 +237,7 @@ size_t PointRangeQuery::hashCode() const {
 
 std::unique_ptr<Query> PointRangeQuery::clone() const {
     return std::make_unique<PointRangeQuery>(field_, lowerPoint_, upperPoint_, numDims_,
-                                              bytesPerDim_);
+                                             bytesPerDim_);
 }
 
 }  // namespace search

@@ -520,12 +520,9 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
 
         // Write point values (BKD tree) if present
         if (pointValuesWriter_ && pointValuesWriter_->hasPoints()) {
-            auto kdmOut = directory_->createOutput(segmentName + ".kdm",
-                                                    store::IOContext::DEFAULT);
-            auto kdiOut = directory_->createOutput(segmentName + ".kdi",
-                                                    store::IOContext::DEFAULT);
-            auto kddOut = directory_->createOutput(segmentName + ".kdd",
-                                                    store::IOContext::DEFAULT);
+            auto kdmOut = directory_->createOutput(segmentName + ".kdm", store::IOContext::DEFAULT);
+            auto kdiOut = directory_->createOutput(segmentName + ".kdi", store::IOContext::DEFAULT);
+            auto kddOut = directory_->createOutput(segmentName + ".kdd", store::IOContext::DEFAULT);
 
             pointValuesWriter_->flush(*kdmOut, *kdiOut, *kddOut);
 

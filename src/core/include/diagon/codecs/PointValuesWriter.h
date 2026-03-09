@@ -59,7 +59,6 @@ private:
     };
 
     std::string segmentName_;
-    int maxDoc_;
     std::unordered_map<int32_t, std::unique_ptr<FieldBuffer>> fieldBuffers_;
 };
 

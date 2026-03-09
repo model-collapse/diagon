@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <stdexcept>
+#include <string>
 
 namespace diagon {
 namespace index {
@@ -21,12 +22,12 @@ struct BKDConfig {
     static constexpr int MAX_DIMS = 16;
     static constexpr int DEFAULT_MAX_POINTS_PER_LEAF = 512;
 
-    int numDims;                // Total number of dimensions
-    int numIndexDims;           // Dimensions used for indexing (may be < numDims)
-    int bytesPerDim;            // Bytes per dimension value
-    int packedBytesLength;      // numDims * bytesPerDim
-    int packedIndexBytesLength; // numIndexDims * bytesPerDim
-    int maxPointsPerLeaf;       // Maximum points in a leaf block
+    int numDims;                 // Total number of dimensions
+    int numIndexDims;            // Dimensions used for indexing (may be < numDims)
+    int bytesPerDim;             // Bytes per dimension value
+    int packedBytesLength;       // numDims * bytesPerDim
+    int packedIndexBytesLength;  // numIndexDims * bytesPerDim
+    int maxPointsPerLeaf;        // Maximum points in a leaf block
 
     BKDConfig() = default;
 
@@ -39,8 +40,7 @@ struct BKDConfig {
         , packedIndexBytesLength(numIndexDims * bytesPerDim)
         , maxPointsPerLeaf(maxPointsPerLeaf) {
         if (numDims < 1 || numDims > MAX_DIMS) {
-            throw std::invalid_argument("numDims must be in [1, " +
-                                        std::to_string(MAX_DIMS) + "]");
+            throw std::invalid_argument("numDims must be in [1, " + std::to_string(MAX_DIMS) + "]");
         }
         if (numIndexDims < 1 || numIndexDims > numDims) {
             throw std::invalid_argument("numIndexDims must be in [1, numDims]");
@@ -56,16 +56,12 @@ struct BKDConfig {
     /**
      * Create config for 1D int64 (8 bytes per dim)
      */
-    static BKDConfig forLong() {
-        return BKDConfig(1, 1, 8);
-    }
+    static BKDConfig forLong() { return BKDConfig(1, 1, 8); }
 
     /**
      * Create config for 1D double (8 bytes per dim, sortable encoding)
      */
-    static BKDConfig forDouble() {
-        return BKDConfig(1, 1, 8);
-    }
+    static BKDConfig forDouble() { return BKDConfig(1, 1, 8); }
 };
 
 }  // namespace index

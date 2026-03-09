@@ -1,17 +1,18 @@
 // Copyright 2024 Diagon Project
 // Licensed under the Apache License, Version 2.0
 
-#include <gtest/gtest.h>
+#include "diagon/search/PointRangeQuery.h"
 
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
 #include "diagon/index/DirectoryReader.h"
 #include "diagon/index/IndexWriter.h"
 #include "diagon/search/IndexSearcher.h"
-#include "diagon/search/PointRangeQuery.h"
 #include "diagon/search/TopDocs.h"
 #include "diagon/store/FSDirectory.h"
 #include "diagon/util/NumericUtils.h"
+
+#include <gtest/gtest.h>
 
 #include <filesystem>
 
@@ -43,11 +44,10 @@ TEST_F(PointRangeQueryTest, EndToEndLongRange) {
 
         for (int i = 0; i < 100; i++) {
             document::Document doc;
-            doc.add(std::make_unique<document::LongPointField>("price",
-                                                                static_cast<int64_t>(i * 10)));
-            doc.add(std::make_unique<document::TextField>("body", "test document " +
-                                                                       std::to_string(i),
-                                                           document::TextField::TYPE_STORED));
+            doc.add(
+                std::make_unique<document::LongPointField>("price", static_cast<int64_t>(i * 10)));
+            doc.add(std::make_unique<document::TextField>(
+                "body", "test document " + std::to_string(i), document::TextField::TYPE_STORED));
             writer.addDocument(doc);
         }
         writer.commit();
@@ -74,7 +74,7 @@ TEST_F(PointRangeQueryTest, EndToEndDoubleRange) {
         for (int i = 0; i < 50; i++) {
             document::Document doc;
             doc.add(std::make_unique<document::DoublePointField>("score",
-                                                                  static_cast<double>(i) * 0.5));
+                                                                 static_cast<double>(i) * 0.5));
             writer.addDocument(doc);
         }
         writer.commit();

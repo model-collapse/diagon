@@ -369,8 +369,7 @@ void SegmentReader::loadPointsReader() const {
         auto kdiInput = dir.openInput(segmentName + ".kdi", IOContext::READ);
         auto kddInput = dir.openInput(segmentName + ".kdd", IOContext::READ);
 
-        pointsReaders_ =
-            codecs::BKDReader::loadFields(*kdmInput, *kdiInput, *kddInput);
+        pointsReaders_ = codecs::BKDReader::loadFields(*kdmInput, *kdiInput, *kddInput);
     } catch (const std::exception&) {
         // Points files don't exist — that's OK
     }

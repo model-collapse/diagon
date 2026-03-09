@@ -43,13 +43,13 @@ public:
      * Convenience factory for int64 range
      */
     static std::unique_ptr<PointRangeQuery> newLongRange(const std::string& field, int64_t lower,
-                                                          int64_t upper);
+                                                         int64_t upper);
 
     /**
      * Convenience factory for double range
      */
     static std::unique_ptr<PointRangeQuery> newDoubleRange(const std::string& field, double lower,
-                                                            double upper);
+                                                           double upper);
 
     // ==================== Accessors ====================
 

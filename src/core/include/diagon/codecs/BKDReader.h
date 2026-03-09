@@ -75,15 +75,13 @@ private:
     /**
      * Recursive tree traversal for intersection
      */
-    void intersectNode(int64_t nodeFP, bool isLeaf,
-                       const uint8_t* cellMin, const uint8_t* cellMax,
+    void intersectNode(int64_t nodeFP, bool isLeaf, const uint8_t* cellMin, const uint8_t* cellMax,
                        IntersectVisitor& visitor) const;
 
     /**
      * Visit all points in a leaf block
      */
-    void visitLeafBlock(int64_t leafFP, IntersectVisitor& visitor,
-                        bool allInside) const;
+    void visitLeafBlock(int64_t leafFP, IntersectVisitor& visitor, bool allInside) const;
 
     FieldTree tree_;
     std::unique_ptr<store::IndexInput> kdiInput_;  // Inner node data

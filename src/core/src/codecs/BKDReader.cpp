@@ -51,8 +51,8 @@ BKDReader::loadFields(store::IndexInput& kdmIn, store::IndexInput& kdiIn,
         auto kddSlice = kddIn.slice("BKDReader.kdd." + tree.fieldName, tree.kddStartFP, kddLen);
 
         std::string fieldName = tree.fieldName;
-        auto reader =
-            std::make_unique<BKDReader>(std::move(tree), std::move(kdiSlice), std::move(kddSlice));
+        auto reader = std::make_unique<BKDReader>(std::move(tree), std::move(kdiSlice),
+                                                  std::move(kddSlice));
         result.emplace(fieldName, std::move(reader));
     }
 
@@ -146,7 +146,7 @@ void BKDReader::intersect(IntersectVisitor& visitor) const {
 }
 
 void BKDReader::intersectNode(int64_t nodeFP, bool isLeaf, const uint8_t* cellMin,
-                               const uint8_t* cellMax, IntersectVisitor& visitor) const {
+                              const uint8_t* cellMax, IntersectVisitor& visitor) const {
     // First check cell against query
     auto rel = visitor.compare(cellMin, cellMax);
     if (rel == PointValues::Relation::CELL_OUTSIDE_QUERY) {

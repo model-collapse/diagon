@@ -41,15 +41,14 @@ public:
      * @param kdiOut Inner node index output (.kdi)
      * @param kddOut Leaf data output (.kdd)
      */
-    void writeField(const std::string& fieldName, int32_t fieldNumber,
-                    std::vector<int32_t>& docIDs, std::vector<uint8_t>& packedValues,
-                    store::IndexOutput& kdmOut, store::IndexOutput& kdiOut,
-                    store::IndexOutput& kddOut);
+    void writeField(const std::string& fieldName, int32_t fieldNumber, std::vector<int32_t>& docIDs,
+                    std::vector<uint8_t>& packedValues, store::IndexOutput& kdmOut,
+                    store::IndexOutput& kdiOut, store::IndexOutput& kddOut);
 
 private:
     // Internal tree node for building
     struct InnerNode {
-        int64_t splitValue;  // For 1D: the split value as int64
+        int64_t splitValue;    // For 1D: the split value as int64
         int64_t leftChildFP;   // File pointer in .kdi for left child (or .kdd for leaf)
         int64_t rightChildFP;  // File pointer in .kdi for right child (or .kdd for leaf)
         bool leftIsLeaf;
@@ -68,8 +67,7 @@ private:
      * @param kddOut Leaf data output
      * @return File pointer where this node was written
      */
-    int64_t buildTree(int from, int to,
-                      int32_t* docIDs, uint8_t* packedValues,
+    int64_t buildTree(int from, int to, int32_t* docIDs, uint8_t* packedValues,
                       const uint8_t* minPacked, const uint8_t* maxPacked,
                       store::IndexOutput& kdiOut, store::IndexOutput& kddOut);
 
@@ -77,15 +75,13 @@ private:
      * Write a leaf block to .kdd
      * @return File pointer where the leaf was written
      */
-    int64_t writeLeafBlock(int from, int to,
-                           const int32_t* docIDs, const uint8_t* packedValues,
+    int64_t writeLeafBlock(int from, int to, const int32_t* docIDs, const uint8_t* packedValues,
                            store::IndexOutput& kddOut);
 
     /**
      * Sort points by packed value (1D: simple int64 comparison)
      */
-    void sortPoints(int from, int to,
-                    int32_t* docIDs, uint8_t* packedValues);
+    void sortPoints(int from, int to, int32_t* docIDs, uint8_t* packedValues);
 
     /**
      * Compare two packed values (1D: big-endian byte comparison = numeric order)

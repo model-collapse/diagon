@@ -833,22 +833,14 @@ void SegmentMerger::mergePoints(const FieldInfos& mergedFieldInfos) {
             continue;
         }
 
-        int newDocID = 0;
         for (size_t segIdx = 0; segIdx < readers.size(); segIdx++) {
             auto* pointValues = readers[segIdx]->getPointValues(fi.name);
+            if (!pointValues) {
+                continue;
+            }
             const util::Bits* liveDocs = readers[segIdx]->getLiveDocs();
             int maxDoc = sourceSegments_[segIdx]->maxDoc();
             int segBase = docMapping_.segmentBases[segIdx];
-
-            if (!pointValues) {
-                // Skip docs without points, but still advance newDocID
-                for (int doc = 0; doc < maxDoc; doc++) {
-                    if (liveDocs == nullptr || liveDocs->get(doc)) {
-                        newDocID++;
-                    }
-                }
-                continue;
-            }
 
             // Collect all points from this segment with doc ID remapping
             struct CollectVisitor : public PointValues::IntersectVisitor {
@@ -879,7 +871,7 @@ void SegmentMerger::mergePoints(const FieldInfos& mergedFieldInfos) {
                 }
 
                 PointValues::Relation compare(const uint8_t* /*minPacked*/,
-                                               const uint8_t* /*maxPacked*/) override {
+                                              const uint8_t* /*maxPacked*/) override {
                     // Accept everything — we want all points
                     return PointValues::Relation::CELL_CROSSES_QUERY;
                 }
@@ -898,13 +890,6 @@ void SegmentMerger::mergePoints(const FieldInfos& mergedFieldInfos) {
 
             CollectVisitor visitor(pvWriter, fi, liveDocs, oldToNew);
             pointValues->intersect(visitor);
-
-            // Advance newDocID for all live docs in this segment
-            for (int doc = 0; doc < maxDoc; doc++) {
-                if (liveDocs == nullptr || liveDocs->get(doc)) {
-                    newDocID++;
-                }
-            }
         }
     }
 

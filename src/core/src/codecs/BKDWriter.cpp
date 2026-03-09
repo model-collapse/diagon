@@ -17,9 +17,9 @@ BKDWriter::BKDWriter(const index::BKDConfig& config)
     : config_(config) {}
 
 void BKDWriter::writeField(const std::string& fieldName, int32_t fieldNumber,
-                            std::vector<int32_t>& docIDs, std::vector<uint8_t>& packedValues,
-                            store::IndexOutput& kdmOut, store::IndexOutput& kdiOut,
-                            store::IndexOutput& kddOut) {
+                           std::vector<int32_t>& docIDs, std::vector<uint8_t>& packedValues,
+                           store::IndexOutput& kdmOut, store::IndexOutput& kdiOut,
+                           store::IndexOutput& kddOut) {
     int numPoints = static_cast<int>(docIDs.size());
     if (numPoints == 0) {
         return;
@@ -67,8 +67,8 @@ void BKDWriter::writeField(const std::string& fieldName, int32_t fieldNumber,
 }
 
 int64_t BKDWriter::buildTree(int from, int to, int32_t* docIDs, uint8_t* packedValues,
-                              const uint8_t* minPacked, const uint8_t* maxPacked,
-                              store::IndexOutput& kdiOut, store::IndexOutput& kddOut) {
+                             const uint8_t* minPacked, const uint8_t* maxPacked,
+                             store::IndexOutput& kdiOut, store::IndexOutput& kddOut) {
     int count = to - from;
 
     if (count <= config_.maxPointsPerLeaf) {
@@ -89,12 +89,12 @@ int64_t BKDWriter::buildTree(int from, int to, int32_t* docIDs, uint8_t* packedV
 
     // Recurse left
     int64_t leftFP = buildTree(from, mid, docIDs, packedValues, minPacked, splitPacked, kdiOut,
-                                kddOut);
+                               kddOut);
     bool leftIsLeaf = (mid - from) <= config_.maxPointsPerLeaf;
 
     // Recurse right
     int64_t rightFP = buildTree(mid, to, docIDs, packedValues, splitPacked, maxPacked, kdiOut,
-                                 kddOut);
+                                kddOut);
     bool rightIsLeaf = (to - mid) <= config_.maxPointsPerLeaf;
 
     // Write inner node to .kdi
@@ -105,8 +105,10 @@ int64_t BKDWriter::buildTree(int from, int to, int32_t* docIDs, uint8_t* packedV
 
     // Write child info: flags byte + file pointers
     uint8_t flags = 0;
-    if (leftIsLeaf) flags |= 0x01;
-    if (rightIsLeaf) flags |= 0x02;
+    if (leftIsLeaf)
+        flags |= 0x01;
+    if (rightIsLeaf)
+        flags |= 0x02;
     kdiOut.writeByte(flags);
     kdiOut.writeLong(leftFP);
     kdiOut.writeLong(rightFP);
@@ -115,7 +117,7 @@ int64_t BKDWriter::buildTree(int from, int to, int32_t* docIDs, uint8_t* packedV
 }
 
 int64_t BKDWriter::writeLeafBlock(int from, int to, const int32_t* docIDs,
-                                   const uint8_t* packedValues, store::IndexOutput& kddOut) {
+                                  const uint8_t* packedValues, store::IndexOutput& kddOut) {
     int64_t leafFP = kddOut.getFilePointer();
     int count = to - from;
     int packedLen = config_.packedBytesLength;
@@ -163,8 +165,9 @@ void BKDWriter::sortPoints(int from, int to, int32_t* docIDs, uint8_t* packedVal
 
     std::sort(indices.begin(), indices.end(), [&](int a, int b) {
         int cmp = comparePackedValues(packedValues + a * packedLen, packedValues + b * packedLen,
-                                       config_.bytesPerDim);
-        if (cmp != 0) return cmp < 0;
+                                      config_.bytesPerDim);
+        if (cmp != 0)
+            return cmp < 0;
         return docIDs[a] < docIDs[b];  // Tie-break by docID
     });
 
@@ -175,7 +178,7 @@ void BKDWriter::sortPoints(int from, int to, int32_t* docIDs, uint8_t* packedVal
     for (int i = 0; i < count; i++) {
         tmpDocIDs[i] = docIDs[indices[i]];
         std::memcpy(tmpValues.data() + i * packedLen, packedValues + indices[i] * packedLen,
-                     packedLen);
+                    packedLen);
     }
 
     std::memcpy(docIDs + from, tmpDocIDs.data(), count * sizeof(int32_t));
