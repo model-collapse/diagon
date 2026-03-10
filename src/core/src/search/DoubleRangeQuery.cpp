@@ -175,9 +175,8 @@ private:
  */
 class DoubleRangeWeight : public Weight {
 public:
-    DoubleRangeWeight(const DoubleRangeQuery& query, IndexSearcher& searcher, float boost)
+    DoubleRangeWeight(const DoubleRangeQuery& query, IndexSearcher& /*searcher*/, float boost)
         : query_(query)
-        , searcher_(searcher)
         , constantScore_(boost) {}
 
     std::unique_ptr<Scorer> scorer(const index::LeafReaderContext& context) const override {
@@ -206,7 +205,6 @@ public:
 
 private:
     const DoubleRangeQuery& query_;
-    [[maybe_unused]] IndexSearcher& searcher_;
     float constantScore_;
 };
 

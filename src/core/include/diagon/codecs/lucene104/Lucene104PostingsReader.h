@@ -254,7 +254,6 @@ private:
     std::unique_ptr<store::IndexInput> docIn_;  // Owned clone for thread-safety
     store::MMapIndexInput* mmapInput_;          // Cached typed pointer (non-owning)
     int docFreq_;
-    [[maybe_unused]] int64_t totalTermFreq_;
     bool writeFreqs_;
 
     // Current state
@@ -320,7 +319,6 @@ public:
 private:
     std::unique_ptr<store::IndexInput> docIn_;  // Owned clone for thread-safety
     int docFreq_;
-    [[maybe_unused]] int64_t totalTermFreq_;
     bool writeFreqs_;
 
     // Current state
@@ -380,7 +378,6 @@ private:
     std::unique_ptr<store::IndexInput> docIn_;
     std::unique_ptr<store::IndexInput> posIn_;
     int docFreq_;
-    [[maybe_unused]] int64_t totalTermFreq_;
     bool writeFreqs_;
 
     // Current state

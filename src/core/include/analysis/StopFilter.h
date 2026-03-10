@@ -92,7 +92,6 @@ public:
 
 private:
     std::unordered_set<std::string> stopWords_;
-    [[maybe_unused]] StopWordSet stopWordSet_;
     bool caseSensitive_;
 
     /**

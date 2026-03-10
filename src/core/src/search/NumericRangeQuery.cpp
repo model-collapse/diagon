@@ -256,7 +256,7 @@ public:
 
 private:
     const NumericRangeQuery& query_;
-    [[maybe_unused]] IndexSearcher& searcher_;
+    IndexSearcher& searcher_;
     float constantScore_;
 };
 

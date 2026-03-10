@@ -7,14 +7,12 @@ namespace diagon {
 namespace analysis {
 
 StopFilter::StopFilter(StopWordSet stopWordSet, bool caseSensitive)
-    : stopWordSet_(stopWordSet)
-    , caseSensitive_(caseSensitive) {
+    : caseSensitive_(caseSensitive) {
     loadStopWords(stopWordSet);
 }
 
 StopFilter::StopFilter(const std::unordered_set<std::string>& customStopWords, bool caseSensitive)
     : stopWords_(customStopWords)
-    , stopWordSet_(StopWordSet::CUSTOM)
     , caseSensitive_(caseSensitive) {}
 
 void StopFilter::loadStopWords(StopWordSet stopWordSet) {

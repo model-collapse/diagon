@@ -320,8 +320,7 @@ public:
                   float boost)
         : query_(query)
         , searcher_(searcher)
-        , scoreMode_(scoreMode)
-        , boost_(boost) {
+        , scoreMode_(scoreMode) {
         // Create weights for all sub-queries
         for (const auto& clause : query_.clauses()) {
             auto weight = clause.query->createWeight(searcher, scoreMode, boost);
@@ -498,7 +497,6 @@ private:
     const BooleanQuery& query_;
     IndexSearcher& searcher_;
     ScoreMode scoreMode_;
-    [[maybe_unused]] float boost_;
     std::vector<WeightClause> weights_;
 };
 

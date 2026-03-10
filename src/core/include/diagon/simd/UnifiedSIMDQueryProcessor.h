@@ -100,13 +100,10 @@ public:
  */
 class UnifiedSIMDQueryProcessor {
 public:
-    explicit UnifiedSIMDQueryProcessor(const UnifiedColumnReader& reader,
+    explicit UnifiedSIMDQueryProcessor(const UnifiedColumnReader& /*reader*/,
                                        ScoringMode mode = ScoringMode::BM25)
-        : reader_(reader)
-        , mode_(mode)
-        , bm25Scorer_(1.2f, 0.75f, 100.0f)
-        , rankFeaturesScorer_()
-        , tfIdfScorer_() {}
+        : mode_(mode)
+        , bm25Scorer_(1.2f, 0.75f, 100.0f) {}
 
     // ==================== Configuration ====================
 
@@ -195,12 +192,9 @@ public:
     }
 
 private:
-    [[maybe_unused]] const UnifiedColumnReader& reader_;
     ScoringMode mode_;
 
     SIMDBm25Scorer bm25Scorer_;
-    [[maybe_unused]] RankFeaturesScorer rankFeaturesScorer_;
-    [[maybe_unused]] SIMDTfIdfScorer tfIdfScorer_;
 };
 
 }  // namespace simd

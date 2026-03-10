@@ -148,7 +148,6 @@ private:
         int docID_;
     };
 
-    [[maybe_unused]] index::SegmentReadState& state_;
     std::unique_ptr<store::IndexInput> data_;  // .nvd file
     std::unique_ptr<store::IndexInput> meta_;  // .nvm file
     int metaVersion_{1};                       // Metadata format version
