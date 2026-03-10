@@ -688,15 +688,15 @@ DiagonQuery diagon_create_double_range_query(const char* field_name, double lowe
 }
 
 DiagonQuery diagon_create_double_point_range_query(const char* field_name, double lower_value,
-                                                    double upper_value) {
+                                                   double upper_value) {
     if (!field_name) {
         set_error("Field name is required");
         return nullptr;
     }
 
     try {
-        auto query = diagon::search::PointRangeQuery::newDoubleRange(
-            std::string(field_name), lower_value, upper_value);
+        auto query = diagon::search::PointRangeQuery::newDoubleRange(std::string(field_name),
+                                                                     lower_value, upper_value);
 
         return query.release();
     } catch (const std::exception& e) {
@@ -1190,20 +1190,15 @@ int diagon_add_documents_from_json(DiagonIndexWriter writer, const char* json_ar
 
 // ==================== BKD-Based Aggregation ====================
 
-int64_t diagon_compute_histogram(DiagonIndexReader reader,
-                                  const char* field_name,
-                                  double min_value,
-                                  double interval,
-                                  int num_buckets,
-                                  int64_t* bucket_counts) {
+int64_t diagon_compute_histogram(DiagonIndexReader reader, const char* field_name, double min_value,
+                                 double interval, int num_buckets, int64_t* bucket_counts) {
     if (!reader || !field_name || !bucket_counts || num_buckets <= 0 || interval <= 0) {
         set_error("Invalid parameters for histogram computation");
         return -1;
     }
 
     try {
-        auto* reader_ptr =
-            static_cast<std::shared_ptr<diagon::index::DirectoryReader>*>(reader);
+        auto* reader_ptr = static_cast<std::shared_ptr<diagon::index::DirectoryReader>*>(reader);
         auto* dir_reader = reader_ptr->get();
 
         if (!dir_reader) {
@@ -1225,10 +1220,12 @@ int64_t diagon_compute_histogram(DiagonIndexReader reader,
 
         for (const auto& ctx : leaves) {
             auto* point_values = ctx.reader->getPointValues(field_str);
-            if (!point_values) continue;
+            if (!point_values)
+                continue;
 
             int bytes_per_dim = point_values->getBytesPerDimension();
-            if (bytes_per_dim != 8) continue;  // only doubles (8 bytes)
+            if (bytes_per_dim != 8)
+                continue;  // only doubles (8 bytes)
 
             // Create a visitor that buckets all points
             struct HistogramVisitor : diagon::index::PointValues::IntersectVisitor {
@@ -1240,8 +1237,12 @@ int64_t diagon_compute_histogram(DiagonIndexReader reader,
                 int64_t total;
 
                 HistogramVisitor(double mn, double mx, double interval, int nb, int64_t* c)
-                    : min_val(mn), max_val(mx), inv_interval(1.0 / interval),
-                      n_buckets(nb), counts(c), total(0) {}
+                    : min_val(mn)
+                    , max_val(mx)
+                    , inv_interval(1.0 / interval)
+                    , n_buckets(nb)
+                    , counts(c)
+                    , total(0) {}
 
                 // Called for doc IDs in cells fully inside query range.
                 // We don't have the value here, so we can't bucket.
@@ -1255,7 +1256,8 @@ int64_t diagon_compute_histogram(DiagonIndexReader reader,
                 // Called at leaf level with the packed value
                 void visit(int /*docID*/, const uint8_t* packedValue) override {
                     double val = diagon::util::NumericUtils::bytesToDoubleBE(packedValue);
-                    if (val < min_val || val >= max_val) return;
+                    if (val < min_val || val >= max_val)
+                        return;
                     int bucket = static_cast<int>((val - min_val) * inv_interval);
                     if (bucket >= 0 && bucket < n_buckets) {
                         counts[bucket]++;
@@ -1263,9 +1265,8 @@ int64_t diagon_compute_histogram(DiagonIndexReader reader,
                     }
                 }
 
-                diagon::index::PointValues::Relation compare(
-                        const uint8_t* minPackedValue,
-                        const uint8_t* maxPackedValue) override {
+                diagon::index::PointValues::Relation
+                compare(const uint8_t* minPackedValue, const uint8_t* maxPackedValue) override {
                     double cellMin = diagon::util::NumericUtils::bytesToDoubleBE(minPackedValue);
                     double cellMax = diagon::util::NumericUtils::bytesToDoubleBE(maxPackedValue);
 

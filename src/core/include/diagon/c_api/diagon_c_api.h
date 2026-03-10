@@ -409,7 +409,7 @@ DiagonQuery diagon_create_double_range_query(const char* field_name, double lowe
  * @return Query handle or NULL on error
  */
 DiagonQuery diagon_create_double_point_range_query(const char* field_name, double lower_value,
-                                                    double upper_value);
+                                                   double upper_value);
 
 /**
  * Create boolean query
@@ -653,12 +653,8 @@ int diagon_add_documents_from_json(DiagonIndexWriter writer, const char* json_ar
  * @param bucket_counts Output array of num_buckets int64_t values (caller-allocated, zeroed)
  * @return Total number of points counted, or -1 on error
  */
-int64_t diagon_compute_histogram(DiagonIndexReader reader,
-                                  const char* field_name,
-                                  double min_value,
-                                  double interval,
-                                  int num_buckets,
-                                  int64_t* bucket_counts);
+int64_t diagon_compute_histogram(DiagonIndexReader reader, const char* field_name, double min_value,
+                                 double interval, int num_buckets, int64_t* bucket_counts);
 
 // ==================== Advanced: Terms Enumeration ====================
 
