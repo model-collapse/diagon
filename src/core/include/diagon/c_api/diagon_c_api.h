@@ -395,6 +395,23 @@ DiagonQuery diagon_create_double_range_query(const char* field_name, double lowe
                                              bool include_upper);
 
 /**
+ * Create a BKD tree-based range query for double values — O(log N) per segment.
+ *
+ * Uses PointRangeQuery with proper sortable double encoding.
+ * Much faster than diagon_create_double_range_query (which does O(N) doc-values scan).
+ * Requires fields indexed with diagon_create_double_point_field.
+ *
+ * NOTE: include_lower/include_upper not yet supported (always inclusive [lower, upper]).
+ *
+ * @param field_name Field to query
+ * @param lower_value Lower bound (inclusive)
+ * @param upper_value Upper bound (inclusive)
+ * @return Query handle or NULL on error
+ */
+DiagonQuery diagon_create_double_point_range_query(const char* field_name, double lower_value,
+                                                   double upper_value);
+
+/**
  * Create boolean query
  * @return Query handle or NULL on error
  */
@@ -614,6 +631,30 @@ DiagonDocument diagon_create_document_from_json_with_id(const char* json_data, s
  */
 int diagon_add_documents_from_json(DiagonIndexWriter writer, const char* json_array,
                                    size_t json_len);
+
+// ==================== BKD-Based Aggregation ====================
+
+/**
+ * Compute a date/numeric histogram by single-pass BKD tree traversal.
+ *
+ * For each point in the BKD tree for the given field, decodes the packed value
+ * as a double, computes bucket_index = floor((value - min_value) / interval),
+ * and increments bucket_counts[bucket_index].
+ *
+ * This is O(N) over all indexed points, but with excellent cache locality since
+ * the BKD tree is traversed in order. Much faster than B individual range queries
+ * when B (num_buckets) is large.
+ *
+ * @param reader IndexReader handle
+ * @param field_name Name of the double point field (e.g. "@timestamp")
+ * @param min_value Minimum bucket boundary (epoch ms for dates)
+ * @param interval Bucket width (ms for dates)
+ * @param num_buckets Number of buckets (bucket_counts array size)
+ * @param bucket_counts Output array of num_buckets int64_t values (caller-allocated, zeroed)
+ * @return Total number of points counted, or -1 on error
+ */
+int64_t diagon_compute_histogram(DiagonIndexReader reader, const char* field_name, double min_value,
+                                 double interval, int num_buckets, int64_t* bucket_counts);
 
 // ==================== Advanced: Terms Enumeration ====================
 
