@@ -12,8 +12,8 @@ DocumentsWriter::DocumentsWriter()
 
 DocumentsWriter::DocumentsWriter(const Config& config, store::Directory* directory)
     : config_(config)
-    , dwpt_(std::make_unique<DocumentsWriterPerThread>(config_.dwptConfig, directory, "Lucene104"))
-    , directory_(directory) {}
+    , dwpt_(
+          std::make_unique<DocumentsWriterPerThread>(config_.dwptConfig, directory, "Lucene104")) {}
 
 int DocumentsWriter::addDocument(const document::Document& doc) {
     std::lock_guard<std::mutex> lock(mutex_);
