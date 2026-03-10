@@ -48,8 +48,7 @@ public:
      */
     void writeField(const std::string& fieldName, int32_t fieldNumber, std::vector<int32_t>& docIDs,
                     std::vector<uint8_t>& packedValues, store::IndexOutput& kdmOut,
-                    store::IndexOutput& kdiOut, store::IndexOutput& kddOut,
-                    bool preSorted = false);
+                    store::IndexOutput& kdiOut, store::IndexOutput& kddOut, bool preSorted = false);
 
 private:
     // Internal tree node for building
@@ -75,8 +74,8 @@ private:
      */
     int64_t buildTree(int from, int to, int32_t* docIDs, uint8_t* packedValues,
                       const uint8_t* minPacked, const uint8_t* maxPacked,
-                      store::IndexOutput& kdiOut, store::IndexOutput& kddOut,
-                      int64_t kdiBaseFP, int64_t kddBaseFP);
+                      store::IndexOutput& kdiOut, store::IndexOutput& kddOut, int64_t kdiBaseFP,
+                      int64_t kddBaseFP);
 
     /**
      * Write a leaf block to .kdd

@@ -85,8 +85,7 @@ public:
      * @param dataOut Output stream for .fdt file (must remain valid until finish())
      * @param indexOut Output stream for .fdx file (must remain valid until finish())
      */
-    StoredFieldsWriter(const std::string& segmentName,
-                       store::IndexOutput& dataOut,
+    StoredFieldsWriter(const std::string& segmentName, store::IndexOutput& dataOut,
                        store::IndexOutput& indexOut);
 
     /**
@@ -238,8 +237,8 @@ private:
      * @param count Number of documents to serialize
      * @return Raw serialized bytes
      */
-    std::vector<uint8_t> serializeDocs(const std::vector<DocumentBuffer>& docs,
-                                        int startIdx, int count);
+    std::vector<uint8_t> serializeDocs(const std::vector<DocumentBuffer>& docs, int startIdx,
+                                       int count);
 
     /**
      * Serialize a range of documents from documents_ (buffered mode compat).
@@ -266,8 +265,8 @@ private:
      * @return BlockEntry with offset and doc count
      */
     BlockEntry writeCompressedBlock(store::IndexOutput& out,
-                                     const std::vector<DocumentBuffer>& docs,
-                                     int startIdx, int count);
+                                    const std::vector<DocumentBuffer>& docs, int startIdx,
+                                    int count);
 };
 
 }  // namespace codecs

@@ -913,12 +913,15 @@ void SegmentMerger::mergePoints(const FieldInfos& mergedFieldInfos) {
                 const std::vector<int>& oldToNew;
 
                 CountVisitor(const util::Bits* ld, const std::vector<int>& mapping)
-                    : liveDocs(ld), oldToNew(mapping) {}
+                    : liveDocs(ld)
+                    , oldToNew(mapping) {}
 
                 void visit(int /*docID*/) override {}
                 void visit(int docID, const uint8_t* /*packedValue*/) override {
-                    if (liveDocs != nullptr && !liveDocs->get(docID)) return;
-                    if (oldToNew[docID] >= 0) count++;
+                    if (liveDocs != nullptr && !liveDocs->get(docID))
+                        return;
+                    if (oldToNew[docID] >= 0)
+                        count++;
                 }
                 PointValues::Relation compare(const uint8_t*, const uint8_t*) override {
                     return PointValues::Relation::CELL_CROSSES_QUERY;
@@ -945,7 +948,10 @@ void SegmentMerger::mergePoints(const FieldInfos& mergedFieldInfos) {
 
                 SortedCollectVisitor(SortedRun& r, int pl, const util::Bits* ld,
                                      const std::vector<int>& mapping)
-                    : run(r), packedLen(pl), liveDocs(ld), oldToNew(mapping) {}
+                    : run(r)
+                    , packedLen(pl)
+                    , liveDocs(ld)
+                    , oldToNew(mapping) {}
 
                 void visit(int /*docID*/) override {}
 
@@ -1008,7 +1014,8 @@ void SegmentMerger::mergePoints(const FieldInfos& mergedFieldInfos) {
                 const uint8_t* va = runs[a.segIdx].packedValues.data() + (size_t)a.pos * packedLen;
                 const uint8_t* vb = runs[b.segIdx].packedValues.data() + (size_t)b.pos * packedLen;
                 int c = std::memcmp(va, vb, packedLen);
-                if (c != 0) return c > 0;  // min-heap: greater = lower priority
+                if (c != 0)
+                    return c > 0;  // min-heap: greater = lower priority
                 return runs[a.segIdx].docIDs[a.pos] > runs[b.segIdx].docIDs[b.pos];
             };
 
@@ -1024,8 +1031,8 @@ void SegmentMerger::mergePoints(const FieldInfos& mergedFieldInfos) {
                 heap.pop();
 
                 mergedDocIDs.push_back(runs[entry.segIdx].docIDs[entry.pos]);
-                const uint8_t* val =
-                    runs[entry.segIdx].packedValues.data() + (size_t)entry.pos * packedLen;
+                const uint8_t* val = runs[entry.segIdx].packedValues.data() +
+                                     (size_t)entry.pos * packedLen;
                 size_t oldSize = mergedPackedValues.size();
                 mergedPackedValues.resize(oldSize + packedLen);
                 std::memcpy(mergedPackedValues.data() + oldSize, val, packedLen);
@@ -1042,8 +1049,8 @@ void SegmentMerger::mergePoints(const FieldInfos& mergedFieldInfos) {
 
         // Write BKD for this field immediately
         codecs::BKDWriter writer(config);
-        writer.writeField(fi.name, fi.number, mergedDocIDs, mergedPackedValues, *kdmOut,
-                          *kdiOut, *kddOut, /*preSorted=*/true);
+        writer.writeField(fi.name, fi.number, mergedDocIDs, mergedPackedValues, *kdmOut, *kdiOut,
+                          *kddOut, /*preSorted=*/true);
 
         // Memory for mergedDocIDs/mergedPackedValues is freed at end of this loop iteration
     }

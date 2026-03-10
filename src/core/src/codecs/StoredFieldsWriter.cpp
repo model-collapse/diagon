@@ -22,8 +22,7 @@ static const int VERSION = 2;  // V2: LZ4 block compression
 StoredFieldsWriter::StoredFieldsWriter(const std::string& segmentName)
     : segmentName_(segmentName) {}
 
-StoredFieldsWriter::StoredFieldsWriter(const std::string& segmentName,
-                                       store::IndexOutput& dataOut,
+StoredFieldsWriter::StoredFieldsWriter(const std::string& segmentName, store::IndexOutput& dataOut,
                                        store::IndexOutput& indexOut)
     : segmentName_(segmentName)
     , dataOut_(&dataOut)
@@ -204,7 +203,7 @@ void StoredFieldsWriter::encodeString(std::vector<uint8_t>& buf, const std::stri
 // ==================== Serialization ====================
 
 std::vector<uint8_t> StoredFieldsWriter::serializeDocs(const std::vector<DocumentBuffer>& docs,
-                                                        int startIdx, int count) {
+                                                       int startIdx, int count) {
     std::vector<uint8_t> raw;
     raw.reserve(count * 128);
 
@@ -240,10 +239,8 @@ std::vector<uint8_t> StoredFieldsWriter::serializeBlock(int startDoc, int count)
 
 // ==================== Block Compression ====================
 
-StoredFieldsWriter::BlockEntry
-StoredFieldsWriter::writeCompressedBlock(store::IndexOutput& out,
-                                          const std::vector<DocumentBuffer>& docs,
-                                          int startIdx, int count) {
+StoredFieldsWriter::BlockEntry StoredFieldsWriter::writeCompressedBlock(
+    store::IndexOutput& out, const std::vector<DocumentBuffer>& docs, int startIdx, int count) {
     BlockEntry entry;
     entry.offset = out.getFilePointer();
     entry.numDocsInBlock = count;
@@ -256,8 +253,8 @@ StoredFieldsWriter::writeCompressedBlock(store::IndexOutput& out,
     std::vector<uint8_t> compressed(maxCompressedSize);
 
     int compressedSize = LZ4_compress_default(reinterpret_cast<const char*>(raw.data()),
-                                              reinterpret_cast<char*>(compressed.data()),
-                                              rawLength, maxCompressedSize);
+                                              reinterpret_cast<char*>(compressed.data()), rawLength,
+                                              maxCompressedSize);
 
     if (compressedSize <= 0) {
         throw std::runtime_error("LZ4 compression failed");
