@@ -29,8 +29,7 @@ float Lucene104NormsReader::decodeNormValue(int8_t norm) {
 
 // ==================== Constructor/Destructor ====================
 
-Lucene104NormsReader::Lucene104NormsReader(index::SegmentReadState& state)
-    : state_(state) {
+Lucene104NormsReader::Lucene104NormsReader(index::SegmentReadState& state) {
     // Open norms data file (.nvd)
     std::string baseName = state.segmentName;
     if (!state.segmentSuffix.empty()) {

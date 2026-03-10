@@ -156,7 +156,6 @@ private:
     int numOuterWindows_ = 0;
     int minWindowSize_ = 1;
 
-    [[maybe_unused]] int maxDoc_;
     int64_t cost_;
 
     // ==================== Core Algorithm ====================

@@ -450,6 +450,36 @@ DiagonField diagon_create_indexed_double_field(const char* name, double value) {
     }
 }
 
+DiagonField diagon_create_double_point_field(const char* name, double value) {
+    if (!name) {
+        set_error("Invalid field name");
+        return nullptr;
+    }
+
+    try {
+        auto field = std::make_unique<diagon::document::DoublePointField>(name, value);
+        return static_cast<DiagonField>(field.release());
+    } catch (const std::exception& e) {
+        set_error(e);
+        return nullptr;
+    }
+}
+
+DiagonField diagon_create_long_point_field(const char* name, int64_t value) {
+    if (!name) {
+        set_error("Invalid field name");
+        return nullptr;
+    }
+
+    try {
+        auto field = std::make_unique<diagon::document::LongPointField>(name, value);
+        return static_cast<DiagonField>(field.release());
+    } catch (const std::exception& e) {
+        set_error(e);
+        return nullptr;
+    }
+}
+
 void diagon_free_field(DiagonField field) {
     if (field) {
         delete static_cast<diagon::document::IndexableField*>(field);

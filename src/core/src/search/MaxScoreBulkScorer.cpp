@@ -19,9 +19,8 @@ namespace search {
 
 // ==================== Constructor ====================
 
-MaxScoreBulkScorer::MaxScoreBulkScorer(int maxDoc, std::vector<std::unique_ptr<Scorer>> scorers)
-    : maxDoc_(maxDoc)
-    , cost_(0) {
+MaxScoreBulkScorer::MaxScoreBulkScorer(int /*maxDoc*/, std::vector<std::unique_ptr<Scorer>> scorers)
+    : cost_(0) {
     ownedScorers_ = std::move(scorers);
 
     int n = static_cast<int>(ownedScorers_.size());

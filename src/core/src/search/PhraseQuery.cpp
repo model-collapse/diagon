@@ -222,10 +222,9 @@ private:
 
 class PhraseWeight : public Weight {
 public:
-    PhraseWeight(const PhraseQuery& query, IndexSearcher& searcher,
-                 [[maybe_unused]] ScoreMode scoreMode, float boost)
+    PhraseWeight(const PhraseQuery& query, IndexSearcher& searcher, ScoreMode /*scoreMode*/,
+                 float boost)
         : query_(query)
-        , searcher_(searcher)
         , simScorer_(createScorer(query, searcher, boost)) {}
 
     std::unique_ptr<Scorer> scorer(const index::LeafReaderContext& context) const override {
@@ -269,7 +268,6 @@ public:
 
 private:
     const PhraseQuery& query_;
-    [[maybe_unused]] IndexSearcher& searcher_;
     BM25Similarity::SimScorer simScorer_;
 
     static BM25Similarity::SimScorer createScorer(const PhraseQuery& query, IndexSearcher& searcher,

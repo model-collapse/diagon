@@ -167,9 +167,8 @@ void MergeTreeIndexAggregatorBloomFilter::addRow(const std::vector<uint64_t>& ro
 // ==================== CONDITION ====================
 
 MergeTreeIndexConditionBloomFilter::MergeTreeIndexConditionBloomFilter(
-    const std::vector<std::string>& index_columns, size_t hash_functions)
-    : index_columns_(index_columns)
-    , hash_functions_(hash_functions) {}
+    const std::vector<std::string>& index_columns, size_t /*hash_functions*/)
+    : index_columns_(index_columns) {}
 
 bool MergeTreeIndexConditionBloomFilter::mayBeTrueOnGranule(
     MergeTreeIndexGranulePtr granule) const {
@@ -272,7 +271,6 @@ MergeTreeIndexBloomFilter::MergeTreeIndexBloomFilter(const std::string& index_na
     : IMergeTreeIndex(IndexDescription(index_name, IndexType::BLOOM_FILTER, granularity))
     , index_name_(index_name)
     , columns_(columns)
-    , granularity_(granularity)
     , bits_per_row_(bits_per_row)
     , hash_functions_(hash_functions) {
     if (columns.empty()) {

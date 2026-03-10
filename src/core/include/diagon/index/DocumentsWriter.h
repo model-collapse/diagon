@@ -189,9 +189,6 @@ private:
     // Active DWPT (Phase 3: single instance)
     std::unique_ptr<DocumentsWriterPerThread> dwpt_;
 
-    // Directory for writing segment files
-    [[maybe_unused]] store::Directory* directory_{nullptr};
-
     // Flushed segments (SegmentInfo objects)
     std::vector<std::shared_ptr<SegmentInfo>> segments_;
 

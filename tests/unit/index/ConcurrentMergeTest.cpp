@@ -103,6 +103,11 @@ TEST_F(ConcurrentMergeTest, MergedFilesCleanedUp) {
 
     writer.commit();
 
+    // With deferred deletion, background merges that complete after commit()
+    // leave orphaned files until the next commit. Wait + re-commit to flush them.
+    writer.waitForMerges();
+    writer.commit();
+
     // Collect all files referenced by current segments
     std::set<std::string> referencedFiles;
     const auto& segInfos = writer.getSegmentInfos();

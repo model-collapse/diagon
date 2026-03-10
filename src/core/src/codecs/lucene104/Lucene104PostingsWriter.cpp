@@ -31,7 +31,6 @@ Lucene104PostingsWriter::Lucene104PostingsWriter(index::SegmentWriteState& state
     , lastDocID_(0)
     , docCount_(0)
     , totalTermFreq_(0)
-    , directory_(state.directory)
     , segmentName_(state.segmentName)
     , segmentSuffix_(state.segmentSuffix)
     , posStartFP_(-1)

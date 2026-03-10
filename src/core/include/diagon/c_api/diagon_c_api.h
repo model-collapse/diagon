@@ -263,6 +263,26 @@ DiagonField diagon_create_indexed_long_field(const char* name, int64_t value);
 DiagonField diagon_create_indexed_double_field(const char* name, double value);
 
 /**
+ * Create double point field for BKD tree indexing (O(log N) range queries)
+ * This creates a DoublePointField that enables efficient range queries via BKD tree.
+ * Should be added ALONGSIDE diagon_create_indexed_double_field (which provides doc values).
+ * @param name Field name
+ * @param value Double value
+ * @return Field handle
+ */
+DiagonField diagon_create_double_point_field(const char* name, double value);
+
+/**
+ * Create long point field for BKD tree indexing (O(log N) range queries)
+ * This creates a LongPointField that enables efficient range queries via BKD tree.
+ * Should be added ALONGSIDE diagon_create_indexed_long_field (which provides doc values).
+ * @param name Field name
+ * @param value Long value
+ * @return Field handle
+ */
+DiagonField diagon_create_long_point_field(const char* name, int64_t value);
+
+/**
  * Free field
  */
 void diagon_free_field(DiagonField field);

@@ -174,11 +174,10 @@ private:
  */
 class TermWeight : public Weight {
 public:
-    TermWeight(const TermQuery& query, IndexSearcher& searcher, ScoreMode scoreMode, float boost)
+    TermWeight(const TermQuery& query, IndexSearcher& searcher, ScoreMode /*scoreMode*/,
+               float boost)
         : query_(query)
         , searcher_(searcher)
-        , scoreMode_(scoreMode)
-        , boost_(boost)
         , simScorer_(createScorer(query, searcher, boost)) {}
 
 private:
@@ -341,8 +340,6 @@ public:
 private:
     const TermQuery& query_;
     IndexSearcher& searcher_;
-    [[maybe_unused]] ScoreMode scoreMode_;
-    [[maybe_unused]] float boost_;
     BM25Similarity::SimScorer simScorer_;
 };
 

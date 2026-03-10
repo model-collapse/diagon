@@ -17,7 +17,6 @@ Lucene104PostingsEnumBatch::Lucene104PostingsEnumBatch(std::unique_ptr<store::In
                                                        const TermState& termState, bool writeFreqs)
     : docIn_(std::move(docIn))
     , docFreq_(termState.docFreq)
-    , totalTermFreq_(termState.totalTermFreq)
     , writeFreqs_(writeFreqs)
     , currentDoc_(-1)
     , currentFreq_(1)
