@@ -21,17 +21,21 @@
 #include "diagon/search/IndexSearcher.h"
 #include "diagon/search/MatchAllDocsQuery.h"
 #include "diagon/search/NumericRangeQuery.h"
+#include "diagon/search/PointRangeQuery.h"
 #include "diagon/search/TermQuery.h"
 #include "diagon/search/TopDocs.h"
 #include "diagon/store/Directory.h"
 #include "diagon/store/FSDirectory.h"
 #include "diagon/store/MMapDirectory.h"
+#include "diagon/util/NumericUtils.h"
 
 #include <bit>
+#include <cmath>
 #include <cstring>
 #include <exception>
 #include <memory>
 #include <string>
+#include <vector>
 
 // ==================== Error Handling ====================
 
@@ -683,6 +687,24 @@ DiagonQuery diagon_create_double_range_query(const char* field_name, double lowe
     }
 }
 
+DiagonQuery diagon_create_double_point_range_query(const char* field_name, double lower_value,
+                                                    double upper_value) {
+    if (!field_name) {
+        set_error("Field name is required");
+        return nullptr;
+    }
+
+    try {
+        auto query = diagon::search::PointRangeQuery::newDoubleRange(
+            std::string(field_name), lower_value, upper_value);
+
+        return query.release();
+    } catch (const std::exception& e) {
+        set_error(e);
+        return nullptr;
+    }
+}
+
 DiagonQuery diagon_create_bool_query() {
     try {
         // Create boolean query using builder
@@ -1160,6 +1182,108 @@ int diagon_add_documents_from_json(DiagonIndexWriter writer, const char* json_ar
 
         index_writer->addDocuments(doc_ptrs);
         return static_cast<int>(docs.size());
+    } catch (const std::exception& e) {
+        set_error(e);
+        return -1;
+    }
+}
+
+// ==================== BKD-Based Aggregation ====================
+
+int64_t diagon_compute_histogram(DiagonIndexReader reader,
+                                  const char* field_name,
+                                  double min_value,
+                                  double interval,
+                                  int num_buckets,
+                                  int64_t* bucket_counts) {
+    if (!reader || !field_name || !bucket_counts || num_buckets <= 0 || interval <= 0) {
+        set_error("Invalid parameters for histogram computation");
+        return -1;
+    }
+
+    try {
+        auto* reader_ptr =
+            static_cast<std::shared_ptr<diagon::index::DirectoryReader>*>(reader);
+        auto* dir_reader = reader_ptr->get();
+
+        if (!dir_reader) {
+            set_error("DirectoryReader is NULL");
+            return -1;
+        }
+
+        auto leaves = dir_reader->leaves();
+        if (leaves.empty()) {
+            return 0;
+        }
+
+        // Zero the output array
+        std::memset(bucket_counts, 0, num_buckets * sizeof(int64_t));
+
+        int64_t total_counted = 0;
+        std::string field_str(field_name);
+        double max_value = min_value + interval * num_buckets;
+
+        for (const auto& ctx : leaves) {
+            auto* point_values = ctx.reader->getPointValues(field_str);
+            if (!point_values) continue;
+
+            int bytes_per_dim = point_values->getBytesPerDimension();
+            if (bytes_per_dim != 8) continue;  // only doubles (8 bytes)
+
+            // Create a visitor that buckets all points
+            struct HistogramVisitor : diagon::index::PointValues::IntersectVisitor {
+                double min_val;
+                double max_val;
+                double inv_interval;
+                int n_buckets;
+                int64_t* counts;
+                int64_t total;
+
+                HistogramVisitor(double mn, double mx, double interval, int nb, int64_t* c)
+                    : min_val(mn), max_val(mx), inv_interval(1.0 / interval),
+                      n_buckets(nb), counts(c), total(0) {}
+
+                // Called for doc IDs in cells fully inside query range.
+                // We don't have the value here, so we can't bucket.
+                // But since we use CELL_CROSSES_QUERY for everything,
+                // this is only called for full-cell matches from compare().
+                // We need the value, so we always return CELL_CROSSES_QUERY.
+                void visit(int /*docID*/) override {
+                    // This should not be called with our compare() implementation
+                }
+
+                // Called at leaf level with the packed value
+                void visit(int /*docID*/, const uint8_t* packedValue) override {
+                    double val = diagon::util::NumericUtils::bytesToDoubleBE(packedValue);
+                    if (val < min_val || val >= max_val) return;
+                    int bucket = static_cast<int>((val - min_val) * inv_interval);
+                    if (bucket >= 0 && bucket < n_buckets) {
+                        counts[bucket]++;
+                        total++;
+                    }
+                }
+
+                diagon::index::PointValues::Relation compare(
+                        const uint8_t* minPackedValue,
+                        const uint8_t* maxPackedValue) override {
+                    double cellMin = diagon::util::NumericUtils::bytesToDoubleBE(minPackedValue);
+                    double cellMax = diagon::util::NumericUtils::bytesToDoubleBE(maxPackedValue);
+
+                    // Prune cells completely outside our histogram range
+                    if (cellMin >= max_val || cellMax < min_val) {
+                        return diagon::index::PointValues::Relation::CELL_OUTSIDE_QUERY;
+                    }
+
+                    return diagon::index::PointValues::Relation::CELL_CROSSES_QUERY;
+                }
+            };
+
+            HistogramVisitor visitor(min_value, max_value, interval, num_buckets, bucket_counts);
+            point_values->intersect(visitor);
+            total_counted += visitor.total;
+        }
+
+        return total_counted;
     } catch (const std::exception& e) {
         set_error(e);
         return -1;
