@@ -133,10 +133,6 @@ void Lucene104PostingsWriter::startDoc(int docID, int freq, int8_t norm) {
     // Track max frequency and norm for current block (for Block-Max WAND)
     blockMaxFreq_ = std::max(blockMaxFreq_, freq);
     blockMaxNorm_ = std::max(blockMaxNorm_, norm);
-    docsSinceLastSkip_++;
-
-    // Check if we need to create a skip entry
-    maybeFlushSkipEntry();
 
     // Buffer doc delta and frequency for StreamVByte encoding
     int docDelta = docID - lastDocID_;
@@ -206,17 +202,9 @@ TermState Lucene104PostingsWriter::finishTerm() {
         posBufferPos_ = 0;
     }
 
-    // Flush final skip entry if there are remaining docs
-    if (docsSinceLastSkip_ > 0 && !skipEntries_.empty()) {
-        // Only create final skip entry if we have a previous one
-        // (no point in single skip entry for small postings lists)
-        SkipEntry entry;
-        entry.doc = lastDocID_;
-        entry.docFP = docOut_->getFilePointer();
-        entry.maxFreq = blockMaxFreq_;
-        entry.maxNorm = blockMaxNorm_;
-        skipEntries_.push_back(entry);
-    }
+    // Note: No final skip entry for VInt tail. Skip entries only mark
+    // boundaries between PFOR blocks. The VInt tail is reached by scanning
+    // past the last PFOR block.
 
     // Write skip data to .skp file
     writeSkipData();
@@ -263,6 +251,23 @@ void Lucene104PostingsWriter::flushBuffer() {
                 docOut_->writeVInt(static_cast<int32_t>(freqBuffer_[i]));
             }
         }
+    }
+
+    // Create skip entry AFTER writing the block.
+    // entry.doc = lastDocID_ (last doc in this flushed block)
+    // entry.docFP = file pointer AFTER the block = start of next block
+    // This ensures skip entries correctly point to block boundaries.
+    {
+        SkipEntry entry;
+        entry.doc = lastDocID_;
+        entry.docFP = docOut_->getFilePointer();
+        entry.maxFreq = blockMaxFreq_;
+        entry.maxNorm = blockMaxNorm_;
+        skipEntries_.push_back(entry);
+
+        // Reset block-level tracking for next block
+        blockMaxFreq_ = 0;
+        blockMaxNorm_ = 0;
     }
 
     bufferPos_ = 0;  // Reset buffer

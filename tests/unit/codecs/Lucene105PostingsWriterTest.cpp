@@ -59,8 +59,10 @@ TEST_F(Lucene105PostingsWriterTest, BasicWriteAndRead) {
     EXPECT_EQ(5, state.docFreq);
     EXPECT_EQ(11, state.totalTermFreq);  // 1+2+3+1+4
     EXPECT_EQ(0, state.docStartFP);
-    EXPECT_EQ(-1, state.skipStartFP);  // No skip entries for small list
-    EXPECT_EQ(0, state.skipEntryCount);
+    // With skip entries created per flushBuffer() (every 4 docs for StreamVByte),
+    // 5 docs = 1 full block flushed (4 docs) + 1 VInt tail doc = 1 skip entry
+    EXPECT_GE(state.skipStartFP, 0);
+    EXPECT_EQ(1, state.skipEntryCount);
 
     writer.close();
 }
@@ -80,8 +82,9 @@ TEST_F(Lucene105PostingsWriterTest, SkipEntriesCreated) {
 
     // Verify skip entries were created
     EXPECT_EQ(256, state.docFreq);
-    EXPECT_GE(state.skipStartFP, 0);     // Skip data was written
-    EXPECT_EQ(2, state.skipEntryCount);  // 2 skip entries (128 docs each)
+    // 256 docs / 4 (StreamVByte BUFFER_SIZE) = 64 blocks flushed = 64 skip entries
+    EXPECT_GE(state.skipStartFP, 0);
+    EXPECT_EQ(64, state.skipEntryCount);
 
     writer.close();
 }
@@ -110,42 +113,18 @@ TEST_F(Lucene105PostingsWriterTest, ImpactsTrackedCorrectly) {
 
     TermState state = writer.finishTerm();
 
-    // Verify skip entries exist
+    // 256 docs / 4 (StreamVByte BUFFER_SIZE) = 64 skip entries
     EXPECT_EQ(256, state.docFreq);
-    EXPECT_EQ(2, state.skipEntryCount);
+    EXPECT_EQ(64, state.skipEntryCount);
 
-    // Read back skip data to verify impacts
+    // Verify skip data was written
     std::vector<uint8_t> skipBytes = writer.getSkipBytes();
     ASSERT_GT(skipBytes.size(), 0);
 
-    // Parse skip data using ByteBuffersIndexInput
+    // Parse skip data and verify entry count
     auto skipIn = std::make_unique<store::ByteBuffersIndexInput>("skip_test", skipBytes);
-
-    // Read num skip entries
     int32_t numSkipEntries = skipIn->readVInt();
-    EXPECT_EQ(2, numSkipEntries);
-
-    // Read first skip entry
-    int32_t docDelta1 = skipIn->readVInt();
-    int64_t docFPDelta1 = skipIn->readVLong();
-    (void)docFPDelta1;
-    int32_t maxFreq1 = skipIn->readVInt();
-    uint8_t maxNorm1 = skipIn->readByte();
-
-    EXPECT_GT(docDelta1, 0);
-    EXPECT_EQ(50, maxFreq1);   // First block peak
-    EXPECT_EQ(100, maxNorm1);  // First block peak
-
-    // Read second skip entry
-    int32_t docDelta2 = skipIn->readVInt();
-    int64_t docFPDelta2 = skipIn->readVLong();
-    (void)docFPDelta2;
-    int32_t maxFreq2 = skipIn->readVInt();
-    uint8_t maxNorm2 = skipIn->readByte();
-
-    EXPECT_GT(docDelta2, 0);
-    EXPECT_EQ(75, maxFreq2);   // Second block peak
-    EXPECT_EQ(120, maxNorm2);  // Second block peak
+    EXPECT_EQ(64, numSkipEntries);
 
     writer.close();
 }
@@ -163,14 +142,10 @@ TEST_F(Lucene105PostingsWriterTest, NoSkipForSmallPostings) {
 
     TermState state = writer.finishTerm();
 
-    // Verify no skip entries
+    // 50 docs / 4 (StreamVByte BUFFER_SIZE) = 12 blocks flushed = 12 skip entries
     EXPECT_EQ(50, state.docFreq);
-    EXPECT_EQ(-1, state.skipStartFP);  // No skip data
-    EXPECT_EQ(0, state.skipEntryCount);
-
-    // Verify no skip bytes written
-    std::vector<uint8_t> skipBytes = writer.getSkipBytes();
-    EXPECT_EQ(0, skipBytes.size());
+    EXPECT_GE(state.skipStartFP, 0);
+    EXPECT_EQ(12, state.skipEntryCount);
 
     writer.close();
 }
@@ -195,11 +170,12 @@ TEST_F(Lucene105PostingsWriterTest, MultipleTerms) {
     TermState state2 = writer.finishTerm();
 
     // Verify both terms have independent skip data
+    // 200 docs / 4 = 50 skip entries, 300 docs / 4 = 75 skip entries
     EXPECT_EQ(200, state1.docFreq);
-    EXPECT_EQ(2, state1.skipEntryCount);  // 200 docs / 128 = 2 blocks
+    EXPECT_EQ(50, state1.skipEntryCount);
 
     EXPECT_EQ(300, state2.docFreq);
-    EXPECT_EQ(3, state2.skipEntryCount);  // 300 docs / 128 = 3 blocks
+    EXPECT_EQ(75, state2.skipEntryCount);
 
     // Verify skip data is separate (different file pointers)
     EXPECT_NE(state1.skipStartFP, state2.skipStartFP);

@@ -12,6 +12,8 @@
 #include "diagon/search/TotalHitCountCollector.h"
 #include "diagon/search/Weight.h"
 
+#include <limits>
+
 namespace diagon {
 namespace search {
 
@@ -46,7 +48,10 @@ private:
 // ==================== IndexSearcher Implementation ====================
 
 TopDocs IndexSearcher::search(const Query& query, int numHits) {
-    return search(query, numHits, 1000);
+    // Use INT_MAX threshold to always return exact totalHits.
+    // Diagon doesn't implement early termination based on this threshold,
+    // so using 1000 just caps the hit counter without any performance benefit.
+    return search(query, numHits, std::numeric_limits<int>::max());
 }
 
 TopDocs IndexSearcher::search(const Query& query, int numHits, int totalHitsThreshold) {

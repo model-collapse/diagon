@@ -358,7 +358,12 @@ float Lucene104PostingsEnumWithImpacts::getMaxScore(int upTo, float k1, float b,
 }
 
 int64_t Lucene104PostingsEnumWithImpacts::skipToTarget(int target) {
-    // Binary search for skip entry before target
+    // Binary search for skip entry whose doc < target.
+    // Skip entries are created at PFOR block boundaries:
+    //   entry.doc = last docID in that block
+    //   entry.docFP = file position of the NEXT block
+    // So finding entry with doc < target means target is in a block AFTER that entry.
+    // We seek to entry.docFP and set currentDoc_ = entry.doc (delta base for next block).
     int left = 0;
     int right = static_cast<int>(skipEntries_.size()) - 1;
     int bestIdx = -1;
@@ -374,8 +379,8 @@ int64_t Lucene104PostingsEnumWithImpacts::skipToTarget(int target) {
     }
 
     if (bestIdx >= 0) {
-        currentDoc_ = skipEntries_[bestIdx].doc - 1;  // Will advance to this doc
-        docsRead_ = (bestIdx + 1) * 128;              // Approximate docs read
+        currentDoc_ = skipEntries_[bestIdx].doc;  // Delta base: last doc of skipped block
+        docsRead_ = (bestIdx + 1) * 128;          // Blocks 0..bestIdx are skipped
         currentSkipIndex_ = bestIdx;
         return skipEntries_[bestIdx].docFP;
     }
