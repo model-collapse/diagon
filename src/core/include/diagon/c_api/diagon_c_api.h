@@ -746,13 +746,9 @@ void diagon_free_postings_enum(DiagonPostingsEnum postings);
  * @param out_found Output array for found flags (pre-allocated, same size as doc_ids)
  * @return Number of values successfully extracted, or -1 on error
  */
-int diagon_reader_get_numeric_doc_values_bulk(
-    DiagonIndexReader reader,
-    const char* field_name,
-    const int* doc_ids,
-    int num_docs,
-    double* out_values,
-    int* out_found);
+int diagon_reader_get_numeric_doc_values_bulk(DiagonIndexReader reader, const char* field_name,
+                                              const int* doc_ids, int num_docs, double* out_values,
+                                              int* out_found);
 
 /**
  * Scan all documents and extract numeric doc values sequentially.
@@ -765,12 +761,8 @@ int diagon_reader_get_numeric_doc_values_bulk(
  * @param max_docs Maximum docs to scan
  * @return Number of documents scanned, or -1 on error
  */
-int diagon_reader_scan_numeric_doc_values(
-    DiagonIndexReader reader,
-    const char* field_name,
-    double* out_values,
-    int* out_valid,
-    int max_docs);
+int diagon_reader_scan_numeric_doc_values(DiagonIndexReader reader, const char* field_name,
+                                          double* out_values, int* out_valid, int max_docs);
 
 // ==================== Search + Aggregate (Collector Pattern) ====================
 
@@ -792,18 +784,11 @@ int diagon_reader_scan_numeric_doc_values(
  * @param out_total_hits Output: total number of matching documents
  * @return Number of non-empty buckets, or -1 on error
  */
-int diagon_search_with_date_histogram(
-    DiagonIndexSearcher searcher,
-    DiagonQuery query,
-    DiagonIndexReader reader,
-    const char* field_name,
-    double interval_ms,
-    double min_value,
-    double max_value,
-    double* out_bucket_keys,
-    int64_t* out_bucket_counts,
-    int max_buckets,
-    int64_t* out_total_hits);
+int diagon_search_with_date_histogram(DiagonIndexSearcher searcher, DiagonQuery query,
+                                      DiagonIndexReader reader, const char* field_name,
+                                      double interval_ms, double min_value, double max_value,
+                                      double* out_bucket_keys, int64_t* out_bucket_counts,
+                                      int max_buckets, int64_t* out_total_hits);
 
 #ifdef __cplusplus
 }
