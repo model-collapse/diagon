@@ -16,18 +16,26 @@
 #include "diagon/index/DirectoryReader.h"
 #include "diagon/index/IndexWriter.h"
 #include "diagon/search/BooleanClause.h"
+#include "diagon/search/Collector.h"
 #include "diagon/search/BooleanQuery.h"
 #include "diagon/search/DoubleRangeQuery.h"
 #include "diagon/search/IndexSearcher.h"
 #include "diagon/search/MatchAllDocsQuery.h"
 #include "diagon/search/NumericRangeQuery.h"
 #include "diagon/search/PointRangeQuery.h"
+#include "diagon/search/ScoreMode.h"
+#include "diagon/search/Scorer.h"
 #include "diagon/search/TermQuery.h"
 #include "diagon/search/TopDocs.h"
+#include "diagon/search/Weight.h"
 #include "diagon/store/Directory.h"
 #include "diagon/store/FSDirectory.h"
 #include "diagon/store/MMapDirectory.h"
 #include "diagon/util/NumericUtils.h"
+
+// Debug: for conjunction bug investigation
+#include "diagon/codecs/blocktree/BlockTreeTermsReader.h"
+#include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
 
 #include <bit>
 #include <cmath>
@@ -583,6 +591,280 @@ DiagonTopDocs diagon_search(DiagonIndexSearcher searcher, DiagonQuery query, int
     } catch (const std::exception& e) {
         set_error(e);
         return nullptr;
+    }
+}
+
+int diagon_count(DiagonIndexSearcher searcher, DiagonQuery query) {
+    if (!searcher || !query) {
+        set_error("Invalid searcher or query");
+        return -1;
+    }
+
+    try {
+        auto* index_searcher = static_cast<diagon::search::IndexSearcher*>(searcher);
+        auto* search_query = static_cast<diagon::search::Query*>(query);
+
+        return index_searcher->count(*search_query);
+    } catch (const std::exception& e) {
+        set_error(e);
+        return -1;
+    }
+}
+
+// DEBUG: Compare impacts vs optimized PostingsEnum for conjunction bug investigation
+int diagon_debug_compare_postings(DiagonIndexSearcher searcher, const char* field, const char* text) {
+    if (!searcher || !field || !text) {
+        set_error("Invalid args");
+        return -1;
+    }
+    try {
+        using namespace diagon;
+        auto* indexSearcher = static_cast<search::IndexSearcher*>(searcher);
+        auto& reader = indexSearcher->getIndexReader();
+
+        int totalImpacts = 0, totalOptimized = 0;
+        int firstDivergenceSegment = -1;
+        (void)firstDivergenceSegment;
+
+        for (const auto& ctx : reader.leaves()) {
+            auto terms = ctx.reader->terms(field);
+            if (!terms) continue;
+
+            // Create two TermsEnums, seek both to the term
+            auto te1 = terms->iterator();
+            auto te2 = terms->iterator();
+            if (!te1 || !te2) continue;
+            if (!te1->seekExact(util::BytesRef(text))) continue;
+            te2->seekExact(util::BytesRef(text));
+
+            // Get impacts postings (WAND path)
+            auto* ste1 = dynamic_cast<codecs::blocktree::SegmentTermsEnum*>(te1.get());
+            auto impactsEnum = ste1 ? ste1->impactsPostings() : nullptr;
+
+            // Get optimized postings (regular path)
+            auto optimizedEnum = te2->postings(false);
+
+            if (!impactsEnum || !optimizedEnum) continue;
+
+            // Iterate both and compare
+            int segImpacts = 0, segOptimized = 0;
+            int impDoc = impactsEnum->nextDoc();
+            int optDoc = optimizedEnum->nextDoc();
+
+            while (impDoc != index::PostingsEnum::NO_MORE_DOCS ||
+                   optDoc != index::PostingsEnum::NO_MORE_DOCS) {
+                if (impDoc != optDoc && firstDivergenceSegment < 0) {
+                    firstDivergenceSegment = ctx.ord;
+                    fprintf(stderr, "DIVERGE seg=%d docOrd=%d: impacts=%d optimized=%d (impRead=%d optRead=%d)\n",
+                            ctx.ord, segImpacts, impDoc, optDoc, segImpacts, segOptimized);
+                    // Print next 10 docs from each
+                    for (int k = 0; k < 10; k++) {
+                        if (impDoc != index::PostingsEnum::NO_MORE_DOCS) {
+                            impDoc = impactsEnum->nextDoc();
+                            segImpacts++;
+                        }
+                        if (optDoc != index::PostingsEnum::NO_MORE_DOCS) {
+                            optDoc = optimizedEnum->nextDoc();
+                            segOptimized++;
+                        }
+                        fprintf(stderr, "  +%d: impacts=%d optimized=%d\n", k+1, impDoc, optDoc);
+                    }
+                    break;
+                }
+                if (impDoc != index::PostingsEnum::NO_MORE_DOCS) {
+                    impDoc = impactsEnum->nextDoc();
+                    segImpacts++;
+                }
+                if (optDoc != index::PostingsEnum::NO_MORE_DOCS) {
+                    optDoc = optimizedEnum->nextDoc();
+                    segOptimized++;
+                }
+            }
+            totalImpacts += segImpacts;
+            totalOptimized += segOptimized;
+        }
+
+        fprintf(stderr, "TOTAL: impacts=%d optimized=%d %s\n",
+                totalImpacts, totalOptimized,
+                totalImpacts == totalOptimized ? "MATCH" : "MISMATCH");
+        return (totalImpacts == totalOptimized) ? 0 : 1;
+    } catch (const std::exception& e) {
+        set_error(e);
+        return -1;
+    }
+}
+
+// DEBUG: Manual conjunction with two impacts PostingsEnums for the same term
+int diagon_debug_manual_conjunction(DiagonIndexSearcher searcher, const char* field, const char* text) {
+    if (!searcher || !field || !text) {
+        set_error("Invalid args");
+        return -1;
+    }
+    try {
+        using namespace diagon;
+        auto* indexSearcher = static_cast<search::IndexSearcher*>(searcher);
+        auto& reader = indexSearcher->getIndexReader();
+        int total = 0;
+
+        for (const auto& ctx : reader.leaves()) {
+            auto terms = ctx.reader->terms(field);
+            if (!terms) continue;
+
+            // Create two TermsEnums
+            auto te1 = terms->iterator();
+            auto te2 = terms->iterator();
+            if (!te1 || !te2) continue;
+            if (!te1->seekExact(util::BytesRef(text))) continue;
+            te2->seekExact(util::BytesRef(text));
+
+            // Get two impacts PostingsEnums
+            auto* ste1 = dynamic_cast<codecs::blocktree::SegmentTermsEnum*>(te1.get());
+            auto* ste2 = dynamic_cast<codecs::blocktree::SegmentTermsEnum*>(te2.get());
+            auto pe1 = ste1 ? ste1->impactsPostings() : te1->postings(false);
+            auto pe2 = ste2 ? ste2->impactsPostings() : te2->postings(false);
+
+            if (!pe1 || !pe2) continue;
+
+            // Manual conjunction: leapfrog like ConjunctionScorer
+            int segCount = 0;
+            int doc = pe1->nextDoc();
+            while (doc != index::PostingsEnum::NO_MORE_DOCS) {
+                int otherDoc = pe2->docID();
+                if (otherDoc < doc) {
+                    otherDoc = pe2->advance(doc);
+                }
+                if (otherDoc == doc) {
+                    segCount++;
+                    doc = pe1->nextDoc();
+                } else {
+                    doc = pe1->advance(otherDoc);
+                }
+            }
+            total += segCount;
+        }
+
+        fprintf(stderr, "MANUAL CONJUNCTION: total=%d\n", total);
+        return total;
+    } catch (const std::exception& e) {
+        set_error(e);
+        return -1;
+    }
+}
+
+// DEBUG: Manual conjunction with two OPTIMIZED PostingsEnums for same term
+int diagon_debug_manual_conjunction_opt(DiagonIndexSearcher searcher, const char* field, const char* text) {
+    if (!searcher || !field || !text) {
+        set_error("Invalid args");
+        return -1;
+    }
+    try {
+        using namespace diagon;
+        auto* indexSearcher = static_cast<search::IndexSearcher*>(searcher);
+        auto& reader = indexSearcher->getIndexReader();
+        int total = 0;
+
+        for (const auto& ctx : reader.leaves()) {
+            auto terms = ctx.reader->terms(field);
+            if (!terms) continue;
+
+            auto te1 = terms->iterator();
+            auto te2 = terms->iterator();
+            if (!te1 || !te2) continue;
+            if (!te1->seekExact(util::BytesRef(text))) continue;
+            te2->seekExact(util::BytesRef(text));
+
+            // Get two REGULAR (optimized) PostingsEnums
+            auto pe1 = te1->postings(false);
+            auto pe2 = te2->postings(false);
+
+            if (!pe1 || !pe2) continue;
+
+            // Manual conjunction: same leapfrog
+            int segCount = 0;
+            int doc = pe1->nextDoc();
+            while (doc != index::PostingsEnum::NO_MORE_DOCS) {
+                int otherDoc = pe2->docID();
+                if (otherDoc < doc) {
+                    otherDoc = pe2->advance(doc);
+                }
+                if (otherDoc == doc) {
+                    segCount++;
+                    doc = pe1->nextDoc();
+                } else {
+                    doc = pe1->advance(otherDoc);
+                }
+            }
+            total += segCount;
+        }
+
+        fprintf(stderr, "MANUAL CONJUNCTION (OPT): total=%d\n", total);
+        return total;
+    } catch (const std::exception& e) {
+        set_error(e);
+        return -1;
+    }
+}
+
+// DEBUG: Test impacts advance() by advancing to each doc found by optimized nextDoc()
+int diagon_debug_advance_test(DiagonIndexSearcher searcher, const char* field, const char* text) {
+    if (!searcher || !field || !text) return -1;
+    try {
+        using namespace diagon;
+        auto* indexSearcher = static_cast<search::IndexSearcher*>(searcher);
+        auto& reader = indexSearcher->getIndexReader();
+        int totalErrors = 0;
+
+        for (const auto& ctx : reader.leaves()) {
+            auto terms = ctx.reader->terms(field);
+            if (!terms) continue;
+
+            auto te_ref = terms->iterator();
+            auto te_test = terms->iterator();
+            if (!te_ref || !te_test) continue;
+            if (!te_ref->seekExact(util::BytesRef(text))) continue;
+            te_test->seekExact(util::BytesRef(text));
+
+            // Reference: optimized enum iterated with nextDoc()
+            auto refEnum = te_ref->postings(false);
+            // Test: impacts enum, tested with advance()
+            auto* ste_test = dynamic_cast<codecs::blocktree::SegmentTermsEnum*>(te_test.get());
+            auto testEnum = ste_test ? ste_test->impactsPostings() : te_test->postings(false);
+
+            if (!refEnum || !testEnum) continue;
+
+            int segErrors = 0;
+            int docCount = 0;
+            int refDoc = refEnum->nextDoc();
+            int prevRefDoc = -1;
+
+            while (refDoc != index::PostingsEnum::NO_MORE_DOCS) {
+                // advance the impacts enum to refDoc
+                int testDoc = testEnum->advance(refDoc);
+                if (testDoc != refDoc) {
+                    if (segErrors < 20) {
+                        fprintf(stderr, "ADVANCE MISMATCH seg=%d doc#%d: advance(%d) returned %d (prev was %d, gap=%d)\n",
+                                ctx.ord, docCount, refDoc, testDoc, prevRefDoc, refDoc - prevRefDoc);
+                    }
+                    segErrors++;
+                }
+                docCount++;
+                prevRefDoc = refDoc;
+                refDoc = refEnum->nextDoc();
+            }
+
+            if (segErrors > 0) {
+                fprintf(stderr, "SEG %d: %d/%d advance errors\n", ctx.ord, segErrors, docCount);
+            } else {
+                fprintf(stderr, "SEG %d: %d advances OK\n", ctx.ord, docCount);
+            }
+            totalErrors += segErrors;
+        }
+
+        fprintf(stderr, "ADVANCE TEST: %d total errors\n", totalErrors);
+        return totalErrors;
+    } catch (const std::exception& e) {
+        fprintf(stderr, "ADVANCE TEST ERROR: %s\n", e.what());
+        return -1;
     }
 }
 
@@ -1285,6 +1567,254 @@ int64_t diagon_compute_histogram(DiagonIndexReader reader, const char* field_nam
         }
 
         return total_counted;
+    } catch (const std::exception& e) {
+        set_error(e);
+        return -1;
+    }
+}
+
+// ==================== NumericDocValues Access ====================
+
+int diagon_reader_get_numeric_doc_values_bulk(
+    DiagonIndexReader reader,
+    const char* field_name,
+    const int* doc_ids,
+    int num_docs,
+    double* out_values,
+    int* out_found)
+{
+    if (!reader || !field_name || !doc_ids || !out_values || !out_found) return -1;
+    if (num_docs <= 0) return 0;
+
+    try {
+        auto* readerSharedPtr = static_cast<std::shared_ptr<diagon::index::DirectoryReader>*>(reader);
+        auto* indexReader = readerSharedPtr->get();
+        auto leaves = indexReader->leaves();
+        std::string fieldStr(field_name);
+
+        int found_count = 0;
+
+        // For each leaf (segment), get NumericDocValues and extract requested docs
+        for (const auto& leaf : leaves) {
+            auto* leafReader = leaf.reader.get();
+            if (!leafReader) continue;
+
+            int docBase = leaf.docBase;
+            int maxDoc = leafReader->maxDoc();
+
+            auto* ndv = leafReader->getNumericDocValues(fieldStr);
+            if (!ndv) continue;
+
+            for (int i = 0; i < num_docs; i++) {
+                if (out_found[i]) continue;  // already found
+
+                int globalDocId = doc_ids[i];
+                int localDocId = globalDocId - docBase;
+                if (localDocId < 0 || localDocId >= maxDoc) continue;
+
+                if (ndv->advanceExact(localDocId)) {
+                    int64_t longVal = ndv->longValue();
+                    // Convert back to double (stored as doubleToRawLongBits)
+                    double dval;
+                    memcpy(&dval, &longVal, sizeof(double));
+                    out_values[i] = dval;
+                    out_found[i] = 1;
+                    found_count++;
+                }
+            }
+        }
+
+        return found_count;
+    } catch (const std::exception& e) {
+        set_error(e);
+        return -1;
+    }
+}
+
+int diagon_reader_scan_numeric_doc_values(
+    DiagonIndexReader reader,
+    const char* field_name,
+    double* out_values,
+    int* out_valid,
+    int max_docs)
+{
+    if (!reader || !field_name || !out_values || !out_valid) return -1;
+    if (max_docs <= 0) return 0;
+
+    try {
+        auto* readerSharedPtr = static_cast<std::shared_ptr<diagon::index::DirectoryReader>*>(reader);
+        auto* indexReader = readerSharedPtr->get();
+        auto leaves = indexReader->leaves();
+        std::string fieldStr(field_name);
+
+        int total_scanned = 0;
+
+        for (const auto& leaf : leaves) {
+            auto* leafReader = leaf.reader.get();
+            auto* segReader = dynamic_cast<diagon::index::SegmentReader*>(leafReader);
+            if (!segReader) continue;
+
+            int docBase = leaf.docBase;
+            int segMaxDoc = segReader->maxDoc();
+
+            auto* ndv = segReader->getNumericDocValues(fieldStr);
+
+            for (int localDoc = 0; localDoc < segMaxDoc && (docBase + localDoc) < max_docs; localDoc++) {
+                int globalDoc = docBase + localDoc;
+                if (globalDoc >= max_docs) break;
+
+                if (ndv && ndv->advanceExact(localDoc)) {
+                    int64_t longVal = ndv->longValue();
+                    double dval;
+                    memcpy(&dval, &longVal, sizeof(double));
+                    out_values[globalDoc] = dval;
+                    out_valid[globalDoc] = 1;
+                } else {
+                    out_valid[globalDoc] = 0;
+                }
+                total_scanned++;
+            }
+        }
+
+        return total_scanned;
+    } catch (const std::exception& e) {
+        set_error(e);
+        return -1;
+    }
+}
+
+int diagon_search_with_date_histogram(
+    DiagonIndexSearcher searcher,
+    DiagonQuery query,
+    DiagonIndexReader reader,
+    const char* field_name,
+    double interval_ms,
+    double min_value,
+    double max_value,
+    double* out_bucket_keys,
+    int64_t* out_bucket_counts,
+    int max_buckets,
+    int64_t* out_total_hits)
+{
+    if (!searcher || !query || !reader || !field_name ||
+        !out_bucket_keys || !out_bucket_counts || !out_total_hits) return -1;
+    if (max_buckets <= 0 || interval_ms <= 0) return -1;
+
+    try {
+        auto* indexSearcher = static_cast<diagon::search::IndexSearcher*>(searcher);
+        auto* diagonQuery = static_cast<diagon::search::Query*>(query);
+        // reader handle is shared_ptr<DirectoryReader>*, not raw IndexReader*
+        auto* readerSharedPtr = static_cast<std::shared_ptr<diagon::index::DirectoryReader>*>(reader);
+        auto* indexReader = readerSharedPtr->get();
+        std::string fieldStr(field_name);
+
+        // Phase 1: Collect all matching doc IDs using a lightweight collector.
+        // We cannot use search(query, maxDoc) because that allocates a priority queue
+        // of maxDoc entries (115M+), causing OOM/SIGSEGV. Instead, use a custom
+        // collector that just records doc IDs with no scoring overhead.
+
+        // Inline DocIdCollector — stores global doc IDs, no scoring
+        struct DocIdLeafCollector : public diagon::search::LeafCollector {
+            std::vector<int>& docIds;
+            int docBase;
+            DocIdLeafCollector(std::vector<int>& ids, int base) : docIds(ids), docBase(base) {}
+            void setScorer(diagon::search::Scorable* /*s*/) override {}
+            void collect(int doc) override { docIds.push_back(docBase + doc); }
+        };
+
+        struct DocIdCollector : public diagon::search::Collector {
+            std::vector<int> docIds;
+            std::vector<std::unique_ptr<DocIdLeafCollector>> leafCollectors;
+
+            diagon::search::LeafCollector* getLeafCollector(
+                const diagon::index::LeafReaderContext& ctx) override {
+                leafCollectors.push_back(
+                    std::make_unique<DocIdLeafCollector>(docIds, ctx.docBase));
+                return leafCollectors.back().get();
+            }
+            diagon::search::ScoreMode scoreMode() const override {
+                return diagon::search::ScoreMode::COMPLETE_NO_SCORES;
+            }
+        };
+
+        DocIdCollector collector;
+        indexSearcher->search(*diagonQuery, &collector);
+
+        int numResults = (int)collector.docIds.size();
+        *out_total_hits = numResults;
+
+        if (numResults == 0) {
+            return 0;
+        }
+
+        // Phase 2: For each matching doc, read timestamp via NumericDocValues.
+        // NumericDocValues uses column-oriented storage — O(1) per doc vs O(N) stored fields.
+        auto leaves = indexReader->leaves();
+        std::unordered_map<int64_t, int64_t> bucketMap;
+
+        // Build segment index: for each segment, record (docBase, maxDoc, ndv)
+        struct SegInfo {
+            int docBase;
+            int maxDoc;
+            diagon::index::NumericDocValues* ndv;
+        };
+        std::vector<SegInfo> segments;
+        segments.reserve(leaves.size());
+        for (const auto& leaf : leaves) {
+            auto* lr = leaf.reader.get();
+            if (!lr) continue;
+            auto* ndv = lr->getNumericDocValues(fieldStr);
+            segments.push_back({leaf.docBase, lr->maxDoc(), ndv});
+        }
+
+        // Sort matching doc IDs for sequential segment access
+        std::sort(collector.docIds.begin(), collector.docIds.end());
+
+        // Process sorted doc IDs, advancing through segments
+        int segIdx = 0;
+        for (int i = 0; i < numResults; i++) {
+            int docId = collector.docIds[i];
+
+            // Find correct segment (segments sorted by docBase)
+            while (segIdx < (int)segments.size() &&
+                   docId >= segments[segIdx].docBase + segments[segIdx].maxDoc) {
+                segIdx++;
+            }
+            if (segIdx >= (int)segments.size()) break;
+
+            auto& seg = segments[segIdx];
+            if (!seg.ndv) continue;
+
+            int localDoc = docId - seg.docBase;
+            if (localDoc < 0 || localDoc >= seg.maxDoc) continue;
+
+            if (seg.ndv->advanceExact(localDoc)) {
+                int64_t longVal = seg.ndv->longValue();
+                double dval;
+                memcpy(&dval, &longVal, sizeof(double));
+
+                if (dval >= min_value && dval < max_value) {
+                    int64_t bucketKey = (int64_t)(std::floor((dval - min_value) / interval_ms) * interval_ms + min_value);
+                    bucketMap[bucketKey]++;
+                }
+            }
+        }
+
+        // Sort bucket keys and write to output
+        std::vector<int64_t> sortedKeys;
+        sortedKeys.reserve(bucketMap.size());
+        for (const auto& [key, count] : bucketMap) {
+            sortedKeys.push_back(key);
+        }
+        std::sort(sortedKeys.begin(), sortedKeys.end());
+
+        int numBuckets = std::min((int)sortedKeys.size(), max_buckets);
+        for (int i = 0; i < numBuckets; i++) {
+            out_bucket_keys[i] = (double)sortedKeys[i];
+            out_bucket_counts[i] = bucketMap[sortedKeys[i]];
+        }
+
+        return numBuckets;
     } catch (const std::exception& e) {
         set_error(e);
         return -1;

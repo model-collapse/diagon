@@ -162,6 +162,7 @@ add_diagon_test(PointRangeQueryTest unit/search/PointRangeQueryTest.cpp)
 add_diagon_test(BooleanQueryTest unit/search/BooleanQueryTest.cpp)
 add_diagon_test(BM25PerformanceGuard unit/search/BM25PerformanceGuard.cpp)
 add_diagon_test(PhraseQueryTest unit/search/PhraseQueryTest.cpp)
+add_diagon_test(BoolConjunctionBugTest unit/search/BoolConjunctionBugTest.cpp)
 
 # Analysis tests
 add_diagon_test(TokenTest unit/analysis/TokenTest.cpp)
