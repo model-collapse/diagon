@@ -374,8 +374,11 @@ int64_t Lucene104PostingsEnumWithImpacts::skipToTarget(int target) {
     }
 
     if (bestIdx >= 0) {
-        currentDoc_ = skipEntries_[bestIdx].doc - 1;  // Will advance to this doc
-        docsRead_ = (bestIdx + 1) * 128;              // Approximate docs read
+        // Skip entry stores: doc = last docID in skipped block, docFP = start of NEXT block.
+        // After skipping, currentDoc_ must equal entry.doc because the first delta
+        // in the next block is relative to the last doc of the previous (skipped) block.
+        currentDoc_ = skipEntries_[bestIdx].doc;
+        docsRead_ = (bestIdx + 1) * 128;              // Blocks 0..bestIdx are skipped
         currentSkipIndex_ = bestIdx;
         return skipEntries_[bestIdx].docFP;
     }

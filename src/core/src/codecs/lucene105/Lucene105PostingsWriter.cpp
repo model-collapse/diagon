@@ -85,7 +85,6 @@ void Lucene105PostingsWriter::startTerm() {
     // Reset block-level tracking
     blockMaxFreq_ = 0;
     blockMaxNorm_ = 0;
-    docsSinceLastSkip_ = 0;
     lastSkipDocFP_ = docStartFP_;
     lastSkipDoc_ = 0;
 
@@ -110,10 +109,6 @@ void Lucene105PostingsWriter::startDoc(int docID, int freq, int8_t norm) {
     // Track max frequency and norm for current block
     blockMaxFreq_ = std::max(blockMaxFreq_, freq);
     blockMaxNorm_ = std::max(blockMaxNorm_, norm);
-    docsSinceLastSkip_++;
-
-    // Check if we need to create a skip entry
-    maybeFlushSkipEntry();
 
     // Buffer doc delta and frequency for StreamVByte encoding
     int docDelta = docID - lastDocID_;
@@ -169,17 +164,9 @@ TermState Lucene105PostingsWriter::finishTerm() {
         bufferPos_ = 0;
     }
 
-    // Flush final skip entry if there are remaining docs
-    if (docsSinceLastSkip_ > 0 && !skipEntries_.empty()) {
-        // Only create final skip entry if we have a previous one
-        // (no point in single skip entry for small postings lists)
-        SkipEntry entry;
-        entry.doc = lastDocID_;
-        entry.docFP = docOut_->getFilePointer();
-        entry.maxFreq = blockMaxFreq_;
-        entry.maxNorm = blockMaxNorm_;
-        skipEntries_.push_back(entry);
-    }
+    // Note: No final skip entry for VInt tail. Skip entries only mark
+    // boundaries between PFOR/StreamVByte blocks. The VInt tail is reached
+    // by scanning past the last encoded block.
 
     // Write skip data to .skp file
     writeSkipData();
@@ -247,6 +234,22 @@ void Lucene105PostingsWriter::flushBuffer() {
     }
 
     bufferPos_ = 0;  // Reset buffer
+
+    // Create skip entry AFTER writing the StreamVByte block.
+    // entry.doc = last docID in this block (delta base for next block)
+    // entry.docFP = file position AFTER block = start of next block
+    {
+        SkipEntry entry;
+        entry.doc = lastDocID_;
+        entry.docFP = docOut_->getFilePointer();
+        entry.maxFreq = blockMaxFreq_;
+        entry.maxNorm = blockMaxNorm_;
+        skipEntries_.push_back(entry);
+
+        // Reset for next block
+        blockMaxFreq_ = 0;
+        blockMaxNorm_ = 0;
+    }
 }
 
 void Lucene105PostingsWriter::close() {
