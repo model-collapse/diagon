@@ -15,6 +15,7 @@
 #include "diagon/util/NumericUtils.h"
 
 #include <gtest/gtest.h>
+
 #include <filesystem>
 #include <set>
 
@@ -52,7 +53,8 @@ TEST_F(BoolConjunctionBugTest, TermANDPointRange) {
             document::Document doc;
             std::string category = (i % 2 == 0) ? "A" : "B";
             doc.add(std::make_unique<document::StringField>("category", category));
-            doc.add(std::make_unique<document::LongPointField>("price", static_cast<int64_t>(i * 10)));
+            doc.add(
+                std::make_unique<document::LongPointField>("price", static_cast<int64_t>(i * 10)));
             doc.add(std::make_unique<document::TextField>("body", "filler"));
             writer.addDocument(doc);
         }
@@ -84,8 +86,7 @@ TEST_F(BoolConjunctionBugTest, TermANDPointRange) {
         search::BooleanQuery::Builder builder;
         builder.add(std::make_unique<search::TermQuery>(search::Term("category", "A")),
                     search::Occur::MUST);
-        builder.add(search::PointRangeQuery::newLongRange("price", 200, 500),
-                    search::Occur::MUST);
+        builder.add(search::PointRangeQuery::newLongRange("price", 200, 500), search::Occur::MUST);
         auto boolQ = builder.build();
 
         int conjCount = searcher.count(*boolQ);
@@ -147,8 +148,7 @@ TEST_F(BoolConjunctionBugTest, TermANDPointRange_MultiSegment) {
     search::BooleanQuery::Builder builder;
     builder.add(std::make_unique<search::TermQuery>(search::Term("category", "X")),
                 search::Occur::MUST);
-    builder.add(search::PointRangeQuery::newDoubleRange("score", 50.0, 149.0),
-                search::Occur::MUST);
+    builder.add(search::PointRangeQuery::newDoubleRange("score", 50.0, 149.0), search::Occur::MUST);
     auto boolQ = builder.build();
 
     int conjCount = searcher.count(*boolQ);
@@ -166,8 +166,10 @@ TEST_F(BoolConjunctionBugTest, TwoTermQueries_SanityCheck) {
         for (int i = 0; i < 50; i++) {
             document::Document doc;
             std::string content;
-            if (i % 2 == 0) content += "apple ";
-            if (i % 3 == 0) content += "banana ";
+            if (i % 2 == 0)
+                content += "apple ";
+            if (i % 3 == 0)
+                content += "banana ";
             content += "filler";
             doc.add(std::make_unique<document::TextField>("content", content));
             writer.addDocument(doc);

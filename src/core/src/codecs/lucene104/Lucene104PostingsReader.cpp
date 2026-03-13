@@ -379,8 +379,8 @@ int64_t Lucene104PostingsEnumWithImpacts::skipToTarget(int target) {
     }
 
     if (bestIdx >= 0) {
-        currentDoc_ = skipEntries_[bestIdx].doc;   // Delta base: last doc of skipped block
-        docsRead_ = (bestIdx + 1) * 128;           // Blocks 0..bestIdx are skipped
+        currentDoc_ = skipEntries_[bestIdx].doc;  // Delta base: last doc of skipped block
+        docsRead_ = (bestIdx + 1) * 128;          // Blocks 0..bestIdx are skipped
         currentSkipIndex_ = bestIdx;
         return skipEntries_[bestIdx].docFP;
     }

@@ -3,8 +3,6 @@
 
 #include "diagon/search/IndexSearcher.h"
 
-#include <limits>
-
 #include "diagon/index/IndexReader.h"
 #include "diagon/search/BulkScorer.h"
 #include "diagon/search/Collector.h"
@@ -13,6 +11,8 @@
 #include "diagon/search/TopScoreDocCollector.h"
 #include "diagon/search/TotalHitCountCollector.h"
 #include "diagon/search/Weight.h"
+
+#include <limits>
 
 namespace diagon {
 namespace search {
