@@ -231,11 +231,32 @@ public:
     void forceMerge(int maxNumSegments);
 
     /**
-     * Wait for merges to complete
-     *
-     * NOTE: Stub implementation - placeholder for future implementation
+     * Wait for all background merges to complete
      */
     void waitForMerges();
+
+    /**
+     * Trigger merge evaluation (maybeMerge with SEGMENT_FLUSH trigger).
+     * Call after bulk indexing to cascade remaining segments.
+     */
+    void triggerMerge();
+
+    /**
+     * Persist merge results to segments_N without flushing or triggering new merges.
+     *
+     * After waitForMerges() completes, the in-memory segmentInfos_ reflects
+     * the merged state but the on-disk segments_N may be stale. This method
+     * writes a new segments_N, cleans up source segment files, and increments
+     * the generation — without flushing buffered docs or triggering new merges.
+     *
+     * Typical usage:
+     *   writer.commit();              // flush + write segments_N + trigger merges
+     *   writer.waitForMerges();       // wait for background merges
+     *   writer.commitMergeResults();  // persist merge results
+     *
+     * @return sequence number
+     */
+    int64_t commitMergeResults();
 
     // ==================== Configuration ====================
 

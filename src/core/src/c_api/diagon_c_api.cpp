@@ -272,6 +272,51 @@ bool diagon_force_merge(DiagonIndexWriter writer, int max_segments) {
     }
 }
 
+bool diagon_wait_for_merges(DiagonIndexWriter writer) {
+    if (!writer) {
+        set_error("Invalid writer");
+        return false;
+    }
+
+    try {
+        static_cast<diagon::index::IndexWriter*>(writer)->waitForMerges();
+        return true;
+    } catch (const std::exception& e) {
+        set_error(e);
+        return false;
+    }
+}
+
+bool diagon_maybe_merge(DiagonIndexWriter writer) {
+    if (!writer) {
+        set_error("Invalid writer");
+        return false;
+    }
+
+    try {
+        static_cast<diagon::index::IndexWriter*>(writer)->triggerMerge();
+        return true;
+    } catch (const std::exception& e) {
+        set_error(e);
+        return false;
+    }
+}
+
+bool diagon_commit_merge_results(DiagonIndexWriter writer) {
+    if (!writer) {
+        set_error("Invalid writer");
+        return false;
+    }
+
+    try {
+        static_cast<diagon::index::IndexWriter*>(writer)->commitMergeResults();
+        return true;
+    } catch (const std::exception& e) {
+        set_error(e);
+        return false;
+    }
+}
+
 void diagon_close_index_writer(DiagonIndexWriter writer) {
     if (writer) {
         try {

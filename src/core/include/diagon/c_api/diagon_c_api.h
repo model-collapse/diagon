@@ -175,6 +175,30 @@ bool diagon_commit(DiagonIndexWriter writer);
 bool diagon_force_merge(DiagonIndexWriter writer, int max_segments);
 
 /**
+ * Wait for all background merges to complete
+ * @param writer IndexWriter handle
+ * @return true on success, false on error
+ */
+bool diagon_wait_for_merges(DiagonIndexWriter writer);
+
+/**
+ * Trigger merge evaluation (maybeMerge).
+ * Call after bulk indexing to cascade remaining segments.
+ * @param writer IndexWriter handle
+ * @return true on success, false on error
+ */
+bool diagon_maybe_merge(DiagonIndexWriter writer);
+
+/**
+ * Persist merge results to segments_N without flushing or triggering new merges.
+ * Call after diagon_wait_for_merges() to write a new segments_N that reflects
+ * completed background merges (removing source segments, adding merged segments).
+ * @param writer IndexWriter handle
+ * @return true on success, false on error
+ */
+bool diagon_commit_merge_results(DiagonIndexWriter writer);
+
+/**
  * Close IndexWriter (commits if configured)
  * @param writer IndexWriter handle
  */

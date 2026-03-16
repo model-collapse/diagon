@@ -515,6 +515,39 @@ void IndexWriter::waitForMerges() {
     mergeScheduler_.waitForMerges();
 }
 
+void IndexWriter::triggerMerge() {
+    ensureOpen();
+    maybeMerge(MergeTrigger::SEGMENT_FLUSH);
+}
+
+int64_t IndexWriter::commitMergeResults() {
+    ensureOpen();
+    std::lock_guard<std::mutex> lock(commitLock_);
+
+    // Write segments_N reflecting current in-memory state (post-merge)
+    {
+        std::lock_guard<std::mutex> slock(segmentLock_);
+        writeSegmentsFile();
+    }
+    directory_.syncMetaData();
+
+    // Delete files from completed merges
+    {
+        std::vector<std::shared_ptr<SegmentInfo>> toDelete;
+        {
+            std::lock_guard<std::mutex> slock(segmentLock_);
+            toDelete.swap(pendingDeleteSegments_);
+        }
+        for (const auto& seg : toDelete) {
+            deleteSegmentFiles(seg);
+        }
+    }
+
+    deleteOldSegmentsFiles(segmentInfos_.getGeneration());
+    segmentInfos_.incrementGeneration();
+    return nextSequenceNumber();
+}
+
 void IndexWriter::close() {
     std::lock_guard<std::mutex> lock(closeLock_);
 
