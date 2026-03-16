@@ -48,6 +48,8 @@
 #include <filesystem>
 #include <vector>
 
+#include <unistd.h>
+
 using namespace diagon;
 using namespace diagon::document;
 using namespace diagon::store;
@@ -56,8 +58,12 @@ using namespace diagon::store;
 
 namespace {
 
-// Test index path
-constexpr const char* TEST_INDEX_PATH = "/tmp/diagon_bm25_perf_guard_reuters_index";
+// Test index path (unique per process to avoid parallel test collisions)
+static std::string getTestIndexPath() {
+    static std::string path = "/tmp/diagon_bm25_perf_guard_reuters_index_" +
+                              std::to_string(getpid());
+    return path;
+}
 
 // Reuters dataset path
 constexpr const char* REUTERS_DATASET_PATH =
@@ -72,11 +78,11 @@ constexpr int MEASUREMENT_ITERATIONS = 100;
  */
 void createTestIndex() {
     // Clean index directory
-    std::filesystem::remove_all(TEST_INDEX_PATH);
-    std::filesystem::create_directories(TEST_INDEX_PATH);
+    std::filesystem::remove_all(getTestIndexPath());
+    std::filesystem::create_directories(getTestIndexPath());
 
     // Create index with MMapDirectory (FSDirectory is 39-65% slower for random access)
-    auto directory = MMapDirectory::open(TEST_INDEX_PATH);
+    auto directory = MMapDirectory::open(getTestIndexPath());
     index::IndexWriterConfig config;
     config.setOpenMode(index::IndexWriterConfig::OpenMode::CREATE);
 
@@ -170,7 +176,7 @@ protected:
         if (!datasetAvailable_) {
             GTEST_SKIP() << "Reuters dataset not found at: " << REUTERS_DATASET_PATH;
         }
-        directory_ = MMapDirectory::open(TEST_INDEX_PATH);
+        directory_ = MMapDirectory::open(getTestIndexPath());
         reader_ = index::DirectoryReader::open(*directory_);
         searcher_ = std::make_unique<search::IndexSearcher>(*reader_);
     }

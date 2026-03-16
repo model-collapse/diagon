@@ -11,6 +11,8 @@
 #include <filesystem>
 #include <memory>
 
+#include <unistd.h>
+
 using namespace diagon;
 using namespace diagon::index;
 using namespace diagon::document;
@@ -21,8 +23,9 @@ namespace fs = std::filesystem;
 class IndexWriterRollbackTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // Create temporary directory for test index
-        testDir_ = fs::temp_directory_path() / "diagon_rollback_test";
+        static int counter = 0;
+        testDir_ = fs::temp_directory_path() / ("diagon_rollback_test_" + std::to_string(getpid()) +
+                                                "_" + std::to_string(counter++));
         fs::remove_all(testDir_);
         fs::create_directories(testDir_);
     }

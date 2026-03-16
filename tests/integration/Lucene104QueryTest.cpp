@@ -36,6 +36,8 @@
 #include <memory>
 #include <unordered_set>
 
+#include <unistd.h>
+
 using namespace diagon;
 using namespace diagon::index;
 using namespace diagon::search;
@@ -48,8 +50,11 @@ namespace fs = std::filesystem;
 class Lucene104QueryTest : public ::testing::Test {
 protected:
     void SetUp() override {
+        static int counter = 0;
         // Create temp directory for test
-        testDir_ = fs::temp_directory_path() / "diagon_lucene104_query_test";
+        testDir_ = fs::temp_directory_path() /
+                   ("diagon_lucene104_query_test_" + std::to_string(getpid()) + "_" +
+                    std::to_string(counter++));
         fs::create_directories(testDir_);
 
         // Create directory

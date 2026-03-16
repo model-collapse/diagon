@@ -18,6 +18,8 @@
 #include <string>
 #include <vector>
 
+#include <unistd.h>
+
 using namespace diagon;
 using namespace diagon::document;
 using namespace diagon::index;
@@ -41,7 +43,10 @@ namespace {
 class QueryEdgeCasesTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        testDir_ = fs::temp_directory_path() / "diagon_edge_cases_test";
+        static int counter = 0;
+        testDir_ = fs::temp_directory_path() /
+                   ("diagon_edge_cases_test_" + std::to_string(getpid()) + "_" +
+                    std::to_string(counter++));
         fs::create_directories(testDir_);
         dir_ = FSDirectory::open(testDir_.string());
     }

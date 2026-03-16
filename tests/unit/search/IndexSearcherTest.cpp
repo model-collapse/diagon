@@ -15,6 +15,8 @@
 
 #include <filesystem>
 
+#include <unistd.h>
+
 using namespace diagon;
 using namespace diagon::index;
 using namespace diagon::document;
@@ -32,7 +34,8 @@ protected:
         // Create unique directory for each test
         static int testCounter = 0;
         testDir_ = fs::temp_directory_path() /
-                   ("diagon_index_searcher_test_" + std::to_string(testCounter++));
+                   ("diagon_index_searcher_test_" + std::to_string(getpid()) + "_" +
+                    std::to_string(testCounter++));
         fs::create_directories(testDir_);
         dir = FSDirectory::open(testDir_.string());
     }

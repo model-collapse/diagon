@@ -16,6 +16,8 @@
 #include <memory>
 #include <unordered_map>
 
+#include <unistd.h>
+
 using namespace diagon;
 using namespace diagon::index;
 using namespace diagon::store;
@@ -26,10 +28,12 @@ namespace fs = std::filesystem;
 class CacheHelperTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        testDir_ = fs::temp_directory_path() / "diagon_cache_helper_test";
+        static int counter = 0;
+        testDir_ = fs::temp_directory_path() /
+                   ("diagon_cache_helper_test_" + std::to_string(getpid()) + "_" +
+                    std::to_string(counter++));
         fs::remove_all(testDir_);
         fs::create_directories(testDir_);
-
         directory_ = FSDirectory::open(testDir_.string());
     }
 

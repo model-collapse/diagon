@@ -14,6 +14,8 @@
 #include <thread>
 #include <vector>
 
+#include <unistd.h>
+
 using namespace diagon;
 using namespace diagon::index;
 using namespace diagon::store;
@@ -22,7 +24,10 @@ using namespace diagon::document;
 class IndexWriterTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        test_dir = std::filesystem::temp_directory_path() / "diagon_test_writer";
+        static int counter = 0;
+        test_dir = std::filesystem::temp_directory_path() /
+                   ("diagon_test_writer_" + std::to_string(getpid()) + "_" +
+                    std::to_string(counter++));
         std::filesystem::create_directories(test_dir);
         dir = FSDirectory::open(test_dir);
     }

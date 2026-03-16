@@ -20,6 +20,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include <unistd.h>
+
 using namespace diagon;
 using namespace diagon::document;
 using namespace diagon::index;
@@ -35,7 +37,10 @@ class QueryCorrectnessTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // Create temp directory for test
-        testDir_ = fs::temp_directory_path() / "diagon_query_correctness_test";
+        static int counter = 0;
+        testDir_ = fs::temp_directory_path() /
+                   ("diagon_query_correctness_test_" + std::to_string(getpid()) + "_" +
+                    std::to_string(counter++));
         fs::create_directories(testDir_);
         dir_ = FSDirectory::open(testDir_.string());
     }

@@ -20,9 +20,7 @@
 #include <fstream>
 #include <string>
 
-#ifdef __linux__
-#    include <unistd.h>
-#endif
+#include <unistd.h>
 
 // Detect AddressSanitizer (GCC uses __SANITIZE_ADDRESS__, Clang uses __has_feature)
 #if defined(__SANITIZE_ADDRESS__)
@@ -62,7 +60,10 @@ static size_t getCurrentRSSBytes() {
 class MemoryLeakTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        indexDir_ = fs::temp_directory_path() / "diagon_memory_leak_test";
+        static int counter = 0;
+        indexDir_ = fs::temp_directory_path() /
+                    ("diagon_memory_leak_test_" + std::to_string(getpid()) + "_" +
+                     std::to_string(counter++));
         fs::remove_all(indexDir_);
         fs::create_directories(indexDir_);
     }

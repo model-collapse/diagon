@@ -15,14 +15,18 @@
 #include <memory>
 #include <string>
 
+#include <unistd.h>
+
 using namespace diagon::document;
 using namespace diagon::index;
 using namespace diagon::store;
 
 // Helper function to create a temporary directory
 static std::string createTempDir() {
+    static int counter = 0;
     std::filesystem::path tempPath = std::filesystem::temp_directory_path();
-    tempPath /= "diagon_deletion_test_" + std::to_string(std::time(nullptr));
+    tempPath /= "diagon_deletion_test_" + std::to_string(getpid()) + "_" +
+                std::to_string(counter++);
     std::filesystem::create_directories(tempPath);
     return tempPath.string();
 }
