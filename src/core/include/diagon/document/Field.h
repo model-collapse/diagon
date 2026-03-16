@@ -213,5 +213,70 @@ public:
     std::vector<std::string> tokenize() const override { return {}; }
 };
 
+/**
+ * SortedDocValuesField - Single sorted string column value per document
+ *
+ * Based on: org.apache.lucene.document.SortedDocValuesField
+ */
+class SortedDocValuesField : public Field {
+public:
+    static FieldType TYPE;
+
+    SortedDocValuesField(std::string name, std::string value)
+        : Field(std::move(name), std::move(value), TYPE) {}
+
+    std::vector<std::string> tokenize() const override { return {}; }
+};
+
+/**
+ * BinaryDocValuesField - Arbitrary binary column value per document
+ *
+ * Based on: org.apache.lucene.document.BinaryDocValuesField
+ */
+class BinaryDocValuesField : public Field {
+public:
+    static FieldType TYPE;
+
+    BinaryDocValuesField(std::string name, std::string value)
+        : Field(std::move(name), std::move(value), TYPE) {}
+
+    BinaryDocValuesField(std::string name, const uint8_t* bytes, int length)
+        : Field(std::move(name), TYPE) {
+        binaryValue_.assign(bytes, bytes + length);
+    }
+
+    std::vector<std::string> tokenize() const override { return {}; }
+};
+
+/**
+ * SortedNumericDocValuesField - Multi-valued numeric column per document
+ *
+ * Based on: org.apache.lucene.document.SortedNumericDocValuesField
+ */
+class SortedNumericDocValuesField : public Field {
+public:
+    static FieldType TYPE;
+
+    SortedNumericDocValuesField(std::string name, int64_t value)
+        : Field(std::move(name), value, TYPE) {}
+
+    std::vector<std::string> tokenize() const override { return {}; }
+};
+
+/**
+ * SortedSetDocValuesField - Multi-valued sorted string column per document
+ *
+ * Based on: org.apache.lucene.document.SortedSetDocValuesField
+ */
+class SortedSetDocValuesField : public Field {
+public:
+    static FieldType TYPE;
+
+    SortedSetDocValuesField(std::string name, std::string value)
+        : Field(std::move(name), std::move(value), TYPE) {}
+
+    std::vector<std::string> tokenize() const override { return {}; }
+};
+
 }  // namespace document
 }  // namespace diagon

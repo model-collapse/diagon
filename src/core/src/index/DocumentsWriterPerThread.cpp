@@ -234,6 +234,100 @@ bool DocumentsWriterPerThread::addDocument(const document::Document& doc) {
             }
         }
 
+        // Pass 3b: Sorted doc values
+        if (fieldType.docValuesType == DocValuesType::SORTED) {
+            auto stringVal = field->stringValue();
+            if (stringVal) {
+                fieldInfosBuilder_.getOrAdd(field->name());
+                fieldInfosBuilder_.updateDocValuesType(field->name(), DocValuesType::SORTED);
+
+                if (!sortedDocValuesWriter_ && directory_) {
+                    sortedDocValuesWriter_ = std::make_unique<codecs::SortedDocValuesWriter>(
+                        "_temp", config_.maxBufferedDocs);
+                }
+
+                if (sortedDocValuesWriter_) {
+                    FieldInfo* fieldInfo = fieldInfosBuilder_.getFieldInfo(field->name());
+                    if (fieldInfo) {
+                        sortedDocValuesWriter_->addValue(*fieldInfo, nextDocID_, *stringVal);
+                    }
+                }
+            }
+        }
+
+        // Pass 3c: Binary doc values
+        if (fieldType.docValuesType == DocValuesType::BINARY) {
+            auto stringVal = field->stringValue();
+            auto binaryVal = field->binaryValue();
+            if (stringVal || binaryVal) {
+                fieldInfosBuilder_.getOrAdd(field->name());
+                fieldInfosBuilder_.updateDocValuesType(field->name(), DocValuesType::BINARY);
+
+                if (!binaryDocValuesWriter_ && directory_) {
+                    binaryDocValuesWriter_ = std::make_unique<codecs::BinaryDocValuesWriter>(
+                        "_temp", config_.maxBufferedDocs);
+                }
+
+                if (binaryDocValuesWriter_) {
+                    FieldInfo* fieldInfo = fieldInfosBuilder_.getFieldInfo(field->name());
+                    if (fieldInfo) {
+                        if (binaryVal) {
+                            binaryDocValuesWriter_->addValue(*fieldInfo, nextDocID_,
+                                                             binaryVal->data(),
+                                                             static_cast<int>(binaryVal->size()));
+                        } else if (stringVal) {
+                            binaryDocValuesWriter_->addValue(*fieldInfo, nextDocID_, *stringVal);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Pass 3d: Sorted numeric doc values
+        if (fieldType.docValuesType == DocValuesType::SORTED_NUMERIC) {
+            auto numericValue = field->numericValue();
+            if (numericValue) {
+                fieldInfosBuilder_.getOrAdd(field->name());
+                fieldInfosBuilder_.updateDocValuesType(field->name(),
+                                                       DocValuesType::SORTED_NUMERIC);
+
+                if (!sortedNumericDocValuesWriter_ && directory_) {
+                    sortedNumericDocValuesWriter_ =
+                        std::make_unique<codecs::SortedNumericDocValuesWriter>(
+                            "_temp", config_.maxBufferedDocs);
+                }
+
+                if (sortedNumericDocValuesWriter_) {
+                    FieldInfo* fieldInfo = fieldInfosBuilder_.getFieldInfo(field->name());
+                    if (fieldInfo) {
+                        sortedNumericDocValuesWriter_->addValue(*fieldInfo, nextDocID_,
+                                                                *numericValue);
+                    }
+                }
+            }
+        }
+
+        // Pass 3e: Sorted set doc values
+        if (fieldType.docValuesType == DocValuesType::SORTED_SET) {
+            auto stringVal = field->stringValue();
+            if (stringVal) {
+                fieldInfosBuilder_.getOrAdd(field->name());
+                fieldInfosBuilder_.updateDocValuesType(field->name(), DocValuesType::SORTED_SET);
+
+                if (!sortedSetDocValuesWriter_ && directory_) {
+                    sortedSetDocValuesWriter_ = std::make_unique<codecs::SortedSetDocValuesWriter>(
+                        "_temp", config_.maxBufferedDocs);
+                }
+
+                if (sortedSetDocValuesWriter_) {
+                    FieldInfo* fieldInfo = fieldInfosBuilder_.getFieldInfo(field->name());
+                    if (fieldInfo) {
+                        sortedSetDocValuesWriter_->addValue(*fieldInfo, nextDocID_, *stringVal);
+                    }
+                }
+            }
+        }
+
         // Pass 4: Point values (BKD tree)
         if (fieldType.hasPointValues()) {
             auto binaryVal = field->binaryValue();
@@ -277,9 +371,21 @@ int64_t DocumentsWriterPerThread::bytesUsed() const {
     // Get RAM from terms writer
     int64_t bytes = termsWriter_.bytesUsed();
 
-    // Add RAM from doc values writer
+    // Add RAM from doc values writers
     if (docValuesWriter_) {
         bytes += docValuesWriter_->ramBytesUsed();
+    }
+    if (sortedDocValuesWriter_) {
+        bytes += sortedDocValuesWriter_->ramBytesUsed();
+    }
+    if (binaryDocValuesWriter_) {
+        bytes += binaryDocValuesWriter_->ramBytesUsed();
+    }
+    if (sortedNumericDocValuesWriter_) {
+        bytes += sortedNumericDocValuesWriter_->ramBytesUsed();
+    }
+    if (sortedSetDocValuesWriter_) {
+        bytes += sortedSetDocValuesWriter_->ramBytesUsed();
     }
 
     // Add RAM from stored fields writer
@@ -518,6 +624,78 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
             segmentInfo->addFile(segmentName + ".dvm");
         }
 
+        // Write sorted doc values if present
+        if (sortedDocValuesWriter_) {
+            for (const auto& fieldInfo : segmentInfo->fieldInfos()) {
+                if (fieldInfo.docValuesType == DocValuesType::SORTED) {
+                    sortedDocValuesWriter_->finishField(fieldInfo);
+                }
+            }
+            auto dataOut = directory_->createOutput(segmentName + ".sdvd",
+                                                    store::IOContext::DEFAULT);
+            auto metaOut = directory_->createOutput(segmentName + ".sdvm",
+                                                    store::IOContext::DEFAULT);
+            sortedDocValuesWriter_->flush(*dataOut, *metaOut);
+            dataOut->close();
+            metaOut->close();
+            segmentInfo->addFile(segmentName + ".sdvd");
+            segmentInfo->addFile(segmentName + ".sdvm");
+        }
+
+        // Write binary doc values if present
+        if (binaryDocValuesWriter_) {
+            for (const auto& fieldInfo : segmentInfo->fieldInfos()) {
+                if (fieldInfo.docValuesType == DocValuesType::BINARY) {
+                    binaryDocValuesWriter_->finishField(fieldInfo);
+                }
+            }
+            auto dataOut = directory_->createOutput(segmentName + ".bdvd",
+                                                    store::IOContext::DEFAULT);
+            auto metaOut = directory_->createOutput(segmentName + ".bdvm",
+                                                    store::IOContext::DEFAULT);
+            binaryDocValuesWriter_->flush(*dataOut, *metaOut);
+            dataOut->close();
+            metaOut->close();
+            segmentInfo->addFile(segmentName + ".bdvd");
+            segmentInfo->addFile(segmentName + ".bdvm");
+        }
+
+        // Write sorted numeric doc values if present
+        if (sortedNumericDocValuesWriter_) {
+            for (const auto& fieldInfo : segmentInfo->fieldInfos()) {
+                if (fieldInfo.docValuesType == DocValuesType::SORTED_NUMERIC) {
+                    sortedNumericDocValuesWriter_->finishField(fieldInfo);
+                }
+            }
+            auto dataOut = directory_->createOutput(segmentName + ".sndvd",
+                                                    store::IOContext::DEFAULT);
+            auto metaOut = directory_->createOutput(segmentName + ".sndvm",
+                                                    store::IOContext::DEFAULT);
+            sortedNumericDocValuesWriter_->flush(*dataOut, *metaOut);
+            dataOut->close();
+            metaOut->close();
+            segmentInfo->addFile(segmentName + ".sndvd");
+            segmentInfo->addFile(segmentName + ".sndvm");
+        }
+
+        // Write sorted set doc values if present
+        if (sortedSetDocValuesWriter_) {
+            for (const auto& fieldInfo : segmentInfo->fieldInfos()) {
+                if (fieldInfo.docValuesType == DocValuesType::SORTED_SET) {
+                    sortedSetDocValuesWriter_->finishField(fieldInfo);
+                }
+            }
+            auto dataOut = directory_->createOutput(segmentName + ".ssvd",
+                                                    store::IOContext::DEFAULT);
+            auto metaOut = directory_->createOutput(segmentName + ".ssvm",
+                                                    store::IOContext::DEFAULT);
+            sortedSetDocValuesWriter_->flush(*dataOut, *metaOut);
+            dataOut->close();
+            metaOut->close();
+            segmentInfo->addFile(segmentName + ".ssvd");
+            segmentInfo->addFile(segmentName + ".ssvm");
+        }
+
         // Write point values (BKD tree) if present
         if (pointValuesWriter_ && pointValuesWriter_->hasPoints()) {
             auto kdmOut = directory_->createOutput(segmentName + ".kdm", store::IOContext::DEFAULT);
@@ -592,8 +770,12 @@ void DocumentsWriterPerThread::reset() {
     // Clear terms writer
     termsWriter_.reset();
 
-    // Clear doc values writer
+    // Clear doc values writers
     docValuesWriter_.reset();
+    sortedDocValuesWriter_.reset();
+    binaryDocValuesWriter_.reset();
+    sortedNumericDocValuesWriter_.reset();
+    sortedSetDocValuesWriter_.reset();
 
     // Clear stored fields writer
     storedFieldsWriter_.reset();

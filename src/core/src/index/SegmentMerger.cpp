@@ -4,6 +4,7 @@
 #include "diagon/index/SegmentMerger.h"
 
 #include "diagon/codecs/BKDWriter.h"
+#include "diagon/codecs/BinaryDocValuesWriter.h"
 #include "diagon/codecs/Codec.h"
 #include "diagon/codecs/LiveDocsFormat.h"
 #include "diagon/codecs/NormsFormat.h"
@@ -11,6 +12,9 @@
 #include "diagon/codecs/NumericDocValuesWriter.h"
 #include "diagon/codecs/PointValuesWriter.h"
 #include "diagon/codecs/PostingsFormat.h"
+#include "diagon/codecs/SortedDocValuesWriter.h"
+#include "diagon/codecs/SortedNumericDocValuesWriter.h"
+#include "diagon/codecs/SortedSetDocValuesWriter.h"
 #include "diagon/codecs/StoredFieldsReader.h"
 #include "diagon/codecs/StoredFieldsWriter.h"
 #include "diagon/index/Fields.h"
@@ -603,15 +607,32 @@ void SegmentMerger::mergeDocValues(const FieldInfos& mergedFieldInfos) {
         return;
     }
 
-    // Check if any field has numeric doc values
-    bool hasNumericDV = false;
+    // Check which doc value types are present
+    bool hasNumericDV = false, hasSortedDV = false, hasBinaryDV = false;
+    bool hasSortedNumericDV = false, hasSortedSetDV = false;
     for (const auto& fi : mergedFieldInfos) {
-        if (fi.docValuesType == DocValuesType::NUMERIC) {
-            hasNumericDV = true;
-            break;
+        switch (fi.docValuesType) {
+            case DocValuesType::NUMERIC:
+                hasNumericDV = true;
+                break;
+            case DocValuesType::SORTED:
+                hasSortedDV = true;
+                break;
+            case DocValuesType::BINARY:
+                hasBinaryDV = true;
+                break;
+            case DocValuesType::SORTED_NUMERIC:
+                hasSortedNumericDV = true;
+                break;
+            case DocValuesType::SORTED_SET:
+                hasSortedSetDV = true;
+                break;
+            default:
+                break;
         }
     }
-    if (!hasNumericDV) {
+
+    if (!hasNumericDV && !hasSortedDV && !hasBinaryDV && !hasSortedNumericDV && !hasSortedSetDV) {
         return;
     }
 
@@ -622,42 +643,163 @@ void SegmentMerger::mergeDocValues(const FieldInfos& mergedFieldInfos) {
         readers.push_back(SegmentReader::open(directory_, segInfo));
     }
 
-    // Create writer for the merged segment
-    codecs::NumericDocValuesWriter dvWriter(segmentName_, docMapping_.newMaxDoc);
-
-    // For each field with numeric doc values
-    for (const auto& fi : mergedFieldInfos) {
-        if (fi.docValuesType != DocValuesType::NUMERIC) {
-            continue;
-        }
-
-        int newDocID = 0;
-        for (size_t segIdx = 0; segIdx < readers.size(); segIdx++) {
-            auto* ndv = readers[segIdx]->getNumericDocValues(fi.name);
-            const util::Bits* liveDocs = readers[segIdx]->getLiveDocs();
-            int maxDoc = sourceSegments_[segIdx]->maxDoc();
-
-            for (int doc = 0; doc < maxDoc; doc++) {
-                if (liveDocs != nullptr && !liveDocs->get(doc)) {
-                    continue;
+    // Merge numeric doc values
+    if (hasNumericDV) {
+        codecs::NumericDocValuesWriter dvWriter(segmentName_, docMapping_.newMaxDoc);
+        for (const auto& fi : mergedFieldInfos) {
+            if (fi.docValuesType != DocValuesType::NUMERIC)
+                continue;
+            int newDocID = 0;
+            for (size_t segIdx = 0; segIdx < readers.size(); segIdx++) {
+                auto* ndv = readers[segIdx]->getNumericDocValues(fi.name);
+                const util::Bits* liveDocs = readers[segIdx]->getLiveDocs();
+                int maxDoc = sourceSegments_[segIdx]->maxDoc();
+                for (int doc = 0; doc < maxDoc; doc++) {
+                    if (liveDocs != nullptr && !liveDocs->get(doc))
+                        continue;
+                    if (ndv && ndv->advanceExact(doc)) {
+                        dvWriter.addValue(fi, newDocID, ndv->longValue());
+                    }
+                    newDocID++;
                 }
-
-                if (ndv && ndv->advanceExact(doc)) {
-                    dvWriter.addValue(fi, newDocID, ndv->longValue());
-                }
-                newDocID++;
             }
+            dvWriter.finishField(fi);
         }
-
-        dvWriter.finishField(fi);
+        auto dataOut = directory_.createOutput(segmentName_ + ".dvd", store::IOContext::DEFAULT);
+        auto metaOut = directory_.createOutput(segmentName_ + ".dvm", store::IOContext::DEFAULT);
+        dvWriter.flush(*dataOut, *metaOut);
+        dataOut->close();
+        metaOut->close();
     }
 
-    // Flush to output files
-    auto dataOut = directory_.createOutput(segmentName_ + ".dvd", store::IOContext::DEFAULT);
-    auto metaOut = directory_.createOutput(segmentName_ + ".dvm", store::IOContext::DEFAULT);
-    dvWriter.flush(*dataOut, *metaOut);
-    dataOut->close();
-    metaOut->close();
+    // Merge sorted doc values
+    if (hasSortedDV) {
+        codecs::SortedDocValuesWriter dvWriter(segmentName_, docMapping_.newMaxDoc);
+        for (const auto& fi : mergedFieldInfos) {
+            if (fi.docValuesType != DocValuesType::SORTED)
+                continue;
+            int newDocID = 0;
+            for (size_t segIdx = 0; segIdx < readers.size(); segIdx++) {
+                auto* sdv = readers[segIdx]->getSortedDocValues(fi.name);
+                const util::Bits* liveDocs = readers[segIdx]->getLiveDocs();
+                int maxDoc = sourceSegments_[segIdx]->maxDoc();
+                for (int doc = 0; doc < maxDoc; doc++) {
+                    if (liveDocs != nullptr && !liveDocs->get(doc))
+                        continue;
+                    if (sdv && sdv->advanceExact(doc)) {
+                        auto val = sdv->lookupOrd(sdv->ordValue());
+                        dvWriter.addValue(fi, newDocID,
+                                          reinterpret_cast<const uint8_t*>(val.data()),
+                                          static_cast<int>(val.size()));
+                    }
+                    newDocID++;
+                }
+            }
+            dvWriter.finishField(fi);
+        }
+        auto dataOut = directory_.createOutput(segmentName_ + ".sdvd", store::IOContext::DEFAULT);
+        auto metaOut = directory_.createOutput(segmentName_ + ".sdvm", store::IOContext::DEFAULT);
+        dvWriter.flush(*dataOut, *metaOut);
+        dataOut->close();
+        metaOut->close();
+    }
+
+    // Merge binary doc values
+    if (hasBinaryDV) {
+        codecs::BinaryDocValuesWriter dvWriter(segmentName_, docMapping_.newMaxDoc);
+        for (const auto& fi : mergedFieldInfos) {
+            if (fi.docValuesType != DocValuesType::BINARY)
+                continue;
+            int newDocID = 0;
+            for (size_t segIdx = 0; segIdx < readers.size(); segIdx++) {
+                auto* bdv = readers[segIdx]->getBinaryDocValues(fi.name);
+                const util::Bits* liveDocs = readers[segIdx]->getLiveDocs();
+                int maxDoc = sourceSegments_[segIdx]->maxDoc();
+                for (int doc = 0; doc < maxDoc; doc++) {
+                    if (liveDocs != nullptr && !liveDocs->get(doc))
+                        continue;
+                    if (bdv && bdv->advanceExact(doc)) {
+                        auto val = bdv->binaryValue();
+                        dvWriter.addValue(fi, newDocID, val.data(), static_cast<int>(val.size()));
+                    }
+                    newDocID++;
+                }
+            }
+            dvWriter.finishField(fi);
+        }
+        auto dataOut = directory_.createOutput(segmentName_ + ".bdvd", store::IOContext::DEFAULT);
+        auto metaOut = directory_.createOutput(segmentName_ + ".bdvm", store::IOContext::DEFAULT);
+        dvWriter.flush(*dataOut, *metaOut);
+        dataOut->close();
+        metaOut->close();
+    }
+
+    // Merge sorted numeric doc values
+    if (hasSortedNumericDV) {
+        codecs::SortedNumericDocValuesWriter dvWriter(segmentName_, docMapping_.newMaxDoc);
+        for (const auto& fi : mergedFieldInfos) {
+            if (fi.docValuesType != DocValuesType::SORTED_NUMERIC)
+                continue;
+            int newDocID = 0;
+            for (size_t segIdx = 0; segIdx < readers.size(); segIdx++) {
+                auto* sndv = readers[segIdx]->getSortedNumericDocValues(fi.name);
+                const util::Bits* liveDocs = readers[segIdx]->getLiveDocs();
+                int maxDoc = sourceSegments_[segIdx]->maxDoc();
+                for (int doc = 0; doc < maxDoc; doc++) {
+                    if (liveDocs != nullptr && !liveDocs->get(doc))
+                        continue;
+                    if (sndv && sndv->advanceExact(doc)) {
+                        int count = sndv->docValueCount();
+                        for (int v = 0; v < count; v++) {
+                            dvWriter.addValue(fi, newDocID, sndv->nextValue());
+                        }
+                    }
+                    newDocID++;
+                }
+            }
+            dvWriter.finishField(fi);
+        }
+        auto dataOut = directory_.createOutput(segmentName_ + ".sndvd", store::IOContext::DEFAULT);
+        auto metaOut = directory_.createOutput(segmentName_ + ".sndvm", store::IOContext::DEFAULT);
+        dvWriter.flush(*dataOut, *metaOut);
+        dataOut->close();
+        metaOut->close();
+    }
+
+    // Merge sorted set doc values
+    if (hasSortedSetDV) {
+        codecs::SortedSetDocValuesWriter dvWriter(segmentName_, docMapping_.newMaxDoc);
+        for (const auto& fi : mergedFieldInfos) {
+            if (fi.docValuesType != DocValuesType::SORTED_SET)
+                continue;
+            int newDocID = 0;
+            for (size_t segIdx = 0; segIdx < readers.size(); segIdx++) {
+                auto* ssdv = readers[segIdx]->getSortedSetDocValues(fi.name);
+                const util::Bits* liveDocs = readers[segIdx]->getLiveDocs();
+                int maxDoc = sourceSegments_[segIdx]->maxDoc();
+                for (int doc = 0; doc < maxDoc; doc++) {
+                    if (liveDocs != nullptr && !liveDocs->get(doc))
+                        continue;
+                    if (ssdv && ssdv->advanceExact(doc)) {
+                        int64_t ord;
+                        while ((ord = ssdv->nextOrd()) != index::SortedSetDocValues::NO_MORE_ORDS) {
+                            auto val = ssdv->lookupOrd(ord);
+                            dvWriter.addValue(
+                                fi, newDocID,
+                                std::string(reinterpret_cast<const char*>(val.data()), val.size()));
+                        }
+                    }
+                    newDocID++;
+                }
+            }
+            dvWriter.finishField(fi);
+        }
+        auto dataOut = directory_.createOutput(segmentName_ + ".ssvd", store::IOContext::DEFAULT);
+        auto metaOut = directory_.createOutput(segmentName_ + ".ssvm", store::IOContext::DEFAULT);
+        dvWriter.flush(*dataOut, *metaOut);
+        dataOut->close();
+        metaOut->close();
+    }
 }
 
 void SegmentMerger::mergeStoredFields(const FieldInfos& mergedFieldInfos) {

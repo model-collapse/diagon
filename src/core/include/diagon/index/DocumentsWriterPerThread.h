@@ -3,8 +3,12 @@
 
 #pragma once
 
+#include "diagon/codecs/BinaryDocValuesWriter.h"
 #include "diagon/codecs/NumericDocValuesWriter.h"
 #include "diagon/codecs/PointValuesWriter.h"
+#include "diagon/codecs/SortedDocValuesWriter.h"
+#include "diagon/codecs/SortedNumericDocValuesWriter.h"
+#include "diagon/codecs/SortedSetDocValuesWriter.h"
 #include "diagon/codecs/StoredFieldsWriter.h"
 #include "diagon/document/Document.h"
 #include "diagon/index/FieldInfo.h"
@@ -150,6 +154,18 @@ private:
 
     // Numeric doc values writer (lazy initialized)
     std::unique_ptr<codecs::NumericDocValuesWriter> docValuesWriter_;
+
+    // Sorted doc values writer (lazy initialized)
+    std::unique_ptr<codecs::SortedDocValuesWriter> sortedDocValuesWriter_;
+
+    // Binary doc values writer (lazy initialized)
+    std::unique_ptr<codecs::BinaryDocValuesWriter> binaryDocValuesWriter_;
+
+    // Sorted numeric doc values writer (lazy initialized)
+    std::unique_ptr<codecs::SortedNumericDocValuesWriter> sortedNumericDocValuesWriter_;
+
+    // Sorted set doc values writer (lazy initialized)
+    std::unique_ptr<codecs::SortedSetDocValuesWriter> sortedSetDocValuesWriter_;
 
     // Stored fields writer (lazy initialized)
     std::unique_ptr<codecs::StoredFieldsWriter> storedFieldsWriter_;

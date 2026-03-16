@@ -4,10 +4,14 @@
 #pragma once
 
 #include "diagon/codecs/BKDReader.h"
+#include "diagon/codecs/BinaryDocValuesReader.h"
 #include "diagon/codecs/LiveDocsFormat.h"
 #include "diagon/codecs/NormsFormat.h"
 #include "diagon/codecs/NumericDocValuesReader.h"
 #include "diagon/codecs/PostingsFormat.h"
+#include "diagon/codecs/SortedDocValuesReader.h"
+#include "diagon/codecs/SortedNumericDocValuesReader.h"
+#include "diagon/codecs/SortedSetDocValuesReader.h"
 #include "diagon/codecs/StoredFieldsReader.h"
 #include "diagon/index/FieldInfo.h"
 #include "diagon/index/IndexReader.h"
@@ -66,27 +70,12 @@ public:
 
     [[nodiscard]] NumericDocValues* getNumericDocValues(const std::string& field) const override;
 
-    [[nodiscard]] BinaryDocValues* getBinaryDocValues(const std::string& field) const override {
-        ensureOpen();
-        return nullptr;
-    }
-
-    [[nodiscard]] SortedDocValues* getSortedDocValues(const std::string& field) const override {
-        ensureOpen();
-        return nullptr;
-    }
-
+    [[nodiscard]] BinaryDocValues* getBinaryDocValues(const std::string& field) const override;
+    [[nodiscard]] SortedDocValues* getSortedDocValues(const std::string& field) const override;
     [[nodiscard]] SortedSetDocValues*
-    getSortedSetDocValues(const std::string& field) const override {
-        ensureOpen();
-        return nullptr;
-    }
-
+    getSortedSetDocValues(const std::string& field) const override;
     [[nodiscard]] SortedNumericDocValues*
-    getSortedNumericDocValues(const std::string& field) const override {
-        ensureOpen();
-        return nullptr;
-    }
+    getSortedNumericDocValues(const std::string& field) const override;
 
     // ==================== Stored Fields ====================
 
@@ -225,6 +214,10 @@ private:
      * Load doc values reader (lazy initialization)
      */
     void loadDocValuesReader() const;
+    void loadSortedDocValuesReader() const;
+    void loadBinaryDocValuesReader() const;
+    void loadSortedNumericDocValuesReader() const;
+    void loadSortedSetDocValuesReader() const;
 
     /**
      * Load stored fields reader (lazy initialization)
@@ -270,12 +263,22 @@ private:
     // Cached Terms objects
     mutable std::unordered_map<std::string, std::unique_ptr<Terms>> termsCache_;
 
-    // Doc values reader (lazy loaded)
+    // Doc values readers (lazy loaded)
     mutable std::unique_ptr<codecs::NumericDocValuesReader> docValuesReader_;
+    mutable std::unique_ptr<codecs::SortedDocValuesReader> sortedDocValuesReader_;
+    mutable std::unique_ptr<codecs::BinaryDocValuesReader> binaryDocValuesReader_;
+    mutable std::unique_ptr<codecs::SortedNumericDocValuesReader> sortedNumericDocValuesReader_;
+    mutable std::unique_ptr<codecs::SortedSetDocValuesReader> sortedSetDocValuesReader_;
 
-    // Cached NumericDocValues objects
+    // Cached doc values objects
     mutable std::unordered_map<std::string, std::unique_ptr<NumericDocValues>>
         numericDocValuesCache_;
+    mutable std::unordered_map<std::string, std::unique_ptr<SortedDocValues>> sortedDocValuesCache_;
+    mutable std::unordered_map<std::string, std::unique_ptr<BinaryDocValues>> binaryDocValuesCache_;
+    mutable std::unordered_map<std::string, std::unique_ptr<SortedNumericDocValues>>
+        sortedNumericDocValuesCache_;
+    mutable std::unordered_map<std::string, std::unique_ptr<SortedSetDocValues>>
+        sortedSetDocValuesCache_;
 
     // Stored fields reader (lazy loaded)
     mutable std::unique_ptr<codecs::StoredFieldsReader> storedFieldsReader_;

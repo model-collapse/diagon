@@ -63,6 +63,14 @@ set(DIAGON_CORE_SOURCES
     src/codecs/ColumnFormat.cpp
     src/codecs/NumericDocValuesWriter.cpp
     src/codecs/NumericDocValuesReader.cpp
+    src/codecs/SortedDocValuesWriter.cpp
+    src/codecs/SortedDocValuesReader.cpp
+    src/codecs/BinaryDocValuesWriter.cpp
+    src/codecs/BinaryDocValuesReader.cpp
+    src/codecs/SortedNumericDocValuesWriter.cpp
+    src/codecs/SortedNumericDocValuesReader.cpp
+    src/codecs/SortedSetDocValuesWriter.cpp
+    src/codecs/SortedSetDocValuesReader.cpp
     src/codecs/StoredFieldsWriter.cpp
     src/codecs/StoredFieldsReader.cpp
     src/codecs/PointValuesWriter.cpp
@@ -225,6 +233,14 @@ set(DIAGON_CORE_HEADERS
     include/diagon/codecs/ColumnFormat.h
     include/diagon/codecs/NumericDocValuesWriter.h
     include/diagon/codecs/NumericDocValuesReader.h
+    include/diagon/codecs/SortedDocValuesWriter.h
+    include/diagon/codecs/SortedDocValuesReader.h
+    include/diagon/codecs/BinaryDocValuesWriter.h
+    include/diagon/codecs/BinaryDocValuesReader.h
+    include/diagon/codecs/SortedNumericDocValuesWriter.h
+    include/diagon/codecs/SortedNumericDocValuesReader.h
+    include/diagon/codecs/SortedSetDocValuesWriter.h
+    include/diagon/codecs/SortedSetDocValuesReader.h
     include/diagon/codecs/StoredFieldsWriter.h
     include/diagon/codecs/StoredFieldsReader.h
     include/diagon/codecs/PointValuesWriter.h

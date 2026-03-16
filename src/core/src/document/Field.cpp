@@ -74,5 +74,45 @@ FieldType DoublePointField::TYPE = []() {
     return ft;
 }();
 
+// SortedDocValuesField field type
+FieldType SortedDocValuesField::TYPE = []() {
+    FieldType ft;
+    ft.indexOptions = index::IndexOptions::NONE;
+    ft.docValuesType = index::DocValuesType::SORTED;
+    ft.stored = false;
+    ft.tokenized = false;
+    return ft;
+}();
+
+// BinaryDocValuesField field type
+FieldType BinaryDocValuesField::TYPE = []() {
+    FieldType ft;
+    ft.indexOptions = index::IndexOptions::NONE;
+    ft.docValuesType = index::DocValuesType::BINARY;
+    ft.stored = false;
+    ft.tokenized = false;
+    return ft;
+}();
+
+// SortedNumericDocValuesField field type
+FieldType SortedNumericDocValuesField::TYPE = []() {
+    FieldType ft;
+    ft.indexOptions = index::IndexOptions::NONE;
+    ft.docValuesType = index::DocValuesType::SORTED_NUMERIC;
+    ft.stored = false;
+    ft.tokenized = false;
+    return ft;
+}();
+
+// SortedSetDocValuesField field type
+FieldType SortedSetDocValuesField::TYPE = []() {
+    FieldType ft;
+    ft.indexOptions = index::IndexOptions::NONE;
+    ft.docValuesType = index::DocValuesType::SORTED_SET;
+    ft.stored = false;
+    ft.tokenized = false;
+    return ft;
+}();
+
 }  // namespace document
 }  // namespace diagon

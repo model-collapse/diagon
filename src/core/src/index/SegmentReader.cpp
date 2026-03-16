@@ -137,6 +137,78 @@ NumericDocValues* SegmentReader::getNumericDocValues(const std::string& field) c
     return nullptr;
 }
 
+BinaryDocValues* SegmentReader::getBinaryDocValues(const std::string& field) const {
+    ensureOpen();
+    const FieldInfo* fieldInfo = segmentInfo_->fieldInfos().fieldInfo(field);
+    if (!fieldInfo || fieldInfo->docValuesType != DocValuesType::BINARY) {
+        return nullptr;
+    }
+    loadBinaryDocValuesReader();
+    if (binaryDocValuesReader_) {
+        auto dv = binaryDocValuesReader_->getBinary(field);
+        if (dv) {
+            BinaryDocValues* dvPtr = dv.get();
+            binaryDocValuesCache_[field] = std::move(dv);
+            return dvPtr;
+        }
+    }
+    return nullptr;
+}
+
+SortedDocValues* SegmentReader::getSortedDocValues(const std::string& field) const {
+    ensureOpen();
+    const FieldInfo* fieldInfo = segmentInfo_->fieldInfos().fieldInfo(field);
+    if (!fieldInfo || fieldInfo->docValuesType != DocValuesType::SORTED) {
+        return nullptr;
+    }
+    loadSortedDocValuesReader();
+    if (sortedDocValuesReader_) {
+        auto dv = sortedDocValuesReader_->getSorted(field);
+        if (dv) {
+            SortedDocValues* dvPtr = dv.get();
+            sortedDocValuesCache_[field] = std::move(dv);
+            return dvPtr;
+        }
+    }
+    return nullptr;
+}
+
+SortedSetDocValues* SegmentReader::getSortedSetDocValues(const std::string& field) const {
+    ensureOpen();
+    const FieldInfo* fieldInfo = segmentInfo_->fieldInfos().fieldInfo(field);
+    if (!fieldInfo || fieldInfo->docValuesType != DocValuesType::SORTED_SET) {
+        return nullptr;
+    }
+    loadSortedSetDocValuesReader();
+    if (sortedSetDocValuesReader_) {
+        auto dv = sortedSetDocValuesReader_->getSortedSet(field);
+        if (dv) {
+            SortedSetDocValues* dvPtr = dv.get();
+            sortedSetDocValuesCache_[field] = std::move(dv);
+            return dvPtr;
+        }
+    }
+    return nullptr;
+}
+
+SortedNumericDocValues* SegmentReader::getSortedNumericDocValues(const std::string& field) const {
+    ensureOpen();
+    const FieldInfo* fieldInfo = segmentInfo_->fieldInfos().fieldInfo(field);
+    if (!fieldInfo || fieldInfo->docValuesType != DocValuesType::SORTED_NUMERIC) {
+        return nullptr;
+    }
+    loadSortedNumericDocValuesReader();
+    if (sortedNumericDocValuesReader_) {
+        auto dv = sortedNumericDocValuesReader_->getSortedNumeric(field);
+        if (dv) {
+            SortedNumericDocValues* dvPtr = dv.get();
+            sortedNumericDocValuesCache_[field] = std::move(dv);
+            return dvPtr;
+        }
+    }
+    return nullptr;
+}
+
 // ==================== Norms Access ====================
 
 NumericDocValues* SegmentReader::getNormValues(const std::string& field) const {
@@ -278,6 +350,58 @@ void SegmentReader::loadDocValuesReader() const {
         // Doc values files don't exist - that's OK
         // Leave docValuesReader_ as nullptr
     }
+}
+
+void SegmentReader::loadSortedDocValuesReader() const {
+    if (sortedDocValuesReader_)
+        return;
+    try {
+        auto& dir = getDirectory();
+        std::string segmentName = segmentInfo_->name();
+        auto dataInput = dir.openInput(segmentName + ".sdvd", IOContext::READ);
+        auto metaInput = dir.openInput(segmentName + ".sdvm", IOContext::READ);
+        sortedDocValuesReader_ = std::make_unique<codecs::SortedDocValuesReader>(
+            std::move(dataInput), std::move(metaInput));
+    } catch (const std::exception&) {}
+}
+
+void SegmentReader::loadBinaryDocValuesReader() const {
+    if (binaryDocValuesReader_)
+        return;
+    try {
+        auto& dir = getDirectory();
+        std::string segmentName = segmentInfo_->name();
+        auto dataInput = dir.openInput(segmentName + ".bdvd", IOContext::READ);
+        auto metaInput = dir.openInput(segmentName + ".bdvm", IOContext::READ);
+        binaryDocValuesReader_ = std::make_unique<codecs::BinaryDocValuesReader>(
+            std::move(dataInput), std::move(metaInput));
+    } catch (const std::exception&) {}
+}
+
+void SegmentReader::loadSortedNumericDocValuesReader() const {
+    if (sortedNumericDocValuesReader_)
+        return;
+    try {
+        auto& dir = getDirectory();
+        std::string segmentName = segmentInfo_->name();
+        auto dataInput = dir.openInput(segmentName + ".sndvd", IOContext::READ);
+        auto metaInput = dir.openInput(segmentName + ".sndvm", IOContext::READ);
+        sortedNumericDocValuesReader_ = std::make_unique<codecs::SortedNumericDocValuesReader>(
+            std::move(dataInput), std::move(metaInput));
+    } catch (const std::exception&) {}
+}
+
+void SegmentReader::loadSortedSetDocValuesReader() const {
+    if (sortedSetDocValuesReader_)
+        return;
+    try {
+        auto& dir = getDirectory();
+        std::string segmentName = segmentInfo_->name();
+        auto dataInput = dir.openInput(segmentName + ".ssvd", IOContext::READ);
+        auto metaInput = dir.openInput(segmentName + ".ssvm", IOContext::READ);
+        sortedSetDocValuesReader_ = std::make_unique<codecs::SortedSetDocValuesReader>(
+            std::move(dataInput), std::move(metaInput));
+    } catch (const std::exception&) {}
 }
 
 void SegmentReader::loadStoredFieldsReader() const {
