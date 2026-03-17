@@ -18,6 +18,57 @@ namespace diagon {
 namespace codecs {
 namespace blocktree {
 
+namespace {
+
+// Read a VInt from an IndexInput (mirrors bufEncodeVInt in writer).
+int32_t readVIntFromInput(store::IndexInput* in) {
+    return in->readVInt();
+}
+
+// Read a VLong from an IndexInput (mirrors bufEncodeVLong in writer).
+int64_t readVLongFromInput(store::IndexInput* in) {
+    return in->readVLong();
+}
+
+/**
+ * Recursively read a TIP5 Patricia trie node from .tip, reconstructing
+ * block index entries (firstTerm, blockFP) in DFS order.
+ */
+void readTrieNode(store::IndexInput* tipIn, std::vector<uint8_t>& termPrefix,
+                  std::vector<BlockTreeTermsReader::BlockMetadata>& blockIndex,
+                  int64_t& prevBlockFP) {
+    // Read edge
+    int edgeLen = readVIntFromInput(tipIn);
+    size_t prefixBefore = termPrefix.size();
+    if (edgeLen > 0) {
+        termPrefix.resize(prefixBefore + edgeLen);
+        tipIn->readBytes(termPrefix.data() + prefixBefore, edgeLen);
+    }
+
+    // Read header: (numChildren << 1) | hasBlockFP
+    int header = readVIntFromInput(tipIn);
+    bool hasBlockFP = (header & 1) != 0;
+    int numChildren = header >> 1;
+
+    // If this node has a blockFP, record the block entry
+    if (hasBlockFP) {
+        int64_t delta = readVLongFromInput(tipIn);
+        prevBlockFP += delta;
+        blockIndex.emplace_back(
+            util::BytesRef(termPrefix.data(), termPrefix.size()), prevBlockFP);
+    }
+
+    // Recurse into children
+    for (int i = 0; i < numChildren; i++) {
+        readTrieNode(tipIn, termPrefix, blockIndex, prevBlockFP);
+    }
+
+    // Pop edge bytes
+    termPrefix.resize(prefixBefore);
+}
+
+}  // anonymous namespace
+
 // ==================== BlockTreeTermsReader ====================
 
 BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::IndexInput* tipIn,
@@ -91,6 +142,42 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
                 }
                 fst_ = std::make_unique<util::FST>();
 
+            } else if (magic == 0x54495034) {  // "TIP4" - prefix-shared block list
+                int numBlocks = tipIn_->readVInt();
+                blockIndex_.reserve(numBlocks);
+
+                std::vector<uint8_t> prevTerm;
+                for (int i = 0; i < numBlocks; i++) {
+                    int prefixLen = tipIn_->readVInt();
+                    int suffixLen = tipIn_->readVInt();
+
+                    // Reconstruct full term: prefix from previous + suffix from disk
+                    std::vector<uint8_t> termData(prefixLen + suffixLen);
+                    if (prefixLen > 0) {
+                        std::memcpy(termData.data(), prevTerm.data(), prefixLen);
+                    }
+                    if (suffixLen > 0) {
+                        tipIn_->readBytes(termData.data() + prefixLen, suffixLen);
+                    }
+                    int64_t blockFP = tipIn_->readVLong();
+
+                    blockIndex_.emplace_back(
+                        util::BytesRef(termData.data(), termData.size()), blockFP);
+                    prevTerm = std::move(termData);
+                }
+                fst_ = std::make_unique<util::FST>();
+
+            } else if (magic == 0x54495035) {  // "TIP5" - Patricia trie block index
+                int numBlocks = tipIn_->readVInt();
+                blockIndex_.reserve(numBlocks);
+                int trieDataSize = tipIn_->readVInt();
+                if (trieDataSize > 0) {
+                    std::vector<uint8_t> termPrefix;
+                    int64_t prevBlockFP = 0;
+                    readTrieNode(tipIn_, termPrefix, blockIndex_, prevBlockFP);
+                }
+                fst_ = std::make_unique<util::FST>();
+
             } else {
                 throw IOException("Invalid .tip magic: " + std::to_string(magic));
             }
@@ -108,6 +195,20 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
             } else if (magic == 0x54495032) {
                 int fstSize = tipIn_->readVInt();
                 tipIn_->seek(tipIn_->getFilePointer() + fstSize);
+            } else if (magic == 0x54495034) {
+                // TIP4: prefix-shared block list — skip prefixLen + suffixLen + suffix bytes + blockFP
+                int numBlocks = tipIn_->readVInt();
+                for (int i = 0; i < numBlocks; i++) {
+                    tipIn_->readVInt();  // prefixLen (unused for skip)
+                    int suffixLen = tipIn_->readVInt();
+                    tipIn_->seek(tipIn_->getFilePointer() + suffixLen);
+                    tipIn_->readVLong();  // blockFP
+                }
+            } else if (magic == 0x54495035) {
+                // TIP5: Patricia trie — skip numBlocks + trieDataSize + trie bytes
+                tipIn_->readVInt();  // numBlocks
+                int trieDataSize = tipIn_->readVInt();
+                tipIn_->seek(tipIn_->getFilePointer() + trieDataSize);
             }
         }
     }

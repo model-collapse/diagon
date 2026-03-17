@@ -303,23 +303,112 @@ void BlockTreeTermsWriter::writeBlock() {
     pendingTerms_.clear();
 }
 
-void BlockTreeTermsWriter::writeBlockIndex() {
-    // Write compact block index to .tip file
-    // TIP3 format: flat block list (no FST trie overhead)
-    // Saves ~200 KB for Reuters vs TIP2 (which serialized the full packed FST trie)
+std::unique_ptr<BlockTreeTermsWriter::TrieNode> BlockTreeTermsWriter::buildTrie(size_t from,
+                                                                                size_t to,
+                                                                                size_t depth) {
+    auto node = std::make_unique<TrieNode>();
+    if (from >= to) {
+        return node;
+    }
 
-    tipOut_->writeInt(0x54495033);          // "TIP3" magic (compact block list)
+    // Check if any entry terminates exactly at this depth (edge = empty)
+    size_t start = from;
+    if (blockEntries_[from].termData.size() == depth) {
+        node->blockFP = blockEntries_[from].blockFP;
+        start = from + 1;
+    }
+
+    // Group remaining entries by their byte at `depth`
+    while (start < to) {
+        uint8_t leadByte = blockEntries_[start].termData[depth];
+        // Find end of group sharing same byte at depth
+        size_t groupEnd = start + 1;
+        while (groupEnd < to && blockEntries_[groupEnd].termData[depth] == leadByte) {
+            groupEnd++;
+        }
+
+        auto child = buildTrie(start, groupEnd, depth + 1);
+        child->edge.insert(child->edge.begin(), leadByte);
+        node->children.push_back(std::move(child));
+
+        start = groupEnd;
+    }
+
+    return node;
+}
+
+void BlockTreeTermsWriter::collapseChains(TrieNode* node) {
+    // First recurse into children
+    for (auto& child : node->children) {
+        collapseChains(child.get());
+    }
+
+    // Collapse: if this node has exactly one child and no blockFP, merge child into this node
+    while (node->children.size() == 1 && node->blockFP < 0) {
+        auto& child = node->children[0];
+        // Append child's edge to this node's edge
+        node->edge.insert(node->edge.end(), child->edge.begin(), child->edge.end());
+        node->blockFP = child->blockFP;
+        // Steal grandchildren
+        auto grandchildren = std::move(child->children);
+        node->children = std::move(grandchildren);
+    }
+}
+
+void BlockTreeTermsWriter::serializeTrie(const TrieNode* node, std::vector<uint8_t>& buf,
+                                          int64_t& prevBlockFP) {
+    // Edge: VInt(edgeLen) + raw bytes
+    bufEncodeVInt(buf, static_cast<int32_t>(node->edge.size()));
+    buf.insert(buf.end(), node->edge.begin(), node->edge.end());
+
+    // Header: VInt((numChildren << 1) | hasBlockFP)
+    bool hasBlockFP = (node->blockFP >= 0);
+    int header = (static_cast<int>(node->children.size()) << 1) | (hasBlockFP ? 1 : 0);
+    bufEncodeVInt(buf, header);
+
+    // Delta-encoded blockFP (if present)
+    if (hasBlockFP) {
+        bufEncodeVLong(buf, node->blockFP - prevBlockFP);
+        prevBlockFP = node->blockFP;
+    }
+
+    // Children follow inline (DFS preorder, already sorted by first edge byte from buildTrie)
+    for (const auto& child : node->children) {
+        serializeTrie(child.get(), buf, prevBlockFP);
+    }
+}
+
+void BlockTreeTermsWriter::writeBlockIndex() {
+    // Write TIP5 Patricia trie block index to .tip file.
+    // Chain-collapsed Patricia trie shares prefixes across ALL entries (not just adjacent),
+    // dramatically more compact than TIP4's pairwise prefix sharing.
+
+    tipOut_->writeInt(0x54495035);          // "TIP5" magic
     tipOut_->writeString(fieldInfo_.name);  // Field name
     tipOut_->writeVLong(termsStartFP_);     // Starting file pointer for this field's terms
     tipOut_->writeVLong(numTerms_);
 
-    // Write block entries
-    tipOut_->writeVInt(static_cast<int>(blockEntries_.size()));
-    for (const auto& entry : blockEntries_) {
-        tipOut_->writeVInt(static_cast<int>(entry.termData.size()));
-        tipOut_->writeBytes(entry.termData.data(), entry.termData.size());
-        tipOut_->writeVLong(entry.blockFP);
+    int numBlocks = static_cast<int>(blockEntries_.size());
+    tipOut_->writeVInt(numBlocks);
+
+    if (numBlocks == 0) {
+        tipOut_->writeVInt(0);  // trieDataSize = 0
+        return;
     }
+
+    // Build Patricia trie from sorted block entries
+    auto root = buildTrie(0, blockEntries_.size(), 0);
+    collapseChains(root.get());
+
+    // Serialize trie to buffer
+    std::vector<uint8_t> trieBuf;
+    trieBuf.reserve(numBlocks * 8);  // Rough estimate
+    int64_t prevBlockFP = 0;
+    serializeTrie(root.get(), trieBuf, prevBlockFP);
+
+    // Write trieDataSize + trie data
+    tipOut_->writeVInt(static_cast<int>(trieBuf.size()));
+    tipOut_->writeBytes(trieBuf.data(), trieBuf.size());
 }
 
 int BlockTreeTermsWriter::sharedPrefixLength(const util::BytesRef& a,

@@ -190,6 +190,23 @@ private:
     };
     std::vector<BlockEntry> blockEntries_;
 
+    /** Patricia trie node for TIP5 compact .tip encoding. */
+    struct TrieNode {
+        std::vector<uint8_t> edge;
+        std::vector<std::unique_ptr<TrieNode>> children;
+        int64_t blockFP = -1;  // -1 means no block at this node
+    };
+
+    /** Build Patricia trie from blockEntries_[from..to) at given byte depth. */
+    std::unique_ptr<TrieNode> buildTrie(size_t from, size_t to, size_t depth);
+
+    /** Collapse single-child chains: merge child edge into parent when parent has
+     *  exactly one child and no blockFP. */
+    void collapseChains(TrieNode* node);
+
+    /** DFS-serialize trie into buf with delta-encoded blockFPs. */
+    void serializeTrie(const TrieNode* node, std::vector<uint8_t>& buf, int64_t& prevBlockFP);
+
     void writeBlock();
     void writeBlockIndex();
     int sharedPrefixLength(const util::BytesRef& a, const util::BytesRef& b) const;
