@@ -379,11 +379,11 @@ void BlockTreeTermsWriter::serializeTrie(const TrieNode* node, std::vector<uint8
 }
 
 void BlockTreeTermsWriter::writeBlockIndex() {
-    // Write TIP6 LZ4-compressed Patricia trie block index to .tip file.
-    // Chain-collapsed Patricia trie shares prefixes across ALL entries,
-    // then LZ4 compresses the serialized trie for ~50-60% size reduction.
+    // Write TIP5 Patricia trie block index to .tip file.
+    // Chain-collapsed Patricia trie shares prefixes across ALL entries (not just adjacent),
+    // dramatically more compact than TIP4's pairwise prefix sharing.
 
-    tipOut_->writeInt(0x54495036);          // "TIP6" magic
+    tipOut_->writeInt(0x54495035);          // "TIP5" magic
     tipOut_->writeString(fieldInfo_.name);  // Field name
     tipOut_->writeVLong(termsStartFP_);     // Starting file pointer for this field's terms
     tipOut_->writeVLong(numTerms_);
@@ -392,8 +392,7 @@ void BlockTreeTermsWriter::writeBlockIndex() {
     tipOut_->writeVInt(numBlocks);
 
     if (numBlocks == 0) {
-        tipOut_->writeVInt(0);  // uncompressedSize = 0
-        tipOut_->writeVInt(0);  // compressedSize = 0
+        tipOut_->writeVInt(0);  // trieDataSize = 0
         return;
     }
 
@@ -403,37 +402,13 @@ void BlockTreeTermsWriter::writeBlockIndex() {
 
     // Serialize trie to buffer
     std::vector<uint8_t> trieBuf;
-    trieBuf.reserve(numBlocks * 8);
+    trieBuf.reserve(numBlocks * 8);  // Rough estimate
     int64_t prevBlockFP = 0;
     serializeTrie(root.get(), trieBuf, prevBlockFP);
 
-    int uncompressedSize = static_cast<int>(trieBuf.size());
-
-#ifdef HAVE_LZ4
-    // LZ4 compress the trie buffer
-    int maxDstSize = LZ4_compressBound(uncompressedSize);
-    std::vector<uint8_t> compBuf(maxDstSize);
-    int compressedSize = LZ4_compress_default(
-        reinterpret_cast<const char*>(trieBuf.data()),
-        reinterpret_cast<char*>(compBuf.data()), uncompressedSize, maxDstSize);
-
-    if (compressedSize > 0 && compressedSize < uncompressedSize) {
-        // Write compressed
-        tipOut_->writeVInt(uncompressedSize);
-        tipOut_->writeVInt(compressedSize);
-        tipOut_->writeBytes(compBuf.data(), compressedSize);
-    } else {
-        // Compression didn't help, write uncompressed
-        tipOut_->writeVInt(uncompressedSize);
-        tipOut_->writeVInt(0);  // compressedSize = 0 means uncompressed
-        tipOut_->writeBytes(trieBuf.data(), trieBuf.size());
-    }
-#else
-    // No LZ4, write uncompressed
-    tipOut_->writeVInt(uncompressedSize);
-    tipOut_->writeVInt(0);
+    // Write trieDataSize + trie data
+    tipOut_->writeVInt(static_cast<int>(trieBuf.size()));
     tipOut_->writeBytes(trieBuf.data(), trieBuf.size());
-#endif
 }
 
 int BlockTreeTermsWriter::sharedPrefixLength(const util::BytesRef& a,

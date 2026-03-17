@@ -31,8 +31,8 @@ int64_t readVLongFromInput(store::IndexInput* in) {
 }
 
 /**
- * Recursively read a TIP5 Patricia trie node from .tip IndexInput,
- * reconstructing block index entries (firstTerm, blockFP) in DFS order.
+ * Recursively read a TIP5 Patricia trie node from .tip, reconstructing
+ * block index entries (firstTerm, blockFP) in DFS order.
  */
 void readTrieNode(store::IndexInput* tipIn, std::vector<uint8_t>& termPrefix,
                   std::vector<BlockTreeTermsReader::BlockMetadata>& blockIndex,
@@ -64,62 +64,6 @@ void readTrieNode(store::IndexInput* tipIn, std::vector<uint8_t>& termPrefix,
     }
 
     // Pop edge bytes
-    termPrefix.resize(prefixBefore);
-}
-
-// Buffer-based VInt/VLong decoders for TIP6 (read from decompressed byte buffer)
-
-int32_t readVIntFromBuffer(const uint8_t* data, int& cursor) {
-    uint8_t b = data[cursor++];
-    int32_t val = b & 0x7F;
-    for (int shift = 7; (b & 0x80) != 0; shift += 7) {
-        b = data[cursor++];
-        val |= (static_cast<int32_t>(b & 0x7F)) << shift;
-    }
-    return val;
-}
-
-int64_t readVLongFromBuffer(const uint8_t* data, int& cursor) {
-    uint8_t b = data[cursor++];
-    int64_t val = b & 0x7F;
-    for (int shift = 7; (b & 0x80) != 0; shift += 7) {
-        b = data[cursor++];
-        val |= (static_cast<int64_t>(b & 0x7F)) << shift;
-    }
-    return val;
-}
-
-/**
- * Recursively read a TIP6 Patricia trie node from a decompressed byte buffer,
- * reconstructing block index entries (firstTerm, blockFP) in DFS order.
- */
-void readTrieNodeFromBuffer(const uint8_t* data, int& cursor,
-                            std::vector<uint8_t>& termPrefix,
-                            std::vector<BlockTreeTermsReader::BlockMetadata>& blockIndex,
-                            int64_t& prevBlockFP) {
-    int edgeLen = readVIntFromBuffer(data, cursor);
-    size_t prefixBefore = termPrefix.size();
-    if (edgeLen > 0) {
-        termPrefix.resize(prefixBefore + edgeLen);
-        std::memcpy(termPrefix.data() + prefixBefore, data + cursor, edgeLen);
-        cursor += edgeLen;
-    }
-
-    int header = readVIntFromBuffer(data, cursor);
-    bool hasBlockFP = (header & 1) != 0;
-    int numChildren = header >> 1;
-
-    if (hasBlockFP) {
-        int64_t delta = readVLongFromBuffer(data, cursor);
-        prevBlockFP += delta;
-        blockIndex.emplace_back(
-            util::BytesRef(termPrefix.data(), termPrefix.size()), prevBlockFP);
-    }
-
-    for (int i = 0; i < numChildren; i++) {
-        readTrieNodeFromBuffer(data, cursor, termPrefix, blockIndex, prevBlockFP);
-    }
-
     termPrefix.resize(prefixBefore);
 }
 
@@ -234,45 +178,6 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
                 }
                 fst_ = std::make_unique<util::FST>();
 
-            } else if (magic == 0x54495036) {  // "TIP6" - LZ4-compressed Patricia trie
-                int numBlocks = tipIn_->readVInt();
-                blockIndex_.reserve(numBlocks);
-                int uncompressedSize = tipIn_->readVInt();
-                int compressedSize = tipIn_->readVInt();
-
-                if (uncompressedSize > 0) {
-                    std::vector<uint8_t> trieData;
-                    if (compressedSize > 0) {
-                        // LZ4 compressed
-                        std::vector<uint8_t> compData(compressedSize);
-                        tipIn_->readBytes(compData.data(), compressedSize);
-#ifdef HAVE_LZ4
-                        trieData.resize(uncompressedSize);
-                        int result = LZ4_decompress_safe(
-                            reinterpret_cast<const char*>(compData.data()),
-                            reinterpret_cast<char*>(trieData.data()), compressedSize,
-                            uncompressedSize);
-                        if (result != uncompressedSize) {
-                            throw IOException("LZ4 decompression failed in .tip TIP6");
-                        }
-#else
-                        throw IOException("LZ4 compressed .tip but LZ4 not available");
-#endif
-                    } else {
-                        // Uncompressed fallback
-                        trieData.resize(uncompressedSize);
-                        tipIn_->readBytes(trieData.data(), uncompressedSize);
-                    }
-
-                    // Parse trie from buffer
-                    std::vector<uint8_t> termPrefix;
-                    int64_t prevBlockFP = 0;
-                    int cursor = 0;
-                    readTrieNodeFromBuffer(trieData.data(), cursor, termPrefix, blockIndex_,
-                                           prevBlockFP);
-                }
-                fst_ = std::make_unique<util::FST>();
-
             } else {
                 throw IOException("Invalid .tip magic: " + std::to_string(magic));
             }
@@ -304,13 +209,6 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
                 tipIn_->readVInt();  // numBlocks
                 int trieDataSize = tipIn_->readVInt();
                 tipIn_->seek(tipIn_->getFilePointer() + trieDataSize);
-            } else if (magic == 0x54495036) {
-                // TIP6: LZ4-compressed Patricia trie — skip numBlocks + sizes + data
-                tipIn_->readVInt();  // numBlocks
-                int uncompressedSize = tipIn_->readVInt();
-                int compressedSize = tipIn_->readVInt();
-                int dataSize = (compressedSize > 0) ? compressedSize : uncompressedSize;
-                tipIn_->seek(tipIn_->getFilePointer() + dataSize);
             }
         }
     }
