@@ -75,7 +75,7 @@ private:
     int64_t buildTree(int from, int to, int32_t* docIDs, uint8_t* packedValues,
                       const uint8_t* minPacked, const uint8_t* maxPacked,
                       store::IndexOutput& kdiOut, store::IndexOutput& kddOut, int64_t kdiBaseFP,
-                      int64_t kddBaseFP);
+                      int64_t kddBaseFP, const uint8_t* parentSplitValue);
 
     /**
      * Write a leaf block to .kdd

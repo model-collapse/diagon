@@ -54,6 +54,7 @@ public:
      */
     struct Config {
         DocumentsWriterPerThread::Config dwptConfig;  // DWPT configuration
+        std::string codecName = "Diagon104";           // Codec name for new segments
     };
 
     /**

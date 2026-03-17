@@ -57,8 +57,8 @@ void BKDWriter::writeField(const std::string& fieldName, int32_t fieldNumber,
     int64_t kddStartFP = kddOut.getFilePointer();
 
     // Build tree recursively (stores relative file pointers within kdi/kdd)
-    buildTree(0, numPoints, docIDs.data(), packedValues.data(), minPacked.data(), maxPacked.data(),
-              kdiOut, kddOut, kdiStartFP, kddStartFP);
+    int64_t rootFP = buildTree(0, numPoints, docIDs.data(), packedValues.data(), minPacked.data(),
+                               maxPacked.data(), kdiOut, kddOut, kdiStartFP, kddStartFP, nullptr);
 
     // Write metadata to .kdm
     kdmOut.writeString(fieldName);
@@ -76,12 +76,15 @@ void BKDWriter::writeField(const std::string& fieldName, int32_t fieldNumber,
     // Write end offsets so reader knows how much data to read
     kdmOut.writeLong(kdiOut.getFilePointer());
     kdmOut.writeLong(kddOut.getFilePointer());
+    // KDI v2: store root FP for variable-length inner node format
+    kdmOut.writeLong(rootFP);
 }
 
 int64_t BKDWriter::buildTree(int from, int to, int32_t* docIDs, uint8_t* packedValues,
                              const uint8_t* minPacked, const uint8_t* maxPacked,
                              store::IndexOutput& kdiOut, store::IndexOutput& kddOut,
-                             int64_t kdiBaseFP, int64_t kddBaseFP) {
+                             int64_t kdiBaseFP, int64_t kddBaseFP,
+                             const uint8_t* parentSplitValue) {
     int count = to - from;
 
     if (count <= config_.maxPointsPerLeaf) {
@@ -96,35 +99,42 @@ int64_t BKDWriter::buildTree(int from, int to, int32_t* docIDs, uint8_t* packedV
     // The split value is the packed value at the median
     const uint8_t* splitPacked = packedValues + mid * packedLen;
 
-    // Compute min/max for children
-    // Left child: [from, mid) has min=minPacked, max=splitPacked
-    // Right child: [mid, to) has min=splitPacked, max=maxPacked
-
-    // Recurse left — returns RELATIVE file pointer
+    // Recurse left — pass current split as parent for prefix-coding
     int64_t leftFP = buildTree(from, mid, docIDs, packedValues, minPacked, splitPacked, kdiOut,
-                               kddOut, kdiBaseFP, kddBaseFP);
+                               kddOut, kdiBaseFP, kddBaseFP, splitPacked);
     bool leftIsLeaf = (mid - from) <= config_.maxPointsPerLeaf;
 
-    // Recurse right — returns RELATIVE file pointer
+    // Recurse right — pass current split as parent for prefix-coding
     int64_t rightFP = buildTree(mid, to, docIDs, packedValues, splitPacked, maxPacked, kdiOut,
-                                kddOut, kdiBaseFP, kddBaseFP);
+                                kddOut, kdiBaseFP, kddBaseFP, splitPacked);
     bool rightIsLeaf = (to - mid) <= config_.maxPointsPerLeaf;
 
     // Write inner node to .kdi — compute RELATIVE file pointer
     int64_t nodeFP = kdiOut.getFilePointer() - kdiBaseFP;
 
-    // Write split value
-    kdiOut.writeBytes(splitPacked, config_.bytesPerDim);
+    // KDI v2: prefix-code split value against parent
+    int prefixLen = 0;
+    if (parentSplitValue) {
+        while (prefixLen < config_.bytesPerDim &&
+               splitPacked[prefixLen] == parentSplitValue[prefixLen]) {
+            prefixLen++;
+        }
+    }
+    int suffixLen = config_.bytesPerDim - prefixLen;
+    kdiOut.writeVInt(prefixLen);
+    if (suffixLen > 0) {
+        kdiOut.writeBytes(splitPacked + prefixLen, suffixLen);
+    }
 
-    // Write child info: flags byte + RELATIVE file pointers
+    // Write child info: flags byte + VLong RELATIVE file pointers
     uint8_t flags = 0;
     if (leftIsLeaf)
         flags |= 0x01;
     if (rightIsLeaf)
         flags |= 0x02;
     kdiOut.writeByte(flags);
-    kdiOut.writeLong(leftFP);
-    kdiOut.writeLong(rightFP);
+    kdiOut.writeVLong(leftFP);
+    kdiOut.writeVLong(rightFP);
 
     return nodeFP;
 }

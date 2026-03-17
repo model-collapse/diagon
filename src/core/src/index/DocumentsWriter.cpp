@@ -8,12 +8,13 @@ namespace index {
 
 DocumentsWriter::DocumentsWriter()
     : config_(Config{})
-    , dwpt_(std::make_unique<DocumentsWriterPerThread>(config_.dwptConfig, nullptr, "Lucene104")) {}
+    , dwpt_(std::make_unique<DocumentsWriterPerThread>(config_.dwptConfig, nullptr,
+                                                       config_.codecName)) {}
 
 DocumentsWriter::DocumentsWriter(const Config& config, store::Directory* directory)
     : config_(config)
-    , dwpt_(
-          std::make_unique<DocumentsWriterPerThread>(config_.dwptConfig, directory, "Lucene104")) {}
+    , dwpt_(std::make_unique<DocumentsWriterPerThread>(config_.dwptConfig, directory,
+                                                       config_.codecName)) {}
 
 int DocumentsWriter::addDocument(const document::Document& doc) {
     std::lock_guard<std::mutex> lock(mutex_);

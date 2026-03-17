@@ -80,4 +80,41 @@ public:
         : IOException(message) {}
 };
 
+/**
+ * @brief Thrown when an index file is corrupt.
+ *
+ * Based on: org.apache.lucene.index.CorruptIndexException
+ */
+class CorruptIndexException : public IOException {
+public:
+    explicit CorruptIndexException(const std::string& message)
+        : IOException(message) {}
+    CorruptIndexException(const std::string& message, const std::string& resource)
+        : IOException(message + " (resource=" + resource + ")") {}
+};
+
+/**
+ * @brief Thrown when the index format is too old to be read.
+ */
+class IndexFormatTooOldException : public CorruptIndexException {
+public:
+    IndexFormatTooOldException(const std::string& resource, int version, int minVersion, int maxVersion)
+        : CorruptIndexException("Format version is not supported (resource=" + resource
+            + "): " + std::to_string(version)
+            + " (needs to be between " + std::to_string(minVersion)
+            + " and " + std::to_string(maxVersion) + ")") {}
+};
+
+/**
+ * @brief Thrown when the index format is too new to be read.
+ */
+class IndexFormatTooNewException : public CorruptIndexException {
+public:
+    IndexFormatTooNewException(const std::string& resource, int version, int minVersion, int maxVersion)
+        : CorruptIndexException("Format version is not supported (resource=" + resource
+            + "): " + std::to_string(version)
+            + " (needs to be between " + std::to_string(minVersion)
+            + " and " + std::to_string(maxVersion) + ")") {}
+};
+
 }  // namespace diagon

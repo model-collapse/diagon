@@ -5,6 +5,8 @@
 
 #include "diagon/util/Exceptions.h"
 
+#include <zlib.h>
+
 #include <sys/file.h>
 
 #include <algorithm>
@@ -352,7 +354,8 @@ FSIndexOutput::FSIndexOutput(const std::filesystem::path& path, size_t bufferSiz
     , file_(path, std::ios::binary | std::ios::trunc)
     , file_position_(0)
     , buffer_(bufferSize)
-    , buffer_position_(0) {
+    , buffer_position_(0)
+    , crc32_(static_cast<uint32_t>(::crc32(0L, Z_NULL, 0))) {
     if (!file_.is_open()) {
         throw IOException("Failed to create file: " + path.string());
     }
@@ -373,9 +376,12 @@ void FSIndexOutput::writeByte(uint8_t b) {
         flushBuffer();
     }
     buffer_[buffer_position_++] = b;
+    crc32_ = static_cast<uint32_t>(::crc32(crc32_, &b, 1));
 }
 
 void FSIndexOutput::writeBytes(const uint8_t* buffer, size_t length) {
+    crc32_ = static_cast<uint32_t>(::crc32(crc32_, buffer, static_cast<uInt>(length)));
+
     size_t remaining = length;
     size_t offset = 0;
 
@@ -396,6 +402,10 @@ void FSIndexOutput::writeBytes(const uint8_t* buffer, size_t length) {
 
 int64_t FSIndexOutput::getFilePointer() const {
     return file_position_ + buffer_position_;
+}
+
+int64_t FSIndexOutput::getChecksum() const {
+    return static_cast<int64_t>(crc32_) & 0xFFFFFFFFL;
 }
 
 void FSIndexOutput::close() {

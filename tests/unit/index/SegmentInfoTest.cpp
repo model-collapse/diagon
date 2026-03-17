@@ -23,7 +23,7 @@ TEST(SegmentInfoTest, BasicConstruction) {
 TEST(SegmentInfoTest, DefaultCodec) {
     SegmentInfo info("_0", 50);
 
-    EXPECT_EQ(info.codecName(), "Lucene104");
+    EXPECT_EQ(info.codecName(), "Diagon104");
 }
 
 TEST(SegmentInfoTest, AddFile) {

@@ -42,6 +42,7 @@ BKDReader::loadFields(store::IndexInput& kdmIn, store::IndexInput& kdiIn,
         tree.kddStartFP = kdmIn.readLong();
         tree.kdiEndFP = kdmIn.readLong();
         tree.kddEndFP = kdmIn.readLong();
+        tree.rootNodeFP = kdmIn.readLong();
 
         // Create slices for this field's data
         int64_t kdiLen = tree.kdiEndFP - tree.kdiStartFP;
@@ -85,43 +86,26 @@ void BKDReader::intersect(IntersectVisitor& visitor) const {
         return;
     }
 
-    // Root is an inner node — read it from .kdi
+    // Root is an inner node — read it from .kdi using rootNodeFP from metadata
     auto kdiClone = kdiInput_->clone();
-    int64_t kdiLen = tree_.kdiEndFP - tree_.kdiStartFP;
+    kdiClone->seek(tree_.rootNodeFP);
 
-    // The root is the LAST inner node written (it was written after its children)
-    // We need to find the root. In our format, buildTree returns the root FP.
-    // The root FP is the last node written to .kdi.
-    // We stored kdiStartFP and kdiEndFP, so the root is at (kdiEndFP - kdiStartFP - nodeSize).
-    // But we don't know exact nodeSize. Instead, let's read the .kdi sequentially from where
-    // the root was written.
-
-    // Actually, our buildTree returns the FP of the root node. But we didn't store it directly.
-    // We stored kdiStartFP as the start of .kdi data for this field.
-    // The root is the LAST node written since we do post-order (left, right, then self).
-    // So the root node is at the END of the .kdi section.
-
-    // Let's find root by reading backwards. The root inner node was the last one written.
-    // Node format: bytesPerDim (split value) + 1 (flags) + 8 (leftFP) + 8 (rightFP)
-    int nodeSize = tree_.config.bytesPerDim + 1 + 8 + 8;
-    int64_t rootFP = kdiLen - nodeSize;
-
-    // Read root node
-    kdiClone->seek(rootFP);
-
-    // Read split value
-    std::vector<uint8_t> splitValue(tree_.config.bytesPerDim);
-    kdiClone->readBytes(splitValue.data(), tree_.config.bytesPerDim);
+    // KDI v2: prefix-coded split value (root has no parent, so prefixLen=0, full value stored)
+    int prefixLen = kdiClone->readVInt();
+    int suffixLen = tree_.config.bytesPerDim - prefixLen;
+    std::vector<uint8_t> splitValue(tree_.config.bytesPerDim, 0);
+    // Root's parent split is undefined — prefix bytes stay zero (prefixLen should be 0 for root)
+    if (suffixLen > 0) {
+        kdiClone->readBytes(splitValue.data() + prefixLen, suffixLen);
+    }
 
     uint8_t flags = kdiClone->readByte();
     bool leftIsLeaf = (flags & 0x01) != 0;
     bool rightIsLeaf = (flags & 0x02) != 0;
-    int64_t leftFP = kdiClone->readLong();
-    int64_t rightFP = kdiClone->readLong();
+    int64_t leftFP = kdiClone->readVLong();
+    int64_t rightFP = kdiClone->readVLong();
 
     // For 1D: left child has values <= split, right has values > split
-    // Left cell: [treeMin, splitValue]
-    // Right cell: [splitValue, treeMax]
     std::vector<uint8_t> leftMax(packedLen);
     std::vector<uint8_t> rightMin(packedLen);
     std::memcpy(leftMax.data(), splitValue.data(), tree_.config.bytesPerDim);
@@ -130,23 +114,21 @@ void BKDReader::intersect(IntersectVisitor& visitor) const {
     // Check and recurse left
     auto leftRel = visitor.compare(tree_.minPackedValue.data(), leftMax.data());
     if (leftRel != PointValues::Relation::CELL_OUTSIDE_QUERY) {
-        if (leftRel == PointValues::Relation::CELL_INSIDE_QUERY) {
-            // Collect all docs in left subtree
-            intersectNode(leftFP, leftIsLeaf, tree_.minPackedValue.data(), leftMax.data(), visitor);
-        } else {
-            intersectNode(leftFP, leftIsLeaf, tree_.minPackedValue.data(), leftMax.data(), visitor);
-        }
+        intersectNode(leftFP, leftIsLeaf, tree_.minPackedValue.data(), leftMax.data(), visitor,
+                      splitValue.data());
     }
 
     // Check and recurse right
     auto rightRel = visitor.compare(rightMin.data(), tree_.maxPackedValue.data());
     if (rightRel != PointValues::Relation::CELL_OUTSIDE_QUERY) {
-        intersectNode(rightFP, rightIsLeaf, rightMin.data(), tree_.maxPackedValue.data(), visitor);
+        intersectNode(rightFP, rightIsLeaf, rightMin.data(), tree_.maxPackedValue.data(), visitor,
+                      splitValue.data());
     }
 }
 
 void BKDReader::intersectNode(int64_t nodeFP, bool isLeaf, const uint8_t* cellMin,
-                              const uint8_t* cellMax, IntersectVisitor& visitor) const {
+                              const uint8_t* cellMax, IntersectVisitor& visitor,
+                              const uint8_t* parentSplitValue) const {
     // First check cell against query
     auto rel = visitor.compare(cellMin, cellMax);
     if (rel == PointValues::Relation::CELL_OUTSIDE_QUERY) {
@@ -158,18 +140,26 @@ void BKDReader::intersectNode(int64_t nodeFP, bool isLeaf, const uint8_t* cellMi
         return;
     }
 
-    // Inner node — read from .kdi
+    // Inner node — read from .kdi (KDI v2: prefix-coded split + VLong FPs)
     auto kdiClone = kdiInput_->clone();
     kdiClone->seek(nodeFP);
 
+    // Reconstruct split value: prefix from parent + suffix from disk
+    int prefixLen = kdiClone->readVInt();
+    int suffixLen = tree_.config.bytesPerDim - prefixLen;
     std::vector<uint8_t> splitValue(tree_.config.bytesPerDim);
-    kdiClone->readBytes(splitValue.data(), tree_.config.bytesPerDim);
+    if (prefixLen > 0 && parentSplitValue) {
+        std::memcpy(splitValue.data(), parentSplitValue, prefixLen);
+    }
+    if (suffixLen > 0) {
+        kdiClone->readBytes(splitValue.data() + prefixLen, suffixLen);
+    }
 
     uint8_t flags = kdiClone->readByte();
     bool leftIsLeaf = (flags & 0x01) != 0;
     bool rightIsLeaf = (flags & 0x02) != 0;
-    int64_t leftFP = kdiClone->readLong();
-    int64_t rightFP = kdiClone->readLong();
+    int64_t leftFP = kdiClone->readVLong();
+    int64_t rightFP = kdiClone->readVLong();
 
     int packedLen = tree_.config.packedBytesLength;
 
@@ -183,18 +173,19 @@ void BKDReader::intersectNode(int64_t nodeFP, bool isLeaf, const uint8_t* cellMi
 
     if (rel == PointValues::Relation::CELL_INSIDE_QUERY) {
         // Both children are fully inside — collect all
-        intersectNode(leftFP, leftIsLeaf, cellMin, leftMax.data(), visitor);
-        intersectNode(rightFP, rightIsLeaf, rightMin.data(), cellMax, visitor);
+        intersectNode(leftFP, leftIsLeaf, cellMin, leftMax.data(), visitor, splitValue.data());
+        intersectNode(rightFP, rightIsLeaf, rightMin.data(), cellMax, visitor, splitValue.data());
     } else {
         // CELL_CROSSES_QUERY — check each child
         auto leftRel = visitor.compare(cellMin, leftMax.data());
         if (leftRel != PointValues::Relation::CELL_OUTSIDE_QUERY) {
-            intersectNode(leftFP, leftIsLeaf, cellMin, leftMax.data(), visitor);
+            intersectNode(leftFP, leftIsLeaf, cellMin, leftMax.data(), visitor, splitValue.data());
         }
 
         auto rightRel = visitor.compare(rightMin.data(), cellMax);
         if (rightRel != PointValues::Relation::CELL_OUTSIDE_QUERY) {
-            intersectNode(rightFP, rightIsLeaf, rightMin.data(), cellMax, visitor);
+            intersectNode(rightFP, rightIsLeaf, rightMin.data(), cellMax, visitor,
+                          splitValue.data());
         }
     }
 }

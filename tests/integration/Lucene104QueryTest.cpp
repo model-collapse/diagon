@@ -456,7 +456,7 @@ TEST_F(Lucene104QueryTest, CodecDetection) {
     ASSERT_NE(nullptr, segmentReader);
 
     // Verify segment info matches
-    EXPECT_EQ("Lucene104", segmentReader->getSegmentInfo()->codecName());
+    EXPECT_EQ("Diagon104", segmentReader->getSegmentInfo()->codecName());
 
     // Access terms (triggers loadFieldsProducer which uses codec detection)
     auto terms = segmentReader->terms("content");

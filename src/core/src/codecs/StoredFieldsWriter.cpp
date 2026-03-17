@@ -248,7 +248,7 @@ StoredFieldsWriter::BlockEntry StoredFieldsWriter::writeCompressedBlock(
     std::vector<uint8_t> raw = serializeDocs(docs, startIdx, count);
     int rawLength = static_cast<int>(raw.size());
 
-#ifdef HAVE_LZ4
+#if defined(HAVE_LZ4) && !defined(DIAGON_NO_STORED_FIELDS_COMPRESSION)
     int maxCompressedSize = LZ4_compressBound(rawLength);
     std::vector<uint8_t> compressed(maxCompressedSize);
 

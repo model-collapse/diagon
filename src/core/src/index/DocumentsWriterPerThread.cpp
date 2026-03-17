@@ -114,7 +114,7 @@ std::atomic<int> DocumentsWriterPerThread::nextSegmentNumber_{0};
 DocumentsWriterPerThread::DocumentsWriterPerThread()
     : config_(Config{})
     , termsWriter_(fieldInfosBuilder_, 50000)  // Pre-size for typical corpus (30k-50k terms)
-    , codecName_("Lucene104") {}
+    , codecName_("Diagon104") {}
 
 DocumentsWriterPerThread::DocumentsWriterPerThread(const Config& config,
                                                    store::Directory* directory,

@@ -57,6 +57,7 @@ set(DIAGON_CORE_SOURCES
     src/index/BlockMaxQuantizedIndex.cpp
 
     # Codecs (Codec architecture - Module 02)
+    src/codecs/CodecUtil.cpp
     src/codecs/Codec.cpp
     src/codecs/PostingsFormat.cpp
     src/codecs/DocValuesFormat.cpp
@@ -88,6 +89,7 @@ set(DIAGON_CORE_SOURCES
     src/codecs/lucene104/Lucene104PostingsEnumBatch.cpp
     src/codecs/lucene104/Lucene104NormsWriter.cpp
     src/codecs/lucene104/Lucene104NormsReader.cpp
+    src/codecs/lucene104/Lucene104OSCodec.cpp
 
     # Lucene105 (Batch-native postings format - P3 Task #35)
     src/codecs/lucene105/Lucene105PostingsWriter.cpp
@@ -227,6 +229,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/index/BlockMaxQuantizedIndex.h
 
     # Codecs
+    include/diagon/codecs/CodecUtil.h
     include/diagon/codecs/Codec.h
     include/diagon/codecs/PostingsFormat.h
     include/diagon/codecs/DocValuesFormat.h
@@ -261,6 +264,7 @@ set(DIAGON_CORE_HEADERS
     include/diagon/codecs/lucene104/Lucene104PostingsEnumBatch.h
     include/diagon/codecs/lucene104/Lucene104NormsWriter.h
     include/diagon/codecs/lucene104/Lucene104NormsReader.h
+    include/diagon/codecs/lucene104/Lucene104OSCodec.h
 
     # Lucene105 (Batch-native postings format - P3 Task #35)
     include/diagon/codecs/lucene105/Lucene105PostingsWriter.h

@@ -303,7 +303,7 @@ TEST_F(IndexWriterIntegrationTest, SegmentInfoMetadata) {
     EXPECT_EQ(segmentInfo->maxDoc(), 10);
 
     // Verify codec name
-    EXPECT_EQ(segmentInfo->codecName(), "Lucene104");
+    EXPECT_EQ(segmentInfo->codecName(), "Diagon104");
 
     // Verify files list
     EXPECT_GT(segmentInfo->files().size(), 0);

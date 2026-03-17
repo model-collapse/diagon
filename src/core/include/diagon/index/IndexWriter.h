@@ -36,6 +36,21 @@ class Query;
  */
 class IndexWriterConfig {
 public:
+    // ==================== Format Modes ====================
+
+    /**
+     * Controls index file format output.
+     *
+     * NATIVE:    Diagon-optimized format (PFOR-Delta, TIP6, etc.)
+     * OS_COMPAT: OpenSearch/Lucene byte-compatible format (ForUtil, CodecUtil headers, etc.)
+     *
+     * See: design/16_OPENSEARCH_FORMAT_COMPATIBILITY.md
+     */
+    enum class FormatMode {
+        NATIVE,     // Diagon optimized (default) — codec "Diagon104"
+        OS_COMPAT   // OpenSearch/Lucene compatible — codec "Lucene104"
+    };
+
     // ==================== Open Modes ====================
 
     enum class OpenMode {
@@ -105,6 +120,21 @@ public:
 
     bool getUseCompoundFile() const { return useCompoundFile_; }
 
+    // ==================== Format Mode ====================
+
+    /**
+     * Set format mode (default: NATIVE)
+     *
+     * NATIVE produces Diagon-optimized files (PFOR-Delta, TIP6, etc.)
+     * OS_COMPAT produces OpenSearch/Lucene byte-compatible files
+     */
+    IndexWriterConfig& setFormatMode(FormatMode mode) {
+        formatMode_ = mode;
+        return *this;
+    }
+
+    FormatMode getFormatMode() const { return formatMode_; }
+
     // ==================== Merge Policy ====================
 
     /**
@@ -123,6 +153,7 @@ private:
     OpenMode openMode_{OpenMode::CREATE_OR_APPEND};
     bool commitOnClose_{true};
     bool useCompoundFile_{true};
+    FormatMode formatMode_{FormatMode::NATIVE};
     std::unique_ptr<MergePolicy> mergePolicy_;  // nullptr = use default TieredMergePolicy
 };
 
@@ -303,6 +334,8 @@ private:
     bool commitOnClose_;
     bool useCompoundFile_;
     IndexWriterConfig::OpenMode openMode_;
+    IndexWriterConfig::FormatMode formatMode_;
+    std::string codecName_;  // Codec name for new segments ("Diagon104" or "Lucene104")
     std::unique_ptr<Lock> writeLock_;
 
     // Indexing pipeline

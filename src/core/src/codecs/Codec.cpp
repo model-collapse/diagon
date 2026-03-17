@@ -14,7 +14,7 @@ std::unordered_map<std::string, std::function<std::unique_ptr<Codec>()>>& Codec:
 }
 
 std::string& Codec::getDefaultCodecName() {
-    static std::string defaultCodecName = "Lucene104";
+    static std::string defaultCodecName = "Diagon104";
     return defaultCodecName;
 }
 

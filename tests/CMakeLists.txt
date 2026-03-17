@@ -223,3 +223,6 @@ add_diagon_test(BM25ScorerSIMDTest unit/search/BM25ScorerSIMDTest.cpp)
 # add_diagon_test(Lucene104IntegrationTest integration/Lucene104IntegrationTest.cpp)
 add_diagon_test(Lucene104ReadWriteTest unit/codecs/Lucene104ReadWriteTest.cpp)
 add_diagon_test(Lucene104QueryTest integration/Lucene104QueryTest.cpp)
+
+# OS-Compat Format tests
+add_diagon_test(OSCompatFormatsTest unit/codecs/OSCompatFormatsTest.cpp)

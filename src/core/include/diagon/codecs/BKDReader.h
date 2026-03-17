@@ -45,6 +45,7 @@ public:
         int64_t kdiEndFP;
         int64_t kddStartFP;
         int64_t kddEndFP;
+        int64_t rootNodeFP;  // KDI v2: relative FP of root inner node
     };
 
     /**
@@ -76,7 +77,7 @@ private:
      * Recursive tree traversal for intersection
      */
     void intersectNode(int64_t nodeFP, bool isLeaf, const uint8_t* cellMin, const uint8_t* cellMax,
-                       IntersectVisitor& visitor) const;
+                       IntersectVisitor& visitor, const uint8_t* parentSplitValue) const;
 
     /**
      * Visit all points in a leaf block

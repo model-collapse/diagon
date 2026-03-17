@@ -188,6 +188,10 @@ public:
 
     int64_t getFilePointer() const override;
 
+    // ==================== Checksum ====================
+
+    int64_t getChecksum() const override;
+
     // ==================== Finalization ====================
 
     void close() override;
@@ -202,6 +206,9 @@ private:
     // Buffering
     std::vector<uint8_t> buffer_;
     size_t buffer_position_;
+
+    // CRC32 checksum accumulator
+    uint32_t crc32_;
 
     // Flush buffer to file
     void flushBuffer();

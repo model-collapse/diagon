@@ -40,7 +40,15 @@ IndexWriter::IndexWriter(Directory& dir, const IndexWriterConfig& config)
     : directory_(dir)
     , commitOnClose_(config.getCommitOnClose())
     , useCompoundFile_(config.getUseCompoundFile())
-    , openMode_(config.getOpenMode()) {
+    , openMode_(config.getOpenMode())
+    , formatMode_(config.getFormatMode()) {
+    // Select codec name based on FormatMode
+    if (formatMode_ == IndexWriterConfig::FormatMode::OS_COMPAT) {
+        codecName_ = "Lucene104";   // OpenSearch-compatible codec
+    } else {
+        codecName_ = "Diagon104";   // Native Diagon codec (default)
+    }
+
     // Obtain write lock
     try {
         writeLock_ = directory_.obtainLock("write.lock");
@@ -61,12 +69,13 @@ IndexWriter::IndexWriter(Directory& dir, const IndexWriterConfig& config)
         mergePolicy_ = std::make_unique<TieredMergePolicy>();
     }
 
-    // Create DocumentsWriter
+    // Create DocumentsWriter with codec name from FormatMode
     DocumentsWriter::Config dwConfig;
     dwConfig.dwptConfig.ramBufferSizeMB = static_cast<int64_t>(config.getRAMBufferSizeMB());
     if (config.getMaxBufferedDocs() > 0) {
         dwConfig.dwptConfig.maxBufferedDocs = config.getMaxBufferedDocs();
     }
+    dwConfig.codecName = codecName_;
     documentsWriter_ = std::make_unique<DocumentsWriter>(dwConfig, &directory_);
 }
 

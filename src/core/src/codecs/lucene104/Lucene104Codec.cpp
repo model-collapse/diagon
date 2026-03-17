@@ -38,11 +38,12 @@ Lucene104Codec::Lucene104Codec()
     , pointsFormat_(std::make_unique<Lucene104PointsFormat>())
     , vectorFormat_(std::make_unique<Lucene104VectorFormat>()) {}
 
-// Register at startup
+// Register as "Diagon104" — the native codec with all Diagon optimizations.
+// "Lucene104" is now registered by Lucene104OSCodec (OS-compatible output).
 namespace {
 struct Lucene104CodecRegistrar {
     Lucene104CodecRegistrar() {
-        Codec::registerCodec("Lucene104", []() { return std::make_unique<Lucene104Codec>(); });
+        Codec::registerCodec("Diagon104", []() { return std::make_unique<Lucene104Codec>(); });
     }
 };
 

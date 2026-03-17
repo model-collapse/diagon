@@ -7,6 +7,8 @@
 #include "diagon/store/IndexInput.h"
 
 #include <algorithm>
+#include <cstring>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 
@@ -20,6 +22,28 @@ SegmentInfo::SegmentInfo(const std::string& name, int maxDoc, const std::string&
     , maxDoc_(maxDoc)
     , codecName_(codecName)
     , fieldInfos_(std::vector<FieldInfo>{}) {  // Initialize with empty vector
+    // Generate random 16-byte segment ID
+    generateSegmentID(segmentID_);
+}
+
+void SegmentInfo::setSegmentID(const uint8_t* id) {
+    std::memcpy(segmentID_, id, ID_LENGTH);
+}
+
+void SegmentInfo::generateSegmentID(uint8_t* out) {
+    // Use std::random_device for cryptographic-quality randomness.
+    // Matches Lucene's StringHelper.randomId() which uses SecureRandom.
+    std::random_device rd;
+    // random_device produces unsigned int (typically 32 bits).
+    // Fill 16 bytes = 4 random ints.
+    for (int i = 0; i < ID_LENGTH; i += sizeof(unsigned int)) {
+        unsigned int val = rd();
+        int remaining = ID_LENGTH - i;
+        int toCopy = remaining < static_cast<int>(sizeof(unsigned int))
+                         ? remaining
+                         : static_cast<int>(sizeof(unsigned int));
+        std::memcpy(out + i, &val, toCopy);
+    }
 }
 
 void SegmentInfo::addFile(const std::string& fileName) {

@@ -143,7 +143,7 @@ public:
 
     // ==================== Identification ====================
 
-    std::string getName() const override { return "Lucene104"; }
+    std::string getName() const override { return "Diagon104"; }
 
     // ==================== Capabilities ====================
 

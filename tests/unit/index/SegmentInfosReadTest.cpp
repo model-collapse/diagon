@@ -122,7 +122,7 @@ TEST_F(SegmentInfosReadTest, SegmentMetadataPreserved) {
         EXPECT_GT(seg->maxDoc(), 0);
 
         // Check codec name
-        EXPECT_EQ(seg->codecName(), "Lucene104");
+        EXPECT_EQ(seg->codecName(), "Diagon104");
 
         // Check files list
         EXPECT_GT(seg->files().size(), 0);

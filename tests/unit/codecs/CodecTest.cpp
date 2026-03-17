@@ -23,7 +23,7 @@ using namespace diagon::codecs::lucene104;
 
 TEST(CodecTest, GetDefaultCodec) {
     Codec& codec = Codec::getDefault();
-    EXPECT_EQ("Lucene104", codec.getName());
+    EXPECT_EQ("Diagon104", codec.getName());
 }
 
 TEST(CodecTest, GetCodecByName) {
@@ -37,16 +37,16 @@ TEST(CodecTest, GetCodecByNameNotFound) {
 
 TEST(CodecTest, AvailableCodecs) {
     auto codecs = Codec::availableCodecs();
-    EXPECT_GE(codecs.size(), 1);
+    EXPECT_GE(codecs.size(), 2);  // At least Diagon104 and Lucene104
 
-    // Should contain Lucene104
+    // Should contain both codec names
+    bool foundDiagon104 = false;
     bool foundLucene104 = false;
     for (const auto& name : codecs) {
-        if (name == "Lucene104") {
-            foundLucene104 = true;
-            break;
-        }
+        if (name == "Diagon104") foundDiagon104 = true;
+        if (name == "Lucene104") foundLucene104 = true;
     }
+    EXPECT_TRUE(foundDiagon104);
     EXPECT_TRUE(foundLucene104);
 }
 
@@ -123,7 +123,7 @@ TEST(CodecTest, CodecSingleton) {
 
 TEST(Lucene104CodecTest, Name) {
     Lucene104Codec codec;
-    EXPECT_EQ("Lucene104", codec.getName());
+    EXPECT_EQ("Diagon104", codec.getName());
 }
 
 TEST(Lucene104CodecTest, PostingsFormat) {

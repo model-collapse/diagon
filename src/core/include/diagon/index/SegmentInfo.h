@@ -5,6 +5,7 @@
 
 #include "diagon/index/FieldInfo.h"
 
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <string>
@@ -45,14 +46,19 @@ namespace index {
  */
 class SegmentInfo {
 public:
+    /** Length of segment ID in bytes (matches Lucene StringHelper.ID_LENGTH). */
+    static constexpr int ID_LENGTH = 16;
+
     /**
      * Constructor
      *
      * @param name Segment name (e.g., "_0")
      * @param maxDoc Number of documents in segment
      * @param codecName Codec name used for this segment
+     *
+     * Automatically generates a random 16-byte segment ID.
      */
-    SegmentInfo(const std::string& name, int maxDoc, const std::string& codecName = "Lucene104");
+    SegmentInfo(const std::string& name, int maxDoc, const std::string& codecName = "Diagon104");
 
     /**
      * Get segment name
@@ -162,6 +168,29 @@ public:
      */
     void setUseCompoundFile(bool useCompound) { useCompoundFile_ = useCompound; }
 
+    // ==================== Segment ID (Lucene Compatibility) ====================
+
+    /**
+     * Get 16-byte segment ID.
+     *
+     * Used by Lucene/OpenSearch for segment identity in CodecUtil index headers.
+     * Based on: org.apache.lucene.index.SegmentInfo.getId()
+     */
+    const uint8_t* segmentID() const { return segmentID_; }
+
+    /**
+     * Set segment ID (e.g., when reading from disk).
+     * @param id Pointer to 16 bytes to copy
+     */
+    void setSegmentID(const uint8_t* id);
+
+    /**
+     * Generate a random 16-byte segment ID.
+     * Uses std::random_device for cryptographic-quality randomness.
+     * @param out Pointer to 16-byte buffer to fill
+     */
+    static void generateSegmentID(uint8_t* out);
+
 private:
     std::string name_;                                // Segment name
     int maxDoc_;                                      // Document count (including deleted)
@@ -172,6 +201,7 @@ private:
     int64_t sizeInBytes_{0};                          // Total size
     FieldInfos fieldInfos_;                           // Field metadata (Phase 4)
     bool useCompoundFile_{false};                     // Whether stored as compound file
+    uint8_t segmentID_[ID_LENGTH]{};                  // 16-byte random segment ID
 };
 
 /**
