@@ -67,6 +67,130 @@ void readTrieNode(store::IndexInput* tipIn, std::vector<uint8_t>& termPrefix,
     termPrefix.resize(prefixBefore);
 }
 
+// === TIP6 helpers ===
+
+// Read N bytes LSB-first from buffer (matches Lucene's readLong + mask pattern).
+int64_t readLongNBytes(const uint8_t* data, int64_t offset, int n) {
+    int64_t result = 0;
+    for (int i = 0; i < n; i++) {
+        result |= (static_cast<int64_t>(data[offset + i]) << (i * 8));
+    }
+    return result;
+}
+
+// Decode child labels from strategy data.
+std::vector<uint8_t> decodeChildLabels(int strategyCode, const uint8_t* data, int64_t offset,
+                                        int strategyBytes, int minLabel) {
+    std::vector<uint8_t> labels;
+
+    if (strategyCode == 2) {
+        // BITS: bitset of present labels
+        for (int i = 0; i < strategyBytes; i++) {
+            uint8_t byte = data[offset + i];
+            for (int bit = 0; bit < 8; bit++) {
+                if (byte & (1 << bit)) {
+                    labels.push_back(static_cast<uint8_t>(minLabel + i * 8 + bit));
+                }
+            }
+        }
+    } else if (strategyCode == 1) {
+        // ARRAY: minLabel (implicit) + explicit remaining labels
+        labels.push_back(static_cast<uint8_t>(minLabel));
+        for (int i = 0; i < strategyBytes; i++) {
+            labels.push_back(data[offset + i]);
+        }
+    } else {
+        // REVERSE_ARRAY (code 0): maxLabel byte + absent labels
+        int maxLabel = data[offset];
+        int absentIdx = 1;
+        for (int label = minLabel; label <= maxLabel; label++) {
+            if (absentIdx < strategyBytes && data[offset + absentIdx] == label) {
+                absentIdx++;  // absent label, skip
+            } else {
+                labels.push_back(static_cast<uint8_t>(label));
+            }
+        }
+    }
+
+    return labels;
+}
+
+// Recursive traversal of TIP6 postorder-serialized trie.
+// Reconstructs (termPrefix, blockFP) entries in DFS order (= sorted order).
+void readTip6Node(const uint8_t* data, int64_t fp,
+                  std::vector<uint8_t>& termPrefix,
+                  std::vector<BlockTreeTermsReader::BlockMetadata>& blockIndex) {
+    int sign = data[fp] & 0x03;
+
+    if (sign == 0x00) {
+        // Leaf node (SIGN_NO_CHILDREN)
+        int outputFpBytes = ((data[fp] >> 2) & 0x07) + 1;
+        // hasTerms = (data[fp] & 0x20), always true for Diagon
+        int64_t outputFP = readLongNBytes(data, fp + 1, outputFpBytes);
+        blockIndex.emplace_back(
+            util::BytesRef(termPrefix.data(), termPrefix.size()), outputFP);
+
+    } else if (sign == 0x01 || sign == 0x02) {
+        // Single-child node
+        int childFpBytes = ((data[fp] >> 2) & 0x07) + 1;
+        uint8_t childLabel = data[fp + 1];
+        int64_t childDeltaFP = readLongNBytes(data, fp + 2, childFpBytes);
+        int64_t childFP = fp - childDeltaFP;
+
+        if (sign == 0x01) {
+            // SIGN_SINGLE_CHILD_WITH_OUTPUT: has block at this node
+            int encodedOutputFpBytes = ((data[fp] >> 5) & 0x07) + 1;
+            int64_t encodedFP = readLongNBytes(data, fp + 2 + childFpBytes,
+                                                encodedOutputFpBytes);
+            int64_t blockFP = encodedFP >> 2;
+            blockIndex.emplace_back(
+                util::BytesRef(termPrefix.data(), termPrefix.size()), blockFP);
+        }
+
+        termPrefix.push_back(childLabel);
+        readTip6Node(data, childFP, termPrefix, blockIndex);
+        termPrefix.pop_back();
+
+    } else {
+        // Multi-child node (SIGN_MULTI_CHILDREN, sign == 0x03)
+        int32_t header = data[fp] | (data[fp + 1] << 8) | (data[fp + 2] << 16);
+
+        int childrenFpBytes = ((header >> 2) & 0x07) + 1;
+        bool hasOutput = ((header >> 5) & 1) != 0;
+        int encodedOutputFpBytes = ((header >> 6) & 0x07) + 1;
+        int strategyCode = (header >> 9) & 0x03;
+        int strategyBytes = ((header >> 11) & 0x1F) + 1;
+        int minLabel = (header >> 16) & 0xFF;
+
+        int64_t offset = fp + 3;
+
+        if (hasOutput) {
+            int64_t encodedFP = readLongNBytes(data, offset, encodedOutputFpBytes);
+            offset += encodedOutputFpBytes;
+            int64_t blockFP = encodedFP >> 2;
+            blockIndex.emplace_back(
+                util::BytesRef(termPrefix.data(), termPrefix.size()), blockFP);
+        }
+
+        // Decode child labels from strategy data
+        std::vector<uint8_t> childLabels = decodeChildLabels(
+            strategyCode, data, offset, strategyBytes, minLabel);
+        offset += strategyBytes;
+
+        // Visit children in label order
+        for (size_t i = 0; i < childLabels.size(); i++) {
+            int64_t childDeltaFP = readLongNBytes(
+                data, offset + static_cast<int64_t>(i) * childrenFpBytes,
+                childrenFpBytes);
+            int64_t childFP = fp - childDeltaFP;
+
+            termPrefix.push_back(childLabels[i]);
+            readTip6Node(data, childFP, termPrefix, blockIndex);
+            termPrefix.pop_back();
+        }
+    }
+}
+
 }  // anonymous namespace
 
 // ==================== BlockTreeTermsReader ====================
@@ -178,6 +302,19 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
                 }
                 fst_ = std::make_unique<util::FST>();
 
+            } else if (magic == 0x54495036) {  // "TIP6" - Lucene 103-aligned per-byte trie
+                int numBlocks = tipIn_->readVInt();
+                blockIndex_.reserve(numBlocks);
+                int64_t rootFP = tipIn_->readVLong();
+                int trieDataSize = tipIn_->readVInt();
+                if (numBlocks > 0 && trieDataSize > 0) {
+                    std::vector<uint8_t> trieData(trieDataSize);
+                    tipIn_->readBytes(trieData.data(), trieDataSize);
+                    std::vector<uint8_t> termPrefix;
+                    readTip6Node(trieData.data(), rootFP, termPrefix, blockIndex_);
+                }
+                fst_ = std::make_unique<util::FST>();
+
             } else {
                 throw IOException("Invalid .tip magic: " + std::to_string(magic));
             }
@@ -207,6 +344,12 @@ BlockTreeTermsReader::BlockTreeTermsReader(store::IndexInput* timIn, store::Inde
             } else if (magic == 0x54495035) {
                 // TIP5: Patricia trie — skip numBlocks + trieDataSize + trie bytes
                 tipIn_->readVInt();  // numBlocks
+                int trieDataSize = tipIn_->readVInt();
+                tipIn_->seek(tipIn_->getFilePointer() + trieDataSize);
+            } else if (magic == 0x54495036) {
+                // TIP6: Lucene 103-aligned trie — skip numBlocks + rootFP + trieDataSize + data
+                tipIn_->readVInt();   // numBlocks
+                tipIn_->readVLong();  // rootFP
                 int trieDataSize = tipIn_->readVInt();
                 tipIn_->seek(tipIn_->getFilePointer() + trieDataSize);
             }

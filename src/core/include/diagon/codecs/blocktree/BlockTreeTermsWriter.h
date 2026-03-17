@@ -190,22 +190,33 @@ private:
     };
     std::vector<BlockEntry> blockEntries_;
 
-    /** Patricia trie node for TIP5 compact .tip encoding. */
-    struct TrieNode {
-        std::vector<uint8_t> edge;
-        std::vector<std::unique_ptr<TrieNode>> children;
-        int64_t blockFP = -1;  // -1 means no block at this node
+    /** Per-byte trie node for TIP6 Lucene 103-aligned encoding. */
+    struct Tip6Node {
+        uint8_t label;
+        int64_t blockFP;  // -1 = no block at this node
+        int64_t fp;       // byte offset in buffer (set during save)
+        std::vector<std::unique_ptr<Tip6Node>> children;  // sorted by label
     };
 
-    /** Build Patricia trie from blockEntries_[from..to) at given byte depth. */
-    std::unique_ptr<TrieNode> buildTrie(size_t from, size_t to, size_t depth);
+    /** Child label encoding strategies for multi-child nodes. */
+    enum class ChildSaveStrategy : int {
+        REVERSE_ARRAY = 0, ARRAY = 1, BITS = 2
+    };
 
-    /** Collapse single-child chains: merge child edge into parent when parent has
-     *  exactly one child and no blockFP. */
-    void collapseChains(TrieNode* node);
+    /** Choose best strategy for encoding child labels. */
+    static ChildSaveStrategy chooseStrategy(int minLabel, int maxLabel, int labelCnt);
 
-    /** DFS-serialize trie into buf with delta-encoded blockFPs. */
-    void serializeTrie(const TrieNode* node, std::vector<uint8_t>& buf, int64_t& prevBlockFP);
+    /** Get byte cost of a strategy. */
+    static int getStrategyBytes(ChildSaveStrategy s, int minLabel, int maxLabel, int labelCnt);
+
+    /** Minimum bytes needed to store a non-negative value (1-8). */
+    static int bytesRequiredVLong(int64_t v);
+
+    /** Build per-byte trie from sorted blockEntries_. */
+    std::unique_ptr<Tip6Node> buildTip6Trie();
+
+    /** Postorder-serialize trie to buffer (Lucene 103 format). */
+    void saveTip6TrieToBuffer(Tip6Node* root, std::vector<uint8_t>& buf);
 
     void writeBlock();
     void writeBlockIndex();

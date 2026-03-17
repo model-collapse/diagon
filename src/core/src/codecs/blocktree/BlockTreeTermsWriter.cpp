@@ -39,6 +39,14 @@ void bufEncodeVLong(std::vector<uint8_t>& buf, int64_t val) {
     buf.push_back(static_cast<uint8_t>(v));
 }
 
+// Write N bytes of v LSB-first to buffer (matches Lucene's writeLongNBytes).
+void bufWriteNBytes(std::vector<uint8_t>& buf, int64_t v, int n) {
+    for (int i = 0; i < n; i++) {
+        buf.push_back(static_cast<uint8_t>(v & 0xFF));
+        v >>= 8;
+    }
+}
+
 }  // anonymous namespace
 
 BlockTreeTermsWriter::BlockTreeTermsWriter(store::IndexOutput* timOut, store::IndexOutput* tipOut,
@@ -303,112 +311,262 @@ void BlockTreeTermsWriter::writeBlock() {
     pendingTerms_.clear();
 }
 
-std::unique_ptr<BlockTreeTermsWriter::TrieNode> BlockTreeTermsWriter::buildTrie(size_t from,
-                                                                                size_t to,
-                                                                                size_t depth) {
-    auto node = std::make_unique<TrieNode>();
-    if (from >= to) {
-        return node;
+// === TIP6 static helpers ===
+
+int BlockTreeTermsWriter::bytesRequiredVLong(int64_t v) {
+    // Matches Lucene's Long.BYTES - (Long.numberOfLeadingZeros(v|1) >>> 3)
+    return 8 - (__builtin_clzll(static_cast<uint64_t>(v) | 1) >> 3);
+}
+
+BlockTreeTermsWriter::ChildSaveStrategy BlockTreeTermsWriter::chooseStrategy(
+    int minLabel, int maxLabel, int labelCnt) {
+    // Priority: BITS > ARRAY > REVERSE_ARRAY (BITS wins ties)
+    ChildSaveStrategy best = ChildSaveStrategy::BITS;
+    int bestCost = getStrategyBytes(ChildSaveStrategy::BITS, minLabel, maxLabel, labelCnt);
+
+    int arrayCost = getStrategyBytes(ChildSaveStrategy::ARRAY, minLabel, maxLabel, labelCnt);
+    if (arrayCost < bestCost) {
+        best = ChildSaveStrategy::ARRAY;
+        bestCost = arrayCost;
     }
 
-    // Check if any entry terminates exactly at this depth (edge = empty)
-    size_t start = from;
-    if (blockEntries_[from].termData.size() == depth) {
-        node->blockFP = blockEntries_[from].blockFP;
-        start = from + 1;
+    int revCost = getStrategyBytes(ChildSaveStrategy::REVERSE_ARRAY, minLabel, maxLabel, labelCnt);
+    if (revCost < bestCost) {
+        best = ChildSaveStrategy::REVERSE_ARRAY;
     }
 
-    // Group remaining entries by their byte at `depth`
-    while (start < to) {
-        uint8_t leadByte = blockEntries_[start].termData[depth];
-        // Find end of group sharing same byte at depth
-        size_t groupEnd = start + 1;
-        while (groupEnd < to && blockEntries_[groupEnd].termData[depth] == leadByte) {
-            groupEnd++;
+    return best;
+}
+
+int BlockTreeTermsWriter::getStrategyBytes(ChildSaveStrategy s, int minLabel, int maxLabel,
+                                           int labelCnt) {
+    int range = maxLabel - minLabel + 1;
+    switch (s) {
+        case ChildSaveStrategy::BITS: return (range + 7) / 8;
+        case ChildSaveStrategy::ARRAY: return labelCnt - 1;
+        case ChildSaveStrategy::REVERSE_ARRAY: return range - labelCnt + 1;
+    }
+    return range;  // unreachable
+}
+
+// === TIP6 trie builder ===
+
+std::unique_ptr<BlockTreeTermsWriter::Tip6Node> BlockTreeTermsWriter::buildTip6Trie() {
+    auto root = std::make_unique<Tip6Node>();
+    root->label = 0;
+    root->blockFP = -1;
+    root->fp = -1;
+
+    for (const auto& entry : blockEntries_) {
+        Tip6Node* current = root.get();
+        for (uint8_t byte : entry.termData) {
+            // Find or create child with this label (children are sorted by label)
+            Tip6Node* child = nullptr;
+            auto it = std::lower_bound(
+                current->children.begin(), current->children.end(), byte,
+                [](const std::unique_ptr<Tip6Node>& n, uint8_t b) { return n->label < b; });
+            if (it != current->children.end() && (*it)->label == byte) {
+                child = it->get();
+            } else {
+                auto newChild = std::make_unique<Tip6Node>();
+                newChild->label = byte;
+                newChild->blockFP = -1;
+                newChild->fp = -1;
+                child = newChild.get();
+                current->children.insert(it, std::move(newChild));
+            }
+            current = child;
         }
-
-        auto child = buildTrie(start, groupEnd, depth + 1);
-        child->edge.insert(child->edge.begin(), leadByte);
-        node->children.push_back(std::move(child));
-
-        start = groupEnd;
+        current->blockFP = entry.blockFP;
     }
 
-    return node;
+    return root;
 }
 
-void BlockTreeTermsWriter::collapseChains(TrieNode* node) {
-    // First recurse into children
-    for (auto& child : node->children) {
-        collapseChains(child.get());
-    }
+// === TIP6 postorder serializer ===
 
-    // Collapse: if this node has exactly one child and no blockFP, merge child into this node
-    while (node->children.size() == 1 && node->blockFP < 0) {
-        auto& child = node->children[0];
-        // Append child's edge to this node's edge
-        node->edge.insert(node->edge.end(), child->edge.begin(), child->edge.end());
-        node->blockFP = child->blockFP;
-        // Steal grandchildren
-        auto grandchildren = std::move(child->children);
-        node->children = std::move(grandchildren);
-    }
-}
+void BlockTreeTermsWriter::saveTip6TrieToBuffer(Tip6Node* root, std::vector<uint8_t>& buf) {
+    // Iterative postorder DFS: children are written before parents,
+    // enabling small delta FPs (parent.fp - child.fp).
+    struct StackEntry {
+        Tip6Node* node;
+        size_t childIdx;
+    };
 
-void BlockTreeTermsWriter::serializeTrie(const TrieNode* node, std::vector<uint8_t>& buf,
-                                          int64_t& prevBlockFP) {
-    // Edge: VInt(edgeLen) + raw bytes
-    bufEncodeVInt(buf, static_cast<int32_t>(node->edge.size()));
-    buf.insert(buf.end(), node->edge.begin(), node->edge.end());
+    std::vector<StackEntry> stack;
+    stack.push_back({root, 0});
 
-    // Header: VInt((numChildren << 1) | hasBlockFP)
-    bool hasBlockFP = (node->blockFP >= 0);
-    int header = (static_cast<int>(node->children.size()) << 1) | (hasBlockFP ? 1 : 0);
-    bufEncodeVInt(buf, header);
+    while (!stack.empty()) {
+        auto& top = stack.back();
+        if (top.childIdx < top.node->children.size()) {
+            Tip6Node* child = top.node->children[top.childIdx].get();
+            top.childIdx++;
+            stack.push_back({child, 0});
+        } else {
+            Tip6Node* node = top.node;
+            stack.pop_back();
 
-    // Delta-encoded blockFP (if present)
-    if (hasBlockFP) {
-        bufEncodeVLong(buf, node->blockFP - prevBlockFP);
-        prevBlockFP = node->blockFP;
-    }
+            node->fp = static_cast<int64_t>(buf.size());
 
-    // Children follow inline (DFS preorder, already sorted by first edge byte from buildTrie)
-    for (const auto& child : node->children) {
-        serializeTrie(child.get(), buf, prevBlockFP);
+            int numChildren = static_cast<int>(node->children.size());
+            bool hasOutput = (node->blockFP >= 0);
+
+            if (numChildren == 0) {
+                // === Leaf node (SIGN_NO_CHILDREN = 0x00) ===
+                // header: [x][0=hasFloor][1=hasTerms][3bit fpBytes-1][2bit 0x00]
+                int64_t outputFP = node->blockFP;
+                int outputFpBytes = bytesRequiredVLong(outputFP);
+                uint8_t header = static_cast<uint8_t>(
+                    0x00 | ((outputFpBytes - 1) << 2) | 0x20);  // hasTerms=1
+                buf.push_back(header);
+                bufWriteNBytes(buf, outputFP, outputFpBytes);
+
+            } else if (numChildren == 1) {
+                // === Single-child node ===
+                Tip6Node* child = node->children[0].get();
+                int64_t childDeltaFP = node->fp - child->fp;
+                int childFpBytes = bytesRequiredVLong(childDeltaFP);
+
+                if (hasOutput) {
+                    // SIGN_SINGLE_CHILD_WITH_OUTPUT = 0x01
+                    int64_t encodedFP = (node->blockFP << 2) | 0x02;  // hasTerms=1
+                    int encodedOutputFpBytes = bytesRequiredVLong(encodedFP);
+                    uint8_t header = static_cast<uint8_t>(
+                        0x01 | ((childFpBytes - 1) << 2) |
+                        ((encodedOutputFpBytes - 1) << 5));
+                    buf.push_back(header);
+                    buf.push_back(child->label);
+                    bufWriteNBytes(buf, childDeltaFP, childFpBytes);
+                    bufWriteNBytes(buf, encodedFP, encodedOutputFpBytes);
+                } else {
+                    // SIGN_SINGLE_CHILD_WITHOUT_OUTPUT = 0x02
+                    uint8_t header = static_cast<uint8_t>(
+                        0x02 | ((childFpBytes - 1) << 2));
+                    buf.push_back(header);
+                    buf.push_back(child->label);
+                    bufWriteNBytes(buf, childDeltaFP, childFpBytes);
+                }
+
+            } else {
+                // === Multi-child node (SIGN_MULTI_CHILDREN = 0x03) ===
+                int minLabel = node->children.front()->label;
+                int maxLabel = node->children.back()->label;
+
+                // Max delta is for the first child (furthest back in buffer)
+                int64_t maxChildDeltaFP = node->fp - node->children.front()->fp;
+                int childrenFpBytes = bytesRequiredVLong(maxChildDeltaFP);
+
+                ChildSaveStrategy strategy = chooseStrategy(minLabel, maxLabel, numChildren);
+                int strategyBytes = getStrategyBytes(strategy, minLabel, maxLabel, numChildren);
+
+                int encodedOutputFpBytes = 1;  // default for no-output case
+                if (hasOutput) {
+                    int64_t encodedFP = (node->blockFP << 2) | 0x02;
+                    encodedOutputFpBytes = bytesRequiredVLong(encodedFP);
+                }
+
+                // 3-byte header (LSB-first, 24-bit):
+                //   [1:0]=sign [4:2]=fpBytes-1 [5]=hasOutput [8:6]=outFpBytes-1
+                //   [10:9]=strategyCode [15:11]=stratBytes-1 [23:16]=minLabel
+                int32_t hdr =
+                    0x03
+                    | ((childrenFpBytes - 1) << 2)
+                    | ((hasOutput ? 1 : 0) << 5)
+                    | ((encodedOutputFpBytes - 1) << 6)
+                    | (static_cast<int>(strategy) << 9)
+                    | ((strategyBytes - 1) << 11)
+                    | (minLabel << 16);
+                bufWriteNBytes(buf, hdr, 3);
+
+                // Encoded output FP (if has output)
+                if (hasOutput) {
+                    int64_t encodedFP = (node->blockFP << 2) | 0x02;
+                    bufWriteNBytes(buf, encodedFP, encodedOutputFpBytes);
+                }
+
+                // Strategy data (child labels)
+                switch (strategy) {
+                    case ChildSaveStrategy::BITS: {
+                        int bytes = (maxLabel - minLabel + 1 + 7) / 8;
+                        size_t start = buf.size();
+                        buf.resize(start + bytes, 0);
+                        for (const auto& c : node->children) {
+                            int idx = c->label - minLabel;
+                            buf[start + idx / 8] |= static_cast<uint8_t>(1 << (idx % 8));
+                        }
+                        break;
+                    }
+                    case ChildSaveStrategy::ARRAY: {
+                        // All labels except minLabel (implicit in header)
+                        for (size_t i = 1; i < node->children.size(); i++) {
+                            buf.push_back(node->children[i]->label);
+                        }
+                        break;
+                    }
+                    case ChildSaveStrategy::REVERSE_ARRAY: {
+                        // maxLabel byte + absent labels
+                        buf.push_back(static_cast<uint8_t>(maxLabel));
+                        size_t ci = 0;
+                        for (int label = minLabel; label <= maxLabel; label++) {
+                            if (ci < node->children.size() &&
+                                node->children[ci]->label == label) {
+                                ci++;
+                            } else {
+                                buf.push_back(static_cast<uint8_t>(label));
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                // Child delta FPs (one per child, fixed-width)
+                for (const auto& child : node->children) {
+                    int64_t childDeltaFP = node->fp - child->fp;
+                    bufWriteNBytes(buf, childDeltaFP, childrenFpBytes);
+                }
+            }
+        }
     }
 }
 
 void BlockTreeTermsWriter::writeBlockIndex() {
-    // Write TIP5 Patricia trie block index to .tip file.
-    // Chain-collapsed Patricia trie shares prefixes across ALL entries (not just adjacent),
-    // dramatically more compact than TIP4's pairwise prefix sharing.
+    // Write TIP6 Lucene 103-aligned per-byte trie block index to .tip file.
+    // Postorder serialization with bit-packed headers and BITS/ARRAY/REVERSE_ARRAY
+    // child strategies — structural compactness without compression.
 
-    tipOut_->writeInt(0x54495035);          // "TIP5" magic
-    tipOut_->writeString(fieldInfo_.name);  // Field name
-    tipOut_->writeVLong(termsStartFP_);     // Starting file pointer for this field's terms
+    tipOut_->writeInt(0x54495036);          // "TIP6" magic
+    tipOut_->writeString(fieldInfo_.name);
+    tipOut_->writeVLong(termsStartFP_);
     tipOut_->writeVLong(numTerms_);
 
     int numBlocks = static_cast<int>(blockEntries_.size());
     tipOut_->writeVInt(numBlocks);
 
     if (numBlocks == 0) {
-        tipOut_->writeVInt(0);  // trieDataSize = 0
+        tipOut_->writeVLong(0);  // rootFP
+        tipOut_->writeVInt(0);   // trieDataSize
         return;
     }
 
-    // Build Patricia trie from sorted block entries
-    auto root = buildTrie(0, blockEntries_.size(), 0);
-    collapseChains(root.get());
+    // Build per-byte trie from sorted block entries
+    auto root = buildTip6Trie();
 
-    // Serialize trie to buffer
+    // Postorder-serialize to buffer
     std::vector<uint8_t> trieBuf;
-    trieBuf.reserve(numBlocks * 8);  // Rough estimate
-    int64_t prevBlockFP = 0;
-    serializeTrie(root.get(), trieBuf, prevBlockFP);
+    trieBuf.reserve(numBlocks * 8);
+    saveTip6TrieToBuffer(root.get(), trieBuf);
 
-    // Write trieDataSize + trie data
-    tipOut_->writeVInt(static_cast<int>(trieBuf.size()));
-    tipOut_->writeBytes(trieBuf.data(), trieBuf.size());
+    // Append 8 zero bytes for over-read safety (matching Lucene)
+    for (int i = 0; i < 8; i++) {
+        trieBuf.push_back(0);
+    }
+
+    int64_t rootFP = root->fp;
+    int trieDataSize = static_cast<int>(trieBuf.size());
+
+    tipOut_->writeVLong(rootFP);
+    tipOut_->writeVInt(trieDataSize);
+    tipOut_->writeBytes(trieBuf.data(), trieDataSize);
 }
 
 int BlockTreeTermsWriter::sharedPrefixLength(const util::BytesRef& a,
