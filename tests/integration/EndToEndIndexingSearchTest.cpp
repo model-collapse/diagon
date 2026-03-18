@@ -11,6 +11,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <iostream>
@@ -37,7 +38,10 @@ namespace fs = std::filesystem;
 class EndToEndIndexingSearchTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        testDir_ = fs::temp_directory_path() / "diagon_end_to_end_test";
+        static std::atomic<int> counter{0};
+        testDir_ = fs::temp_directory_path() /
+                   ("diagon_end_to_end_test_" + std::to_string(getpid()) + "_" +
+                    std::to_string(counter++));
         fs::remove_all(testDir_);
         fs::create_directories(testDir_);
     }

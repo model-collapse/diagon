@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <filesystem>
 #include <memory>
 #include <vector>
@@ -26,7 +27,10 @@ namespace fs = std::filesystem;
 class NormsTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        testDir_ = fs::temp_directory_path() / "diagon_norms_test";
+        static std::atomic<int> counter{0};
+        testDir_ = fs::temp_directory_path() /
+                   ("diagon_norms_test_" + std::to_string(getpid()) + "_" +
+                    std::to_string(counter++));
         fs::remove_all(testDir_);
         fs::create_directories(testDir_);
 

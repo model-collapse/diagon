@@ -9,6 +9,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -18,10 +19,12 @@ using namespace diagon::codecs;
 using namespace diagon::index;
 using namespace diagon::store;
 
-// Helper function to create a temporary directory
+// Helper function to create a temporary directory with unique name for parallel test safety
 static std::string createTempDir() {
+    static std::atomic<int> counter{0};
     std::filesystem::path tempPath = std::filesystem::temp_directory_path();
-    tempPath /= "diagon_stored_fields_test_" + std::to_string(std::time(nullptr));
+    tempPath /= "diagon_stored_fields_test_" + std::to_string(getpid()) + "_" +
+                std::to_string(counter++);
     std::filesystem::create_directories(tempPath);
     return tempPath.string();
 }

@@ -9,6 +9,7 @@
 #include "diagon/index/FieldInfo.h"
 #include "diagon/store/FSDirectory.h"
 
+#include <atomic>
 #include <cstring>
 #include <filesystem>
 #include <string>
@@ -20,9 +21,11 @@ using namespace diagon::codecs::lucene90;
 
 namespace {
 
-// Helper: create a temp directory
+// Helper: create a temp directory with unique name for parallel test safety
 std::string createTempDir(const std::string& prefix) {
-    auto path = fs::temp_directory_path() / (prefix + "_XXXXXX");
+    static std::atomic<int> counter{0};
+    auto path = fs::temp_directory_path() /
+                (prefix + "_" + std::to_string(getpid()) + "_" + std::to_string(counter++));
     std::string pathStr = path.string();
     // Create directory
     fs::create_directories(pathStr);

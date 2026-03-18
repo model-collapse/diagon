@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <filesystem>
 
 using namespace diagon;
@@ -15,7 +16,10 @@ using namespace diagon::store;
 class FSDirectoryTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        test_dir = std::filesystem::temp_directory_path() / "diagon_test_fsdir";
+        static std::atomic<int> counter{0};
+        test_dir = std::filesystem::temp_directory_path() /
+                   ("diagon_test_fsdir_" + std::to_string(getpid()) + "_" +
+                    std::to_string(counter++));
         std::filesystem::create_directories(test_dir);
     }
 

@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <filesystem>
 
 using namespace diagon::store;
@@ -12,7 +13,10 @@ using namespace diagon::store;
 class IndexInputOutputTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        test_dir = std::filesystem::temp_directory_path() / "diagon_test_io";
+        static std::atomic<int> counter{0};
+        test_dir = std::filesystem::temp_directory_path() /
+                   ("diagon_test_io_" + std::to_string(getpid()) + "_" +
+                    std::to_string(counter++));
         std::filesystem::create_directories(test_dir);
         dir = FSDirectory::open(test_dir);
     }

@@ -25,6 +25,7 @@
 #include "diagon/store/ByteBuffersIndexOutput.h"
 #include "diagon/util/Exceptions.h"
 
+#include <atomic>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -425,9 +426,10 @@ TEST(OSCompatIntegrationTest, FullHeaderFooterCycle) {
 class OSCompatFormatsTest : public ::testing::Test {
 protected:
     void SetUp() override {
+        static std::atomic<int> counter{0};
         testDir_ = "/tmp/diagon_oscompat_test_" +
                    std::to_string(getpid()) + "_" +
-                   std::to_string(std::time(nullptr));
+                   std::to_string(counter++);
         std::filesystem::create_directories(testDir_);
         dir_ = store::FSDirectory::open(testDir_);
     }

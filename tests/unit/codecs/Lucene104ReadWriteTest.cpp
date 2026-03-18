@@ -29,6 +29,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -42,8 +43,9 @@ using namespace diagon::store;
 class Lucene104ReadWriteTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // Create temporary test directory
-        testDir_ = "/tmp/diagon_rw_test_" + std::to_string(std::time(nullptr));
+        // Create temporary test directory with unique path for parallel execution
+        static std::atomic<int> counter{0};
+        testDir_ = "/tmp/diagon_rw_test_" + std::to_string(getpid()) + "_" + std::to_string(counter++);
         std::filesystem::create_directories(testDir_);
 
         // Create directory

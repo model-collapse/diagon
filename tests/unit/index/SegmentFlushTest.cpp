@@ -9,6 +9,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <filesystem>
 #include <memory>
 
@@ -23,7 +24,10 @@ class SegmentFlushTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // Create temp directory for test
-        testDir_ = fs::temp_directory_path() / "diagon_flush_test";
+        static std::atomic<int> counter{0};
+        testDir_ = fs::temp_directory_path() /
+                   ("diagon_flush_test_" + std::to_string(getpid()) + "_" +
+                    std::to_string(counter++));
         fs::create_directories(testDir_);
     }
 

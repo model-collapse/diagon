@@ -8,6 +8,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <filesystem>
 #include <iostream>
 
@@ -22,7 +23,10 @@ namespace fs = std::filesystem;
  * Debug test to understand forceMerge behavior
  */
 TEST(ForceMergeDebugTest, SimpleDebug) {
-    fs::path testDir = fs::temp_directory_path() / "diagon_debug_test";
+    static std::atomic<int> counter{0};
+    fs::path testDir = fs::temp_directory_path() /
+                       ("diagon_debug_test_" + std::to_string(getpid()) + "_" +
+                        std::to_string(counter++));
     fs::remove_all(testDir);
     fs::create_directories(testDir);
 

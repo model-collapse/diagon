@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <filesystem>
 #include <iostream>
 
@@ -21,7 +22,10 @@ using namespace diagon::store;
 namespace fs = std::filesystem;
 
 TEST(NormsDebugTest, CheckNormsValues) {
-    fs::path testDir = fs::temp_directory_path() / "diagon_norms_debug_test";
+    static std::atomic<int> counter{0};
+    fs::path testDir = fs::temp_directory_path() /
+                       ("diagon_norms_debug_test_" + std::to_string(getpid()) + "_" +
+                        std::to_string(counter++));
     fs::remove_all(testDir);
     fs::create_directories(testDir);
 

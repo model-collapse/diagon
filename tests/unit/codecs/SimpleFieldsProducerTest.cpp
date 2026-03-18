@@ -9,6 +9,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <filesystem>
 #include <unordered_map>
 
@@ -22,7 +23,10 @@ namespace fs = std::filesystem;
 class SimpleFieldsProducerTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        testDir_ = fs::temp_directory_path() / "diagon_fields_producer_test";
+        static std::atomic<int> counter{0};
+        testDir_ = fs::temp_directory_path() /
+                   ("diagon_fields_producer_test_" + std::to_string(getpid()) + "_" +
+                    std::to_string(counter++));
         fs::create_directories(testDir_);
         dir = FSDirectory::open(testDir_.string());
     }
