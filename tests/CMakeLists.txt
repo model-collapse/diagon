@@ -226,3 +226,4 @@ add_diagon_test(Lucene104QueryTest integration/Lucene104QueryTest.cpp)
 
 # OS-Compat Format tests
 add_diagon_test(OSCompatFormatsTest unit/codecs/OSCompatFormatsTest.cpp)
+add_diagon_test(OSCompatPostingsTest unit/codecs/OSCompatPostingsTest.cpp)

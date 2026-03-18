@@ -5,6 +5,7 @@
 
 #include "diagon/codecs/lucene104/Lucene104Codec.h"
 #include "diagon/codecs/lucene104/Lucene104NormsWriter.h"
+#include "diagon/codecs/lucene104/Lucene104OSPostingsFormat.h"
 #include "diagon/codecs/lucene94/Lucene94FieldInfosFormat.h"
 #include "diagon/codecs/lucene99/Lucene99SegmentInfoFormat.h"
 

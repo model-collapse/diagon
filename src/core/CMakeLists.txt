@@ -90,6 +90,9 @@ set(DIAGON_CORE_SOURCES
     src/codecs/lucene104/Lucene104NormsWriter.cpp
     src/codecs/lucene104/Lucene104NormsReader.cpp
     src/codecs/lucene104/Lucene104OSCodec.cpp
+    src/codecs/lucene104/Lucene104OSPostingsWriter.cpp
+    src/codecs/lucene104/Lucene104OSPostingsReader.cpp
+    src/codecs/lucene104/Lucene104OSPostingsFormat.cpp
     src/codecs/lucene99/Lucene99SegmentInfoFormat.cpp
     src/codecs/lucene94/Lucene94FieldInfosFormat.cpp
 
