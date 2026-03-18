@@ -298,6 +298,47 @@ void OSPostingsEnum::refillPosBlock() {
     position_ = 0;
 }
 
+// ==================== PostingsReaderBase Interface ====================
+
+OSTermState Lucene104OSPostingsReader::toOSTermState(const TermState& termState) {
+    OSTermState osState;
+    osState.docStartFP = termState.docStartFP;
+    osState.posStartFP = termState.posStartFP;
+    osState.docFreq = termState.docFreq;
+    osState.totalTermFreq = termState.totalTermFreq;
+    osState.singletonDocID = -1;       // No singleton when using BlockTreeTermsWriter
+    osState.lastPosBlockOffset = -1;   // No position seek optimization
+    return osState;
+}
+
+std::unique_ptr<index::PostingsEnum> Lucene104OSPostingsReader::postings(
+    const index::FieldInfo& fieldInfo, const TermState& termState, bool /*useBatch*/) {
+    OSTermState osState = toOSTermState(termState);
+    bool readFreqs = fieldInfo.indexOptions >= index::IndexOptions::DOCS_AND_FREQS;
+    return std::make_unique<OSPostingsEnum>(
+        *docIn_, posIn_.get(), osState, readFreqs, false);
+}
+
+std::unique_ptr<index::PostingsEnum> Lucene104OSPostingsReader::postingsWithPositions(
+    const index::FieldInfo& fieldInfo, const TermState& termState) {
+    OSTermState osState = toOSTermState(termState);
+    bool readFreqs = fieldInfo.indexOptions >= index::IndexOptions::DOCS_AND_FREQS;
+    bool readPositions = fieldInfo.indexOptions >= index::IndexOptions::DOCS_AND_FREQS_AND_POSITIONS;
+    return std::make_unique<OSPostingsEnum>(
+        *docIn_, posIn_.get(), osState, readFreqs, readPositions);
+}
+
+std::unique_ptr<index::PostingsEnum> Lucene104OSPostingsReader::impactsPostings(
+    const index::FieldInfo& fieldInfo, const TermState& termState) {
+    // OS-compat format doesn't yet support impacts/WAND — return regular postings
+    return postings(fieldInfo, termState, false);
+}
+
+void Lucene104OSPostingsReader::close() {
+    docIn_.reset();
+    posIn_.reset();
+}
+
 }  // namespace lucene104
 }  // namespace codecs
 }  // namespace diagon

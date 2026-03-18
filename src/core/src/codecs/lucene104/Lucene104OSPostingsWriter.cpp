@@ -193,7 +193,8 @@ OSTermState Lucene104OSPostingsWriter::finishTerm() {
     state.docFreq = docCount_;
 
     // Singleton optimization: if only 1 doc, pulse docID into term dictionary
-    if (docCount_ == 1) {
+    // (disabled when used with BlockTreeTermsWriter which doesn't store singletonDocID)
+    if (docCount_ == 1 && !disableSingleton_) {
         state.singletonDocID = docDeltaBuffer_[0] - 1;
     } else {
         state.singletonDocID = -1;

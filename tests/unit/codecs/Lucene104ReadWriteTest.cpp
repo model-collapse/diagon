@@ -15,8 +15,8 @@
  */
 
 #include "diagon/codecs/Codec.h"
+#include "diagon/codecs/PostingsFormat.h"
 #include "diagon/codecs/lucene104/Lucene104Codec.h"
-#include "diagon/codecs/lucene104/Lucene104FieldsProducer.h"
 #include "diagon/document/Document.h"
 #include "diagon/document/Field.h"
 #include "diagon/index/DocumentsWriterPerThread.h"
@@ -100,11 +100,13 @@ TEST_F(Lucene104ReadWriteTest, BasicRoundTrip) {
     SegmentReadState readState(directory_.get(), segmentInfo->name(), segmentInfo->maxDoc(),
                                segmentInfo->fieldInfos());
 
-    // Create fields producer
-    Lucene104FieldsProducer fieldsProducer(readState);
+    // Create fields producer using the codec (matches the writer format)
+    auto& codec = codecs::Codec::forName("Lucene104");
+    auto fieldsProducer = codec.postingsFormat().fieldsProducer(readState);
+    ASSERT_NE(fieldsProducer, nullptr);
 
     // Get terms for "content" field
-    auto contentTerms = fieldsProducer.terms("content");
+    auto contentTerms = fieldsProducer->terms("content");
     ASSERT_NE(contentTerms, nullptr) << "Should have terms for 'content' field";
 
     std::cout << "\n=== Terms in 'content' field ===" << std::endl;
@@ -195,13 +197,15 @@ TEST_F(Lucene104ReadWriteTest, NonExistentField) {
     auto segmentInfo = dwpt.flush();
     ASSERT_NE(segmentInfo, nullptr);
 
-    // Create reader
+    // Create reader using the codec (matches the writer format)
     SegmentReadState readState(directory_.get(), segmentInfo->name(), segmentInfo->maxDoc(),
                                segmentInfo->fieldInfos());
-    Lucene104FieldsProducer fieldsProducer(readState);
+    auto& codec = codecs::Codec::forName("Lucene104");
+    auto fieldsProducer = codec.postingsFormat().fieldsProducer(readState);
+    ASSERT_NE(fieldsProducer, nullptr);
 
     // Try to get non-existent field
-    auto terms = fieldsProducer.terms("nonexistent");
+    auto terms = fieldsProducer->terms("nonexistent");
     ASSERT_EQ(terms, nullptr) << "Should return nullptr for non-existent field";
 }
 
@@ -220,9 +224,10 @@ TEST_F(Lucene104ReadWriteTest, EmptySegment) {
     // If it does create a segment, reading should work
     SegmentReadState readState(directory_.get(), segmentInfo->name(), segmentInfo->maxDoc(),
                                segmentInfo->fieldInfos());
-    Lucene104FieldsProducer fieldsProducer(readState);
+    auto& codec = codecs::Codec::forName("Lucene104");
+    auto fieldsProducer = codec.postingsFormat().fieldsProducer(readState);
 
-    auto terms = fieldsProducer.terms("_all");
+    auto terms = fieldsProducer->terms("_all");
     if (terms) {
         ASSERT_EQ(terms->size(), 0) << "Empty segment should have 0 terms";
     }

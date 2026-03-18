@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace diagon {
 
@@ -114,6 +115,15 @@ public:
      * Close and flush
      */
     virtual void close() = 0;
+
+    /**
+     * Get files created by this consumer.
+     * Used by DWPT to register files in SegmentInfo.
+     */
+    virtual const std::vector<std::string>& getFiles() const {
+        static const std::vector<std::string> empty;
+        return empty;
+    }
 };
 
 /**

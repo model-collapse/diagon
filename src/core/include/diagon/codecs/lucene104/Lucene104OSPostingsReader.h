@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "diagon/codecs/PostingsReaderBase.h"
 #include "diagon/codecs/lucene104/ForUtil.h"
 #include "diagon/codecs/lucene104/Lucene104OSPostingsWriter.h"
 #include "diagon/codecs/lucene104/PForUtil.h"
@@ -22,44 +23,59 @@ namespace lucene104 {
  * Lucene 104 OS-compatible postings reader.
  *
  * Decodes .doc/.pos files written by Lucene104OSPostingsWriter.
+ * Implements PostingsReaderBase so it can be used with BlockTreeTermsReader.
+ *
  * Handles:
  * - ForUtil 256-int packed doc delta blocks
  * - PForUtil 256-int packed freq/position blocks
  * - Two-level skip data (Level0 per block, Level1 per 32 blocks)
  * - VInt tail blocks
- * - Singleton doc optimization
+ * - Singleton doc optimization (when used with encodeTerm/decodeTerm)
  *
  * Based on: org.apache.lucene.codecs.lucene104.Lucene104PostingsReader
  */
-class Lucene104OSPostingsReader {
+class Lucene104OSPostingsReader : public PostingsReaderBase {
 public:
     explicit Lucene104OSPostingsReader(index::SegmentReadState& state);
-    ~Lucene104OSPostingsReader();
+    ~Lucene104OSPostingsReader() override;
 
     /** Initialize from terms input. Validates header and reads block size. */
     void init(store::IndexInput& termsIn);
 
     /**
      * Decode a term state from the term dictionary.
-     *
-     * @param termsIn Input positioned at term metadata
-     * @param fieldInfo Field info for index options
-     * @param state Output term state
-     * @param absolute If true, decode absolute (first in block)
+     * Used in Lucene-style pipeline where encodeTerm/decodeTerm is called.
      */
     void decodeTerm(store::IndexInput& termsIn, const index::FieldInfo& fieldInfo,
                     OSTermState& state, bool absolute);
 
     /**
-     * Create a PostingsEnum for iterating over a term's postings.
-     *
-     * @param fieldInfo Field info
-     * @param state Term state from decodeTerm
-     * @param flags PostingsEnum flags
-     * @return PostingsEnum instance
+     * Create a PostingsEnum using OS-compat term state.
+     * Used in Lucene-style pipeline.
      */
     std::unique_ptr<index::PostingsEnum> postings(
         const index::FieldInfo& fieldInfo, const OSTermState& state, int flags);
+
+    // ==================== PostingsReaderBase interface ====================
+    // These methods accept native TermState for compatibility with BlockTreeTermsReader.
+
+    std::unique_ptr<index::PostingsEnum> postings(
+        const index::FieldInfo& fieldInfo, const TermState& termState,
+        bool useBatch) override;
+
+    std::unique_ptr<index::PostingsEnum> postingsWithPositions(
+        const index::FieldInfo& fieldInfo, const TermState& termState) override;
+
+    std::unique_ptr<index::PostingsEnum> impactsPostings(
+        const index::FieldInfo& fieldInfo, const TermState& termState) override;
+
+    void close() override;
+
+    /** Set .doc input (for external construction). */
+    void setDocInput(std::unique_ptr<store::IndexInput> docIn) { docIn_ = std::move(docIn); }
+
+    /** Set .pos input (for external construction). */
+    void setPosInput(std::unique_ptr<store::IndexInput> posIn) { posIn_ = std::move(posIn); }
 
 private:
     std::unique_ptr<store::IndexInput> docIn_;
@@ -68,8 +84,11 @@ private:
     ForUtil forUtil_;
     PForUtil pforUtil_;
 
-    // Last decoded state (for delta decoding)
+    // Last decoded state (for delta decoding in decodeTerm)
     OSTermState lastState_;
+
+    /** Convert native TermState to OS-compat OSTermState. */
+    static OSTermState toOSTermState(const TermState& termState);
 };
 
 /**

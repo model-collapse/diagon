@@ -3,7 +3,7 @@
 
 #include "diagon/codecs/blocktree/BlockTreeTermsReader.h"
 
-#include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
+#include "diagon/codecs/PostingsReaderBase.h"
 #include "diagon/util/Exceptions.h"
 
 #include <algorithm>
@@ -775,8 +775,8 @@ std::unique_ptr<index::PostingsEnum> SegmentTermsEnum::postings(bool useBatch) {
     termState.docFreq = stats.docFreq;
     termState.totalTermFreq = stats.totalTermFreq;
 
-    // Cast postings reader back to correct type
-    auto* reader = static_cast<codecs::lucene104::Lucene104PostingsReader*>(postingsReader_);
+    // Cast postings reader to polymorphic base type
+    auto* reader = static_cast<codecs::PostingsReaderBase*>(postingsReader_);
 
     // Get postings from reader
     return reader->postings(*fieldInfo_, termState, useBatch);
@@ -802,7 +802,7 @@ std::unique_ptr<index::PostingsEnum> SegmentTermsEnum::postings(int features) {
         termState.docFreq = stats.docFreq;
         termState.totalTermFreq = stats.totalTermFreq;
 
-        auto* reader = static_cast<codecs::lucene104::Lucene104PostingsReader*>(postingsReader_);
+        auto* reader = static_cast<codecs::PostingsReaderBase*>(postingsReader_);
         return reader->postingsWithPositions(*fieldInfo_, termState);
     }
 
@@ -831,8 +831,8 @@ std::unique_ptr<index::PostingsEnum> SegmentTermsEnum::impactsPostings() {
     termState.totalTermFreq = stats.totalTermFreq;
     termState.skipStartFP = stats.skipStartFP;  // Block-Max WAND support
 
-    // Cast postings reader back to correct type
-    auto* reader = static_cast<codecs::lucene104::Lucene104PostingsReader*>(postingsReader_);
+    // Cast postings reader to polymorphic base type
+    auto* reader = static_cast<codecs::PostingsReaderBase*>(postingsReader_);
 
     // Get impacts-aware postings from reader
     auto result = reader->impactsPostings(*fieldInfo_, termState);

@@ -92,6 +92,9 @@ public:
     /** Encode term metadata to term dictionary. */
     void encodeTerm(store::IndexOutput& out, const OSTermState& state, bool absolute);
 
+    /** Disable singleton optimization (always write doc blocks). */
+    void setDisableSingleton(bool disable) { disableSingleton_ = disable; }
+
     /** Close all output files, write metadata. */
     void close();
 
@@ -174,6 +177,9 @@ private:
 
     // Reference to segment state
     index::SegmentWriteState& state_;
+
+    // If true, always write doc blocks (no singleton pulsing into term dict)
+    bool disableSingleton_{false};
 
     /** Flush a doc block (called when buffer fills or term finishes). */
     void flushDocBlock(bool finishTerm);

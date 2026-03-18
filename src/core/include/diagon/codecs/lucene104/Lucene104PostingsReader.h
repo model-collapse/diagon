@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "diagon/codecs/PostingsReaderBase.h"
 #include "diagon/codecs/lucene104/Lucene104PostingsWriter.h"
 #include "diagon/index/PostingsEnum.h"
 #include "diagon/index/SegmentWriteState.h"
@@ -28,7 +29,7 @@ namespace lucene104 {
  *     - low bit 1 = freq is 1, low bit 0 = freq follows as VInt after block
  *   - VInt tail (< 128 docs): same low-bit encoding
  */
-class Lucene104PostingsReader {
+class Lucene104PostingsReader : public PostingsReaderBase {
 public:
     /**
      * Constructor
@@ -63,7 +64,8 @@ public:
      * @return PostingsEnum (may be batch-capable)
      */
     std::unique_ptr<index::PostingsEnum> postings(const index::FieldInfo& fieldInfo,
-                                                  const TermState& termState, bool useBatch);
+                                                  const TermState& termState,
+                                                  bool useBatch) override;
 
     /**
      * Get impacts-aware postings for Block-Max WAND (Phase 2).
@@ -75,12 +77,12 @@ public:
      * @return Impacts-aware PostingsEnum
      */
     std::unique_ptr<index::PostingsEnum> impactsPostings(const index::FieldInfo& fieldInfo,
-                                                         const TermState& termState);
+                                                         const TermState& termState) override;
 
     /**
      * Close all input files.
      */
-    void close();
+    void close() override;
 
     /**
      * Set input stream for testing (Phase 2 MVP).
@@ -111,8 +113,8 @@ public:
      * @param termState Term state from writer (file pointers including posStartFP)
      * @return PostingsEnum with nextPosition() support
      */
-    std::unique_ptr<index::PostingsEnum> postingsWithPositions(const index::FieldInfo& fieldInfo,
-                                                               const TermState& termState);
+    std::unique_ptr<index::PostingsEnum> postingsWithPositions(
+        const index::FieldInfo& fieldInfo, const TermState& termState) override;
 
     /**
      * Read skip entries for a term from .skp file.

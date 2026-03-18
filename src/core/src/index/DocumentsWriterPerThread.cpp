@@ -557,22 +557,9 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
         // Close consumer
         consumer->close();
 
-        // Add files to SegmentInfo (hack: cast to get files)
-        // TODO Phase 4.1: Make getFiles() part of FieldsConsumer interface
-        auto* lucene104Consumer = dynamic_cast<codecs::lucene104::Lucene104FieldsConsumer*>(
-            consumer.get());
-        auto* simpleConsumer = dynamic_cast<codecs::SimpleFieldsConsumer*>(consumer.get());
-
-        if (lucene104Consumer) {
-            for (const auto& file : lucene104Consumer->getFiles()) {
-                segmentInfo->addFile(file);
-            }
-        } else if (simpleConsumer) {
-            for (const auto& file : simpleConsumer->getFiles()) {
-                segmentInfo->addFile(file);
-            }
-        } else {
-            throw std::runtime_error("Unknown FieldsConsumer type");
+        // Add files to SegmentInfo via virtual getFiles()
+        for (const auto& file : consumer->getFiles()) {
+            segmentInfo->addFile(file);
         }
 
         // Write stored fields if present

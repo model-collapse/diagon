@@ -3,6 +3,7 @@
 
 #include "diagon/codecs/lucene104/Lucene104FieldsProducer.h"
 
+#include "diagon/codecs/PostingsReaderBase.h"
 #include "diagon/codecs/SegmentState.h"
 #include "diagon/codecs/blocktree/BlockTreeTermsReader.h"
 #include "diagon/codecs/lucene104/Lucene104PostingsReader.h"
@@ -39,7 +40,9 @@ public:
         // Cast to SegmentTermsEnum to set PostingsReader
         auto* segmentEnum = dynamic_cast<blocktree::SegmentTermsEnum*>(termsEnum.get());
         if (segmentEnum && postingsReader_ && fieldInfo_) {
-            segmentEnum->setPostingsReader(postingsReader_, fieldInfo_);
+            // Pass as PostingsReaderBase* so SegmentTermsEnum can cast correctly
+            segmentEnum->setPostingsReader(
+                static_cast<codecs::PostingsReaderBase*>(postingsReader_), fieldInfo_);
         }
 
         return termsEnum;

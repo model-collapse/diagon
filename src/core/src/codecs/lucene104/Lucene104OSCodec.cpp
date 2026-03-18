@@ -20,7 +20,7 @@ namespace lucene104 {
 // will be plugged in as subsequent tasks complete them.
 
 Lucene104OSCodec::Lucene104OSCodec()
-    : postingsFormat_(std::make_unique<Lucene104PostingsFormat>())
+    : postingsFormat_(std::make_unique<Lucene104OSPostingsFormat>())
     , docValuesFormat_(std::make_unique<Lucene104DocValuesFormat>())
     , columnFormat_(std::make_unique<MergeTreeColumnFormat>())
     , storedFieldsFormat_(std::make_unique<Lucene104StoredFieldsFormat>())
