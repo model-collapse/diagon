@@ -90,6 +90,8 @@ set(DIAGON_CORE_SOURCES
     src/codecs/lucene104/Lucene104NormsWriter.cpp
     src/codecs/lucene104/Lucene104NormsReader.cpp
     src/codecs/lucene104/Lucene104OSCodec.cpp
+    src/codecs/lucene99/Lucene99SegmentInfoFormat.cpp
+    src/codecs/lucene94/Lucene94FieldInfosFormat.cpp
 
     # Lucene105 (Batch-native postings format - P3 Task #35)
     src/codecs/lucene105/Lucene105PostingsWriter.cpp
@@ -265,6 +267,8 @@ set(DIAGON_CORE_HEADERS
     include/diagon/codecs/lucene104/Lucene104NormsWriter.h
     include/diagon/codecs/lucene104/Lucene104NormsReader.h
     include/diagon/codecs/lucene104/Lucene104OSCodec.h
+    include/diagon/codecs/lucene99/Lucene99SegmentInfoFormat.h
+    include/diagon/codecs/lucene94/Lucene94FieldInfosFormat.h
 
     # Lucene105 (Batch-native postings format - P3 Task #35)
     include/diagon/codecs/lucene105/Lucene105PostingsWriter.h

@@ -3,6 +3,7 @@
 
 #include "diagon/index/SegmentInfo.h"
 
+#include "diagon/codecs/CodecUtil.h"
 #include "diagon/store/Directory.h"
 #include "diagon/store/IndexInput.h"
 
@@ -117,6 +118,116 @@ void SegmentInfos::remove(int index) {
 
 // ==================== Phase 4: Read segments_N ====================
 
+/**
+ * Read segments_N in Lucene format (CodecUtil-framed).
+ *
+ * Wire format:
+ *   IndexHeader: magic + "Lucene90SegmentInfos" + version + segmentID + suffix
+ *   LuceneVersion: VInt(major) VInt(minor) VInt(bugfix)
+ *   Version: int64
+ *   NameCounter: int32
+ *   SegCount: int32
+ *   [MinSegmentLuceneVersion if segCount > 0]
+ *   Per segment: SegName, SegID(16), SegCodec, DelGen, DelCount,
+ *                FieldInfosGen, DocValuesGen, SoftDelCount, SciID,
+ *                FieldInfosFiles (set), DocValuesUpdatesFiles (map of sets)
+ *   CommitUserData: map<string,string>
+ *   Footer: CodecUtil footer
+ */
+static SegmentInfos readLuceneFormat(store::IndexInput& in) {
+    // Position is at byte 4 (after magic, which was already read by caller).
+    // checkHeaderNoMagic reads codecName + version (big-endian).
+    int32_t version = codecs::CodecUtil::checkHeaderNoMagic(
+        in, "Lucene90SegmentInfos", 7, 10);
+    (void)version;
+
+    // Read 16-byte segmentID + suffix (part of index header framing)
+    uint8_t segId[codecs::CodecUtil::ID_LENGTH];
+    in.readBytes(segId, codecs::CodecUtil::ID_LENGTH);
+    uint8_t suffixLen = in.readByte();
+    if (suffixLen > 0) {
+        in.skipBytes(suffixLen);
+    }
+
+    // LuceneVersion (major.minor.bugfix)
+    in.readVInt();
+    in.readVInt();
+    in.readVInt();
+
+    // Version (index version counter)
+    int64_t indexVersion = in.readLong();
+
+    // NameCounter
+    in.readInt();
+
+    // SegCount
+    int32_t segCount = in.readInt();
+
+    // MinSegmentLuceneVersion (only present if segCount > 0)
+    if (segCount > 0) {
+        in.readVInt();
+        in.readVInt();
+        in.readVInt();
+    }
+
+    SegmentInfos sis;
+    // Set version from file (generation is set by caller from filename)
+    // Use a simple loop to bump version to match
+    for (int64_t v = 0; v < indexVersion; v++) {
+        sis.incrementVersion();
+    }
+
+    for (int32_t i = 0; i < segCount; i++) {
+        std::string segName = in.readString();
+
+        uint8_t segID[SegmentInfo::ID_LENGTH];
+        in.readBytes(segID, SegmentInfo::ID_LENGTH);
+
+        std::string codecName = in.readString();
+
+        int64_t delGen = in.readLong();
+        (void)delGen;
+
+        int32_t delCount = in.readInt();
+
+        int64_t fieldInfosGen = in.readLong();
+        (void)fieldInfosGen;
+
+        int64_t docValuesGen = in.readLong();
+        (void)docValuesGen;
+
+        int32_t softDelCount = in.readInt();
+        (void)softDelCount;
+
+        uint8_t sciID = in.readByte();
+        (void)sciID;
+
+        // FieldInfosFiles: set of strings
+        in.readSetOfStrings();
+
+        // DocValuesUpdatesFiles: Map<int, Set<String>>
+        int32_t dvUpdatesCount = in.readVInt();
+        for (int32_t j = 0; j < dvUpdatesCount; j++) {
+            in.readInt();           // field number
+            in.readSetOfStrings();  // update files
+        }
+
+        // Create SegmentInfo with maxDoc=0 (will be filled when .si is read)
+        auto si = std::make_shared<SegmentInfo>(segName, 0, codecName);
+        si->setSegmentID(segID);
+        si->setDelCount(delCount);
+        sis.add(si);
+    }
+
+    // CommitUserData: map<string, string>
+    in.readMapOfStrings();
+
+    // Footer
+    codecs::CodecUtil::checkFooter(in);
+
+    return sis;
+}
+
 int64_t SegmentInfos::findMaxGeneration(store::Directory& dir) {
     auto files = dir.listAll();
     int64_t maxGeneration = -1;
@@ -151,7 +262,33 @@ SegmentInfos SegmentInfos::read(store::Directory& dir, const std::string& fileNa
         throw IOException("Invalid segments file magic: " + std::to_string(magic));
     }
 
-    // Read version
+    // Peek at the next byte to distinguish Diagon native from Lucene format.
+    // - Diagon native: next 4 bytes are big-endian int32 version=1 (byte 5 = 0x00)
+    // - Lucene format: next byte is VInt string length for codec name (1..127)
+    int64_t savedPos = input->getFilePointer();  // should be 4 after magic
+    uint8_t nextByte = input->readByte();
+    input->seek(savedPos);
+
+    if (nextByte > 0 && nextByte < 128) {
+        // Lucene format: byte 5 is VInt string length of codec name
+        auto sis = readLuceneFormat(*input);
+        // Set generation from filename
+        std::string genStr = fileName.substr(9);  // Skip "segments_"
+        if (!genStr.empty()) {
+            try {
+                int64_t gen = std::stoll(genStr, nullptr, 16);
+                // Bump generation to match file
+                while (sis.getGeneration() < gen) {
+                    sis.incrementGeneration();
+                }
+            } catch (...) {
+                // Ignore parse errors
+            }
+        }
+        return sis;
+    }
+
+    // Diagon native format: read version
     int32_t version = input->readInt();
     if (version != 1) {
         throw IOException("Unsupported segments file version: " + std::to_string(version));

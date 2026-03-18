@@ -5,6 +5,8 @@
 
 #include "diagon/codecs/lucene104/Lucene104Codec.h"
 #include "diagon/codecs/lucene104/Lucene104NormsWriter.h"
+#include "diagon/codecs/lucene94/Lucene94FieldInfosFormat.h"
+#include "diagon/codecs/lucene99/Lucene99SegmentInfoFormat.h"
 
 namespace diagon {
 namespace codecs {
@@ -22,8 +24,8 @@ Lucene104OSCodec::Lucene104OSCodec()
     , columnFormat_(std::make_unique<MergeTreeColumnFormat>())
     , storedFieldsFormat_(std::make_unique<Lucene104StoredFieldsFormat>())
     , termVectorsFormat_(std::make_unique<Lucene104TermVectorsFormat>())
-    , fieldInfosFormat_(std::make_unique<Lucene104FieldInfosFormat>())
-    , segmentInfoFormat_(std::make_unique<Lucene104SegmentInfoFormat>())
+    , fieldInfosFormat_(std::make_unique<lucene94::Lucene94FieldInfosFormat>())
+    , segmentInfoFormat_(std::make_unique<lucene99::Lucene99SegmentInfoFormat>())
     , normsFormat_(std::make_unique<Lucene104NormsFormat>())
     , liveDocsFormat_(std::make_unique<LiveDocsFormat>())
     , pointsFormat_(std::make_unique<Lucene104PointsFormat>())

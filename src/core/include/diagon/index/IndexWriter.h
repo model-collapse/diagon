@@ -376,6 +376,7 @@ private:
     createCompoundFile(std::shared_ptr<SegmentInfo> segment);  // Pack segment into .cfs/.cfe
     int64_t commitInternal();                      // Internal commit (caller must hold commitLock_)
     void executeMerges(MergeSpecification* spec);  // Execute a set of merges
+    void writeSegmentsFileLucene();                // Write segments_N in Lucene format (OS_COMPAT)
 };
 
 }  // namespace index

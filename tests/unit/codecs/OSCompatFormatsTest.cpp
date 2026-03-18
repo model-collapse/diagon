@@ -405,40 +405,493 @@ TEST(OSCompatIntegrationTest, FullHeaderFooterCycle) {
     EXPECT_GE(checksum, 0);
 }
 
-// ==================== Test Fixtures for Later Phases ====================
+// ==================== Phase 3: .si, .fnm, segments_N Tests ====================
+
+#include "diagon/codecs/lucene99/Lucene99SegmentInfoFormat.h"
+#include "diagon/codecs/lucene94/Lucene94FieldInfosFormat.h"
+#include "diagon/document/Document.h"
+#include "diagon/document/Field.h"
+#include "diagon/index/SegmentInfo.h"
+#include "diagon/index/IndexWriter.h"
+#include "diagon/store/FSDirectory.h"
+
+#include <fstream>
+#include <unistd.h>
 
 /**
  * Test fixture for OS-Compat Format Tests
- * Provides common setup/teardown and helper methods
+ * Provides common setup/teardown with unique temp directories
  */
 class OSCompatFormatsTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // Create temporary test directory for Phase 3+ tests
-        testDir_ = "/tmp/diagon_oscompat_test_" + std::to_string(std::time(nullptr));
+        testDir_ = "/tmp/diagon_oscompat_test_" +
+                   std::to_string(getpid()) + "_" +
+                   std::to_string(std::time(nullptr));
         std::filesystem::create_directories(testDir_);
+        dir_ = store::FSDirectory::open(testDir_);
     }
 
     void TearDown() override {
-        // Clean up temporary directory
+        dir_.reset();
         if (std::filesystem::exists(testDir_)) {
             std::filesystem::remove_all(testDir_);
         }
     }
 
     std::string testDir_;
+    std::shared_ptr<store::Directory> dir_;
 
-    // Helper methods for later phases
-    void createTestIndex(const std::string& mode) {
-        // Helper for Phase 6 integration tests
-        // mode = "native" or "os_compat"
+    /** Create a SegmentInfo with known values for testing. */
+    std::shared_ptr<index::SegmentInfo> makeTestSegment(
+        const std::string& name = "_0", int docCount = 100) {
+        auto si = std::make_shared<index::SegmentInfo>(name, docCount, "Lucene104");
+        si->addFile(name + ".doc");
+        si->addFile(name + ".pos");
+        si->addFile(name + ".tim");
+        si->setDiagnostic("source", "flush");
+        si->setDiagnostic("os", "linux");
+        return si;
     }
 
-    void verifyIndexFormat(const std::string& format) {
-        // Helper to verify index format
-        // format = "diagon_native", "lucene_compat"
+    /** Create FieldInfos with diverse field types. */
+    index::FieldInfos makeTestFieldInfos() {
+        std::vector<index::FieldInfo> infos;
+
+        // body: indexed with positions, norms, stored term vectors
+        index::FieldInfo body("body", 0);
+        body.indexOptions = index::IndexOptions::DOCS_AND_FREQS_AND_POSITIONS;
+        body.storeTermVector = true;
+        infos.push_back(std::move(body));
+
+        // title: indexed with freqs, norms omitted
+        index::FieldInfo title("title", 1);
+        title.indexOptions = index::IndexOptions::DOCS_AND_FREQS;
+        title.omitNorms = true;
+        infos.push_back(std::move(title));
+
+        // date: numeric doc values only
+        index::FieldInfo date("date", 2);
+        date.indexOptions = index::IndexOptions::NONE;
+        date.docValuesType = index::DocValuesType::NUMERIC;
+        infos.push_back(std::move(date));
+
+        // category: sorted set doc values
+        index::FieldInfo cat("category", 3);
+        cat.indexOptions = index::IndexOptions::DOCS;
+        cat.docValuesType = index::DocValuesType::SORTED_SET;
+        infos.push_back(std::move(cat));
+
+        // price: BKD points
+        index::FieldInfo price("price", 4);
+        price.indexOptions = index::IndexOptions::NONE;
+        price.pointDimensionCount = 1;
+        price.pointIndexDimensionCount = 1;
+        price.pointNumBytes = 8;
+        infos.push_back(std::move(price));
+
+        // _soft_delete: soft-deletes sentinel
+        index::FieldInfo sd("_soft_delete", 5);
+        sd.indexOptions = index::IndexOptions::DOCS;
+        sd.softDeletesField = true;
+        infos.push_back(std::move(sd));
+
+        return index::FieldInfos(std::move(infos));
     }
 };
 
-// Note: Phase 3+ tests will use OSCompatFormatsTest fixture
-// to provide filesystem access and cleanup
+// ==================== Lucene99SegmentInfoFormat (.si) ====================
+
+TEST_F(OSCompatFormatsTest, SIRoundTrip) {
+    codecs::lucene99::Lucene99SegmentInfoFormat fmt;
+    auto si = makeTestSegment("_0", 250);
+
+    // Write .si
+    fmt.write(*dir_, *si);
+
+    // Read .si
+    auto readSI = fmt.read(*dir_, "_0", si->segmentID());
+
+    ASSERT_NE(readSI, nullptr);
+    EXPECT_EQ(readSI->name(), "_0");
+    EXPECT_EQ(readSI->maxDoc(), 250);
+    EXPECT_EQ(readSI->codecName(), "Lucene104");
+    EXPECT_EQ(readSI->getUseCompoundFile(), false);
+    EXPECT_EQ(readSI->getDiagnostic("source"), "flush");
+    EXPECT_EQ(readSI->getDiagnostic("os"), "linux");
+
+    // Files should round-trip
+    auto& files = readSI->files();
+    EXPECT_EQ(files.size(), 3u);
+}
+
+TEST_F(OSCompatFormatsTest, SISegmentIDPreserved) {
+    codecs::lucene99::Lucene99SegmentInfoFormat fmt;
+    auto si = makeTestSegment("_1", 500);
+
+    fmt.write(*dir_, *si);
+    auto readSI = fmt.read(*dir_, "_1", si->segmentID());
+
+    ASSERT_NE(readSI, nullptr);
+    EXPECT_EQ(std::memcmp(readSI->segmentID(), si->segmentID(), 16), 0)
+        << "Segment ID must survive round-trip";
+}
+
+TEST_F(OSCompatFormatsTest, SIWrongSegmentIDRejected) {
+    codecs::lucene99::Lucene99SegmentInfoFormat fmt;
+    auto si = makeTestSegment("_2", 10);
+
+    fmt.write(*dir_, *si);
+
+    // Try reading with a different segment ID — should throw
+    uint8_t bogusID[16];
+    std::memset(bogusID, 0xFF, 16);
+
+    EXPECT_THROW(
+        fmt.read(*dir_, "_2", bogusID),
+        CorruptIndexException
+    ) << "Mismatched segment ID must be rejected";
+}
+
+TEST_F(OSCompatFormatsTest, SICompoundFileFlag) {
+    codecs::lucene99::Lucene99SegmentInfoFormat fmt;
+    auto si = makeTestSegment("_3", 100);
+    si->setUseCompoundFile(true);
+
+    fmt.write(*dir_, *si);
+    auto readSI = fmt.read(*dir_, "_3", si->segmentID());
+
+    ASSERT_NE(readSI, nullptr);
+    EXPECT_TRUE(readSI->getUseCompoundFile());
+}
+
+TEST_F(OSCompatFormatsTest, SIEmptyDiagnostics) {
+    codecs::lucene99::Lucene99SegmentInfoFormat fmt;
+
+    // SegmentInfo with no diagnostics
+    auto si = std::make_shared<index::SegmentInfo>("_4", 50, "Lucene104");
+
+    fmt.write(*dir_, *si);
+    auto readSI = fmt.read(*dir_, "_4", si->segmentID());
+
+    ASSERT_NE(readSI, nullptr);
+    EXPECT_EQ(readSI->maxDoc(), 50);
+    EXPECT_TRUE(readSI->diagnostics().empty());
+}
+
+// ==================== Lucene94FieldInfosFormat (.fnm) ====================
+
+TEST_F(OSCompatFormatsTest, FNMRoundTrip) {
+    codecs::lucene94::Lucene94FieldInfosFormat fmt;
+    auto si = makeTestSegment("_0", 100);
+    auto fieldInfos = makeTestFieldInfos();
+    si->setFieldInfos(std::move(fieldInfos));
+
+    // Write .fnm
+    fmt.write(*dir_, *si, si->fieldInfos());
+
+    // Read .fnm
+    auto readFI = fmt.read(*dir_, *si);
+
+    ASSERT_EQ(readFI.size(), 6u);
+
+    // Verify body field
+    auto* body = readFI.fieldInfo("body");
+    ASSERT_NE(body, nullptr);
+    EXPECT_EQ(body->number, 0);
+    EXPECT_EQ(body->indexOptions, index::IndexOptions::DOCS_AND_FREQS_AND_POSITIONS);
+    EXPECT_TRUE(body->storeTermVector);
+    EXPECT_FALSE(body->omitNorms);
+
+    // Verify title field
+    auto* title = readFI.fieldInfo("title");
+    ASSERT_NE(title, nullptr);
+    EXPECT_EQ(title->number, 1);
+    EXPECT_EQ(title->indexOptions, index::IndexOptions::DOCS_AND_FREQS);
+    EXPECT_TRUE(title->omitNorms);
+    EXPECT_FALSE(title->storeTermVector);
+
+    // Verify date field (doc values)
+    auto* date = readFI.fieldInfo("date");
+    ASSERT_NE(date, nullptr);
+    EXPECT_EQ(date->indexOptions, index::IndexOptions::NONE);
+    EXPECT_EQ(date->docValuesType, index::DocValuesType::NUMERIC);
+
+    // Verify category field (sorted set)
+    auto* cat = readFI.fieldInfo("category");
+    ASSERT_NE(cat, nullptr);
+    EXPECT_EQ(cat->docValuesType, index::DocValuesType::SORTED_SET);
+
+    // Verify price field (BKD points)
+    auto* price = readFI.fieldInfo("price");
+    ASSERT_NE(price, nullptr);
+    EXPECT_EQ(price->pointDimensionCount, 1);
+    EXPECT_EQ(price->pointIndexDimensionCount, 1);
+    EXPECT_EQ(price->pointNumBytes, 8);
+
+    // Verify soft-delete field
+    auto* sd = readFI.fieldInfo("_soft_delete");
+    ASSERT_NE(sd, nullptr);
+    EXPECT_TRUE(sd->softDeletesField);
+}
+
+TEST_F(OSCompatFormatsTest, FNMEmptyFieldInfos) {
+    codecs::lucene94::Lucene94FieldInfosFormat fmt;
+    auto si = makeTestSegment("_0", 0);
+
+    index::FieldInfos empty;
+    fmt.write(*dir_, *si, empty);
+
+    auto readFI = fmt.read(*dir_, *si);
+    EXPECT_EQ(readFI.size(), 0u);
+}
+
+TEST_F(OSCompatFormatsTest, FNMFieldAttributes) {
+    codecs::lucene94::Lucene94FieldInfosFormat fmt;
+    auto si = makeTestSegment("_0", 100);
+
+    std::vector<index::FieldInfo> infos;
+    index::FieldInfo fi("body", 0);
+    fi.indexOptions = index::IndexOptions::DOCS;
+    fi.attributes["custom_key"] = "custom_value";
+    fi.attributes["analyzer"] = "standard";
+    infos.push_back(std::move(fi));
+
+    index::FieldInfos fieldInfos(std::move(infos));
+    fmt.write(*dir_, *si, fieldInfos);
+
+    auto readFI = fmt.read(*dir_, *si);
+    ASSERT_EQ(readFI.size(), 1u);
+    auto* f = readFI.fieldInfo("body");
+    ASSERT_NE(f, nullptr);
+    EXPECT_EQ(f->attributes.at("custom_key"), "custom_value");
+    EXPECT_EQ(f->attributes.at("analyzer"), "standard");
+}
+
+TEST_F(OSCompatFormatsTest, FNMStorePayloads) {
+    codecs::lucene94::Lucene94FieldInfosFormat fmt;
+    auto si = makeTestSegment("_0", 100);
+
+    std::vector<index::FieldInfo> infos;
+    index::FieldInfo fi("body", 0);
+    fi.indexOptions = index::IndexOptions::DOCS_AND_FREQS_AND_POSITIONS;
+    fi.storePayloads = true;
+    infos.push_back(std::move(fi));
+
+    index::FieldInfos fieldInfos(std::move(infos));
+    fmt.write(*dir_, *si, fieldInfos);
+
+    auto readFI = fmt.read(*dir_, *si);
+    ASSERT_EQ(readFI.size(), 1u);
+    auto* f = readFI.fieldInfo("body");
+    ASSERT_NE(f, nullptr);
+    EXPECT_TRUE(f->storePayloads);
+}
+
+// ==================== segments_N Lucene Format ====================
+
+TEST_F(OSCompatFormatsTest, SegmentsNLuceneRoundTrip) {
+    // Write an OS_COMPAT index with IndexWriter, then read back via SegmentInfos
+    index::IndexWriterConfig config;
+    config.setFormatMode(index::IndexWriterConfig::FormatMode::OS_COMPAT);
+
+    auto writer = std::make_unique<index::IndexWriter>(*dir_, config);
+
+    // Add a document
+    document::Document doc;
+    doc.add(std::make_unique<document::TextField>("body", "hello world"));
+    writer->addDocument(doc);
+
+    // Commit writes segments_N
+    writer->commit();
+    writer->close();
+
+    // Verify segments_N file was created
+    auto files = dir_->listAll();
+    bool foundSegmentsFile = false;
+    std::string segmentsFileName;
+    for (const auto& f : files) {
+        if (f.find("segments_") == 0) {
+            foundSegmentsFile = true;
+            segmentsFileName = f;
+            break;
+        }
+    }
+    ASSERT_TRUE(foundSegmentsFile) << "Must produce segments_N file";
+
+    // Read it back with adaptive format detection
+    auto sis = index::SegmentInfos::read(*dir_, segmentsFileName);
+    EXPECT_EQ(sis.size(), 1) << "One segment after single commit";
+
+    auto seg = sis.info(0);
+    EXPECT_FALSE(seg->name().empty());
+    EXPECT_EQ(seg->codecName(), "Lucene104");
+}
+
+TEST_F(OSCompatFormatsTest, SegmentsNLuceneMultiCommit) {
+    index::IndexWriterConfig config;
+    config.setFormatMode(index::IndexWriterConfig::FormatMode::OS_COMPAT);
+
+    auto writer = std::make_unique<index::IndexWriter>(*dir_, config);
+
+    // First commit
+    {
+        document::Document doc;
+        doc.add(std::make_unique<document::TextField>("body", "first"));
+        writer->addDocument(doc);
+        writer->commit();
+    }
+
+    // Second commit with another document
+    {
+        document::Document doc;
+        doc.add(std::make_unique<document::TextField>("body", "second"));
+        writer->addDocument(doc);
+        writer->commit();
+    }
+
+    writer->close();
+
+    // Read the latest commit
+    auto sis = index::SegmentInfos::readLatestCommit(*dir_);
+    EXPECT_EQ(sis.size(), 2) << "Two segments after two commits";
+}
+
+TEST_F(OSCompatFormatsTest, SegmentsNNativeRoundTrip) {
+    // Verify native format still works (regression check)
+    index::IndexWriterConfig config;
+    config.setFormatMode(index::IndexWriterConfig::FormatMode::NATIVE);
+
+    auto writer = std::make_unique<index::IndexWriter>(*dir_, config);
+
+    document::Document doc;
+    doc.add(std::make_unique<document::TextField>("body", "native test"));
+    writer->addDocument(doc);
+
+    writer->commit();
+    writer->close();
+
+    auto sis = index::SegmentInfos::readLatestCommit(*dir_);
+    EXPECT_EQ(sis.size(), 1);
+}
+
+// ==================== .si + .fnm in Flush Pipeline ====================
+
+TEST_F(OSCompatFormatsTest, FlushProducesSIAndFNM) {
+    // OS_COMPAT mode records .si and .fnm in the segment's file list.
+    // After commit, these files may be packed into compound files (.cfs/.cfe),
+    // so we check the segments_N metadata rather than the raw directory listing.
+    index::IndexWriterConfig config;
+    config.setFormatMode(index::IndexWriterConfig::FormatMode::OS_COMPAT);
+
+    auto writer = std::make_unique<index::IndexWriter>(*dir_, config);
+
+    document::Document doc;
+    doc.add(std::make_unique<document::TextField>("body", "test doc"));
+    writer->addDocument(doc);
+    writer->commit();
+    writer->close();
+
+    // Read segments_N and check that the segment was written with codec "Lucene104"
+    auto sis = index::SegmentInfos::readLatestCommit(*dir_);
+    ASSERT_EQ(sis.size(), 1);
+    EXPECT_EQ(sis.info(0)->codecName(), "Lucene104")
+        << "OS_COMPAT flush must use Lucene104 codec";
+
+    // Verify files on disk (compound or individual)
+    auto files = dir_->listAll();
+    bool hasSegment = false;
+    for (const auto& f : files) {
+        // Either .si/.fnm directly or .cfs (compound) — both are valid
+        if (f.find(".si") != std::string::npos ||
+            f.find(".cfs") != std::string::npos) {
+            hasSegment = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(hasSegment) << "Must have segment data files";
+}
+
+TEST_F(OSCompatFormatsTest, NativeFlushSkipsSIAndFNM) {
+    index::IndexWriterConfig config;
+    config.setFormatMode(index::IndexWriterConfig::FormatMode::NATIVE);
+
+    auto writer = std::make_unique<index::IndexWriter>(*dir_, config);
+
+    document::Document doc;
+    doc.add(std::make_unique<document::TextField>("body", "native doc"));
+    writer->addDocument(doc);
+    writer->commit();
+    writer->close();
+
+    // Native mode should NOT produce .si or .fnm
+    auto files = dir_->listAll();
+    for (const auto& f : files) {
+        if (f.size() > 3) {
+            EXPECT_NE(f.substr(f.size() - 3), ".si")
+                << "Native mode must not produce .si: " << f;
+        }
+        if (f.size() > 4) {
+            EXPECT_NE(f.substr(f.size() - 4), ".fnm")
+                << "Native mode must not produce .fnm: " << f;
+        }
+    }
+}
+
+// ==================== CRC32 Integrity ====================
+
+TEST_F(OSCompatFormatsTest, SICorruptionDetected) {
+    codecs::lucene99::Lucene99SegmentInfoFormat fmt;
+    auto si = makeTestSegment("_0", 100);
+
+    fmt.write(*dir_, *si);
+
+    // Corrupt the .si file
+    std::string siPath = testDir_ + "/_0.si";
+    {
+        std::fstream f(siPath, std::ios::in | std::ios::out | std::ios::binary);
+        ASSERT_TRUE(f.is_open());
+        // Seek to middle of file and corrupt a byte
+        f.seekp(20, std::ios::beg);
+        char c = static_cast<char>(0xFF);
+        f.write(&c, 1);
+    }
+
+    // Re-open directory to clear any caches
+    dir_ = store::FSDirectory::open(testDir_);
+
+    EXPECT_THROW(
+        fmt.read(*dir_, "_0", si->segmentID()),
+        CorruptIndexException
+    ) << "CRC32 footer must detect corruption";
+}
+
+TEST_F(OSCompatFormatsTest, FNMCorruptionDetected) {
+    codecs::lucene94::Lucene94FieldInfosFormat fmt;
+    auto si = makeTestSegment("_0", 100);
+
+    std::vector<index::FieldInfo> infos;
+    index::FieldInfo fi("body", 0);
+    fi.indexOptions = index::IndexOptions::DOCS;
+    infos.push_back(std::move(fi));
+    index::FieldInfos fieldInfos(std::move(infos));
+
+    fmt.write(*dir_, *si, fieldInfos);
+
+    // Corrupt the .fnm file
+    std::string fnmPath = testDir_ + "/_0.fnm";
+    {
+        std::fstream f(fnmPath, std::ios::in | std::ios::out | std::ios::binary);
+        ASSERT_TRUE(f.is_open());
+        f.seekp(20, std::ios::beg);
+        char c = static_cast<char>(0xFF);
+        f.write(&c, 1);
+    }
+
+    dir_ = store::FSDirectory::open(testDir_);
+
+    EXPECT_THROW(
+        fmt.read(*dir_, *si),
+        CorruptIndexException
+    ) << "CRC32 footer must detect .fnm corruption";
+}

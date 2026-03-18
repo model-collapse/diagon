@@ -3,10 +3,21 @@
 
 #pragma once
 
+#include "diagon/index/FieldInfo.h"
+
 #include <memory>
 #include <string>
 
 namespace diagon {
+
+namespace store {
+class Directory;
+}
+
+namespace index {
+class SegmentInfo;
+}
+
 namespace codecs {
 
 // Forward declarations
@@ -45,7 +56,20 @@ public:
     virtual ~FieldInfosFormat() = default;
     virtual std::string getName() const = 0;
 
-    // TODO: Add read/write methods when FieldInfos persistence is implemented
+    /**
+     * Write field infos to a per-segment .fnm file.
+     * Default: no-op (native mode stores field infos in segments_N).
+     */
+    virtual void write(store::Directory& dir, const index::SegmentInfo& si,
+                       const index::FieldInfos& fieldInfos) {}
+
+    /**
+     * Read field infos from a per-segment .fnm file.
+     * Default: returns empty FieldInfos (native mode reads from segments_N).
+     */
+    virtual index::FieldInfos read(store::Directory& dir, const index::SegmentInfo& si) {
+        return {};
+    }
 };
 
 // ==================== SegmentInfoFormat ====================
@@ -55,7 +79,21 @@ public:
     virtual ~SegmentInfoFormat() = default;
     virtual std::string getName() const = 0;
 
-    // TODO: Add read/write methods when SegmentInfo is implemented
+    /**
+     * Write segment info to a per-segment .si file.
+     * Default: no-op (native mode stores segment info in segments_N).
+     */
+    virtual void write(store::Directory& dir, const index::SegmentInfo& si) {}
+
+    /**
+     * Read segment info from a per-segment .si file.
+     * Default: returns nullptr (native mode reads from segments_N).
+     */
+    virtual std::shared_ptr<index::SegmentInfo> read(store::Directory& dir,
+                                                      const std::string& segmentName,
+                                                      const uint8_t* segmentID) {
+        return nullptr;
+    }
 };
 
 // ==================== NormsFormat ====================

@@ -5,6 +5,7 @@
 
 #include "diagon/codecs/Codec.h"
 #include "diagon/codecs/NormsFormat.h"
+#include "diagon/codecs/OtherFormats.h"
 #include "diagon/codecs/PointValuesWriter.h"
 #include "diagon/codecs/SegmentState.h"
 #include "diagon/codecs/SimpleFieldsConsumer.h"
@@ -758,6 +759,17 @@ std::shared_ptr<SegmentInfo> DocumentsWriterPerThread::flush() {
         // Set diagnostics
         segmentInfo->setDiagnostic("source", "flush");
         segmentInfo->setDiagnostic("os", "linux");
+
+        // Write per-segment .si and .fnm files for OS-compat codecs.
+        // Only write these files if the codec registered as "Lucene104"
+        // (the OS-compat codec). Native "Diagon104" stores metadata in segments_N.
+        if (codec.getName() == "Lucene104") {
+            codec.segmentInfoFormat().write(*directory_, *segmentInfo);
+            segmentInfo->addFile(segmentName + ".si");
+
+            codec.fieldInfosFormat().write(*directory_, *segmentInfo, segmentInfo->fieldInfos());
+            segmentInfo->addFile(segmentName + ".fnm");
+        }
     }
 
     // Reset for next segment

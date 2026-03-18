@@ -4,8 +4,11 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <set>
 #include <string>
+#include <vector>
 
 namespace diagon::store {
 
@@ -105,6 +108,36 @@ public:
      * @return The decoded string
      */
     virtual std::string readString();
+
+    /**
+     * @brief Reads a map of string key-value pairs.
+     * Format: VInt(count) + [String(key) + String(value)] * count
+     * Based on: org.apache.lucene.store.DataInput.readMapOfStrings
+     */
+    std::map<std::string, std::string> readMapOfStrings() {
+        int32_t count = readVInt();
+        std::map<std::string, std::string> map;
+        for (int32_t i = 0; i < count; i++) {
+            std::string key = readString();
+            std::string value = readString();
+            map[std::move(key)] = std::move(value);
+        }
+        return map;
+    }
+
+    /**
+     * @brief Reads a set of strings.
+     * Format: VInt(count) + String(value) * count
+     * Based on: org.apache.lucene.store.DataInput.readSetOfStrings
+     */
+    std::set<std::string> readSetOfStrings() {
+        int32_t count = readVInt();
+        std::set<std::string> set;
+        for (int32_t i = 0; i < count; i++) {
+            set.insert(readString());
+        }
+        return set;
+    }
 
     // ==================== Positioning ====================
 

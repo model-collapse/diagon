@@ -3,6 +3,7 @@
 
 #include "diagon/index/IndexWriter.h"
 
+#include "diagon/codecs/CodecUtil.h"
 #include "diagon/codecs/LiveDocsFormat.h"
 #include "diagon/index/MergeSpecification.h"
 #include "diagon/index/OneMerge.h"
@@ -656,6 +657,11 @@ void IndexWriter::initializeIndex() {
 }
 
 void IndexWriter::writeSegmentsFile() {
+    if (formatMode_ == IndexWriterConfig::FormatMode::OS_COMPAT) {
+        writeSegmentsFileLucene();
+        return;
+    }
+
     // Generate segments_N filename
     std::string filename = SegmentInfos::getSegmentsFileName(segmentInfos_.getGeneration());
 
@@ -739,6 +745,105 @@ void IndexWriter::writeSegmentsFile() {
         // Write compound file flag
         output->writeByte(segmentInfo->getUseCompoundFile() ? 1 : 0);
     }
+
+    // Close output
+    output->close();
+
+    // Sync the file
+    directory_.sync({filename});
+}
+
+void IndexWriter::writeSegmentsFileLucene() {
+    // Generate segments_N filename
+    std::string filename = SegmentInfos::getSegmentsFileName(segmentInfos_.getGeneration());
+
+    // Create output
+    auto output = directory_.createOutput(filename, store::IOContext::DEFAULT);
+
+    // IndexHeader: magic + codecName + version + segmentID(16 zeros) + suffix("")
+    uint8_t zeroID[codecs::CodecUtil::ID_LENGTH] = {};
+    codecs::CodecUtil::writeIndexHeader(*output, "Lucene90SegmentInfos", 10, zeroID, "");
+
+    // LuceneVersion: 9.12.0
+    output->writeVInt(9);
+    output->writeVInt(12);
+    output->writeVInt(0);
+
+    // Version (indexVersion)
+    output->writeLong(segmentInfos_.getVersion());
+
+    // NameCounter: parse highest segment name suffix + 1
+    int32_t nameCounter = 0;
+    for (int i = 0; i < segmentInfos_.size(); i++) {
+        const std::string& segName = segmentInfos_.info(i)->name();
+        // Segment names are like "_0", "_1", "_3" etc.
+        if (segName.size() > 1 && segName[0] == '_') {
+            try {
+                int32_t num = std::stoi(segName.substr(1));
+                if (num >= nameCounter) {
+                    nameCounter = num + 1;
+                }
+            } catch (...) {
+                // Ignore non-numeric segment names
+            }
+        }
+    }
+    output->writeInt(nameCounter);
+
+    // SegCount
+    int32_t segCount = segmentInfos_.size();
+    output->writeInt(segCount);
+
+    // MinSegmentLuceneVersion (only if segCount > 0)
+    if (segCount > 0) {
+        output->writeVInt(9);
+        output->writeVInt(12);
+        output->writeVInt(0);
+    }
+
+    // Per-segment data
+    for (int i = 0; i < segCount; i++) {
+        auto seg = segmentInfos_.info(i);
+
+        // SegName
+        output->writeString(seg->name());
+
+        // SegID: 16 raw bytes
+        output->writeBytes(seg->segmentID(), SegmentInfo::ID_LENGTH);
+
+        // SegCodec
+        output->writeString("Lucene104");
+
+        // DelGen: -1 (no separate live docs generation)
+        output->writeLong(-1);
+
+        // DeletionCount
+        output->writeInt(seg->delCount());
+
+        // FieldInfosGen: -1 (no separate field infos generation)
+        output->writeLong(-1);
+
+        // DocValuesGen: -1 (no separate doc values generation)
+        output->writeLong(-1);
+
+        // SoftDeleteCount: 0
+        output->writeInt(0);
+
+        // SciID: 0 (no sort info)
+        output->writeByte(0);
+
+        // FieldInfosFiles: empty set (VInt(0))
+        output->writeVInt(0);
+
+        // DocValuesUpdatesFiles: empty map of sets (VInt(0))
+        output->writeVInt(0);
+    }
+
+    // CommitUserData: empty map
+    output->writeMapOfStrings({});
+
+    // Footer
+    codecs::CodecUtil::writeFooter(*output);
 
     // Close output
     output->close();

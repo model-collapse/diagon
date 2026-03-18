@@ -6,7 +6,10 @@
 #include "diagon/util/Exceptions.h"
 
 #include <cstdint>
+#include <map>
+#include <set>
 #include <string>
+#include <vector>
 
 namespace diagon::store {
 
@@ -110,6 +113,42 @@ public:
      * @param s The string to write
      */
     virtual void writeString(const std::string& s);
+
+    /**
+     * @brief Writes a map of string key-value pairs.
+     * Format: VInt(count) + [String(key) + String(value)] * count
+     * Based on: org.apache.lucene.store.DataOutput.writeMapOfStrings
+     */
+    void writeMapOfStrings(const std::map<std::string, std::string>& map) {
+        writeVInt(static_cast<int32_t>(map.size()));
+        for (const auto& [key, value] : map) {
+            writeString(key);
+            writeString(value);
+        }
+    }
+
+    /**
+     * @brief Writes a set of strings.
+     * Format: VInt(count) + String(value) * count
+     * Based on: org.apache.lucene.store.DataOutput.writeSetOfStrings
+     */
+    void writeSetOfStrings(const std::set<std::string>& set) {
+        writeVInt(static_cast<int32_t>(set.size()));
+        for (const auto& value : set) {
+            writeString(value);
+        }
+    }
+
+    /**
+     * @brief Writes a vector of strings as a set.
+     * Format: VInt(count) + String(value) * count
+     */
+    void writeSetOfStrings(const std::vector<std::string>& vec) {
+        writeVInt(static_cast<int32_t>(vec.size()));
+        for (const auto& value : vec) {
+            writeString(value);
+        }
+    }
 
     // ==================== Positioning ====================
 
