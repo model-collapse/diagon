@@ -4,6 +4,7 @@
 #include "diagon/index/SegmentInfo.h"
 
 #include "diagon/codecs/CodecUtil.h"
+#include "diagon/codecs/lucene99/Lucene99SegmentInfoFormat.h"
 #include "diagon/store/Directory.h"
 #include "diagon/store/IndexInput.h"
 
@@ -312,6 +313,27 @@ SegmentInfos SegmentInfos::read(store::Directory& dir, const std::string& fileNa
                 // Ignore parse errors
             }
         }
+
+        // Populate maxDoc from .si files for each segment.
+        // readLuceneFormat sets maxDoc=0; we need to read the actual
+        // Lucene99SegmentInfoFormat .si files to get docCount.
+        codecs::lucene99::Lucene99SegmentInfoFormat siFormat;
+        for (auto& seg : sis.segments()) {
+            if (seg->maxDoc() == 0) {
+                try {
+                    auto fullSi = siFormat.read(dir, seg->name(), seg->segmentID());
+                    seg->setMaxDoc(fullSi->maxDoc());
+                    seg->setUseCompoundFile(fullSi->getUseCompoundFile());
+                    seg->setFiles(fullSi->files());
+                    for (const auto& [k, v] : fullSi->diagnostics()) {
+                        seg->setDiagnostic(k, v);
+                    }
+                } catch (const std::exception&) {
+                    // .si file may not exist or be unreadable; leave maxDoc=0
+                }
+            }
+        }
+
         return sis;
     }
 

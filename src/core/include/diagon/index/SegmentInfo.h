@@ -71,6 +71,11 @@ public:
     int maxDoc() const { return maxDoc_; }
 
     /**
+     * Set maximum document ID (used when populating from .si file)
+     */
+    void setMaxDoc(int maxDoc) { maxDoc_ = maxDoc; }
+
+    /**
      * Get number of deleted documents
      * Phase 3: Track deletions
      */
@@ -258,6 +263,11 @@ public:
      * Get all segments
      */
     const std::vector<std::shared_ptr<SegmentInfo>>& segments() const { return segments_; }
+
+    /**
+     * Mutable access to segments (for populating from .si files)
+     */
+    std::vector<std::shared_ptr<SegmentInfo>>& segments() { return segments_; }
 
     /**
      * Get total document count across all segments
