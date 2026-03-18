@@ -110,10 +110,16 @@ private:
                                         const std::string& segmentName);
 
     /**
-     * @brief Read entries from .cfe file.
+     * @brief Read entries from .cfe file (auto-detects Diagon native vs Lucene format).
      */
     static std::unordered_map<std::string, FileEntry> readEntries(Directory& dir,
                                                                   const std::string& entriesFile);
+
+    /** Read entries in Diagon native format (VInt count + entries, no headers). */
+    static std::unordered_map<std::string, FileEntry> readEntriesNative(IndexInput& input);
+
+    /** Read entries in Lucene90 format (CodecUtil header + entries + footer). */
+    static std::unordered_map<std::string, FileEntry> readEntriesLucene(IndexInput& input);
 };
 
 }  // namespace diagon::store

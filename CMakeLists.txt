@@ -9,6 +9,7 @@ project(Diagon
 
 option(DIAGON_BUILD_TESTS "Build tests" ON)
 option(DIAGON_BUILD_BENCHMARKS "Build benchmarks" OFF)
+option(DIAGON_BUILD_TOOLS "Build diagnostic tools" OFF)
 option(DIAGON_BUILD_SHARED "Build shared library" ON)
 option(DIAGON_BUILD_STATIC "Build static library" ON)
 option(DIAGON_ENABLE_SIMD "Enable SIMD optimizations" ON)
@@ -64,6 +65,12 @@ endif()
 
 if(DIAGON_BUILD_BENCHMARKS)
     add_subdirectory(benchmarks)
+endif()
+
+# ==================== Tools ====================
+
+if(DIAGON_BUILD_TOOLS)
+    add_subdirectory(tools)
 endif()
 
 # ==================== Installation ====================

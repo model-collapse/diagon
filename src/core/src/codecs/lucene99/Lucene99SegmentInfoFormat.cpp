@@ -21,20 +21,21 @@ void Lucene99SegmentInfoFormat::write(store::Directory& dir, const index::Segmen
     CodecUtil::writeIndexHeader(*output, CODEC_NAME, VERSION_CURRENT,
                                 si.segmentID(), "");
 
-    // Write Lucene version triple
-    output->writeVInt(LUCENE_VERSION_MAJOR);
-    output->writeVInt(LUCENE_VERSION_MINOR);
-    output->writeVInt(LUCENE_VERSION_BUGFIX);
+    // Write Lucene version triple (little-endian int32 to match Lucene's
+    // ByteBuffersDataOutput which uses native byte order on x86)
+    output->writeIntLE(LUCENE_VERSION_MAJOR);
+    output->writeIntLE(LUCENE_VERSION_MINOR);
+    output->writeIntLE(LUCENE_VERSION_BUGFIX);
 
     // HasMinVersion: byte(1) — we always write a min version
     output->writeByte(1);
     // MinVersion = same as version
-    output->writeVInt(LUCENE_VERSION_MAJOR);
-    output->writeVInt(LUCENE_VERSION_MINOR);
-    output->writeVInt(LUCENE_VERSION_BUGFIX);
+    output->writeIntLE(LUCENE_VERSION_MAJOR);
+    output->writeIntLE(LUCENE_VERSION_MINOR);
+    output->writeIntLE(LUCENE_VERSION_BUGFIX);
 
-    // DocCount
-    output->writeInt(si.maxDoc());
+    // DocCount (little-endian int32)
+    output->writeIntLE(si.maxDoc());
 
     // IsCompoundFile
     output->writeByte(si.getUseCompoundFile() ? 1 : 0);
@@ -73,21 +74,22 @@ std::shared_ptr<index::SegmentInfo> Lucene99SegmentInfoFormat::read(
                                               VERSION_START, VERSION_CURRENT,
                                               segmentID, "");
 
-    // Read Lucene version triple (ignored — we don't use it)
-    input->readVInt();  // major
-    input->readVInt();  // minor
-    input->readVInt();  // bugfix
+    // Read Lucene version triple (little-endian int32, ignored — we don't use it).
+    // Lucene writes these through ByteBuffersDataOutput which uses native (LE) byte order.
+    input->readIntLE();  // major
+    input->readIntLE();  // minor
+    input->readIntLE();  // bugfix
 
     // HasMinVersion
     uint8_t hasMinVersion = input->readByte();
     if (hasMinVersion == 1) {
-        input->readVInt();  // major
-        input->readVInt();  // minor
-        input->readVInt();  // bugfix
+        input->readIntLE();  // major
+        input->readIntLE();  // minor
+        input->readIntLE();  // bugfix
     }
 
-    // DocCount
-    int32_t docCount = input->readInt();
+    // DocCount (little-endian int32)
+    int32_t docCount = input->readIntLE();
 
     // IsCompoundFile
     bool isCompoundFile = input->readByte() != 0;

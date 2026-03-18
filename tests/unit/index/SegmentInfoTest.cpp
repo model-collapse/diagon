@@ -223,11 +223,13 @@ TEST(SegmentInfosTest, Clear) {
 }
 
 TEST(SegmentInfosTest, GetSegmentsFileName) {
+    // Lucene uses base-36 (Character.MAX_RADIX) for generation encoding
     EXPECT_EQ(SegmentInfos::getSegmentsFileName(0), "segments_0");
     EXPECT_EQ(SegmentInfos::getSegmentsFileName(1), "segments_1");
     EXPECT_EQ(SegmentInfos::getSegmentsFileName(10), "segments_a");
-    EXPECT_EQ(SegmentInfos::getSegmentsFileName(15), "segments_f");
-    EXPECT_EQ(SegmentInfos::getSegmentsFileName(255), "segments_ff");
+    EXPECT_EQ(SegmentInfos::getSegmentsFileName(35), "segments_z");
+    EXPECT_EQ(SegmentInfos::getSegmentsFileName(36), "segments_10");
+    EXPECT_EQ(SegmentInfos::getSegmentsFileName(255), "segments_73");
 }
 
 TEST(SegmentInfosTest, RemoveSegment) {

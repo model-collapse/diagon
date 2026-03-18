@@ -100,12 +100,28 @@ void SegmentInfos::clear() {
     incrementVersion();
 }
 
+/**
+ * Convert a 64-bit generation to base-36 string (matching Lucene's
+ * Long.toString(generation, Character.MAX_RADIX)).
+ */
+static std::string toBase36(int64_t value) {
+    if (value == 0)
+        return "0";
+    static const char digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+    std::string result;
+    uint64_t v = static_cast<uint64_t>(value);
+    while (v > 0) {
+        result.push_back(digits[v % 36]);
+        v /= 36;
+    }
+    std::reverse(result.begin(), result.end());
+    return result;
+}
+
 std::string SegmentInfos::getSegmentsFileName(int64_t generation) {
     // Format: segments_N where N is base-36
     // Examples: segments_0, segments_1, ..., segments_a, segments_z
-    std::ostringstream oss;
-    oss << "segments_" << std::hex << generation;
-    return oss.str();
+    return "segments_" + toBase36(generation);
 }
 
 void SegmentInfos::remove(int index) {
@@ -122,7 +138,7 @@ void SegmentInfos::remove(int index) {
  * Read segments_N in Lucene format (CodecUtil-framed).
  *
  * Wire format:
- *   IndexHeader: magic + "Lucene90SegmentInfos" + version + segmentID + suffix
+ *   IndexHeader: magic + "segments" + version + segmentID + suffix
  *   LuceneVersion: VInt(major) VInt(minor) VInt(bugfix)
  *   Version: int64
  *   NameCounter: int32
@@ -138,8 +154,7 @@ static SegmentInfos readLuceneFormat(store::IndexInput& in) {
     // Position is at byte 4 (after magic, which was already read by caller).
     // checkHeaderNoMagic reads codecName + version (big-endian).
     int32_t version = codecs::CodecUtil::checkHeaderNoMagic(
-        in, "Lucene90SegmentInfos", 7, 10);
-    (void)version;
+        in, "segments", 9, 10);
 
     // Read 16-byte segmentID + suffix (part of index header framing)
     uint8_t segId[codecs::CodecUtil::ID_LENGTH];
@@ -154,11 +169,14 @@ static SegmentInfos readLuceneFormat(store::IndexInput& in) {
     in.readVInt();
     in.readVInt();
 
-    // Version (index version counter)
+    // indexCreatedVersion (the major version that created this index)
+    in.readVInt();
+
+    // Version (index version counter) — big-endian int64
     int64_t indexVersion = in.readLong();
 
-    // NameCounter
-    in.readInt();
+    // NameCounter — variable-length long (VLong)
+    in.readVLong();
 
     // SegCount
     int32_t segCount = in.readInt();
@@ -199,14 +217,23 @@ static SegmentInfos readLuceneFormat(store::IndexInput& in) {
         int32_t softDelCount = in.readInt();
         (void)softDelCount;
 
-        uint8_t sciID = in.readByte();
-        (void)sciID;
+        // SCI ID (only in format > VERSION_74 = 9, i.e., version >= 10)
+        if (version > 9) {
+            uint8_t sciMarker = in.readByte();
+            if (sciMarker == 1) {
+                // Read 16-byte SCI ID
+                in.skipBytes(SegmentInfo::ID_LENGTH);
+            } else if (sciMarker != 0) {
+                throw std::runtime_error("Invalid SegmentCommitInfo ID marker: " +
+                                        std::to_string(sciMarker));
+            }
+        }
 
         // FieldInfosFiles: set of strings
         in.readSetOfStrings();
 
         // DocValuesUpdatesFiles: Map<int, Set<String>>
-        int32_t dvUpdatesCount = in.readVInt();
+        int32_t dvUpdatesCount = in.readInt();
         for (int32_t j = 0; j < dvUpdatesCount; j++) {
             in.readInt();           // field number
             in.readSetOfStrings();  // update files
@@ -238,7 +265,7 @@ int64_t SegmentInfos::findMaxGeneration(store::Directory& dir) {
             std::string genStr = file.substr(9);  // Skip "segments_"
             if (!genStr.empty()) {
                 try {
-                    int64_t gen = std::stoll(genStr, nullptr, 16);
+                    int64_t gen = std::stoll(genStr, nullptr, 36);
                     maxGeneration = std::max(maxGeneration, gen);
                 } catch (...) {
                     // Ignore files with invalid generation format
@@ -276,7 +303,7 @@ SegmentInfos SegmentInfos::read(store::Directory& dir, const std::string& fileNa
         std::string genStr = fileName.substr(9);  // Skip "segments_"
         if (!genStr.empty()) {
             try {
-                int64_t gen = std::stoll(genStr, nullptr, 16);
+                int64_t gen = std::stoll(genStr, nullptr, 36);
                 // Bump generation to match file
                 while (sis.getGeneration() < gen) {
                     sis.incrementGeneration();

@@ -88,6 +88,31 @@ public:
         writeInt(static_cast<int32_t>(l));
     }
 
+    // ==================== Little-Endian Writes ====================
+    // Lucene format files (.si, .cfe, etc.) write content int32/int64
+    // in little-endian via ByteBuffersDataOutput.
+    // CodecUtil headers/footers remain big-endian.
+
+    /**
+     * @brief Writes a 32-bit integer (little-endian).
+     * @param i The int value
+     */
+    virtual void writeIntLE(int32_t i) {
+        writeByte(static_cast<uint8_t>(i));
+        writeByte(static_cast<uint8_t>(i >> 8));
+        writeByte(static_cast<uint8_t>(i >> 16));
+        writeByte(static_cast<uint8_t>(i >> 24));
+    }
+
+    /**
+     * @brief Writes a 64-bit long (little-endian).
+     * @param l The long value
+     */
+    virtual void writeLongLE(int64_t l) {
+        writeIntLE(static_cast<int32_t>(l));
+        writeIntLE(static_cast<int32_t>(l >> 32));
+    }
+
     // ==================== Variable-Length Encoding ====================
 
     /**

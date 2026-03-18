@@ -81,6 +81,34 @@ public:
         return (static_cast<int64_t>(readInt()) << 32) | (readInt() & 0xFFFFFFFFLL);
     }
 
+    // ==================== Little-Endian Reads ====================
+    // Lucene format files (.si, .cfe, etc.) write content int32/int64
+    // in little-endian via ByteBuffersDataOutput on x86 platforms.
+    // CodecUtil headers/footers remain big-endian.
+
+    /**
+     * @brief Reads a 32-bit integer (little-endian).
+     * @return The int value
+     */
+    virtual int32_t readIntLE() {
+        uint8_t b0 = readByte();
+        uint8_t b1 = readByte();
+        uint8_t b2 = readByte();
+        uint8_t b3 = readByte();
+        return static_cast<int32_t>(b0) | (static_cast<int32_t>(b1) << 8) |
+               (static_cast<int32_t>(b2) << 16) | (static_cast<int32_t>(b3) << 24);
+    }
+
+    /**
+     * @brief Reads a 64-bit long (little-endian).
+     * @return The long value
+     */
+    virtual int64_t readLongLE() {
+        int32_t lo = readIntLE();
+        int32_t hi = readIntLE();
+        return (static_cast<int64_t>(hi) << 32) | (static_cast<int64_t>(lo) & 0xFFFFFFFFLL);
+    }
+
     // ==================== Variable-Length Encoding ====================
 
     /**

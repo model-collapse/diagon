@@ -609,7 +609,7 @@ void IndexWriter::initializeIndex() {
             std::string genStr = file.substr(9);  // Skip "segments_"
             if (!genStr.empty()) {
                 try {
-                    int64_t gen = std::stoll(genStr, nullptr, 16);
+                    int64_t gen = std::stoll(genStr, nullptr, 36);
                     maxGeneration = std::max(maxGeneration, gen);
                 } catch (...) {
                     // Ignore files with invalid generation format
@@ -762,18 +762,21 @@ void IndexWriter::writeSegmentsFileLucene() {
 
     // IndexHeader: magic + codecName + version + segmentID(16 zeros) + suffix("")
     uint8_t zeroID[codecs::CodecUtil::ID_LENGTH] = {};
-    codecs::CodecUtil::writeIndexHeader(*output, "Lucene90SegmentInfos", 10, zeroID, "");
+    codecs::CodecUtil::writeIndexHeader(*output, "segments", 10, zeroID, "");
 
     // LuceneVersion: 9.12.0
     output->writeVInt(9);
     output->writeVInt(12);
     output->writeVInt(0);
 
+    // indexCreatedVersion (major version that created this index)
+    output->writeVInt(9);
+
     // Version (indexVersion)
     output->writeLong(segmentInfos_.getVersion());
 
-    // NameCounter: parse highest segment name suffix + 1
-    int32_t nameCounter = 0;
+    // NameCounter: parse highest segment name suffix + 1 (VLong)
+    int64_t nameCounter = 0;
     for (int i = 0; i < segmentInfos_.size(); i++) {
         const std::string& segName = segmentInfos_.info(i)->name();
         // Segment names are like "_0", "_1", "_3" etc.
@@ -788,7 +791,7 @@ void IndexWriter::writeSegmentsFileLucene() {
             }
         }
     }
-    output->writeInt(nameCounter);
+    output->writeVLong(nameCounter);
 
     // SegCount
     int32_t segCount = segmentInfos_.size();
@@ -835,8 +838,8 @@ void IndexWriter::writeSegmentsFileLucene() {
         // FieldInfosFiles: empty set (VInt(0))
         output->writeVInt(0);
 
-        // DocValuesUpdatesFiles: empty map of sets (VInt(0))
-        output->writeVInt(0);
+        // DocValuesUpdatesFiles: empty map of sets (int32(0))
+        output->writeInt(0);
     }
 
     // CommitUserData: empty map
