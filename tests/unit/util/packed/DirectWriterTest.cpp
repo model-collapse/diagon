@@ -15,15 +15,17 @@ using namespace diagon::store;
 // ==================== DirectWriter Tests ====================
 
 TEST(DirectWriterTest, BitsRequired) {
-    EXPECT_EQ(0, DirectWriter::unsignedBitsRequired(0));
-    EXPECT_EQ(1, DirectWriter::unsignedBitsRequired(1));
-    EXPECT_EQ(2, DirectWriter::unsignedBitsRequired(2));
-    EXPECT_EQ(2, DirectWriter::unsignedBitsRequired(3));
-    EXPECT_EQ(3, DirectWriter::unsignedBitsRequired(7));
-    EXPECT_EQ(4, DirectWriter::unsignedBitsRequired(15));
-    EXPECT_EQ(8, DirectWriter::unsignedBitsRequired(255));
-    EXPECT_EQ(16, DirectWriter::unsignedBitsRequired(65535));
-    EXPECT_EQ(32, DirectWriter::unsignedBitsRequired(UINT32_MAX));
+    // unsignedBitsRequired rounds up to Lucene's supported bpv:
+    // {1,2,4,8,12,16,20,24,28,32,40,48,56,64}
+    EXPECT_EQ(1, DirectWriter::unsignedBitsRequired(0));    // raw 0 → 1
+    EXPECT_EQ(1, DirectWriter::unsignedBitsRequired(1));    // raw 1 → 1
+    EXPECT_EQ(2, DirectWriter::unsignedBitsRequired(2));    // raw 2 → 2
+    EXPECT_EQ(2, DirectWriter::unsignedBitsRequired(3));    // raw 2 → 2
+    EXPECT_EQ(4, DirectWriter::unsignedBitsRequired(7));    // raw 3 → 4
+    EXPECT_EQ(4, DirectWriter::unsignedBitsRequired(15));   // raw 4 → 4
+    EXPECT_EQ(8, DirectWriter::unsignedBitsRequired(255));  // raw 8 → 8
+    EXPECT_EQ(16, DirectWriter::unsignedBitsRequired(65535));     // raw 16 → 16
+    EXPECT_EQ(32, DirectWriter::unsignedBitsRequired(UINT32_MAX)); // raw 32 → 32
 }
 
 TEST(DirectWriterTest, WriteRead_1Bit) {
@@ -57,11 +59,12 @@ TEST(DirectWriterTest, WriteRead_1Bit) {
     EXPECT_EQ(0, values[7]);
 }
 
-TEST(DirectWriterTest, WriteRead_3Bits) {
+TEST(DirectWriterTest, WriteRead_4Bits) {
     ByteBuffersIndexOutput output("test");
 
     {
-        DirectWriter writer(&output, 5, 3);
+        // bpv=4 is a supported sub-byte value
+        DirectWriter writer(&output, 5, 4);
         writer.add(3);
         writer.add(7);
         writer.add(1);
@@ -73,7 +76,7 @@ TEST(DirectWriterTest, WriteRead_3Bits) {
     auto data = output.toArrayCopy();
     ByteBuffersIndexInput input("test", data);
 
-    auto values = DirectReader::read(&input, 3, 5);
+    auto values = DirectReader::read(&input, 4, 5);
     EXPECT_EQ(5, values.size());
     EXPECT_EQ(3, values[0]);
     EXPECT_EQ(7, values[1]);
@@ -109,7 +112,8 @@ TEST(DirectWriterTest, GetInstance_RandomAccess) {
     ByteBuffersIndexOutput output("test");
 
     {
-        DirectWriter writer(&output, 100, 7);
+        // Values 0-99 fit in 7 raw bits → rounded to supported bpv=8
+        DirectWriter writer(&output, 100, 8);
         for (int i = 0; i < 100; i++) {
             writer.add(i);
         }
@@ -119,11 +123,11 @@ TEST(DirectWriterTest, GetInstance_RandomAccess) {
     auto data = output.toArrayCopy();
     ByteBuffersIndexInput input("test", data);
 
-    // Random access
-    EXPECT_EQ(0, DirectReader::getInstance(&input, 7, 0));
-    EXPECT_EQ(50, DirectReader::getInstance(&input, 7, 50));
-    EXPECT_EQ(99, DirectReader::getInstance(&input, 7, 99));
-    EXPECT_EQ(25, DirectReader::getInstance(&input, 7, 25));
+    // Random access via DirectReader::get(input, bpv, baseOffset, index)
+    EXPECT_EQ(0, DirectReader::get(&input, 8, 0, 0));
+    EXPECT_EQ(50, DirectReader::get(&input, 8, 0, 50));
+    EXPECT_EQ(99, DirectReader::get(&input, 8, 0, 99));
+    EXPECT_EQ(25, DirectReader::get(&input, 8, 0, 25));
 }
 
 TEST(DirectWriterTest, AllZeros) {
@@ -147,55 +151,53 @@ TEST(DirectMonotonicWriterTest, SimpleSequence) {
     ByteBuffersIndexOutput meta("meta");
     ByteBuffersIndexOutput data("data");
 
-    DirectMonotonicWriter::Meta resultMeta;
+    const int blockShift = 4;  // blockSize = 16
+    const int64_t numValues = 16;
+
     {
-        DirectMonotonicWriter writer(&meta, &data, 16, 4);  // 16 values per block
-        for (int64_t i = 0; i < 16; i++) {
+        DirectMonotonicWriter writer(&meta, &data, numValues, blockShift);
+        for (int64_t i = 0; i < numValues; i++) {
             writer.add(i * 100);
         }
-        resultMeta = writer.finish();
+        writer.finish();
     }
 
     auto metaData = meta.toArrayCopy();
     auto packedData = data.toArrayCopy();
 
-    resultMeta.metaFP = 0;
-    resultMeta.dataFP = 0;
-
     ByteBuffersIndexInput metaIn("meta", metaData);
     ByteBuffersIndexInput dataIn("data", packedData);
 
     // Test random access
-    EXPECT_EQ(0, DirectMonotonicReader::get(resultMeta, &metaIn, &dataIn, 0));
-    EXPECT_EQ(500, DirectMonotonicReader::get(resultMeta, &metaIn, &dataIn, 5));
-    EXPECT_EQ(1000, DirectMonotonicReader::get(resultMeta, &metaIn, &dataIn, 10));
-    EXPECT_EQ(1500, DirectMonotonicReader::get(resultMeta, &metaIn, &dataIn, 15));
+    EXPECT_EQ(0, DirectMonotonicReader::get(&metaIn, &dataIn, 0, blockShift, numValues, 0));
+    EXPECT_EQ(500, DirectMonotonicReader::get(&metaIn, &dataIn, 0, blockShift, numValues, 5));
+    EXPECT_EQ(1000, DirectMonotonicReader::get(&metaIn, &dataIn, 0, blockShift, numValues, 10));
+    EXPECT_EQ(1500, DirectMonotonicReader::get(&metaIn, &dataIn, 0, blockShift, numValues, 15));
 }
 
 TEST(DirectMonotonicWriterTest, PerfectMonotonic) {
     ByteBuffersIndexOutput meta("meta");
     ByteBuffersIndexOutput data("data");
 
-    DirectMonotonicWriter::Meta resultMeta;
+    const int blockShift = 4;  // blockSize = 16
+    const int64_t numValues = 32;
+
     {
-        DirectMonotonicWriter writer(&meta, &data, 32, 4);  // 16 values per block
-        for (int64_t i = 0; i < 32; i++) {
+        DirectMonotonicWriter writer(&meta, &data, numValues, blockShift);
+        for (int64_t i = 0; i < numValues; i++) {
             writer.add(i * 10);  // Perfect slope of 10
         }
-        resultMeta = writer.finish();
+        writer.finish();
     }
 
     auto metaData = meta.toArrayCopy();
     auto packedData = data.toArrayCopy();
 
-    resultMeta.metaFP = 0;
-    resultMeta.dataFP = 0;
-
     ByteBuffersIndexInput metaIn("meta", metaData);
     ByteBuffersIndexInput dataIn("data", packedData);
 
     // Read all values
-    auto values = DirectMonotonicReader::readAll(resultMeta, &metaIn, &dataIn);
+    auto values = DirectMonotonicReader::readAll(&metaIn, &dataIn, 0, blockShift, numValues);
     EXPECT_EQ(32, values.size());
     for (int i = 0; i < 32; i++) {
         EXPECT_EQ(i * 10, values[i]) << "Mismatch at index " << i;
@@ -206,24 +208,23 @@ TEST(DirectMonotonicWriterTest, NonUniformGrowth) {
     ByteBuffersIndexOutput meta("meta");
     ByteBuffersIndexOutput data("data");
 
-    DirectMonotonicWriter::Meta resultMeta;
+    const int blockShift = 4;  // blockSize = 16
+    const int64_t numValues = 20;
+
     {
-        DirectMonotonicWriter writer(&meta, &data, 20, 4);  // 16 values per block
+        DirectMonotonicWriter writer(&meta, &data, numValues, blockShift);
 
         // Non-uniform growth: 0, 1, 3, 6, 10, 15, 21, 28, ...
         int64_t value = 0;
-        for (int64_t i = 0; i < 20; i++) {
+        for (int64_t i = 0; i < numValues; i++) {
             writer.add(value);
             value += i + 1;
         }
-        resultMeta = writer.finish();
+        writer.finish();
     }
 
     auto metaData = meta.toArrayCopy();
     auto packedData = data.toArrayCopy();
-
-    resultMeta.metaFP = 0;
-    resultMeta.dataFP = 0;
 
     ByteBuffersIndexInput metaIn("meta", metaData);
     ByteBuffersIndexInput dataIn("data", packedData);
@@ -231,7 +232,7 @@ TEST(DirectMonotonicWriterTest, NonUniformGrowth) {
     // Verify values
     int64_t expected = 0;
     for (int i = 0; i < 20; i++) {
-        int64_t actual = DirectMonotonicReader::get(resultMeta, &metaIn, &dataIn, i);
+        int64_t actual = DirectMonotonicReader::get(&metaIn, &dataIn, 0, blockShift, numValues, i);
         EXPECT_EQ(expected, actual) << "Mismatch at index " << i;
         expected += i + 1;
     }
@@ -241,27 +242,26 @@ TEST(DirectMonotonicWriterTest, LargeSequence) {
     ByteBuffersIndexOutput meta("meta");
     ByteBuffersIndexOutput data("data");
 
-    DirectMonotonicWriter::Meta resultMeta;
+    const int blockShift = 4;  // blockSize = 16
+    const int64_t numValues = 1000;
+
     {
-        DirectMonotonicWriter writer(&meta, &data, 1000, 4);  // 16 values per block
-        for (int64_t i = 0; i < 1000; i++) {
+        DirectMonotonicWriter writer(&meta, &data, numValues, blockShift);
+        for (int64_t i = 0; i < numValues; i++) {
             writer.add(i * i);  // Quadratic growth
         }
-        resultMeta = writer.finish();
+        writer.finish();
     }
 
     auto metaData = meta.toArrayCopy();
     auto packedData = data.toArrayCopy();
 
-    resultMeta.metaFP = 0;
-    resultMeta.dataFP = 0;
-
     ByteBuffersIndexInput metaIn("meta", metaData);
     ByteBuffersIndexInput dataIn("data", packedData);
 
     // Spot check values
-    EXPECT_EQ(0, DirectMonotonicReader::get(resultMeta, &metaIn, &dataIn, 0));
-    EXPECT_EQ(10000, DirectMonotonicReader::get(resultMeta, &metaIn, &dataIn, 100));
-    EXPECT_EQ(250000, DirectMonotonicReader::get(resultMeta, &metaIn, &dataIn, 500));
-    EXPECT_EQ(998001, DirectMonotonicReader::get(resultMeta, &metaIn, &dataIn, 999));
+    EXPECT_EQ(0, DirectMonotonicReader::get(&metaIn, &dataIn, 0, blockShift, numValues, 0));
+    EXPECT_EQ(10000, DirectMonotonicReader::get(&metaIn, &dataIn, 0, blockShift, numValues, 100));
+    EXPECT_EQ(250000, DirectMonotonicReader::get(&metaIn, &dataIn, 0, blockShift, numValues, 500));
+    EXPECT_EQ(998001, DirectMonotonicReader::get(&metaIn, &dataIn, 0, blockShift, numValues, 999));
 }

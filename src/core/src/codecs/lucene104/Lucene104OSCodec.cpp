@@ -6,6 +6,7 @@
 #include "diagon/codecs/lucene104/Lucene104Codec.h"
 #include "diagon/codecs/lucene104/Lucene104NormsWriter.h"
 #include "diagon/codecs/lucene104/Lucene104OSPostingsFormat.h"
+#include "diagon/codecs/lucene90/Lucene90OSStoredFieldsFormat.h"
 #include "diagon/codecs/lucene94/Lucene94FieldInfosFormat.h"
 #include "diagon/codecs/lucene99/Lucene99SegmentInfoFormat.h"
 
@@ -23,7 +24,7 @@ Lucene104OSCodec::Lucene104OSCodec()
     : postingsFormat_(std::make_unique<Lucene104OSPostingsFormat>())
     , docValuesFormat_(std::make_unique<Lucene104DocValuesFormat>())
     , columnFormat_(std::make_unique<MergeTreeColumnFormat>())
-    , storedFieldsFormat_(std::make_unique<Lucene104StoredFieldsFormat>())
+    , storedFieldsFormat_(std::make_unique<lucene90::Lucene90OSStoredFieldsFormat>())
     , termVectorsFormat_(std::make_unique<Lucene104TermVectorsFormat>())
     , fieldInfosFormat_(std::make_unique<lucene94::Lucene94FieldInfosFormat>())
     , segmentInfoFormat_(std::make_unique<lucene99::Lucene99SegmentInfoFormat>())

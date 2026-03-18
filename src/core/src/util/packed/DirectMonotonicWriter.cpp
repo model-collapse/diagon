@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 
 namespace diagon {
@@ -16,282 +17,195 @@ namespace packed {
 
 // ==================== DirectMonotonicWriter ====================
 
-DirectMonotonicWriter::DirectMonotonicWriter(store::IndexOutput* meta, store::IndexOutput* data,
-                                             int64_t numValues, int blockShift)
-    : meta_(meta)
-    , data_(data)
+DirectMonotonicWriter::DirectMonotonicWriter(store::IndexOutput* metaOut,
+                                             store::IndexOutput* dataOut, int64_t numValues,
+                                             int blockShift)
+    : meta_(metaOut)
+    , data_(dataOut)
     , numValues_(numValues)
-    , blockShift_(blockShift)
-    , blockSize_(1 << blockShift)
+    , baseDataPointer_(dataOut->getFilePointer())
+    , bufferSize_(0)
     , count_(0)
-    , lastValue_(0) {
-    if (!meta_ || !data_) {
+    , previous_(std::numeric_limits<int64_t>::min())
+    , finished_(false) {
+    if (!metaOut || !dataOut) {
         throw std::invalid_argument("Outputs cannot be null");
     }
-    if (numValues < 0) {
-        throw std::invalid_argument("numValues must be >= 0");
+    if (blockShift < MIN_BLOCK_SHIFT || blockShift > MAX_BLOCK_SHIFT) {
+        throw std::invalid_argument("blockShift must be in [" + std::to_string(MIN_BLOCK_SHIFT) +
+                                    "-" + std::to_string(MAX_BLOCK_SHIFT) + "]");
     }
-    if (blockShift < 0 || blockShift > 30) {
-        throw std::invalid_argument("blockShift must be 0-30");
+    if (numValues < 0) {
+        throw std::invalid_argument("numValues can't be negative");
     }
 
-    buffer_.reserve(blockSize_);
+    int blockSize = 1 << blockShift;
+    buffer_.resize(std::min(numValues, static_cast<int64_t>(blockSize)));
 }
 
 void DirectMonotonicWriter::add(int64_t value) {
-    if (count_ >= numValues_) {
-        throw std::runtime_error("Already wrote all values");
+    if (value < previous_) {
+        throw std::invalid_argument("Values do not come in order: " + std::to_string(previous_) +
+                                    ", " + std::to_string(value));
     }
-
-    // Check monotonicity
-    if (count_ > 0 && value < lastValue_) {
-        throw std::invalid_argument("Values must be monotonically increasing");
+    if (bufferSize_ == static_cast<int>(buffer_.size())) {
+        flush();
     }
-
-    buffer_.push_back(value);
-    lastValue_ = value;
+    buffer_[bufferSize_++] = value;
+    previous_ = value;
     count_++;
-
-    // Flush block when full
-    if (static_cast<int>(buffer_.size()) >= blockSize_) {
-        flushBlock();
-    }
 }
 
-DirectMonotonicWriter::Meta DirectMonotonicWriter::finish() {
-    if (count_ != numValues_) {
-        throw std::runtime_error("Must write exactly numValues");
+void DirectMonotonicWriter::flush() {
+    if (bufferSize_ == 0) return;
+
+    // Step 1: Compute average increment (slope)
+    const float avgInc = static_cast<float>(
+        static_cast<double>(buffer_[bufferSize_ - 1] - buffer_[0]) /
+        std::max(1, bufferSize_ - 1));
+
+    // Step 2: Subtract expected values (linear prediction)
+    int64_t min = std::numeric_limits<int64_t>::max();
+    for (int i = 0; i < bufferSize_; i++) {
+        int64_t expected = static_cast<int64_t>(avgInc * static_cast<int64_t>(i));
+        buffer_[i] -= expected;
+        min = std::min(buffer_[i], min);
     }
 
-    // Flush remaining values
-    if (!buffer_.empty()) {
-        flushBlock();
+    // Step 3: Normalize to non-negative by subtracting min
+    int64_t maxDelta = 0;
+    for (int i = 0; i < bufferSize_; i++) {
+        buffer_[i] -= min;
+        maxDelta |= buffer_[i];  // OR to find max bits needed
     }
 
-    // Write all block metadata
-    for (const auto& block : blocks_) {
-        writeMeta(block);
-    }
+    // Step 4: Write metadata (Lucene format: 21 bytes per block)
+    meta_->writeLong(min);
 
-    Meta meta;
-    meta.numValues = numValues_;
-    meta.blockShift = blockShift_;
-    meta.min = blocks_.empty() ? 0 : blocks_.front().min;
-    meta.max = blocks_.empty() ? 0 : blocks_.back().max;
-    meta.metaFP = 0;  // Caller should set this
-    meta.dataFP = 0;  // Caller should set this
+    // Write avgInc as IEEE 754 float bits (big-endian int)
+    uint32_t floatBits;
+    std::memcpy(&floatBits, &avgInc, sizeof(floatBits));
+    meta_->writeInt(static_cast<int32_t>(floatBits));
 
-    return meta;
-}
+    // Write data offset relative to baseDataPointer
+    meta_->writeLong(data_->getFilePointer() - baseDataPointer_);
 
-void DirectMonotonicWriter::flushBlock() {
-    if (buffer_.empty()) {
-        return;
-    }
-
-    Block block;
-    int size = buffer_.size();
-
-    block.min = buffer_.front();
-    block.max = buffer_.back();
-
-    // Compute average slope
-    if (size > 1) {
-        block.avgSlope = static_cast<float>(block.max - block.min) / (size - 1);
+    // Step 5: Write packed residuals (or just metadata if all equal)
+    if (maxDelta == 0) {
+        meta_->writeByte(0);  // No data needed
     } else {
-        block.avgSlope = 0;
-    }
-
-    // Compute deviations from expected values
-    std::vector<int64_t> deviations(size);
-    int64_t minDeviation = INT64_MAX;
-    int64_t maxDeviation = INT64_MIN;
-
-    for (int i = 0; i < size; i++) {
-        int64_t expected = block.min + static_cast<int64_t>(block.avgSlope * i);
-        int64_t deviation = buffer_[i] - expected;
-        deviations[i] = deviation;
-        minDeviation = std::min(minDeviation, deviation);
-        maxDeviation = std::max(maxDeviation, deviation);
-    }
-
-    // Normalize deviations to non-negative
-    for (int i = 0; i < size; i++) {
-        deviations[i] -= minDeviation;
-    }
-
-    // Calculate bits required
-    uint64_t maxNormalized = maxDeviation - minDeviation;
-    block.bitsPerValue = DirectWriter::unsignedBitsRequired(maxNormalized);
-
-    // Store block metadata (written in finish())
-    block.minDeviation = minDeviation;
-    block.dataOffset = data_->getFilePointer();
-    blocks_.push_back(block);
-
-    // Write packed deviations
-    if (block.bitsPerValue > 0) {
-        DirectWriter writer(data_, size, block.bitsPerValue);
-        for (int i = 0; i < size; i++) {
-            writer.add(deviations[i]);
+        int bitsRequired = DirectWriter::unsignedBitsRequired(static_cast<uint64_t>(maxDelta));
+        DirectWriter writer(data_, bufferSize_, bitsRequired);
+        for (int i = 0; i < bufferSize_; i++) {
+            writer.add(buffer_[i]);
         }
         writer.finish();
+        meta_->writeByte(static_cast<uint8_t>(bitsRequired));
     }
 
-    // Clear buffer for next block
-    buffer_.clear();
+    bufferSize_ = 0;
 }
 
-void DirectMonotonicWriter::writeMeta(const Block& block) {
-    // Write block metadata (called during finish())
-    meta_->writeLong(block.min);
-
-    // Write avgSlope as float bits
-    float slope = block.avgSlope;
-    uint32_t bits;
-    std::memcpy(&bits, &slope, sizeof(bits));
-    meta_->writeInt(static_cast<int>(bits));
-
-    meta_->writeLong(block.minDeviation);
-    meta_->writeLong(block.dataOffset);
-    meta_->writeByte(static_cast<uint8_t>(block.bitsPerValue));
+void DirectMonotonicWriter::finish() {
+    if (count_ != numValues_) {
+        throw std::runtime_error("Wrong number of values added, expected: " +
+                                 std::to_string(numValues_) + ", got: " + std::to_string(count_));
+    }
+    if (finished_) {
+        throw std::runtime_error("#finish has been called already");
+    }
+    if (bufferSize_ > 0) {
+        flush();
+    }
+    finished_ = true;
 }
 
 // ==================== DirectMonotonicReader ====================
 
-int64_t DirectMonotonicReader::get(const DirectMonotonicWriter::Meta& meta,
-                                   store::IndexInput* metaIn, store::IndexInput* dataIn,
-                                   int64_t index) {
-    if (index < 0 || index >= meta.numValues) {
-        throw std::invalid_argument("Index out of range");
-    }
+DirectMonotonicReader::BlockMeta
+DirectMonotonicReader::readBlockMeta(store::IndexInput* metaIn, int64_t metaStartFP,
+                                     int64_t blockIndex) {
+    // Each block metadata: Long(8) + Int(4) + Long(8) + Byte(1) = 21 bytes
+    metaIn->seek(metaStartFP + blockIndex * 21);
 
-    int blockSize = 1 << meta.blockShift;
-    int64_t blockIndex = index / blockSize;
-    int offsetInBlock = index % blockSize;
+    BlockMeta block;
+    block.min = metaIn->readLong();
 
-    // Read block metadata
-    Block block = readBlockMeta(meta, metaIn, blockIndex);
+    // Read float from int bits (big-endian int from stream)
+    uint32_t floatBits = static_cast<uint32_t>(metaIn->readInt());
+    std::memcpy(&block.avgInc, &floatBits, sizeof(block.avgInc));
 
-    // Calculate expected value
-    int64_t expected = block.min + static_cast<int64_t>(block.avgSlope * offsetInBlock);
+    block.dataOffset = metaIn->readLong();
+    block.bitsRequired = metaIn->readByte();
 
-    // Read deviation if needed
-    int64_t deviation = 0;
-    if (block.bitsPerValue > 0) {
-        // Calculate absolute bit position: block start + offset within block
-        int64_t absoluteBitPosition = block.dataOffset * 8 + offsetInBlock * block.bitsPerValue;
-        int64_t bytePosition = absoluteBitPosition / 8;
-        dataIn->seek(bytePosition);
-
-        // Read the deviation value
-        int bitOffset = absoluteBitPosition % 8;
-        int bytesNeeded = (bitOffset + block.bitsPerValue + 7) / 8;
-        std::vector<uint8_t> buffer(bytesNeeded);
-        dataIn->readBytes(buffer.data(), bytesNeeded);
-
-        // Reconstruct value from bytes
-        uint64_t accumulator = 0;
-        for (int i = 0; i < bytesNeeded; i++) {
-            accumulator = (accumulator << 8) | buffer[i];
-        }
-
-        // Shift to align value and mask
-        int bitsInLastByte = (bitOffset + block.bitsPerValue) % 8;
-        if (bitsInLastByte == 0) {
-            bitsInLastByte = 8;
-        }
-        int shiftRight = 8 - bitsInLastByte;
-        accumulator >>= shiftRight;
-
-        // Mask to extract only bitsPerValue bits
-        uint64_t mask = (1ULL << block.bitsPerValue) - 1;
-        deviation = accumulator & mask;
-    }
-
-    return expected + deviation + block.minDeviation;
+    return block;
 }
 
-std::vector<int64_t> DirectMonotonicReader::readAll(const DirectMonotonicWriter::Meta& meta,
-                                                    store::IndexInput* metaIn,
-                                                    store::IndexInput* dataIn) {
+int64_t DirectMonotonicReader::get(store::IndexInput* metaIn, store::IndexInput* dataIn,
+                                   int64_t baseDataPointer, int blockShift, int64_t numValues,
+                                   int64_t index, int64_t metaStartFP) {
+    if (index < 0 || index >= numValues) {
+        throw std::invalid_argument("Index out of range: " + std::to_string(index));
+    }
+
+    int blockSize = 1 << blockShift;
+    int64_t blockIndex = index >> blockShift;
+    int offsetInBlock = static_cast<int>(index & (blockSize - 1));
+
+    // Read block metadata from known start position
+    BlockMeta block = readBlockMeta(metaIn, metaStartFP, blockIndex);
+
+    // Compute expected value from linear prediction
+    int64_t expected = static_cast<int64_t>(block.avgInc * static_cast<int64_t>(offsetInBlock));
+
+    // Read residual
+    int64_t residual = 0;
+    if (block.bitsRequired > 0) {
+        int64_t dataOffset = baseDataPointer + block.dataOffset;
+        residual =
+            DirectReader::get(dataIn, block.bitsRequired, dataOffset, offsetInBlock);
+    }
+
+    return block.min + expected + residual;
+}
+
+std::vector<int64_t> DirectMonotonicReader::readAll(store::IndexInput* metaIn,
+                                                     store::IndexInput* dataIn,
+                                                     int64_t baseDataPointer, int blockShift,
+                                                     int64_t numValues, int64_t metaStartFP) {
     std::vector<int64_t> result;
-    result.reserve(meta.numValues);
+    result.reserve(numValues);
 
-    int blockSize = 1 << meta.blockShift;
-    int64_t numBlocks = (meta.numValues + blockSize - 1) / blockSize;
+    int blockSize = 1 << blockShift;
+    int64_t numBlocks = numValues == 0 ? 0 : ((numValues - 1) >> blockShift) + 1;
 
-    for (int64_t blockIndex = 0; blockIndex < numBlocks; blockIndex++) {
-        Block block = readBlockMeta(meta, metaIn, blockIndex);
+    for (int64_t blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
+        BlockMeta block = readBlockMeta(metaIn, metaStartFP, blockIdx);
 
-        // Calculate number of values in this block
-        int64_t valuesInBlock = std::min<int64_t>(blockSize,
-                                                  meta.numValues - blockIndex * blockSize);
+        int64_t valuesInBlock =
+            std::min(static_cast<int64_t>(blockSize), numValues - blockIdx * blockSize);
 
-        // Read deviations for this block
-        std::vector<int64_t> deviations(valuesInBlock);
-        if (block.bitsPerValue > 0) {
-            // Read each deviation using absolute positioning
+        if (block.bitsRequired > 0) {
+            // Read all residuals for this block
+            int64_t dataOffset = baseDataPointer + block.dataOffset;
+            dataIn->seek(dataOffset);
+            auto residuals = DirectReader::read(dataIn, block.bitsRequired, valuesInBlock);
+
             for (int64_t i = 0; i < valuesInBlock; i++) {
-                int64_t absoluteBitPosition = block.dataOffset * 8 + i * block.bitsPerValue;
-                int64_t bytePosition = absoluteBitPosition / 8;
-                dataIn->seek(bytePosition);
-
-                int bitOffset = absoluteBitPosition % 8;
-                int bytesNeeded = (bitOffset + block.bitsPerValue + 7) / 8;
-                std::vector<uint8_t> buffer(bytesNeeded);
-                dataIn->readBytes(buffer.data(), bytesNeeded);
-
-                uint64_t accumulator = 0;
-                for (int j = 0; j < bytesNeeded; j++) {
-                    accumulator = (accumulator << 8) | buffer[j];
-                }
-
-                int bitsInLastByte = (bitOffset + block.bitsPerValue) % 8;
-                if (bitsInLastByte == 0) {
-                    bitsInLastByte = 8;
-                }
-                int shiftRight = 8 - bitsInLastByte;
-                accumulator >>= shiftRight;
-
-                uint64_t mask = (1ULL << block.bitsPerValue) - 1;
-                deviations[i] = accumulator & mask;
+                int64_t expected =
+                    static_cast<int64_t>(block.avgInc * static_cast<int64_t>(i));
+                result.push_back(block.min + expected + residuals[i]);
             }
         } else {
-            deviations.resize(valuesInBlock, 0);
-        }
-
-        // Reconstruct values
-        for (int i = 0; i < valuesInBlock; i++) {
-            int64_t expected = block.min + static_cast<int64_t>(block.avgSlope * i);
-            result.push_back(expected + deviations[i] + block.minDeviation);
+            for (int64_t i = 0; i < valuesInBlock; i++) {
+                int64_t expected =
+                    static_cast<int64_t>(block.avgInc * static_cast<int64_t>(i));
+                result.push_back(block.min + expected);
+            }
         }
     }
 
     return result;
-}
-
-DirectMonotonicReader::Block
-DirectMonotonicReader::readBlockMeta(const DirectMonotonicWriter::Meta& meta,
-                                     store::IndexInput* metaIn, int64_t blockIndex) {
-    // Seek to block metadata
-    // Each block metadata is: 8 (min) + 4 (slope) + 8 (minDeviation) + 8 (offset) + 1 (bits) = 29
-    // bytes
-    int64_t metaOffset = meta.metaFP + blockIndex * 29;
-    metaIn->seek(metaOffset);
-
-    Block block;
-    block.min = metaIn->readLong();
-
-    // Read avgSlope as float from int bits
-    uint32_t bits = static_cast<uint32_t>(metaIn->readInt());
-    std::memcpy(&block.avgSlope, &bits, sizeof(block.avgSlope));
-
-    block.minDeviation = metaIn->readLong();
-    block.dataOffset = metaIn->readLong();
-    block.bitsPerValue = metaIn->readByte();
-
-    return block;
 }
 
 }  // namespace packed
