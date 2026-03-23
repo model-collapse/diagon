@@ -102,8 +102,14 @@ void Lucene90PostingsReader::init(store::IndexInput& metaIn, index::SegmentReadS
             "Lucene90PostingsReader: expected block size 128, got " + std::to_string(blockSize));
     }
 
+    // Build file names with suffix (e.g., "_13_Lucene90_0.doc")
+    auto segFileName = [&](const std::string& ext) -> std::string {
+        if (state.segmentSuffix.empty()) return state.segmentName + "." + ext;
+        return state.segmentName + "_" + state.segmentSuffix + "." + ext;
+    };
+
     // Open .doc file
-    std::string docFile = state.segmentName + ".doc";
+    std::string docFile = segFileName("doc");
     try {
         docIn_ = state.directory->openInput(docFile, store::IOContext::READ);
         CodecUtil::checkIndexHeader(*docIn_, DOC_CODEC,
@@ -115,7 +121,7 @@ void Lucene90PostingsReader::init(store::IndexInput& metaIn, index::SegmentReadS
 
     // Open .pos file if positions are indexed
     if (state.fieldInfos.hasProx()) {
-        std::string posFile = state.segmentName + ".pos";
+        std::string posFile = segFileName("pos");
         try {
             posIn_ = state.directory->openInput(posFile, store::IOContext::READ);
             CodecUtil::checkIndexHeader(*posIn_, POS_CODEC,

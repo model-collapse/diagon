@@ -6,17 +6,108 @@
 #include "diagon/codecs/CodecUtil.h"
 #include "diagon/util/Exceptions.h"
 
-#ifdef HAVE_LZ4
-#    include <lz4.h>
-#endif
-
 #include <algorithm>
-#include <cstring>
 #include <stdexcept>
 
 namespace diagon {
 namespace codecs {
 namespace lucene90 {
+
+// ==================== Lucene Suffix Decompression ====================
+
+/**
+ * Streaming LZ4 decompressor matching Lucene's LZ4.decompress().
+ * Reads tokens from the IndexInput until decompressedLen output bytes are produced.
+ * The standard LZ4 library cannot be used because Lucene writes LZ4 blocks without
+ * a compressed-size prefix — the format is self-delimiting based on decompressed size.
+ */
+static void decompressLZ4(store::IndexInput& in, uint8_t* dest, int decompressedLen) {
+    int dOff = 0;
+    const int destEnd = decompressedLen;
+
+    while (dOff < destEnd) {
+        // Read token: upper 4 bits = literal length, lower 4 bits = match length
+        int token = in.readByte() & 0xFF;
+        int literalLen = token >> 4;
+
+        if (literalLen != 0) {
+            if (literalLen == 0x0F) {
+                uint8_t b;
+                do {
+                    b = in.readByte();
+                    literalLen += (b & 0xFF);
+                } while (b == static_cast<uint8_t>(0xFF));
+            }
+            in.readBytes(dest + dOff, literalLen);
+            dOff += literalLen;
+        }
+
+        if (dOff >= destEnd) break;
+
+        // Read 2-byte little-endian match offset
+        int matchDec = (in.readByte() & 0xFF);
+        matchDec |= (in.readByte() & 0xFF) << 8;
+
+        if (matchDec == 0) {
+            throw CorruptIndexException("LZ4: invalid match offset 0", in.toString());
+        }
+
+        int matchLen = token & 0x0F;
+        if (matchLen == 0x0F) {
+            uint8_t b;
+            do {
+                b = in.readByte();
+                matchLen += (b & 0xFF);
+            } while (b == static_cast<uint8_t>(0xFF));
+        }
+        matchLen += 4;  // Minimum match length is 4
+
+        // Copy match (may overlap for RLE patterns)
+        int ref = dOff - matchDec;
+        int end = dOff + matchLen;
+        if (end > destEnd) {
+            throw CorruptIndexException("LZ4: match extends beyond output buffer", in.toString());
+        }
+        for (; dOff < end; ++dOff, ++ref) {
+            dest[dOff] = dest[ref];
+        }
+    }
+}
+
+/**
+ * LOWERCASE_ASCII decompressor matching Lucene's LowercaseAsciiCompression.decompress().
+ * Packs 4 lowercase ASCII chars into 3 bytes (saving ~25%), with exceptions for
+ * non-compressible bytes.
+ */
+static void decompressLowercaseAscii(store::IndexInput& in, uint8_t* out, int len) {
+    const int saved = len >> 2;  // len / 4
+    int compressedLen = len - saved;
+
+    // 1. Read the packed bytes
+    in.readBytes(out, compressedLen);
+
+    // 2. Restore the leading 2 bits of each packed byte
+    for (int i = 0; i < saved; ++i) {
+        out[compressedLen + i] = static_cast<uint8_t>(
+            ((out[i] & 0xC0) >> 2)
+            | ((out[saved + i] & 0xC0) >> 4)
+            | ((out[(saved << 1) + i] & 0xC0) >> 6));
+    }
+
+    // 3. Move back to original range [0x1F,0x3F) or [0x5F,0x7F)
+    for (int i = 0; i < len; ++i) {
+        uint8_t b = out[i];
+        out[i] = static_cast<uint8_t>(((b & 0x1F) | 0x20 | ((b & 0x20) << 1)) - 1);
+    }
+
+    // 4. Restore exceptions
+    int numExceptions = in.readVInt();
+    int idx = 0;
+    for (int e = 0; e < numExceptions; ++e) {
+        idx += in.readByte() & 0xFF;  // Delta offset
+        out[idx] = in.readByte();      // The exception byte
+    }
+}
 
 // ==================== Helper: read BytesRef from DataInput ====================
 
@@ -44,21 +135,27 @@ Lucene90BlockTreeTermsReader::Lucene90BlockTreeTermsReader(
     const std::string& suffix = state.segmentSuffix;
     const uint8_t* segID = state.segmentID;
 
+    // Build file names with suffix (e.g., "_13_Lucene90_0.tim")
+    auto segFileName = [&](const std::string& ext) -> std::string {
+        if (suffix.empty()) return segment + "." + ext;
+        return segment + "_" + suffix + "." + ext;
+    };
+
     // Open .tim (term blocks)
-    std::string timFile = segment + ".tim";
+    std::string timFile = segFileName("tim");
     termsIn_ = state.directory->openInput(timFile, store::IOContext::READ);
     version_ = CodecUtil::checkIndexHeader(*termsIn_, TERMS_CODEC_NAME,
                                             BLOCKTREE_VERSION_START, BLOCKTREE_VERSION_CURRENT,
                                             segID, suffix);
 
     // Open .tip (FST index)
-    std::string tipFile = segment + ".tip";
+    std::string tipFile = segFileName("tip");
     indexIn_ = state.directory->openInput(tipFile, store::IOContext::READ);
     CodecUtil::checkIndexHeader(*indexIn_, TERMS_INDEX_CODEC_NAME,
                                 version_, version_, segID, suffix);
 
     // Read .tmd (metadata)
-    std::string tmdFile = segment + ".tmd";
+    std::string tmdFile = segFileName("tmd");
     auto metaIn = state.directory->openInput(tmdFile, store::IOContext::READ);
     CodecUtil::checkIndexHeader(*metaIn, TERMS_META_CODEC_NAME,
                                 version_, version_, segID, suffix);
@@ -248,11 +345,13 @@ std::unique_ptr<index::PostingsEnum> Lucene90SegmentTermsEnum::postingsInternal(
 bool Lucene90SegmentTermsEnum::seekExactInternal(const std::vector<uint8_t>& target) {
     termFound_ = false;
     currentTerm_.clear();
+    frame_.reset();  // Full reset at the start of each seek
 
     const LuceneFST* fst = fieldReader_->fst();
     if (!fst) {
-        // No FST — load root block directly and scan
+        frame_.fpOrig = fieldReader_->rootBlockFP();
         loadBlock(fieldReader_->rootBlockFP());
+        frame_.prefixLength = 0;
         return scanToTerm(target);
     }
 
@@ -260,28 +359,16 @@ bool Lucene90SegmentTermsEnum::seekExactInternal(const std::vector<uint8_t>& tar
     LuceneFST::Arc arc;
     fst->getFirstArc(arc);
 
-    // Accumulate FST outputs
-    fstOutput_.clear();
-
-    // The root arc's nextFinalOutput is the empty output (root block code)
-    // For BlockTree, this is always the root code
+    // Accumulate FST outputs along the path
     std::vector<uint8_t> accOutput;
     if (!arc.nextFinalOutput.empty()) {
         accOutput = arc.nextFinalOutput;
     }
 
-    // Best block FP found so far
-    int64_t blockFP = fieldReader_->rootBlockFP();
-    bool blockIsFloor = false;
-
-    // Decode root code flags
-    if (!fieldReader_->meta().rootCode.empty()) {
-        size_t pos = 0;
-        int64_t code = LuceneFST::readMSBVLong(fieldReader_->meta().rootCode.data(), pos);
-        blockIsFloor = (code & OUTPUT_FLAG_IS_FLOOR) != 0;
-    }
-
-    int targetUpto = 0;
+    // Track the best (deepest) block code and its prefix depth
+    // Start with root code (depth 0)
+    std::vector<uint8_t> bestBlockCode = fieldReader_->meta().rootCode;
+    int bestBlockDepth = 0;
 
     // Walk through the target term byte by byte
     for (size_t i = 0; i < target.size(); ++i) {
@@ -289,50 +376,62 @@ bool Lucene90SegmentTermsEnum::seekExactInternal(const std::vector<uint8_t>& tar
 
         LuceneFST::Arc nextArc;
         if (!fst->findTargetArc(label, arc, nextArc)) {
-            // FST index exhausted at this point
             break;
         }
 
         arc = nextArc;
-        targetUpto = static_cast<int>(i + 1);
 
         // Accumulate output
         if (!arc.output.empty()) {
-            // Append arc output to accumulated output
             accOutput.insert(accOutput.end(), arc.output.begin(), arc.output.end());
         }
 
-        // If this arc is final, it points to a block
+        // If this arc is final, it points to a block — update best
         if (arc.isFinal()) {
-            // Combine accumulated output with final output
             std::vector<uint8_t> combined = accOutput;
             if (!arc.nextFinalOutput.empty()) {
                 combined.insert(combined.end(), arc.nextFinalOutput.begin(),
                                 arc.nextFinalOutput.end());
             }
-
-            // Decode block FP from combined output
             if (!combined.empty()) {
-                bool isFloor = false, hasTerms = false;
-                int64_t fp = decodeBlockFP(combined, isFloor, hasTerms);
-                blockFP = fp;
-                blockIsFloor = isFloor;
-                (void)hasTerms;  // Used for block loading decisions in full impl
+                bestBlockCode = combined;
+                bestBlockDepth = static_cast<int>(i + 1);
             }
         }
     }
 
-    // Load the best block
+    // Decode the best block code → blockFP + flags + floor data position
+    bool blockIsFloor = false, blockHasTerms = false;
+    size_t posAfterCode = 0;
+    int64_t blockFP = decodeBlockFP(bestBlockCode, blockIsFloor, blockHasTerms, &posAfterCode);
+
+    // Set frame-level state before loadBlock
+    frame_.fpOrig = blockFP;
+    frame_.isFloor = blockIsFloor;
+    frame_.hasTerms = blockHasTerms;
+    frame_.prefixLength = bestBlockDepth;
+
+    // Extract floor data if this is a floor block
+    if (blockIsFloor && posAfterCode < bestBlockCode.size()) {
+        frame_.floorData.assign(bestBlockCode.begin() + posAfterCode, bestBlockCode.end());
+        frame_.floorDataPos = 0;
+
+        // Read numFollowFloorBlocks (standard VInt) and first nextFloorLabel
+        int pos = 0;
+        frame_.numFollowFloorBlocks = readVInt(frame_.floorData.data(), pos);
+        frame_.nextFloorLabel = frame_.floorData[pos++] & 0xFF;
+        frame_.floorDataPos = pos;
+    }
+
+    // Load the initial block
     loadBlock(blockFP);
 
     // If it's a floor block, navigate to the right sub-block
-    if (blockIsFloor && targetUpto < static_cast<int>(target.size())) {
-        frame_.isFloor = true;
+    if (blockIsFloor && bestBlockDepth < static_cast<int>(target.size())) {
         scanToFloorFrame(target);
     }
 
     // Scan within the block for the exact term
-    frame_.prefixLength = targetUpto;
     return scanToTerm(target);
 }
 
@@ -350,9 +449,28 @@ int64_t Lucene90SegmentTermsEnum::totalTermFreq() const {
 void Lucene90SegmentTermsEnum::loadBlock(int64_t blockFP) {
     if (!timIn_) return;
 
-    frame_.reset();
+    // Clear only block-level state; preserve floor navigation state
+    // (fpOrig, isFloor, floorData, floorDataPos, numFollowFloorBlocks, nextFloorLabel, prefixLength)
     frame_.fp = blockFP;
-    frame_.fpOrig = blockFP;
+    // fpOrig is set by the caller — don't overwrite
+    frame_.fpEnd = 0;
+    frame_.entCount = 0;
+    frame_.nextEnt = 0;
+    frame_.isLastInFloor = false;
+    frame_.isLeafBlock = false;
+    // hasTerms is managed by floor navigation — don't reset
+    frame_.suffixBytes.clear();
+    frame_.suffixBytesPos = 0;
+    frame_.suffixLengthBytes.clear();
+    frame_.suffixLengthPos = 0;
+    frame_.allSuffixesEqual = false;
+    frame_.equalSuffixLength = 0;
+    frame_.statBytes.clear();
+    frame_.statPos = 0;
+    frame_.statsSingletonRunLength = 0;
+    frame_.metaBytes.clear();
+    frame_.metaPos = 0;
+    frame_.termState = Lucene90TermState{};
 
     timIn_->seek(blockFP);
 
@@ -367,32 +485,22 @@ void Lucene90SegmentTermsEnum::loadBlock(int64_t blockFP) {
     int compressionAlg = static_cast<int>(codeL & 0x03);
     int numSuffixBytes = static_cast<int>(static_cast<uint64_t>(codeL) >> 3);
 
+    // Compression algorithms: 0=NONE, 1=LOWERCASE_ASCII, 2=LZ4
+    // numSuffixBytes is always the DECOMPRESSED size
     if (compressionAlg == 0) {
-        // No compression
+        // No compression — read raw bytes
         frame_.suffixBytes.resize(numSuffixBytes);
         if (numSuffixBytes > 0) {
             timIn_->readBytes(frame_.suffixBytes.data(), numSuffixBytes);
         }
-    } else if (compressionAlg == 1 || compressionAlg == 2) {
-        // LZ4 or LZ4_HIGH_COMPRESSION
-        int decompressedLen = timIn_->readVInt();
-        int compressedLen = numSuffixBytes;
-        std::vector<uint8_t> compressed(compressedLen);
-        timIn_->readBytes(compressed.data(), compressedLen);
-
-        frame_.suffixBytes.resize(decompressedLen);
-#ifdef HAVE_LZ4
-        int result = LZ4_decompress_safe(
-            reinterpret_cast<const char*>(compressed.data()),
-            reinterpret_cast<char*>(frame_.suffixBytes.data()),
-            compressedLen, decompressedLen);
-        if (result < 0) {
-            throw CorruptIndexException("LZ4 decompression failed for suffix data",
-                                         timIn_->toString());
-        }
-#else
-        throw std::runtime_error("LZ4 decompression not available (HAVE_LZ4 not defined)");
-#endif
+    } else if (compressionAlg == 1) {
+        // LOWERCASE_ASCII: 6-bit packing (4 chars → 3 bytes) + exceptions
+        frame_.suffixBytes.resize(numSuffixBytes);
+        decompressLowercaseAscii(*timIn_, frame_.suffixBytes.data(), numSuffixBytes);
+    } else if (compressionAlg == 2) {
+        // LZ4: streaming token-based decompression (reads from IndexInput directly)
+        frame_.suffixBytes.resize(numSuffixBytes);
+        decompressLZ4(*timIn_, frame_.suffixBytes.data(), numSuffixBytes);
     } else {
         throw CorruptIndexException(
             "unknown suffix compression: " + std::to_string(compressionAlg),
@@ -440,12 +548,17 @@ void Lucene90SegmentTermsEnum::loadBlock(int64_t blockFP) {
 // ==================== Term Scanning ====================
 
 bool Lucene90SegmentTermsEnum::scanToTerm(const std::vector<uint8_t>& target) {
+    int prefixLen = frame_.prefixLength;
+
     // Scan through all entries in the block
     for (int i = 0; i < frame_.entCount; ++i) {
         frame_.nextEnt = i;
 
         // Get suffix length for this entry
         int suffixLen;
+        bool isSubBlock = false;
+        int64_t subBlockFP = -1;
+
         if (frame_.allSuffixesEqual) {
             suffixLen = frame_.equalSuffixLength;
         } else {
@@ -457,66 +570,100 @@ bool Lucene90SegmentTermsEnum::scanToTerm(const std::vector<uint8_t>& target) {
             if (!frame_.isLeafBlock) {
                 // Non-leaf: low bit indicates sub-block
                 suffixLen = static_cast<int>(static_cast<uint32_t>(lenCode) >> 1);
-                bool isSubBlock = (lenCode & 1) != 0;
+                isSubBlock = (lenCode & 1) != 0;
                 if (isSubBlock) {
-                    // This is a sub-block pointer, not a term — skip it
-                    frame_.suffixBytesPos += suffixLen;
-                    // Also skip the sub-block FP delta in suffix length data
-                    int skipPos = frame_.suffixLengthPos;
-                    readVLong(frame_.suffixLengthBytes.data(), skipPos);
-                    frame_.suffixLengthPos = skipPos;
-                    // Skip stats and meta for this entry
-                    decodeMetaData();
-                    continue;
+                    // Read sub-block relative FP from suffixLengthBytes
+                    pos = frame_.suffixLengthPos;
+                    int64_t subCode = readVLong(frame_.suffixLengthBytes.data(), pos);
+                    frame_.suffixLengthPos = pos;
+                    subBlockFP = frame_.fp - subCode;
                 }
             } else {
                 suffixLen = lenCode;
             }
         }
 
-        // Build the full term: prefix + suffix
+        // Read suffix bytes for this entry
         const uint8_t* suffixData = frame_.suffixBytes.data() + frame_.suffixBytesPos;
         frame_.suffixBytesPos += suffixLen;
 
-        // Compare suffix with target
-        // The block prefix is target[0..prefixLength)
-        // The full term is prefix + suffix
-        // We need to compare target[prefixLength..] with suffix
-        int prefixLen = frame_.prefixLength;
-        int targetSuffixLen = static_cast<int>(target.size()) - prefixLen;
+        int targetRemaining = static_cast<int>(target.size()) - prefixLen;
 
-        // First check: does the prefix match?
-        bool prefixMatch = true;
-        if (prefixLen > 0 && prefixLen <= static_cast<int>(target.size())) {
-            // Prefix was matched by FST traversal, so it should match
-        } else if (prefixLen > static_cast<int>(target.size())) {
-            prefixMatch = false;
-        }
+        if (isSubBlock) {
+            // Sub-block entry: check if target could be in this sub-block.
+            // The sub-block's full prefix is target[0:prefixLen] + suffix.
+            // Descend if the target starts with that prefix.
+            if (targetRemaining >= suffixLen && suffixLen > 0) {
+                bool prefixMatch = true;
+                for (int j = 0; j < suffixLen; ++j) {
+                    if ((suffixData[j] & 0xFF) != (target[prefixLen + j] & 0xFF)) {
+                        // Check if we've gone past the target (entries are sorted)
+                        if ((suffixData[j] & 0xFF) > (target[prefixLen + j] & 0xFF)) {
+                            // Past the target — not in this block or any sub-block
+                            termFound_ = false;
+                            return false;
+                        }
+                        prefixMatch = false;
+                        break;
+                    }
+                }
+                if (prefixMatch) {
+                    // Target starts with this sub-block's prefix — descend
+                    int newPrefixLen = prefixLen + suffixLen;
 
-        if (prefixMatch) {
-            int cmp = 0;
-            int minLen = std::min(suffixLen, targetSuffixLen);
-            for (int j = 0; j < minLen; ++j) {
-                int a = suffixData[j] & 0xFF;
-                int b = target[prefixLen + j] & 0xFF;
-                if (a != b) {
-                    cmp = a - b;
-                    break;
+                    // Set up frame for the sub-block (non-floor, fresh block)
+                    frame_.fpOrig = subBlockFP;
+                    frame_.isFloor = false;
+                    frame_.hasTerms = true;
+                    frame_.floorData.clear();
+                    frame_.numFollowFloorBlocks = 0;
+                    frame_.nextFloorLabel = 0;
+                    frame_.prefixLength = newPrefixLen;
+
+                    loadBlock(subBlockFP);
+                    return scanToTerm(target);  // Recurse into sub-block
                 }
             }
-            if (cmp == 0) {
-                cmp = suffixLen - targetSuffixLen;
-            }
-
-            if (cmp == 0) {
-                // Exact match! Decode metadata.
-                decodeMetaData();
-                termFound_ = true;
-                return true;
-            }
+            // Sub-block doesn't match — skip (no stats/meta to consume)
+            continue;
         }
 
-        // Skip stats + meta for this entry (lazy decode)
+        // Term entry — compare suffix with target[prefixLen:]
+        if (prefixLen > static_cast<int>(target.size())) {
+            // Prefix is longer than target — can't match
+            decodeMetaData();
+            continue;
+        }
+
+        int targetSuffixLen = targetRemaining;
+        int cmp = 0;
+        int minLen = std::min(suffixLen, targetSuffixLen);
+        for (int j = 0; j < minLen; ++j) {
+            int a = suffixData[j] & 0xFF;
+            int b = target[prefixLen + j] & 0xFF;
+            if (a != b) {
+                cmp = a - b;
+                break;
+            }
+        }
+        if (cmp == 0) {
+            cmp = suffixLen - targetSuffixLen;
+        }
+
+        if (cmp == 0) {
+            // Exact match! Decode metadata.
+            decodeMetaData();
+            termFound_ = true;
+            return true;
+        }
+
+        if (cmp > 0) {
+            // Past the target in sorted order — term doesn't exist
+            termFound_ = false;
+            return false;
+        }
+
+        // cmp < 0: haven't reached the target yet, skip stats + meta
         decodeMetaData();
     }
 
@@ -611,30 +758,68 @@ void Lucene90SegmentTermsEnum::decodeMetaData() {
 // ==================== Floor Block Navigation ====================
 
 void Lucene90SegmentTermsEnum::scanToFloorFrame(const std::vector<uint8_t>& target) {
-    // Floor blocks: after loading the main block, check if we need a different sub-block
-    // This is a simplified version — in Lucene the floor data is stored in the FST output
-    // For MVP, we rely on the FST pointing us to the right block
-    // Full floor block navigation would require reading the floor data from the block header
-    (void)target;
+    if (!frame_.isFloor || frame_.prefixLength >= static_cast<int>(target.size())) {
+        return;
+    }
+
+    int targetLabel = target[frame_.prefixLength] & 0xFF;
+
+    // If target label is before the first floor block's label, we're already in the right block
+    if (targetLabel < frame_.nextFloorLabel) {
+        return;
+    }
+
+    // Scan through floor blocks to find the right one
+    // Each floor entry: VLong((deltaFP << 1) | hasTerms), then byte(nextLabel) if not last
+    int64_t newFP;
+    while (true) {
+        int pos = frame_.floorDataPos;
+        int64_t code = readVLong(frame_.floorData.data(), pos);
+        newFP = frame_.fpOrig + (code >> 1);
+        frame_.hasTerms = (code & 1) != 0;
+        frame_.floorDataPos = pos;
+
+        frame_.numFollowFloorBlocks--;
+
+        if (frame_.numFollowFloorBlocks != 0) {
+            int nextLabel = frame_.floorData[frame_.floorDataPos++] & 0xFF;
+            if (targetLabel < nextLabel) {
+                frame_.nextFloorLabel = nextLabel;
+                break;
+            }
+            frame_.nextFloorLabel = nextLabel;
+        } else {
+            frame_.nextFloorLabel = 256;
+            break;
+        }
+    }
+
+    // Load the new sub-block (loadBlock preserves frame-level floor state)
+    loadBlock(newFP);
 }
 
 // ==================== FST Output Decoding ====================
 
 int64_t Lucene90SegmentTermsEnum::decodeBlockFP(const std::vector<uint8_t>& output,
-                                                   bool& isFloor, bool& hasTerms) const {
+                                                   bool& isFloor, bool& hasTerms,
+                                                   size_t* posAfter) const {
     if (output.empty()) return 0;
 
     int64_t code;
+    size_t endPos = 0;
     if (fieldReader_->parent()->version() >= BLOCKTREE_VERSION_MSB_VLONG) {
         size_t pos = 0;
         code = LuceneFST::readMSBVLong(output.data(), pos);
+        endPos = pos;
     } else {
         int pos = 0;
         code = readVLong(output.data(), pos);
+        endPos = static_cast<size_t>(pos);
     }
 
     isFloor = (code & OUTPUT_FLAG_IS_FLOOR) != 0;
     hasTerms = (code & OUTPUT_FLAG_HAS_TERMS) != 0;
+    if (posAfter) *posAfter = endPos;
     return code >> OUTPUT_FLAGS_NUM_BITS;
 }
 

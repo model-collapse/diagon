@@ -95,13 +95,14 @@ TEST(LuceneFSTTest, GetFirstArcWithoutEmptyOutput) {
 // ==================== Linear Scan Node ====================
 
 TEST(LuceneFSTTest, LinearScanSingleArc) {
-    // Build a minimal linear-scan FST with one arc at the root
-    // Pad with a leading byte so startNode != 0 (0 = NON_FINAL_END_NODE)
-    // Node at position 1: flags byte + label (STOP_NODE means no target VLong)
+    // Build a minimal linear-scan FST with one arc at the root.
+    // Reverse byte addressing: readByte(pos) reads bytes_[pos], then pos--.
+    // Node at startNode=1: bytes_[1]=flags, bytes_[0]=label.
+    // STOP_NODE means no target VLong to read.
     uint8_t flags = LuceneFST::BIT_LAST_ARC | LuceneFST::BIT_STOP_NODE | LuceneFST::BIT_FINAL_ARC;
     uint8_t label = 'a';
 
-    std::vector<uint8_t> bytes = {0x00, flags, label};  // pad byte, then arc
+    std::vector<uint8_t> bytes = {label, flags};  // [0]=label, [1]=flags
     int64_t startNode = 1;  // Must be > 0 (0 = NON_FINAL_END_NODE)
 
     LuceneFST fst(startNode, 10, bytes);
@@ -119,7 +120,7 @@ TEST(LuceneFSTTest, LinearScanArcNotFound) {
     uint8_t flags = LuceneFST::BIT_LAST_ARC | LuceneFST::BIT_STOP_NODE | LuceneFST::BIT_FINAL_ARC;
     uint8_t label = 'a';
 
-    std::vector<uint8_t> bytes = {0x00, flags, label};
+    std::vector<uint8_t> bytes = {label, flags};  // [0]=label, [1]=flags (reverse order)
     LuceneFST fst(1, 10, bytes);
 
     LuceneFST::Arc root;

@@ -256,7 +256,9 @@ private:
     void scanToFloorFrame(const std::vector<uint8_t>& target);
 
     // Decode FST output → blockFP + flags
-    int64_t decodeBlockFP(const std::vector<uint8_t>& output, bool& isFloor, bool& hasTerms) const;
+    // posAfter: if non-null, receives position after the MSB VLong (remaining bytes are floor data)
+    int64_t decodeBlockFP(const std::vector<uint8_t>& output, bool& isFloor, bool& hasTerms,
+                          size_t* posAfter = nullptr) const;
 
     // Read VInt from a byte array
     static int32_t readVInt(const uint8_t* data, int& pos);
