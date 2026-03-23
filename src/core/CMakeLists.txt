@@ -99,6 +99,9 @@ set(DIAGON_CORE_SOURCES
     src/codecs/lucene94/Lucene94FieldInfosFormat.cpp
     src/codecs/lucene95/Lucene95Codec.cpp
     src/codecs/lucene90/Lucene90PostingsReader.cpp
+    src/codecs/lucene90/Lucene90PostingsFormat.cpp
+    src/codecs/lucene90/LuceneFST.cpp
+    src/codecs/lucene90/Lucene90BlockTreeTermsReader.cpp
 
     # Lucene105 (Batch-native postings format - P3 Task #35)
     src/codecs/lucene105/Lucene105PostingsWriter.cpp

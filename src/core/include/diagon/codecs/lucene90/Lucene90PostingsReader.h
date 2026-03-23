@@ -76,6 +76,14 @@ public:
     std::unique_ptr<index::PostingsEnum> postingsWithPositions(
         const index::FieldInfo& fieldInfo, const Lucene90TermState& termState);
 
+    /**
+     * Read postings sub-header from .tmd and open .doc/.pos files.
+     * Called by Lucene90BlockTreeTermsReader during construction.
+     *
+     * Based on: org.apache.lucene.backward_codecs.lucene90.Lucene90PostingsReader.init()
+     */
+    void init(store::IndexInput& metaIn, index::SegmentReadState& state);
+
     // Test setters
     void setDocInput(std::unique_ptr<store::IndexInput> input) { docIn_ = std::move(input); }
     void setPosInput(std::unique_ptr<store::IndexInput> input) { posIn_ = std::move(input); }

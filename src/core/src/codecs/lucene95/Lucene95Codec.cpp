@@ -5,6 +5,7 @@
 
 #include "diagon/codecs/lucene104/Lucene104Codec.h"  // MergeTreeColumnFormat
 #include "diagon/codecs/lucene90/Lucene90OSStoredFieldsFormat.h"
+#include "diagon/codecs/lucene90/Lucene90PostingsFormat.h"
 #include "diagon/codecs/lucene94/Lucene94FieldInfosFormat.h"
 #include "diagon/codecs/lucene95/Lucene95Stubs.h"
 #include "diagon/codecs/lucene99/Lucene99SegmentInfoFormat.h"
@@ -19,7 +20,7 @@ namespace lucene95 {
 // Compatible formats are wired to real readers; incompatible formats use stubs.
 
 Lucene95Codec::Lucene95Codec()
-    : postingsFormat_(std::make_unique<Lucene90PostingsFormatStub>())
+    : postingsFormat_(std::make_unique<lucene90::Lucene90PostingsFormat>())
     , docValuesFormat_(std::make_unique<Lucene90DocValuesFormatStub>())
     , columnFormat_(std::make_unique<lucene104::MergeTreeColumnFormat>())
     , storedFieldsFormat_(std::make_unique<lucene90::Lucene90OSStoredFieldsFormat>())

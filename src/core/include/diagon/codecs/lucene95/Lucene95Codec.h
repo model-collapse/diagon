@@ -27,7 +27,7 @@ namespace lucene95 {
  *   - SegmentInfoFormat:   Lucene90SegmentInfo v0  (compatible with Lucene99SegmentInfoFormat)
  *   - FieldInfosFormat:    Lucene94FieldInfos v0   (compatible with Lucene94FieldInfosFormat)
  *   - StoredFieldsFormat:  Lucene90StoredFieldsFastData (compatible with Lucene90OSStoredFieldsReader)
- *   - PostingsFormat:      Lucene90PostingsFormat (128-block) — NOT YET IMPLEMENTED
+ *   - PostingsFormat:      Lucene90PostingsFormat (128-block PFOR, BlockTree FST)
  *   - NormsFormat:         Lucene90NormsFormat — NOT YET IMPLEMENTED
  *   - DocValuesFormat:     Lucene90DocValuesFormat — NOT YET IMPLEMENTED
  *   - PointsFormat:        Lucene90PointsFormat — NOT YET IMPLEMENTED

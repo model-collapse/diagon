@@ -104,6 +104,12 @@ struct SegmentReadState {
     store::IOContext context;
 
     /**
+     * 16-byte segment ID for CodecUtil::checkIndexHeader validation.
+     * nullptr skips ID validation (backward compatible).
+     */
+    const uint8_t* segmentID = nullptr;
+
+    /**
      * Constructor
      */
     SegmentReadState(store::Directory* dir, const std::string& segName, int maxDocs,
@@ -114,6 +120,19 @@ struct SegmentReadState {
         , fieldInfos(fis)
         , segmentSuffix(suffix)
         , context(store::IOContext::DEFAULT) {}
+
+    /**
+     * Constructor with segment ID for Lucene-format index validation.
+     */
+    SegmentReadState(store::Directory* dir, const std::string& segName, int maxDocs,
+                     const FieldInfos& fis, const uint8_t* segID, const std::string& suffix = "")
+        : directory(dir)
+        , segmentName(segName)
+        , maxDoc(maxDocs)
+        , fieldInfos(fis)
+        , segmentSuffix(suffix)
+        , context(store::IOContext::DEFAULT)
+        , segmentID(segID) {}
 };
 
 }  // namespace index

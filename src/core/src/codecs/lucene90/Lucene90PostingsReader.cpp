@@ -3,6 +3,8 @@
 
 #include "diagon/codecs/lucene90/Lucene90PostingsReader.h"
 
+#include "diagon/codecs/CodecUtil.h"
+
 #include <stdexcept>
 
 namespace diagon {
@@ -11,13 +13,20 @@ namespace lucene90 {
 
 // ==================== Lucene90PostingsReader ====================
 
+// Postings sub-header codec names (from Lucene90PostingsFormat.java)
+static constexpr const char* TERMS_CODEC = "Lucene90PostingsWriterTerms";
+static constexpr const char* DOC_CODEC = "Lucene90PostingsWriterDoc";
+static constexpr const char* POS_CODEC = "Lucene90PostingsWriterPos";
+static constexpr int32_t POSTINGS_VERSION_START = 0;
+static constexpr int32_t POSTINGS_VERSION_CURRENT = 1;
+
 Lucene90PostingsReader::Lucene90PostingsReader(index::SegmentReadState& state)
     : docIn_(nullptr)
     , posIn_(nullptr)
     , segmentName_(state.segmentName)
     , segmentSuffix_(state.segmentSuffix) {
-    // Inputs set externally via setDocInput/setPosInput for now.
-    // Phase C.5 will open .doc/.pos files via state.directory.
+    // Inputs set externally via setDocInput/setPosInput,
+    // or via init() when called by Lucene90BlockTreeTermsReader.
 }
 
 Lucene90PostingsReader::~Lucene90PostingsReader() {
@@ -79,6 +88,43 @@ Lucene90PostingsReader::postingsWithPositions(const index::FieldInfo& fieldInfo,
     bool indexHasFreq = (fieldInfo.indexOptions >= index::IndexOptions::DOCS_AND_FREQS);
     return std::make_unique<Lucene90BlockPosEnum>(
         docIn_->clone(), posIn_->clone(), termState, indexHasFreq);
+}
+
+void Lucene90PostingsReader::init(store::IndexInput& metaIn, index::SegmentReadState& state) {
+    // Read postings sub-header from .tmd (the terms dict meta file)
+    // This validates that the postings format version matches
+    CodecUtil::checkIndexHeader(metaIn, TERMS_CODEC,
+                                POSTINGS_VERSION_START, POSTINGS_VERSION_CURRENT,
+                                state.segmentID, state.segmentSuffix);
+    int blockSize = metaIn.readVInt();
+    if (blockSize != 128) {
+        throw std::runtime_error(
+            "Lucene90PostingsReader: expected block size 128, got " + std::to_string(blockSize));
+    }
+
+    // Open .doc file
+    std::string docFile = state.segmentName + ".doc";
+    try {
+        docIn_ = state.directory->openInput(docFile, store::IOContext::READ);
+        CodecUtil::checkIndexHeader(*docIn_, DOC_CODEC,
+                                    POSTINGS_VERSION_START, POSTINGS_VERSION_CURRENT,
+                                    state.segmentID, state.segmentSuffix);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Failed to open .doc file: " + std::string(e.what()));
+    }
+
+    // Open .pos file if positions are indexed
+    if (state.fieldInfos.hasProx()) {
+        std::string posFile = state.segmentName + ".pos";
+        try {
+            posIn_ = state.directory->openInput(posFile, store::IOContext::READ);
+            CodecUtil::checkIndexHeader(*posIn_, POS_CODEC,
+                                        POSTINGS_VERSION_START, POSTINGS_VERSION_CURRENT,
+                                        state.segmentID, state.segmentSuffix);
+        } catch (const std::exception&) {
+            // .pos file optional (no positions indexed)
+        }
+    }
 }
 
 void Lucene90PostingsReader::close() {

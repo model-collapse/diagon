@@ -90,6 +90,9 @@ int32_t CodecUtil::checkIndexHeader(store::IndexInput& in, const std::string& co
 void CodecUtil::checkIndexHeaderID(store::IndexInput& in, const uint8_t* expectedID) {
     uint8_t id[ID_LENGTH];
     in.readBytes(id, ID_LENGTH);
+    if (expectedID == nullptr) {
+        return;  // Skip ID validation when no expected ID provided
+    }
     if (std::memcmp(id, expectedID, ID_LENGTH) != 0) {
         // Format hex strings for the error message
         auto toHex = [](const uint8_t* data, int len) -> std::string {

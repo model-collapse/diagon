@@ -319,9 +319,10 @@ void SegmentReader::loadFieldsProducer() const {
         // Use compound directory if available, otherwise raw directory
         auto& dir = getDirectory();
 
-        // Create segment read state (using index::SegmentReadState)
+        // Create segment read state with segment ID for Lucene format validation
         SegmentReadState readState(&dir, segmentName, segmentInfo_->maxDoc(),
-                                   segmentInfo_->fieldInfos(), "");
+                                   segmentInfo_->fieldInfos(),
+                                   segmentInfo_->segmentID(), "");
 
         // Create fields producer using codec
         fieldsProducer_ = postingsFormat.fieldsProducer(readState);
